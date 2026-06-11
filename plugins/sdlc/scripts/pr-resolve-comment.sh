@@ -10,7 +10,7 @@ set -euo pipefail
 # Why a script: the resolve step needs the GraphQL `resolveReviewThread` mutation
 # (REST cannot resolve threads) + a databaseId→threadId lookup. That $()/jq/GraphQL
 # logic can't be statically analyzed on a Bash command line — it lives here so the
-# auto-mode allowlist (`Bash(bash ./${CLAUDE_PLUGIN_ROOT}/scripts/*)`) matches. Body text is passed
+# auto-mode allowlist (`Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)`) matches. Body text is passed
 # BY FILE (never inline JSON), per the repo's shell-safety rules.
 #
 # Args:

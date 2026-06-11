@@ -156,8 +156,8 @@ item carrying a justification. For each triaged inline comment, write the reply 
 inline JSON) and call the helper:
 
 ```bash
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted ./.tmp/reply-<id>.md   # replies + RESOLVES the thread
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected ./.tmp/reply-<id>.md   # replies, leaves thread OPEN
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted ./.tmp/reply-<id>.md   # replies + RESOLVES the thread
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected ./.tmp/reply-<id>.md   # replies, leaves thread OPEN
 ```
 
 - **Accepted** → reply names why it was valid + the fix commit, then the thread is RESOLVED (drops

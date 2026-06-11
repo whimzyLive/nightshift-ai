@@ -36,7 +36,7 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    # PR: inline (line-anchored) review comments — ONLY those on an UNRESOLVED thread.
    # The REST .../pulls/<PR>/comments endpoint returns EVERY inline comment with no resolution
    # state, so it is NOT used here; this script filters via GraphQL reviewThreads.isResolved.
-   bash ./${CLAUDE_PLUGIN_ROOT}/scripts/pr-unresolved-comments.sh <PR> ./.tmp/review-fix-inline.json
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-unresolved-comments.sh <PR> ./.tmp/review-fix-inline.json
    # Commit target (instead of the two PR calls above) — commit comments have no resolved state:
    # gh api repos/<owner>/<repo>/commits/<SHA>/comments --paginate > ./.tmp/review-fix-inline.json
    ```
@@ -82,10 +82,10 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    mkdir -p .tmp
    # accepted — reply names the fix + commit, then the thread is RESOLVED:
    printf '✅ **Accepted** — %s\n\nFixed in %s.' "<why valid + what changed>" "<fix-commit-sha>" > ./.tmp/reply-<id>.md
-   bash ./${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> accepted ./.tmp/reply-<id>.md
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> accepted ./.tmp/reply-<id>.md
    # rejected — reply explains why it's not applied; thread is LEFT OPEN:
    printf '❎ **Not applied** — %s' "<why wrong/stale/out-of-scope in this app>" > ./.tmp/reply-<id>.md
-   bash ./${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> rejected ./.tmp/reply-<id>.md
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> rejected ./.tmp/reply-<id>.md
    ```
    - The helper replies in-thread (REST) and, for `accepted`, resolves the thread via the GraphQL
      `resolveReviewThread` mutation; `rejected` replies but leaves the thread open. It prints one
@@ -112,7 +112,7 @@ After everything above is complete (success, or a terminal STOP/blocked surfaced
 this as your very last action:
 
 ```bash
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
 It signals the automation worker to release this session's slot. Outside the worker

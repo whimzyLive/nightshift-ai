@@ -64,14 +64,14 @@ BASE_SHA=$(git rev-parse origin/develop)
 gh pr list --search "feat/<STORY-KEY>" --json number,title,headRefName,state
 
 # 4. Dependency gate — every story that BLOCKS this one must already have a feat/* PR.
-#    Deterministic, single statically-analyzable call (allowlisted Bash(bash ./${CLAUDE_PLUGIN_ROOT}/scripts/*)).
+#    Deterministic, single statically-analyzable call (allowlisted Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)).
 #    The script resolves the parent epic, derives blockers by sibling-inversion
 #    (a sibling S blocks <STORY-KEY> iff S's links have outwardIssueKey == <STORY-KEY>),
 #    and verifies each blocker has a feat/<blocker> PR. acli is the only source of truth —
 #    any acli query error => GATE=STOP. See ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh.
 #    NOTE: resolving the epic REQUIRES `acli workitem view KEY --fields parent` — the default
 #    `view --json` strips `parent` and returns empty (this was a real gate-failure bug).
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PASS, exit 1 = GATE=STOP (REASON= printed)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PASS, exit 1 = GATE=STOP (REASON= printed)
 ```
 
 - Plan missing → **STOP**, tell user to merge the plan PR.

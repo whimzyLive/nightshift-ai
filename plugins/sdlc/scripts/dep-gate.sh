@@ -9,7 +9,7 @@
 # verifies every blocker already has a feat/<blocker> PR (open or merged).
 #
 # All command substitution / loops / jq live INSIDE this script so the caller
-# issues one statically-analyzable invocation (allowlisted Bash(bash ./${CLAUDE_PLUGIN_ROOT}/scripts/*)).
+# issues one statically-analyzable invocation (allowlisted Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)).
 #
 # Output (greppable, deterministic):
 #   EPIC=<key>

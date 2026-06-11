@@ -43,7 +43,7 @@ across domain agents and cannot be easily undone. If the playbook hits `Status: 
 phase, STOP and surface it — do not improvise around it.
 
 **Dependency gate (Step 1 of the playbook):** before any work, run
-`bash ./${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>` — it resolves the parent epic, reads `<STORY-KEY>`'s
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>` — it resolves the parent epic, reads `<STORY-KEY>`'s
 Jira `Blocks` links (by sibling-inversion) and requires every blocker to already have a
 `feat/<blocker>` PR (open or merged). `GATE=STOP` (exit 1) → the whole flow STOPs and REJECTs —
 no branch, no domain agents — and the `REASON=` line says which upstream story must ship first.
@@ -54,7 +54,7 @@ Do not bypass this.
 After **everything above is complete** (success, or a terminal STOP/blocked surfaced to the user), run this as your very last action:
 
 ```bash
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
 It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`JUGAAD_SESSION_KEY` unset) it is a silent no-op — always safe to run.

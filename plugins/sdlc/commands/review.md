@@ -65,7 +65,7 @@ After everything above is complete (success, or a terminal STOP/blocked surfaced
 run this as your very last action:
 
 ```bash
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
 It signals the automation worker to release this session's slot. Outside the worker

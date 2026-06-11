@@ -10,7 +10,7 @@ set -euo pipefail
 # inline comment with no resolution state. Resolution lives only on the GraphQL
 # `reviewThreads.isResolved` flag. That GraphQL + jq + pagination can't be statically
 # analyzed on a Bash command line — it lives here so the auto-mode allowlist
-# (`Bash(bash ./${CLAUDE_PLUGIN_ROOT}/scripts/*)`) matches. Same pattern as pr-resolve-comment.sh.
+# (`Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)`) matches. Same pattern as pr-resolve-comment.sh.
 #
 # Args:
 #   $1 pr        PR number

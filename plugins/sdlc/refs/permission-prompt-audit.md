@@ -90,7 +90,7 @@ the CI / spare-machine context. This is the single highest-leverage fix.
 Move any command containing `$(...)`, backticks, or compound `&&`/`|` logic into a
 committed script under `${CLAUDE_PLUGIN_ROOT}/scripts/*.sh` with a fixed positional-param
 interface. The `$(...)` lives INSIDE the script — never on the command line — so the
-analyzer sees one matchable invocation. Allow rule: `Bash(bash ./${CLAUDE_PLUGIN_ROOT}/scripts/*)`.
+analyzer sees one matchable invocation. Allow rule: `Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)`.
 Candidates: jira-fetch probes, git rev/diff comparisons, exit-marker echoes,
 DNS/auth checks (the `S293`/`S294` compound-shell blocks).
 

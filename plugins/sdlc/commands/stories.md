@@ -15,7 +15,7 @@ The scrum-master agent owns the full decompose workflow — Epic fetch, story ma
 Once the scrum-master agent has returned and you have reported its result, run this as your very last action:
 
 ```bash
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
 It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`JUGAAD_SESSION_KEY` unset) it is a silent no-op — always safe to run.

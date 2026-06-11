@@ -50,7 +50,7 @@ PR: <PR_URL>"
 After **everything above is complete** (success or a terminal stop), run this as your very last action:
 
 ```bash
-bash ./${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
 It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`JUGAAD_SESSION_KEY` unset) it is a silent no-op — always safe to run.
