@@ -1,6 +1,6 @@
 ---
 name: writing-specs
-description: Use when producing a technical design spec for a feature or Jira story. Enforces consistent spec structure covering data model, API surface, permissions, PowerSync sync rules, and web/mobile UI. Run before writing-plans.
+description: Use when producing a technical design spec for a feature or Jira story. Enforces consistent spec structure covering data model, API surface, permissions, offline-sync rules where applicable, and web/mobile UI. Run before writing-plans.
 ---
 
 # writing-specs — Technical Spec
@@ -54,7 +54,7 @@ This comment is for human reference only — other agents derive the path from t
 | id    | uuid | No       | gen_random_uuid() | PK    |
 | ...   | ...  | ...      | ...               | ...   |
 
-Entity extends: `BaseEntity` OR `BaseProjectEntity` — state explicitly which and why.
+Entity base class: choose the correct base class per the project's entity/ORM conventions (see project-context) — state explicitly which and why.
 
 ### Modified Entities
 
@@ -71,19 +71,19 @@ Entity extends: `BaseEntity` OR `BaseProjectEntity` — state explicitly which a
 
 ### New Endpoints
 
-| Method | Path          | Factory          | Description      |
-| ------ | ------------- | ---------------- | ---------------- |
-| GET    | /[entity]     | ApiRoute         | List all for org |
-| POST   | /[entity]     | ApiRouteWithUser | Create           |
-| GET    | /[entity]/:id | ApiRoute         | Get by ID        |
-| PATCH  | /[entity]/:id | ApiRouteWithUser | Update           |
-| DELETE | /[entity]/:id | ApiRouteWithUser | Soft delete      |
+| Method | Path          | Auth/Route Type | Description      |
+| ------ | ------------- | --------------- | ---------------- |
+| GET    | /[entity]     | [auth type]     | List all for org |
+| POST   | /[entity]     | [auth type]     | Create           |
+| GET    | /[entity]/:id | [auth type]     | Get by ID        |
+| PATCH  | /[entity]/:id | [auth type]     | Update           |
+| DELETE | /[entity]/:id | [auth type]     | Soft delete      |
 
-Route factory options — pick exactly one per endpoint:
+Auth/route type — state exactly one per endpoint, using the project's route/auth conventions (see project-context). Distinguish at minimum:
 
-- `ApiRoute` — authenticated, org context required
-- `ApiRouteWithUser` — authenticated, full user object resolved
-- `PublicApiRoute` — no auth (QR lookups, public read)
+- authenticated, tenant/org context required
+- authenticated, full user object resolved (for creates and auditable mutations)
+- public, no auth (only for genuinely public endpoints)
 
 ### Request / Response Shapes
 
@@ -106,42 +106,23 @@ All TypeScript interfaces must be fully typed. No `any`.
 
 ### Permissions
 
-| Role                 | List       | Get        | Create | Update | Delete |
-| -------------------- | ---------- | ---------- | ------ | ------ | ------ |
-| fire_safety_engineer | ✓ own org  | ✓ own org  | ✓      | ✓ own  | ✗      |
-| inspector            | ✓ assigned | ✓ assigned | ✗      | ✗      | ✗      |
-| company_admin        | ✓ org      | ✓ org      | ✓      | ✓      | ✓      |
+| Role     | List       | Get        | Create | Update | Delete |
+| -------- | ---------- | ---------- | ------ | ------ | ------ |
+| [role-1] | ✓ own org  | ✓ own org  | ✓      | ✓ own  | ✗      |
+| [role-2] | ✓ assigned | ✓ assigned | ✗      | ✗      | ✗      |
+| [role-3] | ✓ org      | ✓ org      | ✓      | ✓      | ✓      |
 
-Role names MUST come from `packages/auth-rules/` — never invent. Run:
-
-```bash
-ls packages/auth-rules/src/permissions/
-```
+Derive role/permission names from the project's permission source (see project-context) — never invent. Locate that source and enumerate the actual roles before filling this table.
 
 ## Backend Implementation
 
-**SST stack:** `stacks/apis/<domain>-api.stack.ts` — state exact filename.
+**API / infra layer:** the project's API/infra definition (see the project-context workspace→path table) — state the exact file.
 
-**Application layer:**
+**Application layer:** state the exact files this introduces, following the project's layering conventions (implementations, mappers, DTOs, or the project's equivalents), one per operation.
 
-```
-src/application/<domain>/
-  implementations/
-    get-<entity>.impl.ts
-    create-<entity>.impl.ts
-    update-<entity>.impl.ts
-    delete-<entity>.impl.ts
-  mappers/
-    <entity>.mapper.ts
-  dtos/
-    create-<entity>.dto.ts
-    update-<entity>.dto.ts
-    <entity>.response.dto.ts
-```
+**Handlers / entry points:** the project's request entry points — thin, one per operation; state exact paths.
 
-**Handlers:** `src/handlers/<domain>/` — thin Lambda entry points, one per operation.
-
-**Auth-rules:** `packages/auth-rules/permissions/<domain>.ts` — list exact permission keys to add.
+**Permissions:** the project's permission source (see project-context) — list the exact permission keys to add.
 
 ## Web UI (omit section if not web-scoped)
 
@@ -151,13 +132,13 @@ src/application/<domain>/
 | /[domain] | src/pages/[domain]/index.tsx | List view |
 | /[domain]/[id] | src/pages/[domain]/[id].tsx | Detail view |
 
-**Components:** `src/component/<domain>/` — list names and responsibilities.
+**Components:** the project's web component location (see project-context) — list names and responsibilities.
 
-**Data hooks:** `src/hooks/use[Entity].ts` — TanStack Query, one per operation.
+**Data hooks:** the project's server-data fetching layer (per the web stack in project-context) — list the data hooks/queries needed, one per operation.
 
-**State:** Zustand changes in `src/store/` — list which stores change and why.
+**State:** client state changes (per the project's web stack in project-context) — list which stores/slices change and why.
 
-**Route permissions:** `src/config/route-permission-config/<domain>.ts` — which roles can access which routes.
+**Route permissions:** the project's route-permission config (see project-context) — which roles can access which routes.
 
 ## Mobile UI (omit section if not mobile-scoped)
 
@@ -167,40 +148,22 @@ src/application/<domain>/
 | /(app)/[domain] | app/(app)/[domain]/index.tsx | List screen |
 | /(app)/[domain]/[id] | app/(app)/[domain]/[id].tsx | Detail screen |
 
-**Online reads:** REST via `APIProvider` — same endpoints as Web UI.
+**Online reads:** REST via the project's API client — same endpoints as Web UI.
 
-**Offline reads:** PowerSync SQL hook at `src/powersync/hooks/use[Entity].ts`
+**Offline reads:** if the project uses offline sync (see project-context), state the read hook/location and the data it exposes. Every offline read MUST apply a tenant/org-scoped filter so a device only ever sees its own tenant's data (e.g. a JOIN or WHERE constraint on the owning tenant/org id) — describe the exact scoping filter for this entity.
 
-```typescript
-// REQUIRED pattern — always filter by organisationId via JOIN to projects
-const results = usePowerSyncQuery(
-  `SELECT e.* FROM [entity] e
-   JOIN projects p ON e.project_id = p.id
-   WHERE p.owner_id = ?`,
-  [organisationId],
-);
-```
+**Offline writes:** if the project uses offline sync, list the offline write/transaction builders needed (one per mutating operation) and state their location per the project's sync layer (see project-context).
 
-**Offline writes:** Transaction builders needed in `packages/powersync/src/powersync-client/`:
+## Offline Sync (omit section entirely if the project has no offline sync — see project-context)
 
-- `create-[entity]-transaction.ts`
-- `update-[entity]-transaction.ts`
-- `delete-[entity]-transaction.ts` (if applicable)
+If the project uses offline sync, the spec MUST cover:
 
-## PowerSync Sync (omit section if no offline mobile required)
+- **Which entities sync** — list every entity that must be available offline.
+- **Scoping / tenant-isolation filter** — the rule that limits each device's synced data to its own tenant/org. State it explicitly per entity. Bucket/partition scoping in the sync config alone is often insufficient — the read path must also enforce a tenant/org-scoped filter (see Offline reads above).
+- **Read hooks** — where offline reads live and what each exposes.
+- **Write hooks / transaction builders** — list each one needed, what it uploads to, and which API endpoint it calls.
 
-**New table in `config/sync-config.yaml`:**
-
-```yaml
-bucket_definitions:
-  by_org:
-    data:
-      - SELECT * FROM [table_name] WHERE organisation_id = bucket.org_id
-```
-
-**Staff user filter:** REQUIRED — bucket scoping alone is insufficient. Mobile hook MUST JOIN to `projects.ownerId`. (See Mobile UI section above.)
-
-**Transaction builders:** list each one needed, what it uploads to, and which API endpoint it calls.
+Define these using the project's offline-sync technology and config location (see project-context); state the exact files.
 
 ## Error Handling
 
@@ -228,29 +191,25 @@ bucket_definitions:
 
 ---
 
-## Project-Specific Rules
+## Project-Specific Rules (resolve from project-context)
 
 ### Entity rules
-- `BaseEntity` — use for standalone domain entities (id, createdAt, updatedAt, soft-delete)
-- `BaseProjectEntity` — use for project-scoped entities (adds projectId + subProjectId FKs)
-- Never say "add a column" — say "add field to entity + generate migration"
-- All entities in `packages/database/src/entity/<entity-name>.entity.ts`
+- Choose the correct entity base class per the project's conventions (see project-context) — standalone vs tenant/project-scoped — and state why.
+- Never say "add a column" — say "add field to entity + generate migration".
+- State the exact entity file using the project's entity/ORM layer (see the project-context workspace→path table).
 
-### Route factory rules
-- `ApiRoute` — when you need org context but not the full user object
-- `ApiRouteWithUser` — when the handler needs `user.id` or `user.roles` (creates, auditable mutations)
-- `PublicApiRoute` — ONLY for genuinely public endpoints (QR code lookups, public reports)
-- Never use raw Lambda handlers — always wrap with a factory
+### Route / auth rules
+- State the exact auth/route type per endpoint using the project's conventions (authenticated with tenant/org context; authenticated with full user object for creates and auditable mutations; public only when genuinely public).
+- Never leave a raw, unwrapped handler — always use the project's standard route/auth wrapper.
 
-### PowerSync rules
-- Any entity visible offline on mobile **must** have a PowerSync section
-- Staff users over-sync — bucket scoping alone is NOT sufficient
-- Every offline read hook must JOIN to `projects.ownerId` to filter by org
-- Never specify `src/schema.ts` edits — it is generated by `pnpm powersync:typegen`
+### Offline sync rules (only if the project uses offline sync — see project-context)
+- Any entity visible offline **must** have an Offline Sync section.
+- Devices over-sync — partition/bucket scoping alone is NOT sufficient.
+- Every offline read must enforce a tenant/org-scoped filter (see Offline reads).
+- Never specify edits to a generated sync schema/types file — spec the sync-config/rule change instead; the schema is regenerated by the project's typegen step.
 
 ### Role names
-Always derive from `packages/auth-rules/` — never invent. Common roles:
-`fire_safety_engineer`, `inspector`, `company_admin`, `project_manager`, `manufacturer`
+Always derive from the project's permission source (see project-context) — never invent. Enumerate the actual roles before writing the Permissions table.
 
 ---
 
@@ -258,13 +217,13 @@ Always derive from `packages/auth-rules/` — never invent. Common roles:
 
 - [ ] No TBDs — every open question has a concrete answer OR a flagged decision with a suggested default
 - [ ] Every new endpoint has a row in the Permissions table
-- [ ] Every mobile offline entity has a PowerSync section with the organisationId JOIN pattern
+- [ ] Every offline-synced entity has an Offline Sync section with an explicit tenant/org-scoped filter (only if the project uses offline sync)
 - [ ] Entity relationships state exact cardinality (1:1, 1:N, M:N)
-- [ ] Route factory stated for every endpoint (ApiRoute / ApiRouteWithUser / PublicApiRoute)
+- [ ] Auth/route type stated for every endpoint, using the project's conventions
 - [ ] All TypeScript interfaces fully typed — no `any`
 - [ ] Spec says WHAT to build — no HOW (no line-by-line implementation instructions)
-- [ ] Web / Mobile / PowerSync sections omitted if not applicable to this story
-- [ ] `BaseEntity` vs `BaseProjectEntity` choice stated and justified
+- [ ] Web / Mobile / Offline Sync sections omitted if not applicable to this story
+- [ ] Entity base class choice stated and justified per the project's conventions
 
 ---
 
@@ -273,11 +232,11 @@ Always derive from `packages/auth-rules/` — never invent. Common roles:
 | Anti-pattern | Fix |
 |---|---|
 | "Add a column to the table" | "Add field `x: string` to `[Entity]` entity + generate migration" |
-| Inventing a role name | Check `packages/auth-rules/permissions/` first |
-| Missing organisationId JOIN in mobile hook | Always join to `projects.owner_id` |
-| Editing `src/schema.ts` in the spec | Never — it's generated; spec the `sync-config.yaml` change instead |
+| Inventing a role name | Check the project's permission source first (see project-context) |
+| Missing tenant/org-scoped filter in an offline read | Always enforce a tenant/org-scoped filter on every offline read |
+| Editing a generated sync schema/types file in the spec | Never — it's generated; spec the sync-config/rule change instead |
 | `any` in TypeScript interfaces | Fully type every field |
 | TBD without a suggested default | Add "Suggested default: X" so impl can proceed |
 | Spec contains implementation code | Move to agent instructions, not spec |
-| PowerSync section absent for mobile offline entity | Add the section — sync-engineer needs it |
+| Offline Sync section absent for an offline-synced entity | Add the section — the sync implementer needs it |
 ```

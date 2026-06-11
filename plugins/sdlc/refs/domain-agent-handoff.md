@@ -45,7 +45,7 @@ Stage your specific files and the memory file (do NOT use `git add .`):
 git add <domain paths> .claude/memories/agents/<your-name>.md
 ```
 
-Then invoke the `conventional-commit` skill to construct and execute the commit message. Use the `packages/` or `apps/` directory name as the scope — see `.claude/project/project-context.md` for valid scopes in this project.
+Then invoke the `conventional-commit` skill to construct and execute the commit message. Use the directory name as the scope — see `.claude/project/project-context.md` for valid scopes in this project.
 
 Do not split memory updates into a separate commit — they belong with the work that produced them.
 

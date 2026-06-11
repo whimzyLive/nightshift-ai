@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Jira dependency gate for the Principal Engineer playbook (Step 1).
 # Usage: dep-gate.sh <STORY-KEY>
-#   e.g. dep-gate.sh ET-34
+#   e.g. dep-gate.sh <STORY-KEY>
 #
 # Resolves the story's parent epic, derives its BLOCKERS by sibling-inversion
 # (acli link list only exposes outwardIssueKey = the issue a story BLOCKS, so a
