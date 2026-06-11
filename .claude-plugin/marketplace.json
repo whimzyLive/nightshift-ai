@@ -1,0 +1,11 @@
+{
+  "name": "edgetech-sdlc",
+  "owner": { "name": "EdgeTech", "email": "rushi.patel@edgetech.studio" },
+  "plugins": [
+    {
+      "name": "sdlc",
+      "source": "./plugins/sdlc",
+      "description": "Repo-agnostic SDLC agent workflow (Jira→spec→plan→impl→review) for Claude Code"
+    }
+  ]
+}
