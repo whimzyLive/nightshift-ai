@@ -23,21 +23,23 @@ acli reads credentials from `~/.config/acli/`. Before any acli command, run this
 
 ```bash
 # 1. DNS reachability check — fail fast if Atlassian is blocked
-if ! getent hosts edgetechstudio.atlassian.net >/dev/null 2>&1; then
-  echo "ERROR: edgetechstudio.atlassian.net is DNS-blocked in this environment." >&2
-  echo "Fix: allowlist edgetechstudio.atlassian.net and api.atlassian.com in GitHub → Settings → Copilot → Policies." >&2
+if ! getent hosts "$ATLASSIAN_SITE" >/dev/null 2>&1; then
+  echo "ERROR: $ATLASSIAN_SITE is DNS-blocked in this environment." >&2
+  echo "Fix: allowlist $ATLASSIAN_SITE and api.atlassian.com in GitHub → Settings → Copilot → Policies." >&2
   exit 1
 fi
 
 # 2. Re-authenticate if no valid profile (Copilot agent sessions don't share ~/.config/acli from setup steps)
 acli jira auth status 2>/dev/null || \
   echo "$ATLASSIAN_API_TOKEN" | acli jira auth login \
-    --site "edgetechstudio.atlassian.net" \
+    --site "$ATLASSIAN_SITE" \
     --email "$ATLASSIAN_EMAIL" \
     --token
 ```
 
 `ATLASSIAN_API_TOKEN` and `ATLASSIAN_EMAIL` are injected as environment variables by the Copilot agent runtime from repository Copilot secrets. If both are empty and auth fails, abort: "ATLASSIAN_API_TOKEN/ATLASSIAN_EMAIL not set — configure in GitHub → Settings → Secrets → Copilot."
+
+`ATLASSIAN_SITE` must be set alongside `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN`. Its value is the Jira site hostname from the consumer's project-context (e.g. `your-org.atlassian.net`).
 
 ## Core commands for story/workitem management
 
@@ -276,7 +278,7 @@ echo "Created: $key"
 
 ## Error handling
 
-- DNS block (`getent hosts edgetechstudio.atlassian.net` fails) → abort immediately with the DNS-block error message above; do NOT attempt auth or any other acli command
+- DNS block (`getent hosts "$ATLASSIAN_SITE"` fails) → abort immediately with the DNS-block error message above; do NOT attempt auth or any other acli command
 - Auth error (DNS resolves but acli returns auth failure) → run the auth guard block above; if env vars empty, abort with "ATLASSIAN_API_TOKEN/ATLASSIAN_EMAIL not set"
 - Project not found → run `acli jira project list` to confirm key
 - Parent not found → verify epic key exists with `acli jira workitem view <key>`

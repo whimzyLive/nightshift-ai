@@ -138,7 +138,7 @@ Agent({
 4. "Branch `feat/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new
    branch. Check it out, do your work, and commit."
 5. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
-6. "Commit your changes (use the `conventional-commit` skill; scope from the `packages/` dir
+6. "Commit your changes (use the `conventional-commit` skill; scope from the directory
    name). Do NOT push — the orchestrator handles pushes."
 7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`)."

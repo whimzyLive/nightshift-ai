@@ -133,7 +133,7 @@ gh pr merge <number-or-url> --squash --delete-branch
 | Plan       | `plan/<slug>`              |
 | DB changes | `feat/db/<feature>`        |
 | Backend    | `feat/backend/<feature>`   |
-| PowerSync  | `feat/powersync/<feature>` |
+| Sync       | `feat/sync/<feature>`      |
 | Web        | `feat/web/<feature>`       |
 | Mobile     | `feat/mobile/<feature>`    |
 
@@ -147,7 +147,7 @@ gh pr merge <number-or-url> --squash --delete-branch
 | Plan      | `docs(plan): <JIRA-KEY> <feature title>` |
 | DB        | `feat(db): <description>`                |
 | Backend   | `feat(backend): <description>`           |
-| PowerSync | `feat(powersync): <description>`         |
+| Sync      | `feat(sync): <description>`              |
 | Web       | `feat(web): <description>`               |
 | Mobile    | `feat(mobile): <description>`            |
 
@@ -174,8 +174,8 @@ gh pr merge <number-or-url> --squash --delete-branch
 - Changes: <list of key changes>
 
 ## Test plan
-- [ ] `pnpm --filter <app> typecheck` passes
-- [ ] `pnpm --filter <app> lint` passes
+- [ ] Project typecheck passes (command from project-context)
+- [ ] Project lint passes (command from project-context)
 - [ ] <manual verification step>
 
 ## Jira
