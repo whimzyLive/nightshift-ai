@@ -8,7 +8,7 @@
 #                          worker (and is a silent no-op in every other repo). Cannot be
 #                          genericized without editing the worker source, which is out of scope.
 set -euo pipefail
-root="$(cd "$(dirname "$0")/.." && pwd)"
+root="$(cd "$(dirname "$0")/../plugins/sdlc" && pwd)"
 pattern='jugaad-bot|EdgeTechStudio|ET-[0-9]|edgetechstudio\.atlassian|agent-sandbox|\bSST\b|electrodb|\bhono\b|powersync|Next\.js|\bExpo\b|TypeORM|Zustand|\bpnpm\b|apps/(web|mobile|backend)|packages/'
 hits=$(grep -rInE "$pattern" \
   --exclude=portability-lint.sh --exclude=session-complete.sh \

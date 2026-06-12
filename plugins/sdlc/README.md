@@ -5,7 +5,7 @@ using a per-repo config file the consumer supplies at `.claude/project/project-c
 
 ## Install
     /plugin marketplace add <path-or-git-url-to-this-repo>
-    /plugin install sdlc@edgetech-sdlc
+    /plugin install sdlc@nightshift
 
 ## Consumer repo requirements
 - `.claude/project/project-context.md` — project constants (auto-loaded each session by this
@@ -21,8 +21,10 @@ the SessionStart hook (which does have the variable) writes the resolved absolut
 marker from cwd and substitutes it wherever its instructions reference `${CLAUDE_PLUGIN_ROOT}`.
 The file is a regenerated per-session cache — **gitignore it**.
 
-## Dependencies (not bundled — install separately)
-- **superpowers plugin** — agents invoke: executing-plans, subagent-driven-development,
-  test-driven-development, verification-before-completion, requesting-code-review,
-  receiving-code-review, writing-plans.
-- **CLIs:** `acli` (Jira), `gh` (GitHub).
+## Dependencies
+- **superpowers plugin** — **auto-installed.** Declared as a cross-marketplace dependency
+  (`superpowers@claude-plugins-official`), so `/plugin install sdlc@nightshift` reuses an existing
+  superpowers install or pulls it from the official marketplace. Agents invoke its skills:
+  executing-plans, subagent-driven-development, test-driven-development,
+  verification-before-completion, requesting-code-review, receiving-code-review, writing-plans.
+- **CLIs (install manually — not plugins):** `acli` (Jira), `gh` (GitHub).
