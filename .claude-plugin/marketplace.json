@@ -1,6 +1,7 @@
 {
-  "name": "edgetech-sdlc",
-  "owner": { "name": "EdgeTech", "email": "rushi.patel@edgetech.studio" },
+  "name": "nightshift",
+  "owner": { "name": "nightshift" },
+  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"],
   "plugins": [
     {
       "name": "sdlc",
