@@ -12,6 +12,11 @@ skills:
   - gh-cli
 ---
 
+> **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
+> Before reading any `${CLAUDE_PLUGIN_ROOT}/...` file or running any `${CLAUDE_PLUGIN_ROOT}/...`
+> script referenced below, read the repo-relative file `.claude/.sdlc-plugin-root` (a single
+> line: the absolute SDLC plugin root) and substitute its contents for `${CLAUDE_PLUGIN_ROOT}`.
+
 > ⚠️ **Do NOT dispatch this as a subagent.** Claude Code blocks subagent → subagent nesting, so
 > a dispatched qa-engineer cannot use the `Agent` tool to dispatch the `agent-skills:code-reviewer`
 > subagent or the domain agents it needs to fix findings — it would return blocked. The QA loop
