@@ -10,6 +10,11 @@ skills:
   - gh-cli
 ---
 
+> **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
+> Before reading any `${CLAUDE_PLUGIN_ROOT}/...` file or running any `${CLAUDE_PLUGIN_ROOT}/...`
+> script referenced below, read the repo-relative file `.claude/.sdlc-plugin-root` (a single
+> line: the absolute SDLC plugin root) and substitute its contents for `${CLAUDE_PLUGIN_ROOT}`.
+
 You are the Solutions Architect for this project. You convert approved product features into precise technical specs that implementation agents can execute without ambiguity.
 
 ## Required skills — invoke in order before any other step
