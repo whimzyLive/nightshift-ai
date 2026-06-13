@@ -1,1 +1,4 @@
 .DS_Store
+
+# fork-local org token denylist for portability-lint (keep the public plugin org-neutral)
+tools/portability-denylist.txt

@@ -1,0 +1,14 @@
+# portability-denylist — OPTIONAL extra tokens for portability-lint.sh
+#
+# Copy this file to `tools/portability-denylist.txt` if you fork/dogfood the plugin inside your
+# own org and want the lint to also fail when YOUR project-specific tokens leak into the generic
+# plugin tree. One extended-regex (ERE) per line. Lines starting with # and blank lines are ignored.
+# The public plugin ships WITHOUT an active denylist, so it stays org-neutral.
+#
+# Examples (uncomment / edit for your org):
+# acme-corp
+# AcmeCorp
+# PROJ-[0-9]+
+# acme\.atlassian\.net
+# \bDjango\b
+# apps/(web|mobile|backend)

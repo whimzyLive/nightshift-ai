@@ -35,11 +35,20 @@ A lint enforces this. **Run it before every PR:**
 
 ```bash
 bash tools/portability-lint.sh
-# expect: "portability-lint: clean (0 project tokens)"
+# expect: "portability-lint: clean"
 ```
 
+It runs several checks: no machine-absolute paths, no `./${CLAUDE_PLUGIN_ROOT}` regressions, no
+author emails/PII, no forbidden agent frontmatter (`hooks`/`mcpServers`/`permissionMode`), every
+skill has a `SKILL.md`, agents/commands have the right frontmatter, and manifests are valid JSON.
+
 If it flags a line, replace the literal with a token/pointer to `project-context.md`, or move the
-specifics into a per-repo override. (See the README's "Extend the agents to your stack" section.)
+specifics into a per-repo override. (See [EXTENDING.md](EXTENDING.md).)
+
+**Forks that dogfood the plugin in their own org** can add a `tools/portability-denylist.txt`
+(one regex per line) listing their company/Jira/stack tokens — the lint will then also fail if any
+of those leak into the plugin. The file is gitignored-by-convention and absent by default, so the
+public plugin stays org-neutral.
 
 ## Local development
 
