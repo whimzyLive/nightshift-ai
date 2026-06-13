@@ -245,7 +245,6 @@ truth for who owns what, and the **Tooling** rows define the quality gate every 
 
 ## 🗺️ Roadmap
 
-- [ ] GitLab / Linear / Azure DevOps adapters alongside Jira
 - [ ] One-command `project-context.md` scaffolder (`/sdlc init`)
 - [ ] Additional language/stack starter configs
 - [ ] Metrics: cycle-time and review-pass-rate dashboards
