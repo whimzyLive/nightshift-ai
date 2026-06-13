@@ -116,7 +116,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
 It signals the automation worker to release this session's slot. Outside the worker
-(`JUGAAD_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
 GitHub PR number/URL or commit SHA:
 $ARGUMENTS
