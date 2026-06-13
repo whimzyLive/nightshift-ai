@@ -57,7 +57,7 @@ After **everything above is complete** (success, or a terminal STOP/blocked surf
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
-It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`JUGAAD_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
 Jira story key (e.g. <STORY-KEY>):
 $ARGUMENTS

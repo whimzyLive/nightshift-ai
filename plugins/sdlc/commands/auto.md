@@ -163,7 +163,7 @@ After the routed workflow above is fully complete (Workflow A Phase 1 stop, A3, 
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
-It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`JUGAAD_SESSION_KEY` unset) it is a silent no-op — always safe to run. Note: this is distinct from the `phase/*` JSON-RPC events (those drive the service state machine); this signal releases the worker's local concurrency slot.
+It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run. Note: this is distinct from the `phase/*` JSON-RPC events (those drive the service state machine); this signal releases the worker's local concurrency slot.
 
 Jira story key (e.g. CER-123):
 STORY_KEY
