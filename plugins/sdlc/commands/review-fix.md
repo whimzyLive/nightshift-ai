@@ -22,23 +22,24 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
      ```
    - **Commit** (40-/7-hex SHA): the target is that commit on its current branch.
 
-2. **Fetch the feedback** into `./.tmp/` (never `/tmp`; write file, never inline JSON). The ONLY
+2. **Fetch the feedback** into the session temp dir (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh`
+   — session-scoped `./.tmp/<key>`, never `/tmp`; write file, never inline JSON). The ONLY
    thing excluded is an inline thread explicitly marked *Resolved* (a reviewer ticked *Resolve*, or
    a prior `/review-fix` run resolved it — already addressed, needs no fixing). EVERYTHING else is
    pulled in as context: the **PR body**, every **issue/general comment**, every **review-summary
    body**, and every **unresolved** inline thread. Generic comments and the PR body have no
    resolved state, so include them all — they often carry intent the inline notes assume:
    ```bash
-   mkdir -p .tmp
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
    # PR description (body) + review-summary bodies + general/issue comments.
    # None of these are resolvable threads — there is no resolved state to filter, so keep all.
-   gh pr view <PR> --json body,reviews,comments > ./.tmp/review-fix-summary.json
+   gh pr view <PR> --json body,reviews,comments > "$dir/review-fix-summary.json"
    # PR: inline (line-anchored) review comments — ONLY those on an UNRESOLVED thread.
    # The REST .../pulls/<PR>/comments endpoint returns EVERY inline comment with no resolution
    # state, so it is NOT used here; this script filters via GraphQL reviewThreads.isResolved.
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-unresolved-comments.sh <PR> ./.tmp/review-fix-inline.json
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-unresolved-comments.sh <PR> "$dir/review-fix-inline.json"
    # Commit target (instead of the two PR calls above) — commit comments have no resolved state:
-   # gh api repos/<owner>/<repo>/commits/<SHA>/comments --paginate > ./.tmp/review-fix-inline.json
+   # gh api repos/<owner>/<repo>/commits/<SHA>/comments --paginate > "$dir/review-fix-inline.json"
    ```
    `pr-unresolved-comments.sh` emits NDJSON, one object per unresolved inline comment, each with
    its numeric `id` (databaseId), `path`, `line`, `author`, and `body` — the `id` is required later
@@ -79,20 +80,20 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    carrying the reason it wasn't applied. Write the reply text to a file (never inline JSON), then
    call the helper per comment:
    ```bash
-   mkdir -p .tmp
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
    # accepted — reply names the fix + commit, then the thread is RESOLVED:
-   printf '✅ **Accepted** — %s\n\nFixed in %s.' "<why valid + what changed>" "<fix-commit-sha>" > ./.tmp/reply-<id>.md
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> accepted ./.tmp/reply-<id>.md
+   printf '✅ **Accepted** — %s\n\nFixed in %s.' "<why valid + what changed>" "<fix-commit-sha>" > "$dir/reply-<id>.md"
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> accepted "$dir/reply-<id>.md"
    # rejected — reply explains why it's not applied; thread is LEFT OPEN:
-   printf '❎ **Not applied** — %s' "<why wrong/stale/out-of-scope in this app>" > ./.tmp/reply-<id>.md
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> rejected ./.tmp/reply-<id>.md
+   printf '❎ **Not applied** — %s' "<why wrong/stale/out-of-scope in this app>" > "$dir/reply-<id>.md"
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> rejected "$dir/reply-<id>.md"
    ```
    - The helper replies in-thread (REST) and, for `accepted`, resolves the thread via the GraphQL
      `resolveReviewThread` mutation; `rejected` replies but leaves the thread open. It prints one
      `replied:` / `resolved:` / `left-open:` line per comment.
    - **Review-summary bodies and top-level issue comments are not resolvable threads** — for any
      of those you accepted/rejected, post ONE summarising PR issue comment instead
-     (`gh pr comment <PR> --body-file ./.tmp/summary.md`), listing each with its decision+reason.
+     (`gh pr comment <PR> --body-file "$dir/summary.md"`), listing each with its decision+reason.
    - **Commit-SHA target** (not a PR): there are no resolvable review threads — reply on the commit
      comment (`gh api .../commits/<SHA>/comments/<id>/replies`) with the justification; nothing to
      resolve.

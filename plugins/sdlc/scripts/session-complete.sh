@@ -22,6 +22,10 @@
 key="${SDLC_SESSION_KEY:-}"
 [ -z "$key" ] && exit 0
 
+# AC-2/AC-3: remove this session's scoped temp dir before signalling completion,
+# so no dangling temp files remain after a normally-completed session.
+rm -rf "./.tmp/$key"
+
 pr_url="${1:-}"
 if [ -n "$pr_url" ]; then
   printf '<<<SDLC_SESSION_COMPLETE:%s|PR=%s>>>\n' "$key" "$pr_url"

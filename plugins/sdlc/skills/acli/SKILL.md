@@ -86,8 +86,8 @@ Flags reference:
 ### Bulk create from JSON (preferred for multiple stories)
 
 ```bash
-mkdir -p .tmp
-bulk_file=$(mktemp ./.tmp/acli-bulk.XXXXXX)
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
 trap 'rm -f "$bulk_file"' EXIT
 
 # ... write JSON to $bulk_file, then:
@@ -233,14 +233,15 @@ Always follow this order to avoid creating orphaned stories:
 
 Description text often contains special characters. Use files instead of inline strings.
 
-Always use `mktemp` for temp files — write them under the project's `./.tmp/` (inside
-the permission scope, gitignored), never `/tmp` (prompts on every access). This
-guarantees a unique path and pairs with a `trap` for automatic cleanup:
+Always use `mktemp` for temp files — write them under the session-scoped temp dir from
+`scripts/tmp-dir.sh` (`SDLC_SESSION_KEY` set → `./.tmp/<key>`, unset → `./.tmp`; inside the
+permission scope, gitignored), never `/tmp` (prompts on every access). This guarantees a
+unique path, keeps each session's temp files isolated, and pairs with a `trap` for cleanup:
 
 ```bash
-# Create a unique temp file in ./.tmp; clean it up automatically on exit
-mkdir -p .tmp
-desc_file=$(mktemp ./.tmp/acli-desc.XXXXXX)   # X's at end (macOS), no .txt suffix
+# Create a unique temp file in the session temp dir; clean it up automatically on exit
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+desc_file=$(mktemp "$dir/acli-desc.XXXXXX")   # X's at end (macOS), no .txt suffix
 trap 'rm -f "$desc_file"' EXIT
 
 cat > "$desc_file" << 'EOF'
