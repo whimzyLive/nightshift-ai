@@ -30,8 +30,7 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    body**, and every **unresolved** inline thread. Generic comments and the PR body have no
    resolved state, so include them all — they often carry intent the inline notes assume:
    ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-   # PR description (body) + review-summary bodies + general/issue comments.
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>   # PR description (body) + review-summary bodies + general/issue comments.
    # None of these are resolvable threads — there is no resolved state to filter, so keep all.
    gh pr view <PR> --json body,reviews,comments > "$dir/review-fix-summary.json"
    # PR: inline (line-anchored) review comments — ONLY those on an UNRESOLVED thread.
@@ -80,8 +79,7 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    carrying the reason it wasn't applied. Write the reply text to a file (never inline JSON), then
    call the helper per comment:
    ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-   # accepted — reply names the fix + commit, then the thread is RESOLVED:
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>   # accepted — reply names the fix + commit, then the thread is RESOLVED:
    printf '✅ **Accepted** — %s\n\nFixed in %s.' "<why valid + what changed>" "<fix-commit-sha>" > "$dir/reply-<id>.md"
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> accepted "$dir/reply-<id>.md"
    # rejected — reply explains why it's not applied; thread is LEFT OPEN:

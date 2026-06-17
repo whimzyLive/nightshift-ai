@@ -157,8 +157,7 @@ item carrying a justification. For each triaged inline comment, write the reply 
 inline JSON) and call the helper:
 
 ```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted "$dir/reply-<id>.md"   # replies + RESOLVES the thread
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted "$dir/reply-<id>.md"   # replies + RESOLVES the thread
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected "$dir/reply-<id>.md"   # replies, leaves thread OPEN
 ```
 

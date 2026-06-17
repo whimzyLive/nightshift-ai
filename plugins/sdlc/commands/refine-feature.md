@@ -50,8 +50,7 @@ Compose Epic description covering:
 ⚠️ **ADF JSON required.** Read **`${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md`** before writing any description — it has the full node reference and a copy-paste Epic template. Save to a `.json` temp file (not `.txt` or `.md`).
 
 ```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-epic_desc=$(mktemp "$dir/acli-desc-XXXXXX.json")
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>epic_desc=$(mktemp "$dir/acli-desc-XXXXXX.json")
 trap 'rm -f "$epic_desc"' EXIT
 # Write ADF JSON from the Epic template in ${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md
 cat > "$epic_desc" << 'EOF'

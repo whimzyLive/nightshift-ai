@@ -4,8 +4,7 @@
 
 Save to a `.json` temp file under the session-scoped temp dir (never `/tmp` — outside permission scope):
 ```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-desc=$(mktemp "$dir/acli-adf.XXXXXX.json")
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>desc=$(mktemp "$dir/acli-adf.XXXXXX.json")
 trap 'rm -f "$desc"' EXIT
 cat > "$desc" << 'EOF'
 { ... ADF JSON ... }

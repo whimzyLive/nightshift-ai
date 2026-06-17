@@ -74,8 +74,7 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 9. Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
 10. Create stories — each entry in the bulk JSON **must** include `"parentIssueId": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children:
     ```bash
-    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-    bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
+    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>    bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
     trap 'rm -f "$bulk_file"' EXIT
     acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
     ```
@@ -153,8 +152,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
 5. Rewrite (or confirm) the story using the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line + **checkbox** Acceptance Criteria (binary, 3–6 items), never Gherkin. Ensure it is a vertical slice covering all required layers.
 6. Write to a mktemp file — then:
    ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-   refined=$(mktemp "$dir/acli-refined.XXXXXX")
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>   refined=$(mktemp "$dir/acli-refined.XXXXXX")
    trap 'rm -f "$refined"' EXIT
    acli jira workitem edit <STORY-KEY> --description-file "$refined"
    ```
@@ -180,8 +178,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
 7. **[invoke `user-story-splitting` for any story >8 pts]**
 8. Write to a mktemp file, create:
    ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-   bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>   bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
    trap 'rm -f "$bulk_file"' EXIT
    acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
    ```

@@ -86,8 +86,7 @@ Flags reference:
 ### Bulk create from JSON (preferred for multiple stories)
 
 ```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
 trap 'rm -f "$bulk_file"' EXIT
 
 # ... write JSON to $bulk_file, then:
@@ -240,8 +239,7 @@ unique path, keeps each session's temp files isolated, and pairs with a `trap` f
 
 ```bash
 # Create a unique temp file in the session temp dir; clean it up automatically on exit
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
-desc_file=$(mktemp "$dir/acli-desc.XXXXXX")   # X's at end (macOS), no .txt suffix
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>desc_file=$(mktemp "$dir/acli-desc.XXXXXX")   # X's at end (macOS), no .txt suffix
 trap 'rm -f "$desc_file"' EXIT
 
 cat > "$desc_file" << 'EOF'
