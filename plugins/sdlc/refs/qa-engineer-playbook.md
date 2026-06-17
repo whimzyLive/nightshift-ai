@@ -128,9 +128,10 @@ When findings come from an existing **GitHub PR or commit** (Copilot or human re
 than a fresh code-reviewer pass, SKIP the dispatch above. Instead build the finding list from the
 fetched comments:
 
-- The caller (`/review-fix`) has fetched the feedback into files (e.g.
-  `./.tmp/review-fix-summary.json` = PR **body** + general/issue comments + review-summary bodies;
-  `./.tmp/review-fix-inline.json` = **unresolved** inline review comments). Read BOTH. The only
+- The caller (`/review-fix`) has fetched the feedback into files under the session temp dir
+  (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`): `"$dir/review-fix-summary.json"` = PR
+  **body** + general/issue comments + review-summary bodies; `"$dir/review-fix-inline.json"` =
+  **unresolved** inline review comments. Read BOTH. The only
   exclusion is inline threads explicitly marked *Resolved* (filtered at fetch via GraphQL
   `reviewThreads.isResolved`, since a resolved comment is already addressed). The PR body and all
   generic comments have no resolved state and are ALWAYS included — they carry intent the
@@ -156,8 +157,9 @@ item carrying a justification. For each triaged inline comment, write the reply 
 inline JSON) and call the helper:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted ./.tmp/reply-<id>.md   # replies + RESOLVES the thread
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected ./.tmp/reply-<id>.md   # replies, leaves thread OPEN
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted "$dir/reply-<id>.md"   # replies + RESOLVES the thread
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected "$dir/reply-<id>.md"   # replies, leaves thread OPEN
 ```
 
 - **Accepted** → reply names why it was valid + the fix commit, then the thread is RESOLVED (drops
