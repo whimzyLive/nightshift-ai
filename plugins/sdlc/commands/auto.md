@@ -1,5 +1,5 @@
 ---
-description: Full SDLC automation for a Jira story. Quality-assesses and triages if needed, then routes to a two-phase spec → review-gate → plan+impl-single-PR flow (≥3pts) or direct implementation (<3pts). Posts Jira comments at each gate with clickable PR links. Pass --async-review for non-blocking service-driven execution where JSON-RPC events replace the human confirmation gate.
+description: Full SDLC automation for a Jira story. Quality-assesses and triages if needed, then delegates the complexity decision to /triage and routes a `full` story through the two-phase spec → review-gate → plan+impl-single-PR flow, or a `lightweight` story (<= threshold pts, inclusive) straight to implementation. Posts Jira comments at each gate with clickable PR links. Pass --async-review for non-blocking service-driven execution where JSON-RPC events replace the human confirmation gate.
 ---
 
 Parse $ARGUMENTS:
@@ -13,21 +13,29 @@ Dispatch the `scrum-master` agent in **Mode 3 (Auto-Assess)** with `STORY_KEY`.
 Wait for its response — it returns exactly:
 ```
 QUALITY=ok|triaged
-STORY_POINTS=N
+STORY_POINTS=N|missing
 ```
 
 ## Step 2 — Route
 
-Invoke `/triage STORY_KEY` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and route on its `TRIAGE`
-outcome — the single shared definition of the lightweight/full decision (default threshold `<= 3`
-points ⇒ lightweight, inclusive; configurable per-repo):
+**First, short-circuit on missing points from Step 1.** If scrum-master returned
+`STORY_POINTS=missing`, **stop here** — do NOT call `/triage` (it would only re-fetch Jira and
+return `full` + a warning, and a transient `/triage` `acli` failure could then leave `/auto` unable
+to route despite Step 1 having already succeeded). Tell the user: "Story points not set on
+STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
 
-- `STORY_POINTS=missing` → `/triage` returns `TRIAGE=full` + a `WARNING:` line. **Check this first — it must short-circuit before the `TRIAGE=full` route runs.** **Stop here.** Tell the user: "Story points not set on STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
+Otherwise, invoke `/triage STORY_KEY` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and route on its
+`TRIAGE` outcome — the single shared definition of the lightweight/full decision (default threshold
+`<= 3` points ⇒ lightweight, inclusive; configurable per-repo). If `/triage` STOPs **without**
+emitting the required `TRIAGE=`/`STORY_POINTS=` block (e.g. an `acli` auth/DNS failure), **STOP** and
+surface that error — do not guess a route.
+
 - `TRIAGE=full` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
 - `TRIAGE=lightweight` → **Workflow B** (direct impl, no spec/plan review gate)
 
-(Step 1's scrum-master `STORY_POINTS=N` is still used for the `missing` stop; the complexity routing
-itself is delegated to `/triage` so `/auto` and `/impl` share one definition.)
+(Step 1's scrum-master `STORY_POINTS=N|missing` gates the `missing` stop **before** any `/triage`
+call; the complexity routing itself is delegated to `/triage` so `/auto` and `/impl` share one
+definition.)
 
 ---
 
