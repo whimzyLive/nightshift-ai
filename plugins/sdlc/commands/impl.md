@@ -14,7 +14,9 @@ the Principal Engineer role directly.
 
 1. **Triage gate.** Invoke `/triage <STORY-KEY>` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and
    capture `TRIAGE` (`lightweight` | `full`). This decides whether the merged plan file is a hard
-   precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full` (fail-safe).
+   precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full` (fail-safe). If `/triage`
+   **STOPs without emitting a `TRIAGE=` line** (e.g. an `acli` auth/DNS failure), **STOP** here and
+   surface that error — do NOT proceed to implementation without a valid triage decision.
 2. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
    Whether the plan file is **required** depends on `TRIAGE`:
    - **`TRIAGE=full`** → the plan file MUST exist at that path (merged to `develop`). If missing →
