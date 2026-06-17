@@ -83,8 +83,11 @@ the CI / spare-machine context. This is the single highest-leverage fix.
 - Use `./.tmp/` not `/tmp`. Add to `.gitignore`.
 - Allow rules: `Read(./.tmp/**)`, `Write(./.tmp/**)`, `Bash(rm ./.tmp/*)`,
   `Bash(mkdir -p ./.tmp)`.
-- Edit scrum-master.md + acli SKILL.md: `mktemp ./.tmp/acli-XXXXXX.json` (after
-  `mkdir -p ./.tmp`). macOS: `XXXXXX` must be at end after a dot separator.
+- **Session-scoped subdir:** plugin temp files now go under `./.tmp/<SDLC_SESSION_KEY>/`
+  via `scripts/tmp-dir.sh` (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`, then
+  `mktemp "$dir/acli-XXXXXX.json"`). The `./.tmp/**` allow globs are **recursive**, so they already
+  cover nested `./.tmp/<key>/...` — **no new allow rule is required**. `scripts/session-complete.sh`
+  removes `./.tmp/<key>` at teardown. macOS: `XXXXXX` must be at end after a dot separator.
 
 ### R2 — scriptify repeated dynamic shell
 Move any command containing `$(...)`, backticks, or compound `&&`/`|` logic into a
