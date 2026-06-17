@@ -2,9 +2,10 @@
 
 **Rule:** All Jira descriptions and comments written via `acli --description-file` MUST be ADF JSON. Plain markdown renders as raw symbols in Jira Cloud.
 
-Save to a `.json` temp file:
+Save to a `.json` temp file under the session-scoped temp dir (never `/tmp` — outside permission scope):
 ```bash
-desc=$(mktemp /tmp/acli-XXXXXX.json)
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key> (ET-58)
+desc=$(mktemp "$dir/acli-adf.XXXXXX.json")
 trap 'rm -f "$desc"' EXIT
 cat > "$desc" << 'EOF'
 { ... ADF JSON ... }

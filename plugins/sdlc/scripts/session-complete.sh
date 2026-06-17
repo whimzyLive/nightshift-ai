@@ -22,6 +22,16 @@
 key="${SDLC_SESSION_KEY:-}"
 [ -z "$key" ] && exit 0
 
+# ET-58 (AC-2/AC-3): remove this session's scoped temp dir before signalling completion,
+# so no dangling temp files remain after a normally-completed session. Guard against path
+# traversal: only run rm -rf when $key is a single safe path segment (matches tmp-dir.sh).
+# An unsafe key (path separator or `..`) skips cleanup but STILL emits the sentinel below,
+# so the harness releases the slot — we never run rm -rf on a key that could escape ./.tmp.
+case "$key" in
+  */* | *..*) : ;;                 # unsafe key — skip cleanup, still signal completion
+  *) rm -rf "./.tmp/$key" ;;
+esac
+
 pr_url="${1:-}"
 if [ -n "$pr_url" ]; then
   printf '<<<SDLC_SESSION_COMPLETE:%s|PR=%s>>>\n' "$key" "$pr_url"

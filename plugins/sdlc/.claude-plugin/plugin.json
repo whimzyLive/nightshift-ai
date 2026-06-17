@@ -1,6 +1,6 @@
 {
   "name": "sdlc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Repo-agnostic SDLC agents, commands, refs, and skills. Reads per-repo config from .claude/project/project-context.md.",
   "author": { "name": "nightshift" },
   "dependencies": [
