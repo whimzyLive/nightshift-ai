@@ -1,5 +1,5 @@
 ---
-description: Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Run ONLY after the plan PR is reviewed and merged to develop.
+description: Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first — full stories require a merged plan PR; lightweight (<= threshold pts) stories implement directly with no plan precondition.
 ---
 
 Execute the implementation for the Jira story **`$ARGUMENTS`** by running the Principal
@@ -12,9 +12,19 @@ the Principal Engineer role directly.
 
 ## Steps
 
-1. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
-2. Verify the plan file exists at that path (must be merged to `develop`). If missing → **STOP**
-   and tell the user to merge the plan PR first.
+1. **Triage gate.** Invoke `/triage <STORY-KEY>` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and
+   capture `TRIAGE` (`lightweight` | `full`). This decides whether the merged plan file is a hard
+   precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full` (fail-safe).
+2. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
+   Whether the plan file is **required** depends on `TRIAGE`:
+   - **`TRIAGE=full`** → the plan file MUST exist at that path (merged to `develop`). If missing →
+     return **blocked**: tell the user to run `/spec <STORY-KEY>` then `/plan <STORY-KEY>` and merge
+     the plan PR first (AC-2). No branch, no domain agents.
+   - **`TRIAGE=lightweight`** → the plan file is **optional**: a missing
+     `docs/superpowers/plans/<STORY-KEY>.md` is **NOT a blocker**. Proceed directly to the Principal
+     Engineer playbook; it derives tasks from the story description (the same way `/auto` Workflow B's
+     tech-lead does with `LIGHTWEIGHT=true`). The ONLY lock relaxed on this path is the plan-file
+     STOP — the dependency gate below still runs.
 3. Fetch the Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for the
    summary, description, and context (comments, linked tickets, attachments).
 4. **Execute `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` inline**, start to finish, for
@@ -38,9 +48,10 @@ All phases done. Review clean. Quality gate passed."
 6. Report back: phases completed, the PR URL, review rounds, quality-gate evidence, any blockers
    or open items for the reviewer.
 
-**IMPORTANT:** Only run after the plan PR is reviewed and merged. This makes real code changes
-across domain agents and cannot be easily undone. If the playbook hits `Status: blocked` at any
-phase, STOP and surface it — do not improvise around it.
+**IMPORTANT:** On the `full` path, only run after the plan PR is reviewed and merged (Step 2). On
+the `lightweight` path, no plan PR is required. Either way this makes real code changes across
+domain agents and cannot be easily undone. If the playbook hits `Status: blocked` at any phase,
+STOP and surface it — do not improvise around it.
 
 **Dependency gate (Step 1 of the playbook):** before any work, run
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>` — it resolves the parent epic, reads `<STORY-KEY>`'s

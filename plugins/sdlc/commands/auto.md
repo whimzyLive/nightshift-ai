@@ -18,15 +18,20 @@ STORY_POINTS=N
 
 ## Step 2 — Route
 
-Using `STORY_POINTS` from Step 1:
+Invoke `/triage STORY_KEY` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and route on its `TRIAGE`
+outcome — the single shared definition of the lightweight/full decision (default threshold `<= 3`
+points ⇒ lightweight, inclusive; configurable per-repo):
 
-- `STORY_POINTS=missing` → **Stop here.** Tell the user: "Story points not set on STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
-- `STORY_POINTS >= 3` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
-- `STORY_POINTS < 3` → **Workflow B** (direct impl, no spec/plan review gate)
+- `STORY_POINTS=missing` → `/triage` returns `TRIAGE=full` + a `WARNING:` line. **Check this first — it must short-circuit before the `TRIAGE=full` route runs.** **Stop here.** Tell the user: "Story points not set on STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
+- `TRIAGE=full` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
+- `TRIAGE=lightweight` → **Workflow B** (direct impl, no spec/plan review gate)
+
+(Step 1's scrum-master `STORY_POINTS=N` is still used for the `missing` stop; the complexity routing
+itself is delegated to `/triage` so `/auto` and `/impl` share one definition.)
 
 ---
 
-## Workflow A — story points ≥ 3
+## Workflow A — `TRIAGE=full`
 
 Two phases, gated by the **spec PR merge**:
 
@@ -118,7 +123,7 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 ---
 
-## Workflow B — story points < 3
+## Workflow B — `TRIAGE=lightweight`
 
 ### B1 — Plan (lightweight)
 
