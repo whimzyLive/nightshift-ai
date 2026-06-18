@@ -72,12 +72,12 @@ For a Story, the Epic key is in the `parent` field of the view JSON.
 The story `view --json` response does **not** include a story's child sub-tasks. Enumerate them with a dedicated JQL probe on the parent key — this is the source of truth for sub-tasks:
 
 ```bash
-acli jira workitem search --jql "parent = <KEY> AND issuetype = Sub-task" --fields "key,summary" --json
+acli jira workitem search --jql "parent = <KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC" --fields "key,summary" --json
 ```
 
-- The JQL is valid even when the story has no sub-tasks: it returns an **empty result array, not an error**. Treat an empty array as "no sub-tasks" and take the no-op path — never as a failure.
-- The result is an ordered list of `{ key, summary }`. **Preserve Jira's returned order** (creation order); do not re-sort by key or summary.
-- A Jira instance with no `Sub-task` issue type configured also returns an empty array — same no-op path, no error.
+- Use the `subTaskIssueTypes()` JQL function rather than a hard-coded `issuetype = Sub-task`. Sub-task issue types can be **renamed or differ per instance** (e.g. "Subtask", "Sub-task", localized names); `issuetype = Sub-task` would either miss them or raise a JQL error ("The value 'Sub-task' does not exist for the field 'issuetype'") on an instance without a type by that exact name. `subTaskIssueTypes()` resolves to whatever sub-task types the instance actually has.
+- The result is an ordered list of `{ key, summary }`. Ordering is **explicit via `ORDER BY created ASC`** (creation order) — JQL does not guarantee any order without it. Do not re-sort by key or summary.
+- When the story has no sub-tasks — or the instance has **no sub-task issue types at all** (`subTaskIssueTypes()` resolves to an empty set) — the probe returns an **empty result array, not an error**. Treat an empty array as "no sub-tasks" and take the no-op path.
 - Only treat a **non-empty error** (auth/DNS/malformed JQL) as a failure → STOP, consistent with the `acli`-failure rule above.
 
 ## Tooling rule

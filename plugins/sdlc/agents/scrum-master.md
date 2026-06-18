@@ -144,7 +144,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<STORY-KEY>`. If this fails, STOP.
 2. If the story has a parent Epic, apply the same protocol with `<KEY>=<EPIC-KEY>`; check Epic comments for `PRD: docs/features/...`; read PRD ONLY if the exact path appears in a comment. Do NOT search for PRD files. Missing PRD comment is non-fatal in triage mode — proceed without it.
-3. **Detect sub-tasks** — apply the "Fetching sub-tasks" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`: JQL-probe `parent = <STORY-KEY> AND issuetype = Sub-task` for `key,summary`. Let `subtaskCount` = number returned, preserving Jira's order.
+3. **Detect sub-tasks** — apply the "Fetching sub-tasks" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`: JQL-probe `parent = <STORY-KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC` for `key,summary` (use the `subTaskIssueTypes()` function, not a literal `issuetype = Sub-task`, so renamed/instance-specific sub-task types are matched and the no-sub-task-type case stays a clean empty result). Let `subtaskCount` = number returned, in the explicit creation order.
    - An empty array is the **no-op path** (not an error): proceed exactly as today — no AC fold-in, no annotation. Only a non-empty `acli` error STOPs.
 4. Assess gaps against the template:
    - Missing or vague user story (As a / I want / So that)
