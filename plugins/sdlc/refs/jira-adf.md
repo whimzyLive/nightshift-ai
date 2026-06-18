@@ -335,6 +335,36 @@ Use for `/refine-issue`, `/stories`, and any Story create/update. See `jira-stor
 
 ---
 
+## Minimal sub-task description
+
+When refining a story that has child sub-tasks, the parent story's own description folds each sub-task's scope into its **existing Acceptance Criteria** `taskList` (one extra `taskItem` per sub-task, derived from the sub-task summary) — there is **no separate "Sub-tasks" section, heading, or second `taskList`**. Re-use the single AC `taskList` (`localId` scheme `tl-1` / `ti-*`).
+
+Each child **sub-task** then gets its own minimal description — purpose only, **no story template** (no Mike Cohn line, no AC list, no Out of Scope / Dependencies headings):
+
+```json
+{
+  "version": 1,
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "One sentence stating the sub-task's purpose, derived from its summary (do not invent acceptance criteria)." }]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "Part of ", "marks": [{ "type": "strong" }] },
+        { "type": "text", "text": "ED-456" }
+      ]
+    }
+  ]
+}
+```
+
+Replace `ED-456` with the parent story key. If the sub-task summary is empty, fall back to a generic one-line purpose that references the parent.
+
+---
+
 ## Comment template
 
 ```json

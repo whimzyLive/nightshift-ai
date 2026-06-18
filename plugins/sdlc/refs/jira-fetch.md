@@ -67,6 +67,19 @@ For a Story, the Epic key is in the `parent` field of the view JSON.
 
 **Guard before fetching Epic:** Check the `parent` field in the story view JSON response first. If `parent` is `null`, absent, or an empty object — stop. Do NOT fire the four calls. Only re-run the four calls with the Epic key when `parent` is non-null and contains a valid issue key.
 
+## Fetching sub-tasks
+
+The story `view --json` response does **not** include a story's child sub-tasks. Enumerate them with a dedicated JQL probe on the parent key — this is the source of truth for sub-tasks:
+
+```bash
+acli jira workitem search --jql "parent = <KEY> AND issuetype = Sub-task" --fields "key,summary" --json
+```
+
+- The JQL is valid even when the story has no sub-tasks: it returns an **empty result array, not an error**. Treat an empty array as "no sub-tasks" and take the no-op path — never as a failure.
+- The result is an ordered list of `{ key, summary }`. **Preserve Jira's returned order** (creation order); do not re-sort by key or summary.
+- A Jira instance with no `Sub-task` issue type configured also returns an empty array — same no-op path, no error.
+- Only treat a **non-empty error** (auth/DNS/malformed JQL) as a failure → STOP, consistent with the `acli`-failure rule above.
+
 ## Tooling rule
 
 Always use `acli` via Bash. Never call Atlassian MCP tools — token cost is significantly higher.
