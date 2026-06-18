@@ -67,6 +67,19 @@ For a Story, the Epic key is in the `parent` field of the view JSON.
 
 **Guard before fetching Epic:** Check the `parent` field in the story view JSON response first. If `parent` is `null`, absent, or an empty object — stop. Do NOT fire the four calls. Only re-run the four calls with the Epic key when `parent` is non-null and contains a valid issue key.
 
+## Fetching sub-tasks
+
+The story `view --json` response does **not** include a story's child sub-tasks. Enumerate them with a dedicated JQL probe on the parent key — this is the source of truth for sub-tasks:
+
+```bash
+acli jira workitem search --jql "parent = <KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC" --fields "key,summary" --json
+```
+
+- Use the `subTaskIssueTypes()` JQL function rather than a hard-coded `issuetype = Sub-task`. Sub-task issue types can be **renamed or differ per instance** (e.g. "Subtask", "Sub-task", localized names); `issuetype = Sub-task` would either miss them or raise a JQL error ("The value 'Sub-task' does not exist for the field 'issuetype'") on an instance without a type by that exact name. `subTaskIssueTypes()` resolves to whatever sub-task types the instance actually has.
+- The result is an ordered list of `{ key, summary }`. Ordering is **explicit via `ORDER BY created ASC`** (creation order) — JQL does not guarantee any order without it. Do not re-sort by key or summary.
+- When the story has no sub-tasks — or the instance has **no sub-task issue types at all** (`subTaskIssueTypes()` resolves to an empty set) — the probe returns an **empty result array, not an error**. Treat an empty array as "no sub-tasks" and take the no-op path.
+- Only treat a **non-empty error** (auth/DNS/malformed JQL) as a failure → STOP, consistent with the `acli`-failure rule above.
+
 ## Tooling rule
 
 Always use `acli` via Bash. Never call Atlassian MCP tools — token cost is significantly higher.

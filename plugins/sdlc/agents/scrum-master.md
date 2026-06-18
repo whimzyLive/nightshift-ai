@@ -144,29 +144,44 @@ Refine an unpolished story in-place OR create new stories from raw text.
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<STORY-KEY>`. If this fails, STOP.
 2. If the story has a parent Epic, apply the same protocol with `<KEY>=<EPIC-KEY>`; check Epic comments for `PRD: docs/features/...`; read PRD ONLY if the exact path appears in a comment. Do NOT search for PRD files. Missing PRD comment is non-fatal in triage mode — proceed without it.
-3. Assess gaps against the template:
+3. **Detect sub-tasks** — apply the "Fetching sub-tasks" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`: JQL-probe `parent = <STORY-KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC` for `key,summary` (use the `subTaskIssueTypes()` function, not a literal `issuetype = Sub-task`, so renamed/instance-specific sub-task types are matched and the no-sub-task-type case stays a clean empty result). Let `subtaskCount` = number returned, in the explicit creation order.
+   - An empty array is the **no-op path** (not an error): proceed exactly as today — no AC fold-in, no annotation. Only a non-empty `acli` error STOPs.
+4. Assess gaps against the template:
    - Missing or vague user story (As a / I want / So that)
    - Fewer than 3 ACs, or ACs not independently testable
    - Missing Out of Scope section
    - Missing Dependencies section
-4. **[invoke `user-story-splitting` if story is >8 pts]**
-5. Rewrite (or confirm) the story using the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line + **checkbox** Acceptance Criteria (binary, 3–6 items), never Gherkin. Ensure it is a vertical slice covering all required layers.
-6. Write to a mktemp file — then:
+5. **[invoke `user-story-splitting` if story is >8 pts]**
+6. Rewrite (or confirm) the story using the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line + **checkbox** Acceptance Criteria (binary, 3–6 items), never Gherkin. Ensure it is a vertical slice covering all required layers.
+   - **When `subtaskCount > 0`:** fold each sub-task's scope into the parent's **Acceptance Criteria** — add one `taskItem` per sub-task to the single AC `taskList` (`localId` scheme `tl-1` / `ti-*`), derived from the sub-task summary, in Jira's returned order. There is **NO separate "Sub-tasks" section, heading, or second `taskList`** (per `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task ACs sit alongside the standard story ACs.
+7. Write to a mktemp file — then:
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
    refined=$(mktemp "$dir/acli-refined.XXXXXX")
    trap 'rm -f "$refined"' EXIT
    acli jira workitem edit <STORY-KEY> --description-file "$refined"
    ```
-7. Comment: `acli jira workitem comment create <STORY-KEY> --body "Refined — story template applied, ACs formalised, scope boundaries added"`
-8. **Swap the refinement label — REQUIRED on every successful refine of an existing ticket.** Add `AI-Ready` and remove `AI-Refine` in one call. This is the single signal the rest of the pipeline relies on: `/auto`'s Mode 3 reads `AI-Ready` to skip re-triage, and the worker/assessment treats the story as refined.
+8. **Annotate each sub-task (only when `subtaskCount > 0`).** For each sub-task, write a **minimal** ADF description (purpose sentence + `Part of <STORY-KEY>` reference; the shape is in `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task MUST NOT receive the full story template. Use the **session-scoped** temp dir, one file per sub-task. Do **NOT** register a per-iteration `trap '... EXIT'` inside the loop — an EXIT trap set in a loop overwrites the prior handler and fires only once at exit, so it would clean up just the last file; instead `rm -f "$file"` at the end of each iteration (or rely on the single session-dir teardown):
+   ```bash
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+   for st in "${subtask_keys[@]}"; do           # zsh: keys MUST be an array, not a space string
+     sub=$(mktemp "$dir/acli-subtask.XXXXXX")
+     # ... write the minimal ADF for "$st" into "$sub" ...
+     acli jira workitem edit "$st" --description-file "$sub" || { echo "STOP: sub-task edit failed for $st"; rm -f "$sub"; exit 1; }
+     rm -f "$sub"                               # deterministic per-iteration cleanup (no in-loop EXIT trap)
+   done
+   ```
+   Sub-task edits are idempotent-friendly: re-running `/refine-issue` overwrites the minimal description with the same generated content — no duplicate content appended.
+9. Comment: `acli jira workitem comment create <STORY-KEY> --body "Refined — story template applied, ACs formalised, scope boundaries added"`
+10. **Swap the refinement label — REQUIRED on every successful refine of an existing ticket, and GATED on sub-task annotation.** When `subtaskCount > 0`, swap the label **only after every sub-task edit in step 8 has succeeded**; if any sub-task edit failed, do NOT swap — leave the story in `AI-Refine` for retry and surface the failure. Add `AI-Ready` and remove `AI-Refine` in one call. This is the single signal the rest of the pipeline relies on: `/auto`'s Mode 3 reads `AI-Ready` to skip re-triage, and the worker/assessment treats the story as refined.
    ```bash
    acli jira workitem edit --key "<STORY-KEY>" --labels "AI-Ready" --remove-labels "AI-Refine" --yes
    ```
    - `--labels` ADDS `AI-Ready` (other labels untouched); `--remove-labels` drops `AI-Refine`.
    - Labels are hyphenated single tokens — **never** `"AI Ready"` / `"AI Refine"`: Jira splits a label on any space into two separate labels.
+   - The label swap is **parent-story-only** — sub-tasks never receive `AI-Ready` / `AI-Refine`.
    - Only swap when refining an EXISTING Jira ticket (this mode). Do NOT add these labels to brand-new stories created in Mode 2B.
-9. Return: updated story key + bullet summary of what changed
+11. Return: updated story key + bullet summary of what changed (including sub-task count folded into ACs + annotated)
 
 ### Mode 2B — Raw text blob
 
