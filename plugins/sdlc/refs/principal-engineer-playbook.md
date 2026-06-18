@@ -95,6 +95,30 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
 4. Note any "grounding corrections" / "open items" the plan flagged — pass them verbatim into
    the relevant domain-agent prompt so the implementer honors them.
 
+## Step 2.5 — Detect child sub-tasks (drives per-sub-task commit sequencing)
+
+Before branching, enumerate the story's child sub-tasks using the **"Fetching sub-tasks"**
+subsection of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (JQL
+`parent = <STORY-KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC`,
+`--fields "key,summary"`). That subsection is the source of truth — **do not re-document the probe.**
+
+Define:
+- `SUBTASKS` — the ordered list of `{ key, summary }` exactly as the probe returns it
+  (`ORDER BY created ASC`; **never re-sort** by key or summary — fetch order *is* implementation order).
+- `subtaskCount` — `SUBTASKS.length`.
+
+Branch on the count:
+- **`subtaskCount === 0`** → **no-regression path**: skip ALL sub-task sequencing. Steps 3–7 run
+  exactly as they do today — one full-story implementation pass per phase, normal commit cadence,
+  normal PR. An empty probe result is **not** an error.
+- **`subtaskCount > 0`** → drive the per-sub-task commit sequencing in Step 4 and the sub-task
+  enumeration in the Step 7 PR body.
+- **Probe failure** (a real auth/DNS/malformed-JQL error, not an empty result) → **STOP before
+  branching**, consistent with the `acli`-failure rule. Do not create a branch or dispatch agents.
+
+Branch creation (Step 3) stays **once per story** regardless of `subtaskCount` — sub-tasks are
+**never** given their own branches.
+
 ## Step 3 — Create the implementation branch (YOU do this)
 
 ```bash
@@ -103,7 +127,9 @@ git checkout -b feat/<STORY-KEY> origin/develop 2>/dev/null \
 git push -u origin feat/<STORY-KEY>
 ```
 
-Domain agents never create branches or PRs. PR is opened only in Step 7, after QA returns `clean`.
+One branch per story — even when `subtaskCount > 0`, you create `feat/<STORY-KEY>` exactly once
+here; the sub-task loop in Step 4 is commit-only (no per-sub-task `git checkout -b`). Domain agents
+never create branches or PRs. PR is opened only in Step 7, after QA returns `clean`.
 
 ## Step 4 — Dispatch domain agents (NON-NEGOTIABLE order, one at a time)
 
@@ -117,6 +143,31 @@ Phase 5 — [mobile-engineer]         mobile screens (only if plan has tasks)
 
 - Sequential only — never two domain agents at once.
 - Each phase verified complete before the next is dispatched.
+
+### Sub-task commit sequencing (only when `subtaskCount > 0`, from Step 2.5)
+
+Sub-task sequencing happens **within** each domain phase — it does not reorder or replace the
+phase ladder. When the story has sub-tasks, the domain agent for a phase implements that phase's
+slice **one sub-task at a time, in `SUBTASKS` (fetch) order**, landing **a commit per sub-task that
+touches this phase** (the "commit per sub-task" rule is scoped to the current phase — a sub-task
+with no work in this phase produces no commit here; see the third bullet):
+
+- Iterate `SUBTASKS` top-to-bottom (`ORDER BY created ASC`); **do not re-sort**.
+- For each sub-task **whose work touches the current phase's domain**, make **≥1 commit** on the
+  single `feat/<STORY-KEY>` branch, with a conventional-commit message that **embeds the sub-task
+  key**, e.g. `feat(<scope>): [<SUBTASK-KEY>] <sub-task summary>` (scope from the changed directory
+  per the `conventional-commit` skill). Across the whole run every sub-task lands **≥1 commit** —
+  in whichever phase(s) own its files — but within any single phase only the sub-tasks that phase
+  touches get a commit.
+- A sub-task whose work does not touch the current phase's domain contributes **no commit in that
+  phase** — it lands its commits in whichever phase(s) own its files. Sequencing is within the
+  ladder; it never breaks it.
+- **No branch per sub-task** — every commit lands on the one `feat/<STORY-KEY>` branch (Step 3).
+- **Sequential only** — one sub-task at a time; no parallel sub-task work.
+- **No Jira status transitions** on sub-tasks — `/impl` does not move sub-task status.
+
+When `subtaskCount === 0`, ignore this subsection entirely: each phase is a single full-story pass
+with the normal commit cadence (today's behaviour, unchanged).
 
 Dispatch with the `Agent` tool, **`isolation: "worktree"`** (domain agents write code, they
 need isolation):
@@ -140,6 +191,13 @@ Agent({
 5. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
 6. "Commit your changes (use the `conventional-commit` skill; scope from the directory
    name). Do NOT push — the orchestrator handles pushes."
+   - **When the story has sub-tasks** (`subtaskCount > 0`): you are given the ordered `SUBTASKS`
+     list. Implement your phase's slice **one sub-task at a time, in that order**, and make **a
+     separate commit per sub-task** whose message embeds the sub-task key —
+     `feat(<scope>): [<SUBTASK-KEY>] <sub-task summary>`. All commits go on the already-checked-out
+     `feat/<STORY-KEY>` branch (no new branch, no push). A sub-task with no work in your domain
+     gets no commit in your phase — it is implemented in whichever phase owns its files, not
+     dropped. When `subtaskCount === 0`, commit once for the phase as normal.
 7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`)."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
@@ -155,7 +213,9 @@ git push origin feat/<STORY-KEY>           # YOU push
 git fetch origin feat/<STORY-KEY>
 ```
 
-- No new commits since pre-dispatch HEAD → agent failed silently. **STOP**, report.
+- No new commits since pre-dispatch HEAD → agent failed silently. **STOP**, report. (With
+  `subtaskCount > 0` a phase is expected to advance HEAD by **one commit per sub-task it touched**,
+  not a single commit; "zero new commits" remains the silent-failure STOP condition.)
 - Push fails (conflict/auth) → **STOP**, report.
 - Agent returned `Status: blocked` → **STOP** immediately:
   ```
@@ -201,12 +261,32 @@ Status: clean | blocked
 
 Only after Step 6 returns `Status: clean`:
 
+The PR **title always keeps the parent `<STORY-KEY>`** (never a sub-task key). When
+`subtaskCount > 0`, the PR **body lists every sub-task key** from `SUBTASKS` (the parent PR
+enumerates the sequenced work); when `subtaskCount === 0`, the body has no sub-tasks section
+(unchanged from today). Write the body to a file first when it includes the sub-task list, then
+pass it by reference (`--body-file`):
+
 ```bash
+# subtaskCount === 0 — inline short body (today's behaviour):
 PR_URL=$(gh pr create \
   --title "[<STORY-KEY>] <story summary>" \
   --body "Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed." \
   --base develop \
   --head feat/<STORY-KEY>)
+
+# subtaskCount > 0 — write the enumerated body to the session temp dir, then pass by reference.
+# Use the session-scoped temp dir (tmp-dir.sh) so session-complete.sh cleans it up — never a bare
+# ./.tmp path or /tmp:
+#   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+#   write "$dir/pr-body.md":
+#     Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed.
+#
+#     Sub-tasks (implemented in fetch order, one commit per sub-task):
+#     - <SUBTASK-KEY> — <summary>
+#     - <SUBTASK-KEY> — <summary>
+#   PR_URL=$(gh pr create --title "[<STORY-KEY>] <story summary>" \
+#     --body-file "$dir/pr-body.md" --base develop --head feat/<STORY-KEY>)
 gh pr ready "$PR_URL"
 # Extra review layer (independent of the QA Engineer's Claude review loop in Step 6): request a
 # Copilot code review on the new PR. Best-effort — NEVER let it fail PR creation. Needs gh >= 2.88.0 + Copilot code review
