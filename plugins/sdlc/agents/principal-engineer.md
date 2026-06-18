@@ -145,9 +145,11 @@ Each agent prompt MUST include all of the following (agent starts cold — no co
 Never send an agent just a task title — include enough context to work without asking questions.
 
 **Sub-task-bearing stories.** When the story has child sub-tasks, the domain agent commits **once
-per sub-task** (sub-task key embedded in the message, `feat(<scope>): [<SUBTASK-KEY>] <summary>`),
-implementing them **in Jira fetch order, sequentially, on the single `feat/<STORY-KEY>` branch** —
-never a branch per sub-task. The authoritative description of this sequencing lives in
+per sub-task that touches its phase** (sub-task key embedded in the message,
+`feat(<scope>): [<SUBTASK-KEY>] <summary>`) — a sub-task with no work in this phase produces no
+commit here and lands in whichever phase owns its files (every sub-task gets ≥1 commit across the
+run). It implements them **in Jira fetch order, sequentially, on the single `feat/<STORY-KEY>`
+branch** — never a branch per sub-task. The authoritative description of this sequencing lives in
 `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` (Step 2.5 detection + Step 4 commit
 sequencing); pass the ordered sub-task slice into the agent prompt per that playbook. Do not
 re-spell the full loop here — the playbook is the source of truth. When the story has no

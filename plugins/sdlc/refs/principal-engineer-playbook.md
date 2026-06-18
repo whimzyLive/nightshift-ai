@@ -148,13 +148,17 @@ Phase 5 — [mobile-engineer]         mobile screens (only if plan has tasks)
 
 Sub-task sequencing happens **within** each domain phase — it does not reorder or replace the
 phase ladder. When the story has sub-tasks, the domain agent for a phase implements that phase's
-slice **one sub-task at a time, in `SUBTASKS` (fetch) order**, landing **a commit per sub-task**:
+slice **one sub-task at a time, in `SUBTASKS` (fetch) order**, landing **a commit per sub-task that
+touches this phase** (the "commit per sub-task" rule is scoped to the current phase — a sub-task
+with no work in this phase produces no commit here; see the third bullet):
 
 - Iterate `SUBTASKS` top-to-bottom (`ORDER BY created ASC`); **do not re-sort**.
-- Each sub-task contributes **≥1 commit** on the single `feat/<STORY-KEY>` branch, with a
-  conventional-commit message that **embeds the sub-task key**, e.g.
-  `feat(<scope>): [<SUBTASK-KEY>] <sub-task summary>` (scope from the changed directory per the
-  `conventional-commit` skill).
+- For each sub-task **whose work touches the current phase's domain**, make **≥1 commit** on the
+  single `feat/<STORY-KEY>` branch, with a conventional-commit message that **embeds the sub-task
+  key**, e.g. `feat(<scope>): [<SUBTASK-KEY>] <sub-task summary>` (scope from the changed directory
+  per the `conventional-commit` skill). Across the whole run every sub-task lands **≥1 commit** —
+  in whichever phase(s) own its files — but within any single phase only the sub-tasks that phase
+  touches get a commit.
 - A sub-task whose work does not touch the current phase's domain contributes **no commit in that
   phase** — it lands its commits in whichever phase(s) own its files. Sequencing is within the
   ladder; it never breaks it.
@@ -271,15 +275,18 @@ PR_URL=$(gh pr create \
   --base develop \
   --head feat/<STORY-KEY>)
 
-# subtaskCount > 0 — write the enumerated body to a file, then pass by reference (--body-file):
-#   mkdir -p .tmp; write to ./.tmp/pr-body.md:
+# subtaskCount > 0 — write the enumerated body to the session temp dir, then pass by reference.
+# Use the session-scoped temp dir (tmp-dir.sh) so session-complete.sh cleans it up — never a bare
+# ./.tmp path or /tmp:
+#   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+#   write "$dir/pr-body.md":
 #     Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed.
 #
 #     Sub-tasks (implemented in fetch order, one commit per sub-task):
 #     - <SUBTASK-KEY> — <summary>
 #     - <SUBTASK-KEY> — <summary>
 #   PR_URL=$(gh pr create --title "[<STORY-KEY>] <story summary>" \
-#     --body-file ./.tmp/pr-body.md --base develop --head feat/<STORY-KEY>)
+#     --body-file "$dir/pr-body.md" --base develop --head feat/<STORY-KEY>)
 gh pr ready "$PR_URL"
 # Extra review layer (independent of the QA Engineer's Claude review loop in Step 6): request a
 # Copilot code review on the new PR. Best-effort — NEVER let it fail PR creation. Needs gh >= 2.88.0 + Copilot code review
