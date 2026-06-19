@@ -26,6 +26,74 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
 
 ---
 
+## Global loop budget
+
+**Default: 30 minutes wall-clock time (1800 seconds), also bounded by 30
+passes.** These defaults are configurable: the budget values are set in the
+bash blocks below (the `BUDGET_SECS` and `BUDGET_PASSES` variables) — adjust
+them before invoking if a different bound is needed.
+
+The budget covers ALL wait states — it is a single, unified bound regardless
+of which wait rule (1, 2, or 5) is active. There is no separate Copilot-only
+timer.
+
+### Budget initialisation (first pass only)
+
+On the very first pass, check whether the budget file exists. If it does not,
+create it:
+
+```bash
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+BUDGET_FILE="$dir/loop-budget"
+
+if [ ! -f "$BUDGET_FILE" ]; then
+  # First pass: record start epoch and initialise pass counter to 0
+  start_epoch=$(date +%s)
+  printf '%s 0\n' "$start_epoch" > "$BUDGET_FILE"
+fi
+```
+
+### Budget read and increment (every pass, before each WAIT)
+
+Before scheduling any WAIT (rules 1, 2, or 5), read the budget file,
+increment the pass counter, compute elapsed seconds, and check both limits:
+
+```bash
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+BUDGET_FILE="$dir/loop-budget"
+BUDGET_SECS=1800   # 30 minutes
+BUDGET_PASSES=30   # max pass count
+
+read start_epoch pass_count < "$BUDGET_FILE"
+pass_count=$(( pass_count + 1 ))
+now=$(date +%s)
+elapsed=$(( now - start_epoch ))
+printf '%s %s\n' "$start_epoch" "$pass_count" > "$BUDGET_FILE"
+
+if [ "$elapsed" -ge "$BUDGET_SECS" ] || [ "$pass_count" -ge "$BUDGET_PASSES" ]; then
+  # Budget exceeded — STOP.  BLOCKED_BY is set by the caller to describe
+  # which wait condition held (see rules 1, 2, 5 below).
+  echo "Loop budget exceeded after ${elapsed}s / ${pass_count} passes. Blocking condition: ${BLOCKED_BY}. Last status: $(cat "$dir/loop-status-last" 2>/dev/null || echo '(none)')"
+  # Do NOT schedule a next iteration.
+  exit 0   # <-- stop the loop
+fi
+```
+
+The check runs BEFORE scheduling the WAIT, so the loop always stops promptly
+when the budget is hit. The budget is NOT checked on rule 4 (clean exit) or on
+halt paths (rules 3 fail / step 5) — those have their own exit logic.
+
+### Persisting the last status line
+
+After step 3 (status probe), save the `loop-status:` line for budget-exceeded
+messages:
+
+```bash
+echo "<the loop-status: line from step 3>" > "$dir/loop-status-last"
+```
+
+---
+
 ## Pass steps
 
 ### 1. Resolve the target PR (first pass only, or always as a guard)
@@ -67,17 +135,24 @@ Read the `loop-status:` line — it contains six fields (in order):
 **Print progress to stdout (AC-5):** pass number, head oid (first 8 chars),
 all six field values.
 
+**Persist the status line** for budget-exceeded messages:
+
+```bash
+# Replace <loop-status-line> with the actual line read from the script output
+printf '%s\n' "<loop-status-line>" > "$dir/loop-status-last"
+```
+
 ### 4. Apply the decision table
 
 Evaluate the fields in the order below; the FIRST matching rule wins.
 
 | # | Condition | Action |
 |---|-----------|--------|
-| 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — see note). **WAIT** — schedule next iteration. No fix. |
-| 2 | `copilot-reviewed-head == 0 && copilot-pending == 0` | Current HEAD has no Copilot review yet (initial wait, or post-push re-review needed). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT** — schedule next iteration. |
+| 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — see note). **WAIT** — check budget first (set `BLOCKED_BY="copilot-review-pending (copilot-pending=1, head=<head-oid>)"`), then schedule next iteration. No fix. |
+| 2 | `copilot-reviewed-head == 0 && copilot-pending == 0` | Current HEAD has no Copilot review yet (initial wait, or post-push re-review needed). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT** — check budget first (set `BLOCKED_BY="Copilot has not reviewed HEAD <head-oid>"`), then schedule next iteration. |
 | 3 | `copilot-reviewed-head == 1 && unresolved-copilot > 0` | Real unresolved comments on current HEAD. Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release). On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
-| 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. |
-| 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — schedule next iteration. |
+| 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
+| 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — check budget first (set `BLOCKED_BY="checks still pending: P=<checks-pending value>"`), then schedule next iteration. |
 
 > **`copilot-reviewed-head` is the load-bearing signal.** It is derived from
 > the REST reviews API and is reliable. `copilot-pending` (derived from
@@ -92,25 +167,28 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 > **Rule 4 is the only clean exit.** A zero `unresolved-copilot` while
 > `copilot-reviewed-head == 0` means Copilot has NOT yet reviewed the current
 > HEAD — that is rule 2 (wait), not a clean exit.
+>
+> **Budget applies to ALL WAIT paths (rules 1, 2, 5) only.** Rules 3 and 4
+> have their own exit paths and are never interrupted by the budget check.
+
+#### Budget check detail for WAIT rules (1, 2, 5)
+
+In each WAIT branch, before scheduling the next iteration:
+
+1. Set the `BLOCKED_BY` variable to the condition-specific description (shown
+   in the table above).
+2. Run the **Budget read and increment** block from the "Global loop budget"
+   section.
+3. If the budget block exits (budget exceeded) → the loop stops with the
+   message including `BLOCKED_BY` and the last status line.
+4. If the budget block does NOT exit → schedule the next iteration normally.
 
 ### 5. Halt on /review-fix failure (AC-4)
 
 If the `/review-fix` run in rule 3 errors or returns `Status: blocked`, stop
 the loop immediately. Print the failure details (which comment / what error) to
 stdout and do NOT schedule a next iteration. Surface the error to the user.
-
-### 6. Stall guard
-
-If Copilot has not produced a review of the current HEAD after **15 minutes**
-(approximately 15 self-paced passes at ~1 min each, or a configurable pass
-counter), STOP the loop and surface:
-
-> "Copilot did not review \<head-oid\> within 15 minutes. Stopping."
-
-Track elapsed time or pass count from the first pass where
-`copilot-reviewed-head == 0` for the current HEAD. Reset the counter whenever
-HEAD advances (a new push happened). This prevents infinite waiting when the
-Copilot reviewer is unavailable.
+Budget is NOT checked here — this is an immediate halt.
 
 ---
 
@@ -120,14 +198,18 @@ Copilot reviewer is unavailable.
 count, total Copilot comments resolved across the run, and green-checks
 confirmation.
 
-**On halt (steps 5 or 6 / stall guard):** print the failing pass number and
-the surfaced error or stall reason. Do not improvise around it.
+**On budget-exceeded stop (rules 1, 2, or 5):** print the elapsed time, pass
+count, the blocking condition, and the last `loop-status:` line. Do not
+improvise around it.
+
+**On halt (step 5 / review-fix failure):** print the failing pass number and
+the surfaced error or halt reason. Do not improvise around it.
 
 ---
 
 ## Final action — release the session (required)
 
-After all pass logic above is complete (clean exit, halt, or stall-guard stop),
+After all pass logic above is complete (clean exit, budget stop, or halt),
 run this as your very last action:
 
 ```bash
