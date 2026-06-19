@@ -78,7 +78,7 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 7. **[invoke `user-story-splitting` for any story >8 pts]** Apply the splitting patterns. Do NOT create the oversized story — split first.
 8. **Order by dependency** — stories that unblock others go first.
 9. Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
-10. Create stories — each entry in the bulk JSON **must** include `"parentIssueId": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children:
+10. Create stories — each entry in the bulk JSON **must** include `"parentIssueId": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children. Each entry **must also include** the `AI-Ready` label and the assessed Story Points (from step 6a):
     ```bash
     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
     bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
@@ -92,10 +92,25 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
       "projectKey": "<PROJECT-KEY>",
       "issueType": "Story",
       "parentIssueId": "<EPIC-KEY>",
-      "description": "..."
+      "description": "...",
+      "labels": ["AI-Ready"],
+      "Story point estimate": <points>
     }
     ```
+    Label rules:
+    - The label value is `"AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels).
+    - Decompose-created stories receive **only** `AI-Ready` — **never** `AI-Refine`.
+    Story Points field rules:
+    - Use the field **name** as the JSON key, not a `customfield_*` id. Probe both names per the "Reading story points" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) and use whichever the project recognises. If neither can be resolved, omit the field and surface a warning — do not fail the bulk-create.
     **Note:** `parentIssueId` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
+10a. **Post-create: stamp the AI Workflow field on each created child story.** For each key returned by step 10:
+    - If `epicAiWorkflow` is `Auto` or `Assisted`: set the AI Workflow custom field by name via a follow-up `acli jira workitem edit <KEY>` (resolving the field by display name, never by `customfield_*` id):
+      ```bash
+      acli jira workitem edit --key "<CHILD-KEY>" --custom-field "AI Workflow" --value "<epicAiWorkflow>" --yes
+      ```
+    - If `epicAiWorkflow` is `unset`: **skip the follow-up edit entirely** for that story and continue. Do not add an empty or null AI Workflow value.
+    - If the `edit` call fails for a story after successful bulk-create: surface the failing key in the agent return (non-silent) — the story exists but without the AI Workflow stamp. Do not abort the remaining stories. Example warning: `"Warning: AI Workflow stamp failed for <KEY> — story created without AI Workflow field."`
+    - **Never add `AI-Refine` to a decompose-created story** in this step or any other.
 11. Capture issue keys — pipe `--json` output through `jq -r '.key'` to collect each key
 12. **Link blocking dependencies.** Use the `link create` form (the positional `link <a> <b>` form is unreliable; do not use it). **acli's direction is counter-intuitive — verified against the Jira UI: `--in` is the BLOCKER, `--out` is the BLOCKED story.** So to express "**A blocks B**" (A is the prerequisite, B depends on A), put the blocker in `--in`:
     ```bash
