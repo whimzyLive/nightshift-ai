@@ -64,6 +64,11 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 ### Execution steps
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<EPIC-KEY>`. If this fails, STOP.
+   **After fetching the Epic, resolve the "AI Workflow" field value by name** — look up the field by its display name `"AI Workflow"` via the `acli`/Jira REST path described in `jira-fetch.md`. Do NOT use a hard-coded `customfield_*` id (ids vary per Jira instance). Capture the result as `epicAiWorkflow`:
+   - `Auto` → capture `epicAiWorkflow=Auto`
+   - `Assisted` → capture `epicAiWorkflow=Assisted`
+   - Any other value (null, empty, or unrecognised string) → treat as **unset**: set `epicAiWorkflow=unset` and continue. Do NOT error on unrecognised values.
+   - If the field cannot be resolved by name at all (API error, field absent on this instance) → treat as **unset**, surface a warning in the agent return ("Warning: AI Workflow field could not be resolved — omitting from child stories"), and continue decomposition without blocking. This is non-fatal (unset Epic tolerance).
 2. Find the PRD file path from Epic comments ONLY (format: `PRD: docs/features/...`). If no such comment exists on the Epic, STOP: "Cannot decompose — no PRD found on <EPIC-KEY>. Run /prd first." If the comment exists, verify the file exists on disk: `test -f <path> || { echo "STOP: PRD file not found at <path> — merge the prd/<EPIC-KEY> branch first."; exit 1; }` Then read it.
 3. Identify if an existing Epic has child stories already — do not duplicate
 4. **[invoke `user-story-mapping`]** Map the user journey for this Epic: identify persona, narrative, activities, and steps. Use the output as the structural skeleton for story decomposition.
