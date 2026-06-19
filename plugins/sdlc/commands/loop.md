@@ -65,9 +65,30 @@ BUDGET_SECS=1800   # 30 minutes
 BUDGET_PASSES=30   # max pass count
 
 read start_epoch pass_count < "$BUDGET_FILE"
+
+# Validate fields: if either is empty or non-numeric, re-initialise to avoid
+# arithmetic crashes under set -u or bogus elapsed values (e.g. empty file
+# coerces start_epoch to 0, making elapsed ≈ 1.7e9 and tripping the budget
+# immediately on pass 1).
+case "$start_epoch" in
+  (''|*[!0-9]*) start_epoch=$(date +%s); pass_count=0 ;;
+esac
+case "$pass_count" in
+  (''|*[!0-9]*) pass_count=0 ;;
+esac
+
 pass_count=$(( pass_count + 1 ))
 now=$(date +%s)
 elapsed=$(( now - start_epoch ))
+
+# Clamp clock skew: if start_epoch is in the future (e.g. NTP step-back),
+# elapsed goes negative and the wall-clock bound is silently disabled because
+# negative never satisfies -ge BUDGET_SECS.  Reset both so the bound works.
+if [ "$elapsed" -lt 0 ]; then
+  elapsed=0
+  start_epoch=$now
+fi
+
 printf '%s %s\n' "$start_epoch" "$pass_count" > "$BUDGET_FILE"
 
 if [ "$elapsed" -ge "$BUDGET_SECS" ] || [ "$pass_count" -ge "$BUDGET_PASSES" ]; then
@@ -82,15 +103,6 @@ fi
 The check runs BEFORE scheduling the WAIT, so the loop always stops promptly
 when the budget is hit. The budget is NOT checked on rule 4 (clean exit) or on
 halt paths (rules 3 fail / step 5) — those have their own exit logic.
-
-### Persisting the last status line
-
-After step 3 (status probe), save the `loop-status:` line for budget-exceeded
-messages:
-
-```bash
-echo "<the loop-status: line from step 3>" > "$dir/loop-status-last"
-```
 
 ---
 
@@ -153,6 +165,8 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 | 3 | `copilot-reviewed-head == 1 && unresolved-copilot > 0` | Real unresolved comments on current HEAD. Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release). On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
 | 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
 | 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — check budget first (set `BLOCKED_BY="checks still pending: P=<checks-pending value>"`), then schedule next iteration. |
+| 6 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing > 0 && checks-pending == 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there are no unresolved Copilot comments left to fix. `/loop` cannot repair CI failures. Print: "Required check(s) failing (F=<checks-failing value>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. Budget is NOT checked here — this is an immediate terminal halt, same as AC-4. |
+| 7 | _(catch-all — no rule above matched)_ | **UNEXPECTED STATE — HALT.** Print the current `loop-status:` line and "unexpected loop state — stopping to avoid a silent hang." Do NOT schedule a next iteration. No state may fall off the table silently. |
 
 > **`copilot-reviewed-head` is the load-bearing signal.** It is derived from
 > the REST reviews API and is reliable. `copilot-pending` (derived from
@@ -168,8 +182,20 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 > `copilot-reviewed-head == 0` means Copilot has NOT yet reviewed the current
 > HEAD — that is rule 2 (wait), not a clean exit.
 >
-> **Budget applies to ALL WAIT paths (rules 1, 2, 5) only.** Rules 3 and 4
-> have their own exit paths and are never interrupted by the budget check.
+> **Budget applies to ALL WAIT paths (rules 1, 2, 5) only.** Rules 3, 4, 6,
+> and 7 have their own exit paths and are never interrupted by the budget check.
+>
+> **Rule 6 ordering rationale.** Rule 6 (failing checks) is placed AFTER rule 3
+> (unresolved comments). This means that when a PR has BOTH unresolved Copilot
+> comments AND failing checks, rule 3 fires first and `/review-fix` runs — the
+> code fix push may also resolve the CI failure. Only when `unresolved-copilot
+> == 0` (nothing actionable left for `/review-fix`) does rule 6 halt on the
+> failing checks. Placing rule 6 before rule 3 would prevent `/review-fix` from
+> ever running when CI is red, which is the wrong behaviour.
+>
+> **Rule 7 (catch-all) is a safety net.** It must be the final rule. No
+> combination of field values may fall off the table silently and terminate the
+> loop without a surfaced reason.
 
 #### Budget check detail for WAIT rules (1, 2, 5)
 
@@ -204,6 +230,15 @@ improvise around it.
 
 **On halt (step 5 / review-fix failure):** print the failing pass number and
 the surfaced error or halt reason. Do not improvise around it.
+
+**On failing-checks halt (rule 6):** print the failing pass number, the
+`checks-failing` count, the head oid, and: "Required check(s) failing
+(F=<n>) on <head-oid> — /loop cannot fix CI; stopping." Do not improvise
+around it.
+
+**On unexpected-state halt (rule 7):** print the current `loop-status:` line
+and: "unexpected loop state — stopping to avoid a silent hang." Do not
+improvise around it.
 
 ---
 
