@@ -1,67 +1,127 @@
 ---
-description: After a PR is raised, stay active and drive the Copilot review-and-fix cycle to completion. Polls the PR every minute for unresolved Copilot review comments, runs /review-fix on each pass, and exits cleanly only when all Copilot comments are resolved AND all required status checks pass. Halts and surfaces the failure if a /review-fix run errors. Does NOT merge the PR and does NOT process non-Copilot review comments.
+description: >
+  Per-pass logic for the Copilot review-and-fix cycle. Each invocation probes
+  PR status, applies the decision table (wait / fix / stop), and returns — the
+  native /loop command handles re-invocation and pacing. Exits cleanly only
+  when Copilot has reviewed the current HEAD, all inline comments are resolved,
+  and all required status checks pass. Halts and surfaces the failure if
+  /review-fix errors or blocks. Does NOT merge the PR and does NOT process
+  non-Copilot review comments.
 ---
 
-Drive the post-PR review-fix cycle for **`$ARGUMENTS`** (a GitHub PR number or URL) to completion.
-This command STAYS ACTIVE after a PR exists: it polls for Copilot review feedback, applies fixes
-via `/review-fix`, and only exits when Copilot's comments are all resolved and the PR's required
-checks are green. It does NOT merge the PR (out of scope) and ignores non-Copilot reviewers.
+# sdlc:loop — Copilot review-fix pass
 
-Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitHub -> Org/repo).
+**Note:** This command surfaces as `sdlc:loop` (plugin-namespaced) and is
+distinct from the native `/loop`; it is designed as the per-pass body driven
+BY native `/loop`, not a competing loop engine.
 
-## Steps
+Drive **one pass** of the post-PR review-fix cycle for **`$ARGUMENTS`** (a
+GitHub PR number or URL). The native `/loop` command handles iteration and
+pacing (self-paced mode — it re-invokes this command after each pass and
+terminates the loop when this pass does not schedule a next iteration). This
+command NEVER merges the PR and ignores non-Copilot reviewers.
 
-1. **Resolve the target PR** from `$ARGUMENTS`:
-   `gh pr view <PR> --json number,headRefName,baseRefName,url,state`
-   If the PR is not OPEN -> STOP: "PR <PR> is not open — nothing to loop on".
+Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
+(GitHub → Org/repo).
 
-2. **Confirm Copilot is the reviewer** (AC-1). If `@copilot` is not already a requested reviewer,
-   request it best-effort (`gh pr edit <PR> --add-reviewer @copilot`), then enter the polling phase
-   WITHOUT exiting the session.
+---
 
-3. **Poll loop (1-minute interval)** (AC-2, AC-5). On each iteration:
-   - Probe status into the session temp dir (never /tmp, never inline JSON):
-     ```bash
-     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
-     bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR> "$dir/loop-copilot.json"
-     ```
-     Read the `loop-status:` line: `unresolved-copilot`, `checks-pending`, `checks-failing`, `checks-passing`.
-   - **Print progress to stdout** (AC-5): iteration number, unresolved-copilot count, checks pending/failing/passing.
-   - **Exit condition (AC-3):** if `unresolved-copilot == 0` AND `checks-failing == 0` AND
-     `checks-pending == 0` -> the loop is DONE; break and go to Report.
-   - **Fix pass (AC-2):** if `unresolved-copilot > 0`, run `/review-fix <PR>` INLINE (apply the
-     review-fix command's steps in this session; do NOT dispatch a subagent and do NOT let
-     review-fix run its own session-complete — `/loop` owns the single release). On success,
-     continue the loop (next poll picks up newly-resolved threads + new check runs).
-   - **Wait** one minute before the next iteration (poll interval):
-     ```bash
-     sleep 60
-     ```
+## Pass steps
 
-4. **Halt on failure (AC-4).** If a `/review-fix` pass errors or returns `Status: blocked`
-   (cannot apply a fix), STOP the loop immediately: print the failure (which comment / what error)
-   to stdout and EXIT non-clean — do NOT silently continue to the next poll iteration.
+### 1. Resolve the target PR (first pass only, or always as a guard)
+
+```bash
+gh pr view <PR> --json number,headRefName,baseRefName,url,state
+```
+
+If the PR is not OPEN → STOP the loop: surface "PR <PR> is not open — nothing
+to loop on" and do NOT schedule a next iteration.
+
+### 2. Ensure @copilot is a reviewer (AC-1)
+
+If `@copilot` is not already a requested reviewer, add it best-effort:
+
+```bash
+gh pr edit <PR> --add-reviewer @copilot
+```
+
+Proceed without exiting regardless of outcome.
+
+### 3. Probe current status (AC-2, AC-5)
+
+```bash
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR> "$dir/loop-copilot.json"
+```
+
+Read the `loop-status:` line — it contains six fields (in order):
+`copilot-reviewed-head`, `copilot-pending`, `unresolved-copilot`,
+`checks-pending`, `checks-failing`, `checks-passing`.
+
+**Print progress to stdout (AC-5):** pass number, head oid (first 8 chars),
+all six field values.
+
+### 4. Apply the decision table
+
+Evaluate the fields in the order below; the FIRST matching rule wins.
+
+| # | Condition | Action |
+|---|-----------|--------|
+| 1 | `copilot-pending == 1` | Copilot is actively reviewing now. **WAIT** — schedule next iteration. No fix. |
+| 2 | `copilot-reviewed-head == 0 && copilot-pending == 0` | Current HEAD has no Copilot review yet (initial wait, or post-push re-review needed). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT** — schedule next iteration. |
+| 3 | `copilot-reviewed-head == 1 && unresolved-copilot > 0` | Real unresolved comments on current HEAD. Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release). On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
+| 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. |
+| 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — schedule next iteration. |
+
+> **Rule 4 is the only clean exit.** A zero `unresolved-copilot` while
+> `copilot-reviewed-head == 0` means Copilot has NOT yet reviewed the current
+> HEAD — that is rule 2 (wait), not a clean exit.
+
+### 5. Halt on /review-fix failure (AC-4)
+
+If the `/review-fix` run in rule 3 errors or returns `Status: blocked`, stop
+the loop immediately. Print the failure details (which comment / what error) to
+stdout and do NOT schedule a next iteration. Surface the error to the user.
+
+### 6. Stall guard
+
+If Copilot has not produced a review of the current HEAD after **15 minutes**
+(approximately 15 self-paced passes at ~1 min each, or a configurable pass
+counter), STOP the loop and surface:
+
+> "Copilot did not review \<head-oid\> within 15 minutes. Stopping."
+
+Track elapsed time or pass count from the first pass where
+`copilot-reviewed-head == 0` for the current HEAD. Reset the counter whenever
+HEAD advances (a new push happened). This prevents infinite waiting when the
+Copilot reviewer is unavailable.
+
+---
 
 ## Report
 
-On clean exit: print the final `loop-status:` line, the number of poll iterations, total Copilot
-comments resolved across the run, and the green-checks confirmation. On halt (AC-4): print the
-failing iteration and the surfaced `/review-fix` error/blocked reason — do not improvise around it.
+**On clean exit (rule 4):** print the final `loop-status:` line, total pass
+count, total Copilot comments resolved across the run, and green-checks
+confirmation.
 
-**IMPORTANT:** `/loop` never merges the PR and never touches `/spec`, `/plan`, `/impl`, or `/auto`
-PR-raising logic. It only drives review + review-fix + check-gating on an already-open PR.
+**On halt (steps 5 or 6 / stall guard):** print the failing pass number and
+the surfaced error or stall reason. Do not improvise around it.
+
+---
 
 ## Final action — release the session (required)
 
-After everything above is complete (clean exit, or a terminal STOP/halt surfaced to the user), run
-this as your very last action:
+After all pass logic above is complete (clean exit, halt, or stall-guard stop),
+run this as your very last action:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
-It signals the automation worker to release this session's slot. Outside the worker
-(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+It signals the automation worker to release this session's slot. Outside the
+worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+
+---
 
 GitHub PR number or URL:
 $ARGUMENTS
