@@ -12,11 +12,17 @@ the Principal Engineer role directly.
 
 ## Steps
 
-1. **Triage gate.** Invoke `/triage <STORY-KEY>` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and
-   capture `TRIAGE` (`lightweight` | `full`). This decides whether the merged plan file is a hard
-   precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full` (fail-safe). If `/triage`
-   **STOPs without emitting a `TRIAGE=` line** (e.g. an `acli` auth/DNS failure), **STOP** here and
-   surface that error — do NOT proceed to implementation without a valid triage decision.
+1. **Triage gate.** Run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE**
+   (in this same session) and capture `TRIAGE` (`lightweight` | `full`). This decides whether the
+   merged plan file is a hard precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full`
+   (fail-safe). If the triage step **STOPs without emitting a `TRIAGE=` line** (e.g. an `acli`
+   auth/DNS failure), **STOP** here and surface that error — do NOT proceed to implementation without
+   a valid triage decision.
+
+   > **Do NOT invoke the `/triage` slash command here.** Its final action runs `session-complete.sh`,
+   > which under the automation harness emits the session-complete sentinel and releases this worker
+   > slot mid-`/impl`. `/impl` owns the single release at the very end. Apply the **ref** inline,
+   > never the **command** (`refs/triage.md` emits no sentinel).
 2. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
    Whether the plan file is **required** depends on `TRIAGE`:
    - **`TRIAGE=full`** → the plan file MUST exist at that path (merged to `develop`). If missing →
@@ -62,7 +68,12 @@ Jira `Blocks` links (by sibling-inversion) and requires every blocker to already
 no branch, no domain agents — and the `REASON=` line says which upstream story must ship first.
 Do not bypass this.
 
-## Final action — release the session (required)
+## Final action — release the session (required when run standalone)
+
+This step applies only when `/impl` is the **top-level** command. When `/auto` runs the
+implementation as part of Workflow A Phase 2 (it executes the Principal Engineer playbook inline on
+the `feat/<STORY-KEY>` branch), `/auto` owns the single session release at the very end — do **not**
+run this final action nested, or the worker slot is released mid-`/auto`.
 
 After **everything above is complete** (success, or a terminal STOP/blocked surfaced to the user), run this as your very last action:
 

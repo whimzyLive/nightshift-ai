@@ -6,7 +6,11 @@
 # unique completion marker so the harness can release the session's slot immediately instead of
 # waiting for an idle timeout. Outside such a harness it is a silent no-op — always safe to run.
 #
-# Invoked as the FINAL step of each SDLC slash command.
+# Invoked as the FINAL step of each TOP-LEVEL SDLC slash command — exactly once per driven session.
+# A command that runs ANOTHER command's logic as a sub-step must apply that command's *ref* inline
+# (e.g. /auto and /impl apply refs/triage.md) rather than invoking the nested *command*, so this
+# script fires only once, at the end of the top-level flow. Calling it from a nested command would
+# emit the sentinel mid-flow and release the worker slot before the parent finishes.
 #
 # Usage:
 #   bash session-complete.sh              # bare marker — no PR (refine/review-fix/folded-plan)

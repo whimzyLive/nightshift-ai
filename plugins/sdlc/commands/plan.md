@@ -46,7 +46,12 @@ PR: <PR_URL>"
     ```
 12. Return: story key, plan file path, PR URL
 
-## Final action — release the session (required)
+## Final action — release the session (required when run standalone)
+
+This step applies only when `/plan` is the **top-level** command. When `/auto` generates the plan as
+part of Workflow A Phase 2 (it dispatches the `tech-lead` agent and ships the plan on the impl
+branch), `/auto` owns the single session release at the very end — do **not** run this final action
+nested, or the worker slot is released mid-`/auto`.
 
 After **everything above is complete** (success or a terminal stop), run this as your very last action:
 

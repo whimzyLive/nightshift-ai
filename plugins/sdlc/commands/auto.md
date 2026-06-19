@@ -1,5 +1,5 @@
 ---
-description: Full SDLC automation for a Jira story. Quality-assesses and triages if needed, then delegates the complexity decision to /triage and routes a `full` story through the two-phase spec → review-gate → plan+impl-single-PR flow, or a `lightweight` story (<= threshold pts, inclusive) straight to implementation. Posts Jira comments at each gate with clickable PR links. Pass --async-review for non-blocking service-driven execution where JSON-RPC events replace the human confirmation gate.
+description: Full SDLC automation for a Jira story. Quality-assesses and triages if needed, then delegates the complexity decision to the shared triage protocol (refs/triage.md, applied inline) and routes a `full` story through the two-phase spec → review-gate → plan+impl-single-PR flow, or a `lightweight` story (<= threshold pts, inclusive) straight to implementation. Posts Jira comments at each gate with clickable PR links. Pass --async-review for non-blocking service-driven execution where JSON-RPC events replace the human confirmation gate.
 ---
 
 Parse $ARGUMENTS:
@@ -19,23 +19,29 @@ STORY_POINTS=N|missing
 ## Step 2 — Route
 
 **First, short-circuit on missing points from Step 1.** If scrum-master returned
-`STORY_POINTS=missing`, **stop here** — do NOT call `/triage` (it would only re-fetch Jira and
-return `full` + a warning, and a transient `/triage` `acli` failure could then leave `/auto` unable
+`STORY_POINTS=missing`, **stop here** — do NOT run the triage step (it would only re-fetch Jira and
+return `full` + a warning, and a transient triage `acli` failure could then leave `/auto` unable
 to route despite Step 1 having already succeeded). Tell the user: "Story points not set on
 STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
 
-Otherwise, invoke `/triage STORY_KEY` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and route on its
-`TRIAGE` outcome — the single shared definition of the lightweight/full decision (default threshold
-`<= 3` points ⇒ lightweight, inclusive; configurable per-repo). If `/triage` STOPs **without**
-emitting the required `TRIAGE=`/`STORY_POINTS=` block (e.g. an `acli` auth/DNS failure), **STOP** and
-surface that error — do not guess a route.
+Otherwise, run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE** (in
+this same session) and route on its `TRIAGE` outcome — the single shared definition of the
+lightweight/full decision (default threshold `<= 3` points ⇒ lightweight, inclusive; configurable
+per-repo). If the triage step STOPs **without** emitting the required `TRIAGE=`/`STORY_POINTS=`
+block (e.g. an `acli` auth/DNS failure), **STOP** and surface that error — do not guess a route.
+
+> **Do NOT invoke the `/triage` slash command here.** `/triage` is a top-level command whose final
+> action runs `session-complete.sh`, which (under the automation harness) emits the session-complete
+> sentinel and releases this worker slot — mid-`/auto`, before plan/impl have run. `/auto` owns the
+> single release at the very end. Apply the **ref** inline; never call the **command** from inside
+> `/auto`. (`refs/triage.md` is pure routing logic and emits no sentinel.)
 
 - `TRIAGE=full` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
 - `TRIAGE=lightweight` → **Workflow B** (direct impl, no spec/plan review gate)
 
-(Step 1's scrum-master `STORY_POINTS=N|missing` gates the `missing` stop **before** any `/triage`
-call; the complexity routing itself is delegated to `/triage` so `/auto` and `/impl` share one
-definition.)
+(Step 1's scrum-master `STORY_POINTS=N|missing` gates the `missing` stop **before** the triage step
+runs; the complexity routing itself is delegated to the shared `refs/triage.md` protocol — applied
+inline, not the `/triage` command — so `/auto` and `/impl` share one definition.)
 
 ---
 
@@ -169,6 +175,12 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 ---
 
 ## Final action — release the session (required)
+
+> **This is the ONE and ONLY session release for the whole `/auto` run.** Every phase `/auto`
+> delegates — triage (applied inline from `refs/triage.md`), spec/plan (the `solutions-architect` /
+> `tech-lead` agents), and impl (the Principal Engineer playbook run inline) — must NOT run its own
+> command's `session-complete.sh`. `/auto` reaches this final action exactly once, at the very end,
+> and that single emit releases the worker slot. A nested release would free the slot mid-run.
 
 After the routed workflow above is fully complete (Workflow A Phase 1 stop, A3, or B3 — whichever this run reached) and all Jira comments / JSON-RPC events have been sent, run this as your very last action:
 
