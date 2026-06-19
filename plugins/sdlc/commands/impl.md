@@ -68,7 +68,12 @@ Jira `Blocks` links (by sibling-inversion) and requires every blocker to already
 no branch, no domain agents — and the `REASON=` line says which upstream story must ship first.
 Do not bypass this.
 
-## Final action — release the session (required)
+## Final action — release the session (required when run standalone)
+
+This step applies only when `/impl` is the **top-level** command. When `/auto` runs the
+implementation as part of Workflow A Phase 2 (it executes the Principal Engineer playbook inline on
+the `feat/<STORY-KEY>` branch), `/auto` owns the single session release at the very end — do **not**
+run this final action nested, or the worker slot is released mid-`/auto`.
 
 After **everything above is complete** (success, or a terminal STOP/blocked surfaced to the user), run this as your very last action:
 

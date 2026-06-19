@@ -176,6 +176,12 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 ## Final action — release the session (required)
 
+> **This is the ONE and ONLY session release for the whole `/auto` run.** Every phase `/auto`
+> delegates — triage (applied inline from `refs/triage.md`), spec/plan (the `solutions-architect` /
+> `tech-lead` agents), and impl (the Principal Engineer playbook run inline) — must NOT run its own
+> command's `session-complete.sh`. `/auto` reaches this final action exactly once, at the very end,
+> and that single emit releases the worker slot. A nested release would free the slot mid-run.
+
 After the routed workflow above is fully complete (Workflow A Phase 1 stop, A3, or B3 — whichever this run reached) and all Jira comments / JSON-RPC events have been sent, run this as your very last action:
 
 ```bash

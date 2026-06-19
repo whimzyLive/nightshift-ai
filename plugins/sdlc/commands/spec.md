@@ -48,7 +48,12 @@ PR: <PR_URL>"
    ```
 9. Return: story key, spec file path, PR URL
 
-## Final action — release the session (required)
+## Final action — release the session (required when run standalone)
+
+This step applies only when `/spec` is the **top-level** command. When `/auto` generates the spec as
+part of Workflow A (it dispatches the `solutions-architect` agent for this work), `/auto` owns the
+single session release at the very end — do **not** run this final action nested, or the worker slot
+is released mid-`/auto`.
 
 After **everything above is complete** (success or a terminal stop), run this as your very last action:
 
