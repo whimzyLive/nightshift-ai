@@ -51,14 +51,22 @@ gh pr edit "$PR_URL" --add-reviewer "$REVIEWER" >/dev/null 2>&1 \
 
 # 4. VERIFY the request actually attached. `gh pr edit --add-reviewer` can exit 0 yet silently
 #    drop a Bot reviewer, and `gh pr view --json reviewRequests` does NOT list Bot reviewers — so
-#    confirm via REST. Warn loudly (but still succeed) when the bot is missing.
+#    confirm via REST. Distinguish three outcomes so a slug/API failure is never reported as a
+#    missing reviewer: (a) verified present, (b) verified absent, (c) could-not-verify.
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
 PR_NUM="${PR_URL##*/}"
-if [ -n "$SLUG" ] && gh api "repos/$SLUG/pulls/$PR_NUM/requested_reviewers" \
-     --jq '.users[].login' 2>/dev/null | grep -qix "${REVIEWER#@}"; then
-  echo "reviewer-confirmed: $REVIEWER requested on $PR_URL" >&2
+if [ -z "$SLUG" ]; then
+  echo "warn: could not determine repo slug — $REVIEWER request NOT verified (PR created regardless)" >&2
+elif reviewers=$(gh api "repos/$SLUG/pulls/$PR_NUM/requested_reviewers" --jq '.users[].login' 2>/dev/null); then
+  # gh api succeeded — empty output here means the reviewer is genuinely absent.
+  if printf '%s\n' "$reviewers" | grep -qix "${REVIEWER#@}"; then
+    echo "reviewer-confirmed: $REVIEWER requested on $PR_URL" >&2
+  else
+    echo "warn: $REVIEWER NOT present in requested_reviewers for $PR_URL — assign it manually" >&2
+  fi
 else
-  echo "warn: $REVIEWER NOT present in requested_reviewers for $PR_URL — assign it manually" >&2
+  # gh api itself failed (auth/network/404) — verification could not run; do not claim absence.
+  echo "warn: could not query requested_reviewers (auth/network) — $REVIEWER request NOT verified" >&2
 fi
 
 # 5. Bare URL to stdout for capture by the caller.
