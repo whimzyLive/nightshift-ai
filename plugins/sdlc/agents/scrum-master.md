@@ -64,15 +64,25 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 ### Execution steps
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<EPIC-KEY>`. If this fails, STOP.
+   **After fetching the Epic, resolve the "AI Workflow" field value by name** — probe by display name using JQL (mirror the "Reading story points" pattern in `jira-fetch.md`): check whether the Epic has a non-empty value for the field named `"AI Workflow"` by running:
+   ```bash
+   acli jira workitem search --jql "key = <EPIC-KEY> AND \"AI Workflow\" is not EMPTY" --fields "key,\"AI Workflow\"" --json 2>/dev/null
+   ```
+   If the result is non-empty, read the `"AI Workflow"` field value from the returned JSON. Do NOT use a hard-coded `customfield_*` id (ids vary per Jira instance). Capture the result as `epicAiWorkflow`:
+   - `Auto` → capture `epicAiWorkflow=Auto`
+   - `Assisted` → capture `epicAiWorkflow=Assisted`
+   - Any other value (null, empty, or unrecognised string) → treat as **unset**: set `epicAiWorkflow=unset` and continue. Do NOT error on unrecognised values.
+   - If the field cannot be resolved by name at all (API error, field absent on this instance) → treat as **unset**, surface a warning in the agent return ("Warning: AI Workflow field could not be resolved — omitting from child stories"), and continue decomposition without blocking. This is non-fatal (unset Epic tolerance).
 2. Find the PRD file path from Epic comments ONLY (format: `PRD: docs/features/...`). If no such comment exists on the Epic, STOP: "Cannot decompose — no PRD found on <EPIC-KEY>. Run /prd first." If the comment exists, verify the file exists on disk: `test -f <path> || { echo "STOP: PRD file not found at <path> — merge the prd/<EPIC-KEY> branch first."; exit 1; }` Then read it.
 3. Identify if an existing Epic has child stories already — do not duplicate
 4. **[invoke `user-story-mapping`]** Map the user journey for this Epic: identify persona, narrative, activities, and steps. Use the output as the structural skeleton for story decomposition.
 5. Apply the vertical-slice decomposition rules from `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`: each story cuts through ALL layers required (per .claude/project/project-context.md active agents) — never split horizontally by layer. Draft ALL stories before creating any.
 6. For each drafted story, write it using the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line (As a / I want / So that) + **checkbox** Acceptance Criteria (binary, 3–6 items). Never use Gherkin.
+6a. **Assess a Fibonacci estimate for each drafted story.** Using the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`, assign each story a `points` value from {1, 2, 3, 5, 8} — snap any computed value to the nearest Fibonacci number in that set. Capture the `points` value per story; it will be stamped in step 10. The existing >8 split rule in step 7 already guarantees no story exceeds 8 points before creation — a story estimated >8 is split in step 7 and the resulting sub-stories are each re-estimated, never created oversized.
 7. **[invoke `user-story-splitting` for any story >8 pts]** Apply the splitting patterns. Do NOT create the oversized story — split first.
 8. **Order by dependency** — stories that unblock others go first.
 9. Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
-10. Create stories — each entry in the bulk JSON **must** include `"parentIssueId": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children:
+10. Create stories — each entry in the bulk JSON **must** include `"parentKey": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children. Each entry **must also include** the `AI-Ready` label and the assessed Story Points (from step 6a):
     ```bash
     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
     bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
@@ -85,11 +95,26 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
       "summary": "...",
       "projectKey": "<PROJECT-KEY>",
       "issueType": "Story",
-      "parentIssueId": "<EPIC-KEY>",
-      "description": "..."
+      "parentKey": "<EPIC-KEY>",
+      "description": "...",
+      "labels": ["AI-Ready"],
+      "<STORY_POINTS_FIELD>": <points>
     }
     ```
-    **Note:** `parentIssueId` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
+    Label rules:
+    - The label value is `"AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels).
+    - Decompose-created stories receive **only** `AI-Ready` — **never** `AI-Refine`.
+    Story Points field rules:
+    - Use the field **name** as the JSON key, not a `customfield_*` id. Probe both names per the "Reading story points" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) and use whichever the project recognises. If neither can be resolved, omit the field and surface a warning — do not fail the bulk-create.
+    **Note:** `parentKey` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
+10a. **Post-create: stamp the AI Workflow field on each created child story.** For each key returned by step 10:
+    - If `epicAiWorkflow` is `Auto` or `Assisted`: set the AI Workflow custom field by name via a follow-up `acli jira workitem edit <KEY>` (resolving the field by display name, never by `customfield_*` id):
+      ```bash
+      acli jira workitem edit --key "<CHILD-KEY>" --custom-field "AI Workflow" --value "<epicAiWorkflow>" --yes
+      ```
+    - If `epicAiWorkflow` is `unset`: **skip the follow-up edit entirely** for that story and continue. Do not add an empty or null AI Workflow value.
+    - If the `edit` call fails for a story after successful bulk-create: surface the failing key in the agent return (non-silent) — the story exists but without the AI Workflow stamp. Do not abort the remaining stories. Example warning: `"Warning: AI Workflow stamp failed for <KEY> — story created without AI Workflow field."`
+    - **Never add `AI-Refine` to a decompose-created story** in this step or any other.
 11. Capture issue keys — pipe `--json` output through `jq -r '.key'` to collect each key
 12. **Link blocking dependencies.** Use the `link create` form (the positional `link <a> <b>` form is unreliable; do not use it). **acli's direction is counter-intuitive — verified against the Jira UI: `--in` is the BLOCKER, `--out` is the BLOCKED story.** So to express "**A blocks B**" (A is the prerequisite, B depends on A), put the blocker in `--in`:
     ```bash
