@@ -16,6 +16,16 @@ set -euo pipefail
 # copilot-reviewed-head=1  Copilot's latest review was submitted against the
 #                          current HEAD commit (commit_id matches headRefOid).
 # copilot-pending=1        Copilot is currently listed in reviewRequests for the PR.
+#                          BEST-EFFORT: gh pr view --json reviewRequests does not
+#                          reliably list bot reviewers (incl. the Copilot bot), so
+#                          this field may stay 0 even when a review is in-flight.
+#                          The loop's correctness relies on copilot-reviewed-head
+#                          (derived from the REST reviews API), NOT on this field.
+#                          copilot-pending=1 is only an optimisation: it suppresses
+#                          a redundant re-request while a review is mid-flight.
+#                          Even when it is always 0 the loop still waits correctly:
+#                          rule 2 (reviewed-head=0 & !pending) fires and the loop
+#                          re-requests + waits until copilot-reviewed-head=1.
 #
 # Why a script: GraphQL reviewThreads + checks rollup + jq + pagination cannot be
 # statically analyzed on a Bash command line — it lives here so the auto-mode
@@ -28,7 +38,7 @@ OWNER="${SLUG%/*}"; REPO="${SLUG#*/}"
 PR_NUM="${PR##*/}"
 
 # Copilot review-bot login(s). GitHub's Copilot reviewer posts as this bot login.
-COPILOT_LOGIN_RE='^(copilot-pull-request-reviewer|copilot|copilot-pull-request-reviewer\[bot\])$'
+COPILOT_LOGIN_RE='^(copilot-pull-request-reviewer|copilot)(\[bot\])?$'
 
 # ── HEAD oid ────────────────────────────────────────────────────────────────
 head_oid=$(gh pr view "$PR_NUM" --json headRefOid -q .headRefOid 2>/dev/null || echo "")

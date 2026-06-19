@@ -39,7 +39,13 @@ to loop on" and do NOT schedule a next iteration.
 
 ### 2. Ensure @copilot is a reviewer (AC-1)
 
-If `@copilot` is not already a requested reviewer, add it best-effort:
+Detect whether @copilot is already a requested reviewer by inspecting the
+`reviewRequests` field returned by `gh pr view`. **Note:** `reviewRequests` may
+not list the Copilot bot (GitHub does not reliably expose bot reviewers here),
+so this detection is best-effort. When in doubt the loop treats the current HEAD
+as not-yet-reviewed and waits or re-requests (rule 2 in the decision table).
+
+If @copilot is not detected as a pending reviewer, add it best-effort:
 
 ```bash
 gh pr edit <PR> --add-reviewer @copilot
@@ -67,12 +73,22 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 
 | # | Condition | Action |
 |---|-----------|--------|
-| 1 | `copilot-pending == 1` | Copilot is actively reviewing now. **WAIT** — schedule next iteration. No fix. |
+| 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — see note). **WAIT** — schedule next iteration. No fix. |
 | 2 | `copilot-reviewed-head == 0 && copilot-pending == 0` | Current HEAD has no Copilot review yet (initial wait, or post-push re-review needed). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT** — schedule next iteration. |
 | 3 | `copilot-reviewed-head == 1 && unresolved-copilot > 0` | Real unresolved comments on current HEAD. Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release). On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
 | 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. |
 | 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — schedule next iteration. |
 
+> **`copilot-reviewed-head` is the load-bearing signal.** It is derived from
+> the REST reviews API and is reliable. `copilot-pending` (derived from
+> `reviewRequests`) is BEST-EFFORT: GitHub does not reliably expose bot
+> reviewers in that field, so it may stay 0 even when the Copilot bot is
+> mid-review. Rule 1 is therefore an optimisation only — it suppresses a
+> redundant re-request when a review is confirmed in-flight. When
+> `copilot-pending` is always 0, rule 2 fires instead and the loop still
+> waits correctly (re-requesting and polling) until `copilot-reviewed-head`
+> becomes 1. No exit path depends on `copilot-pending`.
+>
 > **Rule 4 is the only clean exit.** A zero `unresolved-copilot` while
 > `copilot-reviewed-head == 0` means Copilot has NOT yet reviewed the current
 > HEAD — that is rule 2 (wait), not a clean exit.
