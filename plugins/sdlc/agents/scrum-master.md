@@ -64,7 +64,11 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 ### Execution steps
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<EPIC-KEY>`. If this fails, STOP.
-   **After fetching the Epic, resolve the "AI Workflow" field value by name** — look up the field by its display name `"AI Workflow"` via the `acli`/Jira REST path described in `jira-fetch.md`. Do NOT use a hard-coded `customfield_*` id (ids vary per Jira instance). Capture the result as `epicAiWorkflow`:
+   **After fetching the Epic, resolve the "AI Workflow" field value by name** — probe by display name using JQL (mirror the "Reading story points" pattern in `jira-fetch.md`): check whether the Epic has a non-empty value for the field named `"AI Workflow"` by running:
+   ```bash
+   acli jira workitem search --jql "key = <EPIC-KEY> AND \"AI Workflow\" is not EMPTY" --fields "key,\"AI Workflow\"" --json 2>/dev/null
+   ```
+   If the result is non-empty, read the `"AI Workflow"` field value from the returned JSON. Do NOT use a hard-coded `customfield_*` id (ids vary per Jira instance). Capture the result as `epicAiWorkflow`:
    - `Auto` → capture `epicAiWorkflow=Auto`
    - `Assisted` → capture `epicAiWorkflow=Assisted`
    - Any other value (null, empty, or unrecognised string) → treat as **unset**: set `epicAiWorkflow=unset` and continue. Do NOT error on unrecognised values.
@@ -78,7 +82,7 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 7. **[invoke `user-story-splitting` for any story >8 pts]** Apply the splitting patterns. Do NOT create the oversized story — split first.
 8. **Order by dependency** — stories that unblock others go first.
 9. Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
-10. Create stories — each entry in the bulk JSON **must** include `"parentIssueId": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children. Each entry **must also include** the `AI-Ready` label and the assessed Story Points (from step 6a):
+10. Create stories — each entry in the bulk JSON **must** include `"parentKey": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children. Each entry **must also include** the `AI-Ready` label and the assessed Story Points (from step 6a):
     ```bash
     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
     bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
@@ -91,10 +95,10 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
       "summary": "...",
       "projectKey": "<PROJECT-KEY>",
       "issueType": "Story",
-      "parentIssueId": "<EPIC-KEY>",
+      "parentKey": "<EPIC-KEY>",
       "description": "...",
       "labels": ["AI-Ready"],
-      "Story point estimate": <points>
+      "<STORY_POINTS_FIELD>": <points>
     }
     ```
     Label rules:
@@ -102,7 +106,7 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
     - Decompose-created stories receive **only** `AI-Ready` — **never** `AI-Refine`.
     Story Points field rules:
     - Use the field **name** as the JSON key, not a `customfield_*` id. Probe both names per the "Reading story points" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) and use whichever the project recognises. If neither can be resolved, omit the field and surface a warning — do not fail the bulk-create.
-    **Note:** `parentIssueId` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
+    **Note:** `parentKey` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
 10a. **Post-create: stamp the AI Workflow field on each created child story.** For each key returned by step 10:
     - If `epicAiWorkflow` is `Auto` or `Assisted`: set the AI Workflow custom field by name via a follow-up `acli jira workitem edit <KEY>` (resolving the field by display name, never by `customfield_*` id):
       ```bash
