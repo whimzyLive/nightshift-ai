@@ -217,17 +217,22 @@ returns a verdict:
 
 Only run after the QA Engineer returns `Status: clean`.
 
+Raise the PR **atomically via `raise-pr.sh`** (create → mark-ready → request `@copilot` → verify
+the request attached). Do **NOT** hand-roll `gh pr create` and run `gh pr ready` /
+`gh pr edit --add-reviewer` separately — that is how the reviewer step gets silently dropped and a
+PR opens with no code-review bot. Write the body to the session-scoped temp dir, then pass by file:
+
 ```bash
-PR_URL=$(gh pr create \
-  --title "feat(<STORY-KEY>): <story summary>" \
-  --body "Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed." \
-  --base <BASE-BRANCH> \
-  --head feat/<STORY-KEY>)
-gh pr ready "$PR_URL"
-# Extra review layer (independent of the Claude review loop): request a Copilot code review.
-# Best-effort — never fails PR creation (needs gh >= 2.88.0 + Copilot review on plan).
-gh pr edit "$PR_URL" --add-reviewer "@copilot" || echo "warn: @copilot reviewer not assigned — PR created regardless"
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+# write "$dir/pr-body.md" with your file-write tool, e.g.:
+#   Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed.
+PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
+  "feat/<STORY-KEY>" "<BASE-BRANCH>" "feat(<STORY-KEY>): <story summary>" "$dir/pr-body.md")
 ```
+
+`raise-pr.sh` prints only the PR URL on stdout; a `warn:` on stderr means `@copilot` did not attach
+(it verifies via REST, since `gh pr view --json reviewRequests` does not list Bot reviewers) — the
+PR is still created. Reviewer assignment is best-effort and never fails PR creation.
 
 ## Final report format
 

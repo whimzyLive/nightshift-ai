@@ -29,11 +29,14 @@ The agent should:
    git commit -m "docs(spec): <STORY-KEY> <story summary>"
    # Push BEFORE creating PR — PR creation fails if branch not on remote
    git push -u origin spec/<STORY-KEY>
-   # Then create PR and immediately mark ready for review (never draft)
-   PR_URL=$(gh pr create --title "docs(spec): <STORY-KEY> <story summary>" --base develop --head spec/<STORY-KEY>)
-   gh pr ready "$PR_URL"
-   # Best-effort: request a Copilot review on the PR. Never fails the flow (needs gh >= 2.88.0 + Copilot review on plan).
-   gh pr edit "$PR_URL" --add-reviewer "@copilot" || echo "warn: @copilot reviewer not assigned — PR created regardless"
+   # Raise the PR atomically via raise-pr.sh (create + mark-ready + request @copilot + verify the
+   # request attached). NEVER hand-roll gh pr create + add-reviewer separately — that is how the
+   # reviewer step gets dropped. Write the body to the session-scoped temp dir, then pass by file.
+   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+   # write "$dir/pr-body.md" with your file-write tool, e.g.:
+   #   Spec for <STORY-KEY>. See docs/superpowers/specs/<STORY-KEY>.md.
+   PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
+     "spec/<STORY-KEY>" develop "docs(spec): <STORY-KEY> <story summary>" "$dir/pr-body.md")
    ```
 8. Comment the story with the spec reference. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
    ```bash
