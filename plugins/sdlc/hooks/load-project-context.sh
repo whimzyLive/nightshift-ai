@@ -32,15 +32,18 @@ fi
 # (.../sdlc/<semver>); its parent holds every installed version. If a newer version exists in the
 # cache than the one this session resolved, we are running a stale playbook — surface a warning.
 # Inert when the root is not a versioned dir (e.g. a dev/source checkout) or only one version is
-# installed. Never fails the hook (set -e safe: the lookup pipeline is guarded with `|| true`).
+# installed. Never fails the hook: EVERY pipeline that could error under `pipefail` (incl. `sort -V`
+# on a platform that lacks it) is `2>/dev/null`-silenced and `|| true`-guarded, so the safety is
+# local and does not rely on the surrounding `if`-context. On a `sort -V`-less platform the feature
+# simply goes inert (no warning) rather than aborting.
 drift=""
 if [ -n "$plugin_root" ]; then
   running_ver="$(basename "$plugin_root")"
   if printf '%s' "$running_ver" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     latest_ver="$(ls -1 "$(dirname "$plugin_root")" 2>/dev/null \
-      | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)"
-    if [ -n "$latest_ver" ] && [ "$latest_ver" != "$running_ver" ] \
-       && [ "$(printf '%s\n%s\n' "$running_ver" "$latest_ver" | sort -V | tail -n1)" = "$latest_ver" ]; then
+      | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V 2>/dev/null | tail -n1 || true)"
+    max_ver="$(printf '%s\n%s\n' "$running_ver" "$latest_ver" | sort -V 2>/dev/null | tail -n1 || true)"
+    if [ -n "$latest_ver" ] && [ "$latest_ver" != "$running_ver" ] && [ "$max_ver" = "$latest_ver" ]; then
       drift="⚠️ SDLC PLUGIN DRIFT: this session resolved sdlc plugin v${running_ver}, but a newer v${latest_ver} is installed in the plugin cache. You are running an OLDER playbook — newer command/ref/script behavior will NOT take effect. Restart the session (or refresh the plugin) so \${CLAUDE_PLUGIN_ROOT} resolves to v${latest_ver}."
     fi
   fi
