@@ -26,14 +26,17 @@ JQ='.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == f
 
 all=$(gh api graphql --paginate -f query="$Q" -F o="$OWNER" -F r="$REPO" -F n="$PR_NUM" --jq "$JQ" 2>/dev/null || true)
 copilot=$(printf '%s\n' "$all" | jq -c --arg re "$COPILOT_LOGIN_RE" 'select((.author | ascii_downcase) | test($re))' 2>/dev/null || true)
-unresolved=$(printf '%s' "$copilot" | grep -c . || true)
+# Count distinct unresolved threads (not raw comment lines) so the progress number
+# reflects thread count even when a thread has multiple Copilot comments.
+unresolved=$(printf '%s' "$copilot" | jq -rs '[.[].thread] | unique | length' 2>/dev/null || printf '%s' "$copilot" | grep -c . || true)
 
-# Status checks: tally the PR's check runs by conclusion. statusCheckRollup gives
-# state per check; map to pending/failing/passing. Best-effort — zeros on failure.
-checks=$(gh pr checks "$PR_NUM" --json state,conclusion 2>/dev/null || echo '[]')
-pending=$(printf '%s' "$checks" | jq '[.[] | select((.state // "") | ascii_downcase | test("queued|in_progress|pending"))] | length' 2>/dev/null || echo 0)
-failing=$(printf '%s' "$checks" | jq '[.[] | select((.conclusion // "") | ascii_downcase | test("failure|timed_out|cancelled|action_required|startup_failure"))] | length' 2>/dev/null || echo 0)
-passing=$(printf '%s' "$checks" | jq '[.[] | select((.conclusion // "") | ascii_downcase == "success")] | length' 2>/dev/null || echo 0)
+# Status checks: use gh's own bucket normalization (pass|fail|pending|skipping|cancel).
+# --required limits to checks that are required by branch-protection rules so optional
+# or flaky checks cannot wedge the loop. Best-effort — zeros on failure.
+checks=$(gh pr checks "$PR_NUM" --required --json bucket 2>/dev/null || echo '[]')
+pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
+failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
+passing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass")]|length' 2>/dev/null || echo 0)
 
 if [ -n "$OUT" ]; then
   mkdir -p "$(dirname "$OUT")"

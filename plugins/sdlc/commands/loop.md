@@ -33,7 +33,10 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
      review-fix command's steps in this session; do NOT dispatch a subagent and do NOT let
      review-fix run its own session-complete — `/loop` owns the single release). On success,
      continue the loop (next poll picks up newly-resolved threads + new check runs).
-   - **Wait** one minute before the next iteration (poll interval).
+   - **Wait** one minute before the next iteration (poll interval):
+     ```bash
+     sleep 60
+     ```
 
 4. **Halt on failure (AC-4).** If a `/review-fix` pass errors or returns `Status: blocked`
    (cannot apply a fix), STOP the loop immediately: print the failure (which comment / what error)
