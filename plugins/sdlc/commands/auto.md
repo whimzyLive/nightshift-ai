@@ -19,8 +19,8 @@ STORY_POINTS=N|missing
 ## Step 2 — Route
 
 **First, short-circuit on missing points from Step 1.** If scrum-master returned
-`STORY_POINTS=missing`, **stop here** — do NOT call `/triage` (it would only re-fetch Jira and
-return `full` + a warning, and a transient `/triage` `acli` failure could then leave `/auto` unable
+`STORY_POINTS=missing`, **stop here** — do NOT run the triage step (it would only re-fetch Jira and
+return `full` + a warning, and a transient triage `acli` failure could then leave `/auto` unable
 to route despite Step 1 having already succeeded). Tell the user: "Story points not set on
 STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
 
@@ -39,9 +39,9 @@ block (e.g. an `acli` auth/DNS failure), **STOP** and surface that error — do 
 - `TRIAGE=full` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
 - `TRIAGE=lightweight` → **Workflow B** (direct impl, no spec/plan review gate)
 
-(Step 1's scrum-master `STORY_POINTS=N|missing` gates the `missing` stop **before** any `/triage`
-call; the complexity routing itself is delegated to `/triage` so `/auto` and `/impl` share one
-definition.)
+(Step 1's scrum-master `STORY_POINTS=N|missing` gates the `missing` stop **before** the triage step
+runs; the complexity routing itself is delegated to the shared `refs/triage.md` protocol — applied
+inline, not the `/triage` command — so `/auto` and `/impl` share one definition.)
 
 ---
 
