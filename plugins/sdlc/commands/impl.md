@@ -12,11 +12,17 @@ the Principal Engineer role directly.
 
 ## Steps
 
-1. **Triage gate.** Invoke `/triage <STORY-KEY>` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and
-   capture `TRIAGE` (`lightweight` | `full`). This decides whether the merged plan file is a hard
-   precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full` (fail-safe). If `/triage`
-   **STOPs without emitting a `TRIAGE=` line** (e.g. an `acli` auth/DNS failure), **STOP** here and
-   surface that error — do NOT proceed to implementation without a valid triage decision.
+1. **Triage gate.** Run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE**
+   (in this same session) and capture `TRIAGE` (`lightweight` | `full`). This decides whether the
+   merged plan file is a hard precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full`
+   (fail-safe). If the triage step **STOPs without emitting a `TRIAGE=` line** (e.g. an `acli`
+   auth/DNS failure), **STOP** here and surface that error — do NOT proceed to implementation without
+   a valid triage decision.
+
+   > **Do NOT invoke the `/triage` slash command here.** Its final action runs `session-complete.sh`,
+   > which under the automation harness emits the session-complete sentinel and releases this worker
+   > slot mid-`/impl`. `/impl` owns the single release at the very end. Apply the **ref** inline,
+   > never the **command** (`refs/triage.md` emits no sentinel).
 2. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
    Whether the plan file is **required** depends on `TRIAGE`:
    - **`TRIAGE=full`** → the plan file MUST exist at that path (merged to `develop`). If missing →

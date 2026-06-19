@@ -19,7 +19,12 @@ Triage the Jira story **`$ARGUMENTS`** and emit the shared routing contract so c
    ```
    On the `acli`-failure STOP path (Step 3), emit **no** `TRIAGE=` block — surface the error instead, so callers never parse a guessed route.
 
-## Final action — release the session (required)
+## Final action — release the session (required when run standalone)
+
+This step applies only when `/triage` is the **top-level** command the harness drove. When triage
+runs **inside** `/auto` or `/impl`, those parents apply `refs/triage.md` inline (they do NOT invoke
+this command) and own the single session release at the very end — so this final action never runs
+nested.
 
 After **everything above is complete** (success, or a terminal STOP surfaced to the user), run this as your very last action:
 

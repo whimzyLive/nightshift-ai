@@ -24,11 +24,17 @@ return `full` + a warning, and a transient `/triage` `acli` failure could then l
 to route despite Step 1 having already succeeded). Tell the user: "Story points not set on
 STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
 
-Otherwise, invoke `/triage STORY_KEY` (apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`) and route on its
-`TRIAGE` outcome — the single shared definition of the lightweight/full decision (default threshold
-`<= 3` points ⇒ lightweight, inclusive; configurable per-repo). If `/triage` STOPs **without**
-emitting the required `TRIAGE=`/`STORY_POINTS=` block (e.g. an `acli` auth/DNS failure), **STOP** and
-surface that error — do not guess a route.
+Otherwise, run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE** (in
+this same session) and route on its `TRIAGE` outcome — the single shared definition of the
+lightweight/full decision (default threshold `<= 3` points ⇒ lightweight, inclusive; configurable
+per-repo). If the triage step STOPs **without** emitting the required `TRIAGE=`/`STORY_POINTS=`
+block (e.g. an `acli` auth/DNS failure), **STOP** and surface that error — do not guess a route.
+
+> **Do NOT invoke the `/triage` slash command here.** `/triage` is a top-level command whose final
+> action runs `session-complete.sh`, which (under the automation harness) emits the session-complete
+> sentinel and releases this worker slot — mid-`/auto`, before plan/impl have run. `/auto` owns the
+> single release at the very end. Apply the **ref** inline; never call the **command** from inside
+> `/auto`. (`refs/triage.md` is pure routing logic and emits no sentinel.)
 
 - `TRIAGE=full` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
 - `TRIAGE=lightweight` → **Workflow B** (direct impl, no spec/plan review gate)
