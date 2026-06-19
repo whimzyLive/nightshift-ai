@@ -47,7 +47,8 @@ copilot_pending=$(printf '%s' "$review_requests" \
 reviews_raw=$(gh api "repos/$OWNER/$REPO/pulls/$PR_NUM/reviews" --paginate 2>/dev/null || echo '[]')
 copilot_latest_commit=$(printf '%s' "$reviews_raw" \
   | jq -r --arg re "$COPILOT_LOGIN_RE" \
-    '[.[] | select((.user.login // "") | ascii_downcase | test($re))]
+    '[.[] | select((.user.login // "") | ascii_downcase | test($re))
+          | select((.state // "") | test("APPROVED|CHANGES_REQUESTED|COMMENTED"))]
      | sort_by(.submitted_at)
      | last
      | .commit_id // ""' \
