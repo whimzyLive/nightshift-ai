@@ -54,18 +54,26 @@ merge), `plan+impl`, or `impl` (completes the story on merge).
 
 ### Resolving the working issue's mode
 
-The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode. Read
-it from the working issue's **AI Workflow** field — the same single-select the scrum-master and
-triage steps already rely on (its field id lives in the consuming repo's config; read by name via
-acli):
+The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode. Do
+**not** parse `acli workitem view` text output — that format is not stable across acli
+versions/flags, and a parse miss would silently disable Full Auto. Instead probe **definitively**
+with a JQL match (the repo's established custom-field-read pattern — see `refs/jira-fetch.md`), so
+auto-merge is enabled **only** when Jira itself confirms the field equals `Full Auto`:
 
 ```bash
-MODE=$(acli jira workitem view STORY_KEY --fields "AI Workflow" 2>/dev/null | sed -n 's/.*AI Workflow[^:]*:[[:space:]]*//p' | head -1)
+# Definitive, format-agnostic Full-Auto check: ask Jira directly whether STORY_KEY matches.
+if acli jira workitem search --jql 'key = STORY_KEY AND "AI Workflow" = "Full Auto"' --fields key 2>/dev/null | grep -qw STORY_KEY; then
+  MODE="Full Auto"
+else
+  MODE="other"   # Auto / Assisted / unset / unreadable — all take the human-merge path
+fi
 ```
 
-`MODE="Full Auto"` is the **only** value that enables auto-merge. Any other value (`Auto`,
-`Assisted`, unset, or an unreadable/transient error) → the **human-merge** path. Defaulting to the
-human path is the safe failure mode: a transient read error must never trigger an unattended merge.
+`MODE="Full Auto"` is the **only** value that enables auto-merge. Any other outcome (`Auto`,
+`Assisted`, unset, or a JQL/auth error that yields no match) → the **human-merge** path. Defaulting
+to the human path is the safe failure mode: a transient read error must never trigger an unattended
+merge. (The `"AI Workflow"` field name is the consuming repo's single-select; the JQL match is
+case- and format-stable, unlike scraping view output.)
 
 ### The procedure (run nested — do NOT release here)
 
