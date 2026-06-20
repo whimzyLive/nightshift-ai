@@ -6,6 +6,35 @@ Parse $ARGUMENTS:
 - `STORY_KEY` = $ARGUMENTS with `--async-review` stripped (e.g. `CER-123 --async-review` → `CER-123`)
 - `ASYNC_REVIEW` = `true` if `--async-review` present in $ARGUMENTS, else `false`
 
+## Step 0 — Detect the input type (Story vs Epic)
+
+`/auto` accepts **either** a single Story key (its original behaviour) **or** an Epic key (drives
+every child story to completion). Decide which by probing the issue type **definitively** — never
+scrape `acli workitem view` rendered text (that format is not stable across acli versions/flags).
+Read the structured `issuetype.name` field and compare case-insensitively:
+
+```bash
+ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null \
+           | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
+```
+
+Route on `ITYPE`:
+
+- `story` (or any non-epic *implementable* type your project routes through `/auto` as a single
+  story) → **continue to Step 1 below — the single-story flow is UNCHANGED.**
+- `epic` → **go to the [Epic orchestration](#epic-orchestration--drive-every-child-story) section
+  and do NOT run Steps 1+ for the epic key itself.** Each child story runs its own full `/auto`
+  single-story flow in a child session.
+- `sub-task` / any other type / an empty/unreadable probe → **STOP** with `unsupported input type`.
+  Tell the user: "STORY_KEY is not a Story or Epic (issuetype=`<name>`) — `/auto` drives a single
+  story or a whole epic; unsupported input type." Spawn **no** session. Then run the direct
+  `session-complete.sh` release (see **Final action**) and exit.
+
+> Everything from **Step 1** onward is the **single-story** flow. It is entered only for a Story-type
+> key (whether you ran `/auto <STORY>` directly or the epic loop spawned a child `/auto <STORY>`),
+> and behaves exactly as it always has. The epic path never falls through into Step 1 for the epic
+> key — it loops over children, each of which is itself a single-story `/auto` run.
+
 ## Step 1 — Assess
 
 Dispatch the `scrum-master` agent in **Mode 3 (Auto-Assess)** with `STORY_KEY`.
@@ -289,6 +318,176 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 ---
 
+## Epic orchestration — drive every child story
+
+Entered from **Step 0** when `STORY_KEY` is an **Epic**. The epic session drives every child story
+to completion in dependency order, spawning **one child `claude` session per story** and running
+exactly **one child live at a time**. Throughout this section `EPIC_KEY` = the epic key passed as
+`STORY_KEY`.
+
+The epic session keeps its **own** `SDLC_SESSION_KEY=EPIC_KEY`. Each child it spawns gets
+`SDLC_SESSION_KEY=<that child's story key>` — the epic key and every child key are distinct, so the
+parent's release sentinel and each child's completion sentinel never collide.
+
+### E0 — Epic precondition: the Epic's AI Workflow mode (`epicFallback`)
+
+Read the **Epic's own** AI Workflow field **once**, at loop start, using the same definitive,
+format-stable JQL probe the single-story flow uses for a story's mode (see *Resolving the working
+issue's mode*) — applied to `EPIC_KEY`:
+
+```bash
+# epicFallback = the Epic's AI Workflow value, or empty if unset/unreadable.
+if acli jira workitem search --jql 'key = EPIC_KEY AND "AI Workflow" = "Full Auto"' --fields key 2>/dev/null | grep -qw EPIC_KEY; then
+  epicFallback="Full Auto"
+elif acli jira workitem search --jql 'key = EPIC_KEY AND "AI Workflow" is not EMPTY' --fields key 2>/dev/null | grep -qw EPIC_KEY; then
+  epicFallback="set-non-fullauto"   # Auto / Assisted — a real, non-Full-Auto value
+else
+  epicFallback=""                   # unset OR unreadable
+fi
+```
+
+**If `epicFallback` is empty (the field is unset)** → **REJECT**: post a comment on the **Epic**
+explaining that an AI Workflow mode must be set before automation, and exit **without spawning any
+session**:
+
+```bash
+acli jira workitem comment create --key EPIC_KEY --body "Cannot start epic automation: the AI Workflow field is not set on this Epic.
+
+Set the Epic's AI Workflow to one of Full Auto / Auto / Assisted (it becomes the default mode for every child story that does not set its own), then re-run /auto EPIC_KEY."
+```
+
+Then run the direct `session-complete.sh` release (see **Final action**) and exit. (An unreadable
+probe is treated as unset — the safe default is to refuse to spawn anything rather than guess a mode.)
+
+### E1 — Build the dependency-ordered queue
+
+Run the queue builder as **one** statically-analysable invocation (all `acli`/`jq`/loops live inside
+the script, mirroring `dep-gate.sh`):
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/epic-queue.sh EPIC_KEY
+```
+
+Parse its greppable output:
+
+- `ORDER=<k1 k2 …>` — the stories in execution order: a story appears only after every sibling that
+  `Blocks` it (the feature-spec dependencies, encoded in the Jira `Blocks` graph). Independent
+  stories are tie-broken by Jira `created ASC`.
+- one `<key> BLOCKERS=<…>` line per story (informational).
+- `GATE=PASS` (exit 0) → proceed with `ORDER`.
+- `GATE=STOP` (exit 1) → the builder hit an acli failure **or a dependency cycle** (its `REASON=`
+  line names the cycle keys). **Do not spawn anything** — surface the `REASON` to the user, run the
+  direct `session-complete.sh` release, and exit.
+
+### E2 — Per-story loop
+
+For each story `S` in `ORDER`, in order, run the steps below. Maintain a `cursor` (see E5) so the
+epic is resumable. Exactly **one** child session is live at any moment.
+
+**E2a — Idempotent skip (re-run safety).** Before spawning, probe `S`'s Jira status definitively
+(format-stable field read — `acli jira workitem view S --fields status --json` then read
+`.fields.status.name`; do not scrape rendered text). If it already equals the **pipeline done
+status** (the consuming repo's terminal status — read from `.claude/project/project-context.md`,
+the same done status the pipeline already uses; add no new terminal status here) → **skip `S`
+without spawning a session** and advance to the next story. This makes re-running `/auto EPIC_KEY`
+idempotent: already-finished stories are passed over.
+
+**E2b — Decide whether `S` is gated.** Resolve `S`'s effective mode:
+
+- `storyMode(S)` = `S`'s own AI Workflow value via the single-story JQL probe (`Full Auto` /
+  non-Full-Auto / unset).
+- `effectiveMode(S) = storyMode(S) ?? epicFallback` — the story's own mode if it has one, else the
+  Epic's `epicFallback`.
+- `gated(S) := effectiveMode(S) != "Full Auto"`.
+
+`Full Auto` is the **only** non-gated value. `Auto`, `Assisted`, and any unreadable mode probe ⇒
+**gated** (the safe default — a transient read error must never silently un-gate a story).
+
+**E2c — Spawn the child session and wait for its sentinel.** Spawn exactly one child:
+
+```bash
+SDLC_SESSION_KEY=S claude --name S --dangerously-skip-permissions
+```
+
+Drive it with the single-story command `/auto S` (a fresh single-story run — it re-enters Step 0,
+detects `S` as a Story, and runs Steps 1+ unchanged). Because the child's environment carries
+`SDLC_SESSION_KEY=S`, the child's final `session-complete.sh` emits the **keyed** sentinel on its own
+output stream:
+
+- bare: `<<<SDLC_SESSION_COMPLETE:S>>>`
+- with PR: `<<<SDLC_SESSION_COMPLETE:S|PR=URL>>>`
+
+(KEY is exactly `S`; the terminator is exactly `>>>`.) **Watch the child's stream for that exact
+sentinel keyed on `S`.** On seeing it, the child has succeeded for this phase — tear the child
+session down and continue (handle gating in E3, then advance to the next story).
+
+### E3 — Gate handling (suspend primitive)
+
+After a child completes (sentinel seen), if `gated(S)` the epic must **suspend** before starting the
+next story — the gated story's PR needs human review + merge first. Suspension goes through a single
+documented seam (see **E5 — Suspend-primitive protocol**); the **interactive default** implemented
+here is:
+
+The child has **already** posted its own mode-aware Jira gate comment with the PR link (existing
+single-story behaviour — unchanged; the epic adds **no** new Jira comment format). The parent epic
+session then **blocks and prompts on stdout**:
+
+```
+Story S is gated (mode=<effectiveMode(S)>). PR: <url>. Review + merge, then type 'continue' to proceed to <nextStory>, or 'abort' to stop the epic.
+```
+
+- operator types **`continue`** → resume **in-process** at the next story (advance the cursor, loop
+  back to E2 for `nextStory`).
+- operator types **`abort`** → **clean stop**: no failure is recorded, the epic simply ends here. Run
+  the direct `session-complete.sh` release and exit. (Re-running `/auto EPIC_KEY` later resumes —
+  E2a skips every already-done story and picks up where the abort left off.)
+
+If `gated(S)` is **false** (`effectiveMode(S) == "Full Auto"`): the child already drove its PR to
+auto-merge via its own tail loop — **no suspend**, just advance straight to the next story. The
+all-Full-Auto epic is therefore **emergent**: no story is ever gated ⇒ the suspend primitive is
+never invoked ⇒ the whole epic runs to completion in this single epic session, hands-free.
+
+### E4 — HALT on child failure
+
+A child **succeeds** iff it emits its `<<<SDLC_SESSION_COMPLETE:S…>>>` sentinel. If the child instead
+exits non-zero, errors out, or hits its **idle timeout with no sentinel**, treat it as a **failure**
+and **HALT the whole epic immediately** — do **not** skip the story and do **not** continue to the
+next one:
+
+1. Post a Jira comment on the **failed story `S`** noting the epic run halted on it and why (e.g.
+   `child session for S failed: <reason>` — non-zero exit / error / idle-timeout-no-sentinel).
+2. Surface an **epic-level halt on stdout** naming the failed story and the reason.
+3. Run the direct `session-complete.sh` release and exit.
+
+The epic stays **resumable**: a later `/auto EPIC_KEY` skips every terminal story (E2a) and resumes
+at the still-unfinished failed story. An idle-timeout-with-no-sentinel is **always** a HALT, never a
+silent skip — a child that went quiet without signalling completion has *not* succeeded.
+
+### E5 — Suspend-primitive protocol (the seam)
+
+The gate-suspension point in E3 is a documented **prose protocol** (a seam), not an exported type.
+It is defined by two operations the epic loop calls at a gated story:
+
+- **`suspendForGate(epicKey, storyKey, cursor)`** — persist the resume state at the **next** story,
+  then either **block-and-resume in-process** (the interactive default — wait at the stdout prompt,
+  resume the loop on `continue`) **or** **release-and-exit** (an alternate substrate may choose to
+  drop the session and re-enqueue later instead of holding it open). Either way the epic resumes at
+  the cursor's next story.
+- **`resolveImpl()`** — selects which `suspendForGate` implementation is active: the **worker
+  alternate** when a worker-substrate marker is present (e.g. `SDLC_SESSION_KEY` is set **and** a
+  worker environment marker indicates the session is running under that substrate), the **interactive
+  default** otherwise.
+
+`cursor` carries: `epicKey`, the **next** story key (and its index into `ORDER`), and the gated
+story's PR URL. It is the single source of resume truth, so a resumed epic continues at exactly the
+story after the gate.
+
+> **This plugin ships the interactive default working** (the E3 stdout prompt + in-process resume).
+> A worker substrate registers the alternate `suspendForGate` behind this same seam **without
+> changing this command** — `resolveImpl()` picks it up from the environment marker. That substrate
+> lives outside this plugin and is intentionally not referenced here; the seam is all the plugin
+> needs to know about.
+
 ## Final action — release the session
 
 > **In the normal path the TAIL LOOP owns the single release.** Each routed phase ends by running
@@ -305,6 +504,11 @@ actually run it (the `ASYNC_REVIEW=false` phase paths above). In **every other c
 loop executed**, run `session-complete.sh` directly as the very last action, or the slot leaks until
 the idle timeout:
 
+- the Step 0 unsupported-input-type stop (no session spawned); **and**
+- the **epic path** when the epic session itself ends (E0 unset-Epic reject, E1 `GATE=STOP`, E3
+  `abort`, E4 HALT, or all children done) — the epic session keeps `SDLC_SESSION_KEY=EPIC_KEY` and
+  must release its **own** slot directly here (each child released its own slot via its own tail
+  loop); **and**
 - the Step 2 missing-points stop, a triage failure, or any early error (no PR raised); **and**
 - the **`ASYNC_REVIEW=true`** branches (A1, A2, B-phase), which raise a PR, fire the `phase/*`
   JSON-RPC event, and **stop without looping** — they still need the explicit release.
