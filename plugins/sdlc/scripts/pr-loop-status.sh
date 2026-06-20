@@ -11,7 +11,9 @@ set -euo pipefail
 # to /review-fix.
 #
 # Output line format:
-#   loop-status: copilot-reviewed-head=<0|1> copilot-pending=<0|1> unresolved-copilot=<N> checks-pending=<P> checks-failing=<F> checks-passing=<S>
+#   loop-status: copilot-reviewed-head=<0|1> copilot-changes-requested=<0|1> copilot-pending=<0|1> unresolved-copilot=<N> checks-pending=<P> checks-failing=<F> checks-passing=<S>
+#   copilot-changes-requested=1 ⇒ Copilot's LATEST review on the current head is CHANGES_REQUESTED
+#   (must NOT be treated as clean even if unresolved-copilot=0, e.g. a summary-only request).
 #
 # copilot-reviewed-head=1  Copilot's latest review was submitted against the
 #                          current HEAD commit (commit_id matches headRefOid).
@@ -55,18 +57,26 @@ copilot_pending=$(printf '%s' "$review_requests" \
 # Fetch all reviews, filter for Copilot bot, pick the latest by submitted_at,
 # extract its commit_id, compare to head_oid.
 reviews_raw=$(gh api "repos/$OWNER/$REPO/pulls/$PR_NUM/reviews" --paginate 2>/dev/null || echo '[]')
-copilot_latest_commit=$(printf '%s' "$reviews_raw" \
+# Capture BOTH the latest Copilot review's commit AND its state (tab-separated), so the loop can
+# distinguish an APPROVED/COMMENTED head review (clean-eligible) from a CHANGES_REQUESTED one
+# (must NOT be treated as clean even with zero unresolved inline threads — e.g. a summary-only
+# changes-requested review).
+copilot_latest=$(printf '%s' "$reviews_raw" \
   | jq -r --arg re "$COPILOT_LOGIN_RE" \
     '[.[] | select((.user.login // "") | ascii_downcase | test($re))
           | select((.state // "") | test("APPROVED|CHANGES_REQUESTED|COMMENTED"))]
      | sort_by(.submitted_at)
      | last
-     | .commit_id // ""' \
-    2>/dev/null || echo "")
+     | "\(.commit_id // "")\t\(.state // "")"' \
+    2>/dev/null || printf '\t')
+copilot_latest_commit=$(printf '%s' "$copilot_latest" | cut -f1)
+copilot_latest_state=$(printf '%s' "$copilot_latest" | cut -f2)
 
 copilot_reviewed_head=0
+copilot_changes_requested=0
 if [ -n "$copilot_latest_commit" ] && [ -n "$head_oid" ] && [ "$copilot_latest_commit" = "$head_oid" ]; then
   copilot_reviewed_head=1
+  if [ "$copilot_latest_state" = "CHANGES_REQUESTED" ]; then copilot_changes_requested=1; fi
 fi
 
 # ── Unresolved Copilot review threads (inline comments) ─────────────────────
@@ -91,5 +101,5 @@ if [ -n "$OUT" ]; then
   mkdir -p "$(dirname "$OUT")"
   printf '%s\n' "$copilot" > "$OUT"
 fi
-echo "loop-status: copilot-reviewed-head=$copilot_reviewed_head copilot-pending=$copilot_pending unresolved-copilot=$unresolved checks-pending=$pending checks-failing=$failing checks-passing=$passing"
+echo "loop-status: copilot-reviewed-head=$copilot_reviewed_head copilot-changes-requested=$copilot_changes_requested copilot-pending=$copilot_pending unresolved-copilot=$unresolved checks-pending=$pending checks-failing=$failing checks-passing=$passing"
 exit 0

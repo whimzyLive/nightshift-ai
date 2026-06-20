@@ -300,10 +300,16 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 > (A Full-Auto auto-merge of the spec PR resumes Phase 2 as a *separate* `/auto` invocation with its
 > own tail-loop release — not a nested one.)
 
-**Direct release only when no tail loop ran.** If `/auto` reached a terminal STOP *before* raising a
-PR and handing off to the tail loop — e.g. the Step 2 missing-points stop, a triage failure, or an
-early error — there is no loop to release the slot. In that case only, run this as the very last
-action:
+**Direct release whenever no tail loop ran.** The tail loop owns the release only on the paths that
+actually run it (the `ASYNC_REVIEW=false` phase paths above). In **every other case where no tail
+loop executed**, run `session-complete.sh` directly as the very last action, or the slot leaks until
+the idle timeout:
+
+- the Step 2 missing-points stop, a triage failure, or any early error (no PR raised); **and**
+- the **`ASYNC_REVIEW=true`** branches (A1, A2, B-phase), which raise a PR, fire the `phase/*`
+  JSON-RPC event, and **stop without looping** — they still need the explicit release.
+
+In those cases run this as the very last action:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh

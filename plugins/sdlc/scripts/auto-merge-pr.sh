@@ -43,9 +43,10 @@ fi
 [ -n "$METHOD" ] || { echo "ERROR: no merge method enabled on $SLUG — cannot auto-merge" >&2; exit 1; }
 echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 
-# Merge with the explicit resolved flag (never a bare `gh pr merge` — that prompts interactively).
-# Capture output for diagnostics rather than discarding it.
-if ! MERGE_OUT=$(gh pr merge "$PR" "$METHOD" 2>&1); then
+# Merge with the explicit resolved flag plus `--yes` (non-interactive confirm). `gh pr merge` can
+# still prompt for confirmation even when the method is given — `--yes` forces it through so an
+# automated session never hangs. Capture output for diagnostics rather than discarding it.
+if ! MERGE_OUT=$(gh pr merge "$PR" "$METHOD" --yes 2>&1); then
   echo "ERROR: gh pr merge $PR $METHOD failed (branch protection / conflict / required checks not met): $MERGE_OUT" >&2
   exit 1
 fi
