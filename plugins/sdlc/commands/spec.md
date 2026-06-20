@@ -48,20 +48,32 @@ PR: <PR_URL>"
    ```
 9. Return: story key, spec file path, PR URL
 
-## Final action — release the session (required when run standalone)
+## Final action — loop the PR to Copilot-clean, then release (when run standalone)
 
 This step applies only when `/spec` is the **top-level** command. When `/auto` generates the spec as
 part of Workflow A (it dispatches the `solutions-architect` agent for this work), `/auto` owns the
-single session release at the very end — do **not** run this final action nested, or the worker slot
-is released mid-`/auto`.
+loop **and** the single session release at the very end — do **not** run this final action nested.
 
-After **everything above is complete** (success or a terminal stop), run this as your very last action:
+After **everything above is complete** (the spec PR is raised and the Jira comment posted), the
+standalone command's final action is to drive the Copilot review-fix loop on the just-raised PR to
+convergence, **then** release — the loop is the session's **tail**:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+# PR_URL is the spec PR captured from the agent (step 9). Drive the review-fix loop on it.
+/loop /sdlc:loop <PR_URL>
 ```
 
-It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+The native `/loop` re-invokes `sdlc:loop` each pass: it polls Copilot's review of the PR head, runs
+`/review-fix` inline on each round of comments, and exits when the head is Copilot-reviewed with no
+unresolved comments and checks pass (or it halts / hits the idle budget). Because the loop is the
+**tail**, its own "Final action — release the session" emits the single `session-complete` — do
+**NOT** call `session-complete.sh` separately here.
+
+> - If the harness cannot invoke the native `/loop` from inside a command, drive `sdlc:loop`'s
+>   pass-cycle via `ScheduleWakeup` instead (same effect — the loop is the last thing the session
+>   does), then let its final pass release.
+> - If the command hit a terminal STOP **before** a PR was raised (nothing to loop on), run
+>   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` directly to release.
 
 Jira story key (e.g. CER-123):
 $ARGUMENTS
