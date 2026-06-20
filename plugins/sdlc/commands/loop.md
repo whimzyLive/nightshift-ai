@@ -15,11 +15,34 @@ description: >
 distinct from the native `/loop`; it is designed as the per-pass body driven
 BY native `/loop`, not a competing loop engine.
 
-Drive **one pass** of the post-PR review-fix cycle for **`$ARGUMENTS`** (a
-GitHub PR number or URL). The native `/loop` command handles iteration and
-pacing (self-paced mode — it re-invokes this command after each pass and
-terminates the loop when this pass does not schedule a next iteration). This
-command NEVER merges the PR and ignores non-Copilot reviewers.
+Drive **one pass** of the post-PR review-fix cycle for the PR in **`$ARGUMENTS`**
+(a GitHub PR number or URL, optionally followed by `--on-clean "<command>"`). The
+native `/loop` command handles iteration and pacing (self-paced mode — it
+re-invokes this command after each pass and terminates the loop when this pass
+does not schedule a next iteration). This command NEVER merges the PR **itself**
+and ignores non-Copilot reviewers.
+
+**Arguments.** `$ARGUMENTS` is `<PR> [--on-clean "<command>"]`:
+
+- `<PR>` — the PR number or URL to loop on.
+- `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
+  rule-4 clean exit** (head Copilot-reviewed, zero unresolved comments, checks
+  green), immediately before the session release. It is **NOT** run on any halt
+  (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
+  `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
+  whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
+  command for a Full Auto story; standalone `/spec`/`/plan`/`/impl` pass nothing).
+  If `--on-clean` is absent, rule 4 simply stops.
+
+**Parsing `$ARGUMENTS`.** Split it explicitly — do NOT pass the whole string to
+`gh`:
+- `PR` = the **first whitespace-delimited token** of `$ARGUMENTS`.
+- If the literal `--on-clean` appears, everything after it (the quoted command)
+  is the hook; capture it as `ON_CLEAN`. Otherwise `ON_CLEAN` is empty.
+
+Use `PR` alone in every `gh pr ...` call (passing the whole `$ARGUMENTS` would
+fail once `--on-clean` is present), and run `ON_CLEAN` only at the rule-4 clean
+exit.
 
 Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
 (GitHub → Org/repo).
@@ -28,10 +51,22 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
 
 ## Global loop budget
 
-**Default: 30 minutes wall-clock time (1800 seconds), also bounded by 30
-passes.** These defaults are configurable: the budget values are set in the
-bash blocks below (the `BUDGET_SECS` and `BUDGET_PASSES` variables) — adjust
-them before invoking if a different bound is needed.
+**Default: a 20-minute (1200-second) IDLE / no-progress timeout, also bounded
+by an absolute 30-pass runaway backstop.** These defaults are configurable: the
+budget values are set in the bash blocks below (the `BUDGET_SECS` and
+`BUDGET_PASSES` variables) — adjust them before invoking if a different bound is
+needed.
+
+`BUDGET_SECS` bounds **inactivity**, not total runtime: the timer is reset to
+"now" on every pass that makes progress (the reviewed head advanced, or the
+unresolved-comment count changed). So a PR that keeps getting Copilot reviews
+and fixes may run longer than 20 minutes as long as it keeps progressing; the
+bound only ever fires when Copilot adds **nothing** for 20 minutes. This is a
+ceiling on *waiting*, never a minimum runtime — a fast review-and-fix cycle
+that reaches the clean exit (rule 4) ends immediately, regardless of elapsed
+time. `BUDGET_PASSES` is a non-reset absolute ceiling that catches a
+pathological fix↔re-review oscillation (too *much* activity) — the two bounds
+are independent.
 
 The budget covers ALL wait states — it is a single, unified bound regardless
 of which wait rule (1, 2, or 5) is active. There is no separate Copilot-only
@@ -47,62 +82,76 @@ dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
 BUDGET_FILE="$dir/loop-budget"
 
 if [ ! -f "$BUDGET_FILE" ]; then
-  # First pass: record start epoch and initialise pass counter to 0
-  start_epoch=$(date +%s)
-  printf '%s 0\n' "$start_epoch" > "$BUDGET_FILE"
+  # First pass: record the progress epoch (now), pass counter 0, and an empty progress
+  # marker (head oid + unresolved count). Format: "<progress_epoch> <pass_count> <head> <unresolved>".
+  progress_epoch=$(date +%s)
+  printf '%s 0 - -\n' "$progress_epoch" > "$BUDGET_FILE"
 fi
 ```
 
 ### Budget read and increment (every pass, before each WAIT)
 
-Before scheduling any WAIT (rules 1, 2, or 5), read the budget file,
-increment the pass counter, compute elapsed seconds, and check both limits:
+Before scheduling any WAIT (rules 1, 2, or 5), read the budget file, increment
+the pass counter, **reset the idle window if this pass made progress**, compute
+idle elapsed seconds, and check both limits. This block runs AFTER the status
+probe (step 3), so it has this pass's `CUR_HEAD` and `CUR_UNRESOLVED`:
 
 ```bash
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
 BUDGET_FILE="$dir/loop-budget"
-BUDGET_SECS=1800   # 30 minutes
-BUDGET_PASSES=30   # max pass count
+BUDGET_SECS=1200   # 20 minutes of NO PROGRESS (idle timeout — reset on progress, NOT total runtime)
+BUDGET_PASSES=30   # absolute runaway backstop — NOT reset on progress
 
-read start_epoch pass_count < "$BUDGET_FILE"
+# CUR_HEAD / CUR_UNRESOLVED come from this pass's status probe (step 3):
+#   CUR_HEAD       = the PR head oid (gh pr view --json headRefOid, or the probe's head field)
+#   CUR_UNRESOLVED = the unresolved-copilot field from pr-loop-status.sh
+# Default to placeholders if a field is somehow unavailable, so progress detection still runs.
+CUR_HEAD="${CUR_HEAD:--}"
+CUR_UNRESOLVED="${CUR_UNRESOLVED:--}"
 
-# Validate fields: if either is empty or non-numeric, re-initialise to avoid
-# arithmetic crashes under set -u or bogus elapsed values (e.g. empty file
-# coerces start_epoch to 0, making elapsed ≈ 1.7e9 and tripping the budget
-# immediately on pass 1).
-case "$start_epoch" in
-  (''|*[!0-9]*) start_epoch=$(date +%s); pass_count=0 ;;
-esac
-case "$pass_count" in
-  (''|*[!0-9]*) pass_count=0 ;;
-esac
+read progress_epoch pass_count last_head last_unresolved < "$BUDGET_FILE"
+
+# Validate fields: re-initialise empty/non-numeric numerics to avoid set -u crashes or a bogus
+# huge elapsed (an empty file would coerce progress_epoch to 0 → elapsed ≈ 1.7e9 → trip on pass 1).
+case "$progress_epoch" in (''|*[!0-9]*) progress_epoch=$(date +%s) ;; esac
+case "$pass_count"     in (''|*[!0-9]*) pass_count=0 ;; esac
+[ -n "$last_head" ] || last_head=-
+[ -n "$last_unresolved" ] || last_unresolved=-
 
 pass_count=$(( pass_count + 1 ))
 now=$(date +%s)
-elapsed=$(( now - start_epoch ))
 
-# Clamp clock skew: if start_epoch is in the future (e.g. NTP step-back),
-# elapsed goes negative and the wall-clock bound is silently disabled because
-# negative never satisfies -ge BUDGET_SECS.  Reset both so the bound works.
-if [ "$elapsed" -lt 0 ]; then
-  elapsed=0
-  start_epoch=$now
+# Reset the idle window on PROGRESS: a new reviewed head (Copilot reviewed a new oid, or a
+# /review-fix push moved HEAD) or a changed unresolved-comment count since the last pass. Either
+# means forward progress — the loop should keep going regardless of total elapsed time so far.
+if [ "$CUR_HEAD" != "$last_head" ] || [ "$CUR_UNRESOLVED" != "$last_unresolved" ]; then
+  progress_epoch=$now
 fi
 
-printf '%s %s\n' "$start_epoch" "$pass_count" > "$BUDGET_FILE"
+elapsed=$(( now - progress_epoch ))   # IDLE seconds: time since the last progress
+
+# Clamp clock skew: if progress_epoch is in the future (NTP step-back), elapsed goes negative and
+# the bound would be silently disabled (negative never satisfies -ge). Reset so the bound works.
+if [ "$elapsed" -lt 0 ]; then
+  elapsed=0
+  progress_epoch=$now
+fi
+
+printf '%s %s %s %s\n' "$progress_epoch" "$pass_count" "$CUR_HEAD" "$CUR_UNRESOLVED" > "$BUDGET_FILE"
 
 if [ "$elapsed" -ge "$BUDGET_SECS" ] || [ "$pass_count" -ge "$BUDGET_PASSES" ]; then
-  # Budget exceeded — STOP.  BLOCKED_BY is set by the caller to describe
-  # which wait condition held (see rules 1, 2, 5 below).
-  echo "Loop budget exceeded after ${elapsed}s / ${pass_count} passes. Blocking condition: ${BLOCKED_BY}. Last status: $(cat "$dir/loop-status-last" 2>/dev/null || echo '(none)')"
+  # Budget exceeded — STOP.  BLOCKED_BY is set by the caller to describe which wait condition held
+  # (see rules 1, 2, 5 below). The message reports idle seconds (no-progress), not total runtime.
+  echo "Loop budget exceeded: ${elapsed}s idle (no progress) / ${pass_count} passes. Blocking condition: ${BLOCKED_BY}. Last status: $(cat "$dir/loop-status-last" 2>/dev/null || echo '(none)')"
   # Do NOT schedule a next iteration.
   exit 0   # <-- stop the loop
 fi
 ```
 
 The check runs BEFORE scheduling the WAIT, so the loop always stops promptly
-when the budget is hit. The budget is NOT checked on rule 4 (clean exit) or on
-halt paths (rules 3 fail / step 5) — those have their own exit logic.
+when the idle bound (or the pass backstop) is hit. The budget is NOT checked on
+rule 4 (clean exit) or on halt paths (rules 3 fail / step 5) — those have their
+own exit logic, so a converged PR is never held open by the timer.
 
 ---
 
@@ -140,12 +189,15 @@ dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR> "$dir/loop-copilot.json"
 ```
 
-Read the `loop-status:` line — it contains six fields (in order):
-`copilot-reviewed-head`, `copilot-pending`, `unresolved-copilot`,
-`checks-pending`, `checks-failing`, `checks-passing`.
+Read the `loop-status:` line — it contains seven fields (in order):
+`copilot-reviewed-head`, `copilot-changes-requested`, `copilot-pending`,
+`unresolved-copilot`, `checks-pending`, `checks-failing`, `checks-passing`.
+`copilot-changes-requested=1` means Copilot's **latest review on the current
+head is `CHANGES_REQUESTED`** — the PR is NOT clean even if `unresolved-copilot=0`
+(e.g. a summary-only changes-requested review with no inline threads).
 
 **Print progress to stdout (AC-5):** pass number, head oid (first 8 chars),
-all six field values.
+all seven field values.
 
 **Persist the status line** for budget-exceeded messages:
 
@@ -153,6 +205,17 @@ all six field values.
 # Replace <loop-status-line> with the actual line read from the script output
 printf '%s\n' "<loop-status-line>" > "$dir/loop-status-last"
 ```
+
+**Capture the progress signals for the idle budget.** The "Budget read and
+increment" block (above) resets the idle window when the loop makes progress, so
+it needs this pass's head oid and unresolved count:
+
+```bash
+CUR_HEAD=$(gh pr view <PR> --json headRefOid -q .headRefOid 2>/dev/null || echo -)
+CUR_UNRESOLVED=<the unresolved-copilot field from the loop-status line>
+```
+
+Export both before running the budget block in any WAIT branch (rules 1, 2, 5).
 
 ### 4. Apply the decision table
 
@@ -162,10 +225,10 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 |---|-----------|--------|
 | 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — see note). **WAIT** — check budget first (set `BLOCKED_BY="copilot-review-pending (copilot-pending=1, head=<head-oid>)"`), then schedule next iteration. No fix. |
 | 2 | `copilot-reviewed-head == 0 && copilot-pending == 0` | Current HEAD has no Copilot review yet (initial wait, or post-push re-review needed). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT** — check budget first (set `BLOCKED_BY="Copilot has not reviewed HEAD <head-oid>"`), then schedule next iteration. |
-| 3 | `copilot-reviewed-head == 1 && unresolved-copilot > 0` | Real unresolved comments on current HEAD. Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release). On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
-| 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
+| 3 | `copilot-reviewed-head == 1 && (unresolved-copilot > 0 \|\| copilot-changes-requested == 1)` | Copilot has actionable feedback on current HEAD — either unresolved inline threads **or** a `CHANGES_REQUESTED` review (including a summary-only one with no inline threads). Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release); `/review-fix` reads the review-summary body too, so a summary-only request is addressed. On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
+| 4 | `copilot-reviewed-head == 1 && copilot-changes-requested == 0 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — Copilot's latest head review is NOT `CHANGES_REQUESTED`, no unresolved comments, checks green. If an `--on-clean "<command>"` was provided, run it **exactly once now** (this rule is the ONLY place it runs); if it exits non-zero, surface the error in the report (the PR is still raised — the caller decides whether that is terminal). Then STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
 | 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — check budget first (set `BLOCKED_BY="checks still pending: P=<checks-pending value>"`), then schedule next iteration. |
-| 6 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing > 0 && checks-pending == 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there are no unresolved Copilot comments left to fix. `/loop` cannot repair CI failures. Print: "Required check(s) failing (F=<checks-failing value>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. Budget is NOT checked here — this is an immediate terminal halt, same as AC-4. |
+| 6 | `copilot-reviewed-head == 1 && copilot-changes-requested == 0 && unresolved-copilot == 0 && checks-failing > 0 && checks-pending == 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there are no unresolved Copilot comments left to fix. `/loop` cannot repair CI failures. Print: "Required check(s) failing (F=<checks-failing value>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. Budget is NOT checked here — this is an immediate terminal halt, same as AC-4. |
 | 7 | _(catch-all — no rule above matched)_ | **UNEXPECTED STATE — HALT.** Print the current `loop-status:` line and "unexpected loop state — stopping to avoid a silent hang." Do NOT schedule a next iteration. No state may fall off the table silently. |
 
 > **`copilot-reviewed-head` is the load-bearing signal.** It is derived from
@@ -254,7 +317,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 It signals the automation worker to release this session's slot. Outside the
 worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
+> Ordering with `--on-clean`: on a rule-4 clean exit the `--on-clean` command (if
+> any) runs **before** this release — it is part of the terminal pass, not after
+> the slot is freed. On halt/budget paths `--on-clean` does not run; this release
+> still happens.
+
 ---
 
-GitHub PR number or URL:
+GitHub PR number or URL, optionally `--on-clean "<command>"`:
 $ARGUMENTS

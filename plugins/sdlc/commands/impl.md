@@ -68,20 +68,32 @@ Jira `Blocks` links (by sibling-inversion) and requires every blocker to already
 no branch, no domain agents — and the `REASON=` line says which upstream story must ship first.
 Do not bypass this.
 
-## Final action — release the session (required when run standalone)
+## Final action — loop the PR to Copilot-clean, then release (when run standalone)
 
 This step applies only when `/impl` is the **top-level** command. When `/auto` runs the
 implementation as part of Workflow A Phase 2 (it executes the Principal Engineer playbook inline on
-the `feat/<STORY-KEY>` branch), `/auto` owns the single session release at the very end — do **not**
-run this final action nested, or the worker slot is released mid-`/auto`.
+the `feat/<STORY-KEY>` branch), `/auto` owns the loop **and** the single session release at the very
+end — do **not** run this final action nested.
 
-After **everything above is complete** (success, or a terminal STOP/blocked surfaced to the user), run this as your very last action:
+After **everything above is complete** (the implementation PR is raised and commented on the story),
+the standalone command's final action is to drive the Copilot review-fix loop on the just-raised PR
+to convergence, **then** release — the loop is the session's **tail**:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+# IMPL_PR_URL is the PR the Principal Engineer playbook opened. Drive the review-fix loop on it.
+/loop /sdlc:loop <IMPL_PR_URL>
 ```
 
-It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+The native `/loop` re-invokes `sdlc:loop` each pass: it polls Copilot's review of the PR head, runs
+`/review-fix` inline on each round of comments, and exits when the head is Copilot-reviewed with no
+unresolved comments and checks pass (or it halts / hits the idle budget). Because the loop is the
+**tail**, its own "Final action — release the session" emits the single `session-complete` — do
+**NOT** call `session-complete.sh` separately here.
+
+> - If the harness cannot invoke the native `/loop` from inside a command, drive `sdlc:loop`'s
+>   pass-cycle via `ScheduleWakeup` instead (same effect), then let its final pass release.
+> - If the command hit a terminal STOP/blocked **before** a PR was raised (nothing to loop on), run
+>   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` directly to release.
 
 Jira story key (e.g. <STORY-KEY>):
 $ARGUMENTS
