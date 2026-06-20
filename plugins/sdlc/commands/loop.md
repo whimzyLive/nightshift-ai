@@ -15,11 +15,24 @@ description: >
 distinct from the native `/loop`; it is designed as the per-pass body driven
 BY native `/loop`, not a competing loop engine.
 
-Drive **one pass** of the post-PR review-fix cycle for **`$ARGUMENTS`** (a
-GitHub PR number or URL). The native `/loop` command handles iteration and
-pacing (self-paced mode — it re-invokes this command after each pass and
-terminates the loop when this pass does not schedule a next iteration). This
-command NEVER merges the PR and ignores non-Copilot reviewers.
+Drive **one pass** of the post-PR review-fix cycle for the PR in **`$ARGUMENTS`**
+(a GitHub PR number or URL, optionally followed by `--on-clean "<command>"`). The
+native `/loop` command handles iteration and pacing (self-paced mode — it
+re-invokes this command after each pass and terminates the loop when this pass
+does not schedule a next iteration). This command NEVER merges the PR **itself**
+and ignores non-Copilot reviewers.
+
+**Arguments.** `$ARGUMENTS` is `<PR> [--on-clean "<command>"]`:
+
+- `<PR>` — the PR number or URL to loop on.
+- `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
+  rule-4 clean exit** (head Copilot-reviewed, zero unresolved comments, checks
+  green), immediately before the session release. It is **NOT** run on any halt
+  (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
+  `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
+  whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
+  command for a Full Auto story; standalone `/spec`/`/plan`/`/impl` pass nothing).
+  If `--on-clean` is absent, rule 4 simply stops.
 
 Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
 (GitHub → Org/repo).
@@ -200,7 +213,7 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 | 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — see note). **WAIT** — check budget first (set `BLOCKED_BY="copilot-review-pending (copilot-pending=1, head=<head-oid>)"`), then schedule next iteration. No fix. |
 | 2 | `copilot-reviewed-head == 0 && copilot-pending == 0` | Current HEAD has no Copilot review yet (initial wait, or post-push re-review needed). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT** — check budget first (set `BLOCKED_BY="Copilot has not reviewed HEAD <head-oid>"`), then schedule next iteration. |
 | 3 | `copilot-reviewed-head == 1 && unresolved-copilot > 0` | Real unresolved comments on current HEAD. Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release). On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2 while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
-| 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
+| 4 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — if an `--on-clean "<command>"` was provided, run it **exactly once now** (this rule is the ONLY place it runs); if it exits non-zero, surface the error in the report (the PR is still raised — the caller decides whether that is terminal). Then STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
 | 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — check budget first (set `BLOCKED_BY="checks still pending: P=<checks-pending value>"`), then schedule next iteration. |
 | 6 | `copilot-reviewed-head == 1 && unresolved-copilot == 0 && checks-failing > 0 && checks-pending == 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there are no unresolved Copilot comments left to fix. `/loop` cannot repair CI failures. Print: "Required check(s) failing (F=<checks-failing value>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. Budget is NOT checked here — this is an immediate terminal halt, same as AC-4. |
 | 7 | _(catch-all — no rule above matched)_ | **UNEXPECTED STATE — HALT.** Print the current `loop-status:` line and "unexpected loop state — stopping to avoid a silent hang." Do NOT schedule a next iteration. No state may fall off the table silently. |
@@ -291,7 +304,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 It signals the automation worker to release this session's slot. Outside the
 worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
+> Ordering with `--on-clean`: on a rule-4 clean exit the `--on-clean` command (if
+> any) runs **before** this release — it is part of the terminal pass, not after
+> the slot is freed. On halt/budget paths `--on-clean` does not run; this release
+> still happens.
+
 ---
 
-GitHub PR number or URL:
+GitHub PR number or URL, optionally `--on-clean "<command>"`:
 $ARGUMENTS

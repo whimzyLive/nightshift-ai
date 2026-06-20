@@ -75,38 +75,41 @@ to the human path is the safe failure mode: a transient read error must never tr
 merge. (The `"AI Workflow"` field name is the consuming repo's single-select; the JQL match is
 case- and format-stable, unlike scraping view output.)
 
-### The procedure (run nested — do NOT release here)
+### The procedure (the loop is the tail — it owns the release)
 
-The loop runs **nested** under `/auto`: it must NOT emit `session-complete` (`/auto` owns the single
-release at its very end). `/auto` must regain control after the loop to merge/advance, so drive
-`sdlc:loop`'s pass-cycle via `ScheduleWakeup` here — do **not** hand off to the native `/loop` (which
-would become the session tail and release).
+The loop is the phase's **tail**, exactly like the standalone commands: hand it to the native
+`/loop` driving `sdlc:loop`. For a **Full Auto** story, inject the auto-merge as the loop's
+`--on-clean` hook so it runs at the loop's rule-4 clean exit — the loop stays mode-agnostic and just
+runs the hook. The loop owns the single `session-complete`; `/auto` does **not** release separately.
 
-1. **Run the loop nested** on `<PR_URL>`: apply `sdlc:loop`'s pass logic (poll Copilot review of the
-   head → `/review-fix` inline on each round) until it converges (head Copilot-reviewed, zero
-   unresolved comments, checks pass) or halts (review-fix blocked, CI red, idle budget). Do NOT let
-   it run `session-complete.sh`.
-2. **Re-probe the clean state** once the loop returns:
-   ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR_URL> "$dir/loop-final.json"
-   # CLEAN ⇔ copilot-reviewed-head=1 AND unresolved-copilot=0 AND checks-failing=0 AND checks-pending=0
-   ```
-3. **Terminal action:**
-   - **`MODE` = `Full Auto` AND CLEAN** → auto-merge; merging emits the GitHub merge event that
-     advances the pipeline (`<PHASE>=spec` → resumes into Phase 2; `<PHASE>=plan+impl`/`impl` →
-     completes the story):
+1. **Resolve `MODE`** (see above) — this decides whether an `--on-clean` hook is attached.
+2. **Post the phase's Jira comment FIRST** (the loop is the session's last act, so the comment is
+   posted before it — see A1/A3/B3 for the per-phase, mode-aware text).
+3. **Run the loop as the tail:**
+   - **`MODE` = `Full Auto`** → attach the auto-merge hook; on the loop's clean exit it auto-merges
+     `<PR_URL>`, whose merge event advances the pipeline (`<PHASE>=spec` → resumes Phase 2;
+     `plan+impl`/`impl` → completes the story):
      ```bash
-     bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>
+     /loop /sdlc:loop <PR_URL> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
      ```
-     Non-zero exit (no merge method enabled / branch protection / merge failed) → **STOP and
-     surface** the error; do not guess — the PR stays open.
-   - **`MODE` ≠ `Full Auto`, OR the loop did NOT converge clean** → **stop on the human gate**: leave
-     the PR open and post the phase's human-merge Jira comment (as written in A1/A3/B3). For a
-     non-clean halt, also surface the loop's halt reason. Take no merge action.
+   - **Any other mode** → no hook; the loop just drives the PR to Copilot-clean and stops for a human
+     merge:
+     ```bash
+     /loop /sdlc:loop <PR_URL>
+     ```
 
-`sdlc:loop` stays mode-agnostic — it only drives review-fix to convergence; `/auto` holds the mode
-and owns the merge decision and the single release.
+The loop drives review-fix to convergence (or halts on review-fix-blocked / CI-red / idle-budget),
+then releases via its own Final action. On a non-clean halt the `--on-clean` hook does **not** run
+(no merge) — the PR stays open and the halt reason is surfaced. If the hook itself fails (branch
+protection, conflict), the loop surfaces it and the PR stays open.
+
+> **Fallback** — if the harness cannot self-invoke the native `/loop` from inside `/auto`: drive
+> `sdlc:loop`'s pass-cycle via `ScheduleWakeup` yourself and run the resolved `--on-clean` command at
+> the rule-4 clean exit, before the single release. Same effect — the loop is the last thing the
+> session does, and `/auto` adds no separate release.
+
+`sdlc:loop` stays mode-agnostic — it only drives review-fix and runs whatever `--on-clean` hook it
+was handed; `/auto` decides (via `MODE`) whether to attach the auto-merge hook.
 
 ---
 
@@ -146,31 +149,32 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 ```
 **Exit.** Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
 
-**If ASYNC_REVIEW=false** — run the **Loop-after-raise + mode-conditioned terminal action**
-procedure (above) for the spec PR (`<PR_URL>`=`SPEC_PR_URL`, `<PHASE>`=`spec`):
+**If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then run the
+**Loop-after-raise** procedure (above) for the spec PR as the session **tail** (`<PR_URL>`=`SPEC_PR_URL`,
+`<PHASE>`=`spec`). The comment is posted **before** the loop (the loop is the last act):
 
-- **`MODE`=`Full Auto` AND the loop converged clean** → the procedure auto-merges the spec PR.
-  Merging fires the GitHub webhook that resumes the pipeline into **Phase 2** automatically — no
-  human step. Post a Jira note:
+- **`MODE`=`Full Auto`** → post an intent note, then run the tail loop **with** the auto-merge hook
+  (it auto-merges the spec PR on clean exit; that merge webhook then resumes Phase 2 automatically):
   ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Spec PR auto-merged (Full Auto): SPEC_PR_URL
+  acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
 
-Copilot review + checks passed; pipeline advancing to plan + implementation automatically."
+Driving Copilot review-fix now; will auto-merge once review + checks pass, then advance to plan + implementation automatically."
   ```
-- **Any other mode, OR the loop did not converge clean** → leave the spec PR open for human review:
+- **Any other mode** → post the human-merge note, then run the tail loop **without** a hook (drives
+  the PR to Copilot-clean, leaves it open for a human merge):
   ```bash
   acli jira workitem comment create --key STORY_KEY --body "Spec PR ready for review.
 
 Spec PR: SPEC_PR_URL
 
-Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
+Driven to Copilot-clean. Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
   ```
   Tell the user:
-  > Spec PR raised and driven to Copilot-clean. Review and merge it to `develop`, then re-run `/auto STORY_KEY` — plan and implementation will be generated together in a single PR.
+  > Spec PR raised; driving it to Copilot-clean as the session tail. Review and merge it to `develop`, then re-run `/auto STORY_KEY`.
 
-Do **not** proceed to A2 in this run — even after a Full-Auto auto-merge, Phase 2 is resumed by the
-merge webhook as a fresh `/auto STORY_KEY` invocation (A0 detects the merged spec). Fall through to
-the single **Final action** release at the end of `/auto`.
+The **tail loop owns the release** — do not run `session-complete.sh` here. Do **not** proceed to A2
+in this run; Phase 2 is resumed by the spec-PR merge (human, or the Full-Auto auto-merge) as a fresh
+`/auto STORY_KEY` invocation (A0 detects the merged spec).
 
 ---
 
@@ -193,25 +197,27 @@ curl -s --retry 3 -X POST http://localhost:9001 \
   -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/pr_raised\",\"params\":{\"storyKey\":\"STORY_KEY\",\"type\":\"impl\",\"url\":\"IMPL_PR_URL\"},\"id\":2}"
 ```
 
-5. **Loop + terminal action.** Run the **Loop-after-raise + mode-conditioned terminal action**
-   procedure (above) for the impl PR (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`plan+impl`):
-   - **`MODE`=`Full Auto` AND clean** → the procedure auto-merges `IMPL_PR_URL`, which **completes**
-     the story (the plan+impl PR landing on `develop` is the terminal merge event).
-   - **Any other mode, OR not clean** → leave the PR open for human review + merge.
+5. **Comment, then loop (tail).** Resolve `MODE`, post the mode-aware A3 comment **before** the loop,
+   then run the **Loop-after-raise** procedure (above) for the impl PR as the session **tail**
+   (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`plan+impl`): `Full Auto` → tail loop **with** the auto-merge
+   hook (auto-merges on clean → the plan+impl PR landing on `develop` **completes** the story); any
+   other mode → tail loop **without** a hook (leave open for human merge). The tail loop owns the
+   release.
 
-### A3 — Complete
+### A3 — Complete (comment posted BEFORE the tail loop)
 
-Post the Jira completion comment. Word it for the path A2 step 5 took:
+Post the mode-aware comment now — before the loop, since the loop is the session's last act (intent
+tense; any merge happens inside the loop's clean exit):
 
-- **Full-Auto auto-merge:**
+- **`Full Auto`:**
   ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete and auto-merged (Full Auto).
+  acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete (Full Auto).
 
 PR: IMPL_PR_URL
 
-Single PR contained the implementation plan and code; Copilot review + checks passed, so it was auto-merged. Spec was merged separately."
+Single PR contains the implementation plan and code. Driving Copilot review-fix; will auto-merge once review + checks pass. Spec was merged separately."
   ```
-- **Human-merge path (Auto / Assisted, or a non-clean loop halt):**
+- **Any other mode:**
   ```bash
   acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete.
 
@@ -246,23 +252,26 @@ the Principal Engineer playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-
 session** — dispatch the domain agents yourself with the `Agent` tool. Do NOT dispatch a
 `principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`.
 
-Then run the **Loop-after-raise + mode-conditioned terminal action** procedure (above) for the impl
-PR (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`impl`): `Full Auto` + clean → auto-merge (completes the
-story); any other mode or a non-clean halt → leave the PR open for human merge.
+Then resolve `MODE`, post the mode-aware Jira comment (B3 below) **before** the loop, and run the
+**Loop-after-raise** procedure (above) for the impl PR as the session **tail**
+(`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`impl`): `Full Auto` → tail loop **with** the auto-merge hook
+(auto-merges on clean → completes the story); any other mode → tail loop **without** a hook (leave the
+PR open for human merge). The tail loop owns the release.
 
-### B3 — Complete
+### B3 — Complete (comment posted BEFORE the tail loop)
 
-Post the Jira completion comment, worded for the path B2 took:
+Post the mode-aware comment now — before entering the loop, since the loop is the session's last act
+(intent tense; any merge happens inside the loop's clean exit):
 
-- **Full-Auto auto-merge:**
+- **`Full Auto`:**
   ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Implementation complete and auto-merged (Full Auto).
+  acli jira workitem comment create --key STORY_KEY --body "Implementation complete (Full Auto).
 
 PR: IMPL_PR_URL
 
-Small story (≤3pts) — direct implementation path. Copilot review + checks passed, so the PR was auto-merged."
+Small story (≤3pts) — direct implementation path. Driving Copilot review-fix; will auto-merge once review + checks pass."
   ```
-- **Human-merge path (Auto / Assisted, or a non-clean loop halt):**
+- **Any other mode:**
   ```bash
   acli jira workitem comment create --key STORY_KEY --body "Implementation complete.
 
@@ -280,24 +289,30 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 ---
 
-## Final action — release the session (required)
+## Final action — release the session
 
-> **This is the ONE and ONLY session release for the whole `/auto` run.** Every phase `/auto`
-> delegates — triage (applied inline from `refs/triage.md`), spec/plan (the `solutions-architect` /
-> `tech-lead` agents), impl (the Principal Engineer playbook run inline), and the **loop-after-raise**
-> (the shared procedure's `sdlc:loop` pass-cycle, run **nested** via `ScheduleWakeup`) — must NOT run
-> its own `session-complete.sh`. `/auto` reaches this final action exactly once, at the very end, and
-> that single emit releases the worker slot. A nested release would free the slot mid-run. (Note: a
-> Full-Auto auto-merge of the spec PR resumes Phase 2 as a *separate* `/auto` invocation, which has
-> its own single release — not a nested one.)
+> **In the normal path the TAIL LOOP owns the single release.** Each routed phase ends by running
+> `/loop /sdlc:loop <PR> [--on-clean …]` as its tail (the shared procedure); that loop's own Final
+> action emits the single `session-complete`. So every phase `/auto` delegates — triage (inline from
+> `refs/triage.md`), spec/plan (the agents), impl (the playbook inline), and the loop-after-raise
+> itself — must NOT emit its own `session-complete`. After a phase has handed off to the tail loop,
+> `/auto` runs **nothing** further — running `session-complete.sh` again would be a double release.
+> (A Full-Auto auto-merge of the spec PR resumes Phase 2 as a *separate* `/auto` invocation with its
+> own tail-loop release — not a nested one.)
 
-After the routed workflow above is fully complete (Workflow A Phase 1 stop, A3, or B3 — whichever this run reached) and all Jira comments / JSON-RPC events have been sent, run this as your very last action:
+**Direct release only when no tail loop ran.** If `/auto` reached a terminal STOP *before* raising a
+PR and handing off to the tail loop — e.g. the Step 2 missing-points stop, a triage failure, or an
+early error — there is no loop to release the slot. In that case only, run this as the very last
+action:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
 ```
 
-It prints the completion signal the automation worker watches for, so the worker releases this session's slot immediately instead of waiting for the idle timeout. Outside the worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run. Note: this is distinct from the `phase/*` JSON-RPC events (those drive the service state machine); this signal releases the worker's local concurrency slot.
+It prints the completion signal the automation worker watches for. Outside the worker
+(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run. (Distinct from the `phase/*`
+JSON-RPC events, which drive the service state machine; this releases the worker's local concurrency
+slot.)
 
 Jira story key (e.g. CER-123):
 STORY_KEY
