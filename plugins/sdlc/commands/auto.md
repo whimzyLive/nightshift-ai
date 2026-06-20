@@ -425,8 +425,9 @@ session down and continue (handle gating in E3, then advance to the next story).
 
 After a child completes (sentinel seen), if `gated(S)` the epic must **suspend** before starting the
 next story — the gated story's PR needs human review + merge first. Suspension goes through a single
-documented seam (see **E5 — Suspend-primitive protocol**); the **interactive default** implemented
-here is:
+documented seam (see **E5 — Suspend-primitive protocol**), and `resolveImpl()` picks the path: the
+**worker alternate** emits the `<<<SDLC_EPIC_GATED:…>>>` marker and yields to the worker host (E5a/E5b),
+the **interactive default** (implemented here, unchanged) is:
 
 The child has **already** posted its own mode-aware Jira gate comment with the PR link (existing
 single-story behaviour — unchanged; the epic adds **no** new Jira comment format). The parent epic
@@ -470,9 +471,9 @@ It is defined by two operations the epic loop calls at a gated story:
 
 - **`suspendForGate(epicKey, storyKey, cursor)`** — persist the resume state at the **next** story,
   then either **block-and-resume in-process** (the interactive default — wait at the stdout prompt,
-  resume the loop on `continue`) **or** **release-and-exit** (an alternate substrate may choose to
-  drop the session and re-enqueue later instead of holding it open). Either way the epic resumes at
-  the cursor's next story.
+  resume the loop on `continue`) **or** **emit-marker-and-yield** (the worker alternate — print the
+  gated marker on stdout and hand control to the worker host, which persists the cursor, releases its
+  slot, and tears the session down). Either way the epic resumes at the cursor's next story.
 - **`resolveImpl()`** — selects which `suspendForGate` implementation is active: the **worker
   alternate** when a worker-substrate marker is present (e.g. `SDLC_SESSION_KEY` is set **and** a
   worker environment marker indicates the session is running under that substrate), the **interactive
@@ -481,6 +482,53 @@ It is defined by two operations the epic loop calls at a gated story:
 `cursor` carries: `epicKey`, the **next** story key (and its index into `ORDER`), and the gated
 story's PR URL. It is the single source of resume truth, so a resumed epic continues at exactly the
 story after the gate.
+
+#### E5a — The two suspend paths
+
+`resolveImpl()` chooses **exactly one** of these at a gated story; they are mutually exclusive:
+
+- **Interactive default** (no worker-substrate marker) — **unchanged**: the E3 stdout prompt + the
+  in-process `continue`/`abort` resume. The session stays open and blocks for an operator. No marker
+  is emitted on this path.
+- **Worker alternate** (`resolveImpl()` saw the worker-substrate marker) — the loop does **not**
+  block-and-prompt. Instead it emits the single-line **epic-gated marker** (below) on stdout and
+  **yields control to the worker host**. The worker host (the substrate that spawned this session)
+  watches the session's stdout for that marker, persists the resume cursor from its fields, releases
+  the session's concurrency slot, and tears the session down. The epic later resumes — driven by the
+  worker host re-spawning `/auto EPIC_KEY` — at exactly `nextIndex` into `ORDER` (E2a re-skips every
+  already-done story, so the marker is an optimisation/handoff signal, never the sole source of
+  resume truth).
+
+#### E5b — Epic-gated marker contract (worker-alternate path only)
+
+On the worker-alternate path, at a gated story, the loop emits **exactly** this single line on
+stdout (and nothing block-and-prompt on this path):
+
+```
+<<<SDLC_EPIC_GATED:<epicKey>|story=<gatedStoryKey>|nextIndex=<N>|order=<b64>|fallback=<mode>|pr=<URL>>>>
+```
+
+This mirrors the `<<<SDLC_SESSION_COMPLETE:…>>>` sentinel convention: the opening token is
+`<<<SDLC_EPIC_GATED:` and the terminator is **exactly** `>>>`. Field sourcing:
+
+- `<epicKey>` — the Epic key (`EPIC_KEY`, the epic this loop is driving — `cursor.epicKey`).
+- `<gatedStoryKey>` — the story the epic is suspended at: the just-completed gated story `S`
+  (`gated(S)` is true; this is the story whose PR needs review + merge).
+- `<N>` — the **0-based** index into `ORDER` of the **next** story to run after the gate
+  (`cursor`'s next-story index; if `S` is the last entry in `ORDER` there is no next story — the epic
+  is done and this marker is not emitted).
+- `<b64>` — **base64** of the JSON array of the full ordered story-key list, i.e. `base64(JSON)` of
+  the `ORDER` list emitted by `epic-queue.sh` (e.g. `["KEY-1","KEY-2","KEY-3"]`). Carrying the whole
+  order lets the worker host reconstruct the queue without re-deriving it.
+- `<mode>` — the epic's resolved **AI Workflow fallback mode** (the fallback applied when a story has
+  no explicitly readable mode; see E2b mode resolution).
+- `<URL>` — the gated story's **PR URL** (`cursor`'s PR URL — the same link the child posted on its
+  Jira gate comment).
+
+The worker host parses these fields to persist the cursor + resume later; the plugin's only
+obligation on this path is to emit the line **verbatim** and then yield. The substrate itself lives
+outside this plugin and is intentionally not named here — the marker line is the entire contract the
+plugin exposes to it.
 
 > **This plugin ships the interactive default working** (the E3 stdout prompt + in-process resume).
 > A worker substrate registers the alternate `suspendForGate` behind this same seam **without
