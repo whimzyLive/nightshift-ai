@@ -228,38 +228,20 @@ framework are confirmed.
 
 ### Skill suggestion mapping
 
-Derive candidates from the confirmed stack values using this deterministic table:
+Read `refs/skills-map.yml`. For each skill entry in the `skills` array, evaluate its `when`
+conditions against the confirmed stack values:
 
-| Detected condition | Suggested skill(s) |
-| ------------------ | ------------------ |
-| `framework = Hono` | `hono-api` |
-| `framework = Express` | `api-routes` |
-| `framework = NestJS` | `api-routes` |
-| `framework = Fastify` | `api-routes` |
-| `framework = Next.js` | `vercel-react-best-practices`, `vercel-composition-patterns` |
-| `framework = Remix` | `vercel-react-best-practices` |
-| `framework = Astro` | `vercel-react-best-practices` |
-| `framework = React` (without Next/Remix) | `react-components` |
-| `framework = Vue` | `react-components` (skip if Vue skill unavailable) |
-| `framework = Svelte` | (no built-in suggestion — add via "Other") |
-| `framework = FastAPI` or `Flask` or `Django` | (no built-in suggestion — add via "Other") |
-| `framework = Axum` or `Actix` | (no built-in suggestion — add via "Other") |
-| `package_manager = pnpm` and monorepo detected (multiple `package.json` at depth 2) | `vercel-composition-patterns` (if not already suggested) |
-| Prisma or Drizzle in `package.json` deps | `typeorm` (note: covers migration-layer conventions; check relevance) |
-| `language = TypeScript` | (no extra suggestion — TypeScript strictness rules go in the agent override) |
-| `language = Python` | (no built-in suggestion — add via "Other") |
-| `language = Rust` or `Go` | (no built-in suggestion — add via "Other") |
+- A `framework:` condition matches when `DETECTED_FRAMEWORK` contains that value.
+- A `dep:` condition matches when that string appears as a key in the repo's `package.json`
+  dependencies or devDependencies.
+- A `package_manager_monorepo: pnpm` condition matches when `DETECTED_PM = pnpm` **and** the
+  monorepo check in `monorepo_detection` resolves to true (count > 1).
 
-**Monorepo detection** (for the pnpm row above):
+If any condition for a skill matches, add it to the candidate list. De-duplicate the candidate
+list — a skill appears at most once even if multiple conditions match it.
 
-```bash
-find . -maxdepth 2 -name "package.json" -not -path "*/node_modules/*" | wc -l
-```
-
-If count > 1, treat as monorepo.
-
-De-duplicate the candidate list (a skill should appear at most once even if multiple conditions
-match it).
+Each skill entry in `refs/skills-map.yml` carries a `description` field. Use that field verbatim
+as the picker description for that skill — do not generate descriptions dynamically.
 
 ### Pre-select already-installed skills
 
@@ -275,25 +257,16 @@ AskUserQuestion(
   question: "Select the skills to install for this project. Already-installed skills are pre-selected.",
   multiSelect: true,
   options: [
-    { label: "<skill-name>", description: "<one-line description of what it teaches>" },
+    { label: "<skill-name>", description: "<description from refs/skills-map.yml>" },
     ... (one option per candidate, already-installed ones pre-selected)
   ]
 )
 ```
 
-One-line descriptions to use for the built-in skills:
-
-| Skill | Description |
-| ----- | ----------- |
-| `hono-api` | Hono route patterns, middleware, and Zod validation conventions |
-| `api-routes` | REST/HTTP handler structure, input validation, and error response shapes |
-| `react-components` | React component patterns, hooks, and composition conventions |
-| `vercel-react-best-practices` | Next.js / React patterns optimised for Vercel deployment |
-| `vercel-composition-patterns` | Vercel monorepo workspace layout and composition patterns |
-| `typeorm` | ORM entity, migration, and query conventions |
-
-The "Other" escape (automatically appended by `AskUserQuestion`) lets the user type a custom skill
-name not in the list. Custom entries receive `source: "custom"` in the manifest.
+The `description` for each option comes from the matching skill entry's `description` field in
+`refs/skills-map.yml`. The "Other" escape (automatically appended by `AskUserQuestion`) lets the
+user type a custom skill name not in the list. Custom entries receive `source: "custom"` in the
+manifest.
 
 The confirmed selection (accepted + any custom additions) is the **install list** used in Steps 4c
 and 4d.
@@ -308,110 +281,39 @@ the value detected and confirmed in the steps above — when you finish, **no pl
 `${CLAUDE_PLUGIN_ROOT}`. Write the absolute SDLC plugin root (this command's own
 `${CLAUDE_PLUGIN_ROOT}`) as a single line.
 
-**4b. `.claude/project/project-context.md`** — from the collected and detected values:
+**4b. `.claude/project/project-context.md`** — fill the template in `refs/project-context-template.md`
+from the collected and detected values. Replace every token slot with an actual value; the fill rules
+are documented in that template file. Token slots to substitute:
 
-```markdown
-# Project Context
+| Token | Source |
+| ----- | ------ |
+| `<project name>` | user input (Step 3) |
+| `<KEY>` | Jira project key (Step 3) |
+| `<site>` | Jira site (Step 3) |
+| `<base branch>` | base branch (Step 3) |
+| `<pm>` | confirmed package manager (Step 3) |
+| `<typecheck>` / `<test>` | confirmed commands (Step 3) |
+| `<DETECTED_LANG>` | `DETECTED_LANG` (Step 2.5) |
+| `<DETECTED_FRAMEWORK>` | `DETECTED_FRAMEWORK` (Step 2.5) |
+| `<DETECTED_PM>` | `DETECTED_PM` (Step 2.5) |
+| `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
+| `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
+| `<threshold>` | lightweight threshold (Step 3) |
+| workspace→agent rows | one row per active agent with its confirmed owned path(s) |
 
-| Token                | Value                  |
-| -------------------- | ---------------------- |
-| Project name         | <project name>         |
-| Jira project key     | <KEY>                  |
-| Jira site            | <site>                 |
-| Base branch          | <base branch>          |
-| Package manager      | <pm>                   |
-| Typecheck / Test     | <typecheck> / <test>   |
+**4c. `.claude/project/agents/<agent>.md`** — one file **per active agent only**. For each active
+agent, fill the template in `refs/agent-override-template.md` using:
 
-## Detected stack
-| Signal           | Detected value         |
-| ---------------- | ---------------------- |
-| Primary language | <DETECTED_LANG>        |
-| Framework(s)     | <DETECTED_FRAMEWORK>   |
-| Package manager  | <DETECTED_PM>          |
-| Test runner      | <DETECTED_TEST>        |
+- The **agent domain mapping** table in `refs/agent-override-template.md` (which references skill
+  domains from `refs/skills-map.yml` as the authoritative source) to filter the confirmed install
+  list to skills relevant to this agent.
+- The **run-order table** in `refs/agent-override-template.md` to populate the `runs after / before`
+  line — list only agents that are active in this repo.
+- The **per-agent filtering rules** in `refs/agent-override-template.md` for edge cases.
 
-## Workspace → agent
-| Path            | Owner             |
-| --------------- | ----------------- |
-<one row per active agent: its owned path → the agent>
-
-## Tooling
-| Typecheck | `<typecheck cmd>` |
-| Test      | `<test cmd>`      |
-
-## Triage
-
-| Token | Value |
-| ----- | ----- |
-| Lightweight threshold (story points, inclusive) | `<threshold>` |
-```
-
-Rules:
-- Omit the Typecheck/Test rows the user left blank rather than writing an empty backtick pair.
-- In the `## Detected stack` table, omit any row whose detected value is empty or `none` — do not
-  write `none` into the file.
-- `Package manager` appears in both the top table (user-confirmed) and `## Detected stack`
-  (detected). If the user changed the detected value, the top table reflects the confirmed choice
-  and `## Detected stack` reflects what was auto-detected.
-
-**4c. `.claude/project/agents/<agent>.md`** — one file **per active agent only**, from the override
-contract in `EXTENDING.md`. Fill the Ownership line with the real owned/forbidden paths and the
-run-order. Populate `## Tech rules` and `## Local dev` from detected values (not placeholders).
-Seed `## Project skills` from the install list (Task 3.5) filtered to skills relevant to this
-agent's domain:
-
-```markdown
-# <Agent display name> — <project name> bindings
-
-## Project skills (invoke in order via the Skill tool)
-<list each confirmed skill relevant to this agent's domain, one per line, numbered>
-<if no skills are relevant to this agent, write: # No project skills configured yet.>
-
-## Directory guides (read before coding)
-<list each owned-path CLAUDE.md file that exists, e.g.: - <owned-path>/CLAUDE.md>
-<if none exist yet, write: # No directory guides yet — add CLAUDE.md files to owned paths.>
-
-## Ownership
-- owns: <this agent's confirmed owned path(s)>
-- never: <all other agents' owned paths — list them explicitly>
-- runs after: <upstream agent in pipeline or "—"> · before: <downstream agent or "—">
-
-## Tech rules
-- Language: <DETECTED_LANG>, strict mode — no `any`, no unsafe casts.
-- Framework: <DETECTED_FRAMEWORK> (or "none detected" if framework is none).
-- Runtime: <DETECTED_RUNTIME> (omit this line if no runtime was detected).
-- Commit scopes: <DETECTED_COMMIT_SCOPES> — use only these conventional-commit scopes (omit this line if none derived).
-- File naming: kebab-case for all source files.
-- Import order: external packages → internal aliases → relative paths → type-only imports.
-- <Add any repo-specific "always do X / never do Y" rules the user confirms.>
-
-## Local dev (tokens from project-context Tooling)
-- Typecheck: `<confirmed typecheck cmd>` · Test: `<confirmed test cmd>`
-- Never run cloud deploys — those are manual ops actions outside agent scope.
-```
-
-Agent-to-skill domain mapping (use when filtering the install list per agent):
-
-| Agent | Relevant skill domains |
-| ----- | ---------------------- |
-| `platform-engineer` | API/backend skills: `hono-api`, `api-routes`, `typeorm`, and any custom backend skills |
-| `web-engineer` | Frontend skills: `react-components`, `vercel-react-best-practices`, `vercel-composition-patterns` |
-| `mobile-engineer` | Mobile skills: any custom mobile skills; no built-in suggestions map here |
-| `database-administrator` | ORM/migration skills: `typeorm`, and any custom DB skills |
-| `sync-engineer` | Sync-layer skills: no built-in suggestions; any custom sync skills |
-
-Run-order in pipeline (use for the `runs after / before` line):
-
-| Agent | Runs after | Runs before |
-| ----- | ---------- | ----------- |
-| `database-administrator` | — | `platform-engineer`, `sync-engineer` |
-| `platform-engineer` | `database-administrator` | `sync-engineer`, `web-engineer`, `mobile-engineer` |
-| `sync-engineer` | `database-administrator`, `platform-engineer` | `web-engineer`, `mobile-engineer` |
-| `web-engineer` | `platform-engineer`, `sync-engineer` | — |
-| `mobile-engineer` | `platform-engineer`, `sync-engineer` | — |
-
-For each agent, only list the upstream/downstream agents that are **active in this repo**. If an
-agent has no active upstream, write `—`; if no active downstream, write `—`.
+Fill the Ownership line with the real owned/forbidden paths and the run-order. Populate `## Tech rules`
+and `## Local dev` from detected values (not placeholders). Every token slot in the template must be
+replaced with an actual value — no `<...>` placeholders may remain.
 
 Do not write override files for agents the user did not select.
 

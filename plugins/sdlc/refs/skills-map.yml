@@ -1,0 +1,88 @@
+# Skill suggestion map for /init Step 3.5.
+# Edit this file to change which skills /init suggests for a detected stack —
+# no command-file edit needed. Each entry carries:
+#   name        — the skill identifier (matches skills.json and agent override)
+#   description — the one-line description shown to the user in the picker
+#   domains     — which domain agent(s) this skill is relevant to
+#   when        — detection conditions that cause this skill to be suggested
+#                 (any matching condition adds the skill to the candidate list;
+#                  the skill appears at most once even if multiple conditions match)
+
+skills:
+  - name: hono-api
+    description: Hono route patterns, middleware, and Zod validation conventions
+    domains: [platform-engineer]
+    when:
+      - framework: Hono
+
+  - name: api-routes
+    description: REST/HTTP handler structure, input validation, and error response shapes
+    domains: [platform-engineer]
+    when:
+      - framework: Express
+      - framework: NestJS
+      - framework: Fastify
+
+  - name: vercel-react-best-practices
+    description: Next.js / React patterns optimised for Vercel deployment
+    domains: [web-engineer]
+    when:
+      - framework: Next.js
+      - framework: Remix
+      - framework: Astro
+
+  - name: vercel-composition-patterns
+    description: Vercel monorepo workspace layout and composition patterns
+    domains: [web-engineer]
+    when:
+      - framework: Next.js
+      # Also suggested when pnpm monorepo is detected (see monorepo_detection below).
+      # The de-duplicate rule ensures it appears at most once.
+      - package_manager_monorepo: pnpm
+
+  - name: react-components
+    description: React component patterns, hooks, and composition conventions
+    domains: [web-engineer]
+    when:
+      - framework: React
+      # Vue has no dedicated built-in skill; react-components is the closest match.
+      # Skip this suggestion if a Vue-specific skill becomes available.
+      - framework: Vue
+
+  - name: typeorm
+    description: ORM entity, migration, and query conventions
+    domains: [platform-engineer, database-administrator]
+    when:
+      # Prisma and Drizzle detected in package.json deps trigger this suggestion.
+      # Note: covers migration-layer conventions; confirm relevance with the user.
+      - dep: prisma
+      - dep: drizzle-orm
+
+# Frameworks with no built-in skill suggestion — user must add via "Other":
+#   Svelte       → no built-in suggestion
+#   FastAPI      → no built-in suggestion
+#   Flask        → no built-in suggestion
+#   Django       → no built-in suggestion
+#   Axum         → no built-in suggestion
+#   Actix        → no built-in suggestion
+#   Python       → no built-in suggestion
+#   Rust / Go    → no built-in suggestion
+#   TypeScript   → no extra suggestion (strictness rules go in the agent override)
+
+# Agent-to-skill domain mapping.
+# Used by /init Step 4c to filter the confirmed install list per agent.
+# Each skill's `domains` list above is the authoritative source;
+# this summary lists the built-in skills per agent for quick reference.
+#
+# platform-engineer  : hono-api, api-routes, typeorm
+# web-engineer       : react-components, vercel-react-best-practices, vercel-composition-patterns
+# mobile-engineer    : (no built-in suggestions; add custom mobile skills via "Other")
+# database-administrator : typeorm
+# sync-engineer      : (no built-in suggestions; add custom sync skills via "Other")
+
+# Monorepo detection used for the vercel-composition-patterns / pnpm condition above.
+monorepo_detection:
+  command: 'find . -maxdepth 2 -name "package.json" -not -path "*/node_modules/*" | wc -l'
+  rule: "count > 1 => monorepo"
+  # When package_manager = pnpm AND this count > 1, add vercel-composition-patterns
+  # to the candidate list (if not already present from the framework conditions).
