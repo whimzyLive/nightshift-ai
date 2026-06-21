@@ -336,11 +336,18 @@ format-stable JQL probe the single-story flow uses for a story's mode (see *Reso
 issue's mode*) — applied to `EPIC_KEY`:
 
 ```bash
-# epicFallback = the Epic's AI Workflow value, or empty if unset/unreadable.
+# epicFallback = the Epic's ACTUAL AI Workflow value (e.g. Full Auto / Auto /
+# Assisted), or empty if the field is unset/unreadable. It must be a real mode
+# string: later sections interpolate <effectiveMode(S)> into operator-facing
+# prompts, so a placeholder here would leak into output.
 if acli jira workitem search --jql 'key = EPIC_KEY AND "AI Workflow" = "Full Auto"' --fields key 2>/dev/null | grep -qw EPIC_KEY; then
   epicFallback="Full Auto"
 elif acli jira workitem search --jql 'key = EPIC_KEY AND "AI Workflow" is not EMPTY' --fields key 2>/dev/null | grep -qw EPIC_KEY; then
-  epicFallback="set-non-fullauto"   # Auto / Assisted — a real, non-Full-Auto value
+  # Set but not Full Auto — read the field's real value (Auto / Assisted / …)
+  # so effectiveMode resolves to a genuine mode string rather than a placeholder.
+  epicFallback="$(acli jira workitem view EPIC_KEY --fields 'AI Workflow' --json 2>/dev/null \
+                    | jq -r '.fields["AI Workflow"].value // .fields["AI Workflow"].name // .fields["AI Workflow"] // empty')"
+  [ -z "$epicFallback" ] && epicFallback="Auto"   # set-but-unreadable name ⇒ safe gated default (any non-Full-Auto value gates)
 else
   epicFallback=""                   # unset OR unreadable
 fi

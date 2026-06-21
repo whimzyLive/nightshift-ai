@@ -45,10 +45,55 @@ children="$(acli jira workitem search --jql "parent = $epic ORDER BY created ASC
 #    are themselves children of this epic — a Blocks link to an out-of-epic
 #    issue does not gate intra-epic ordering.
 #
-# We store the result as two parallel newline-delimited records:
-#   blockers_of[C] = space-separated in-epic keys that block C
-# Bash 3.2 (macOS default) has no associative arrays, so encode as text lines
-# "C\t<b1 b2 …>" and look up with awk.
+# O(N), not O(N²): fetch each child S's outward-Blocks set ONCE (N acli calls
+# total, not one per (child × sibling) pair), then derive blockers by inversion
+# — S blocks T iff T ∈ outwardBlocks(S) AND T is a child of this epic, so
+# blockers(T) = { S : T ∈ outwardBlocks(S) }.
+#
+# Each acli call's exit status is checked explicitly: a non-zero/error result
+# (distinct from a successful-but-empty link set) is a hard STOP per this
+# script's contract — acli is the only source of truth, so a flaky query must
+# never be silently read as "no blocker" and corrupt the dependency order.
+#
+# We store the result as newline-delimited records "C\t<b1 b2 …>" looked up with
+# awk — Bash 3.2 (macOS default) has no associative arrays. Outward sets are
+# accumulated the same way.
+outward_table=""   # "S\t<t1 t2 …>" : in-epic keys S Blocks (S's outward-Blocks)
+while IFS= read -r s; do
+  [ -z "$s" ] && continue
+  links_json="$(acli jira workitem link list --key "$s" --json 2>/dev/null)"
+  acli_status=$?
+  if [ "$acli_status" -ne 0 ]; then
+    fail "acli error resolving blocker links for $s: link list exited $acli_status"
+  fi
+  # outwardIssueKey of every typeName=="Blocks" link, restricted to in-epic keys.
+  outward="$(printf '%s' "$links_json" \
+               | jq -r '.issueLinks[]? | select(.typeName=="Blocks") | .outwardIssueKey // empty' 2>/dev/null)"
+  jq_status=$?
+  if [ "$jq_status" -ne 0 ]; then
+    fail "acli error resolving blocker links for $s: malformed link JSON (jq exited $jq_status)"
+  fi
+  oset=""
+  while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    [ "$t" = "$s" ] && continue
+    # keep only in-epic targets (siblings of this epic)
+    case "
+$children
+" in
+      *"
+$t
+"*) oset="${oset:+$oset }$t" ;;
+      *) : ;;
+    esac
+  done <<< "$outward"
+  outward_table="${outward_table}${s}	${oset}
+"
+done <<< "$children"
+
+# Invert: blockers(C) = { S : C ∈ outwardBlocks(S) }, preserving children's
+# created-ASC order for both the outer (C) and inner (S) scans so the blocker
+# lists — and thus the tie-break — stay deterministic.
 blockers_table=""
 while IFS= read -r c; do
   [ -z "$c" ] && continue
@@ -56,11 +101,13 @@ while IFS= read -r c; do
   while IFS= read -r s; do
     [ -z "$s" ] && continue
     [ "$s" = "$c" ] && continue
-    if acli jira workitem link list --key "$s" --json 2>/dev/null \
-         | jq -e --arg k "$c" \
-           '.issueLinks[]? | select(.typeName=="Blocks" and .outwardIssueKey==$k)' >/dev/null; then
-      bset="${bset:+$bset }$s"
-    fi
+    oset="$(printf '%s' "$outward_table" | awk -F'\t' -v key="$s" '$1==key {print $2; exit}')"
+    for t in $oset; do
+      if [ "$t" = "$c" ]; then
+        bset="${bset:+$bset }$s"
+        break
+      fi
+    done
   done <<< "$children"
   blockers_table="${blockers_table}${c}	${bset}
 "
