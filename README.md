@@ -113,6 +113,7 @@ Standby roles activate only when your `project-context.md` says your project has
 
 | Command | Does |
 | ------- | ---- |
+| `/init` | Onboard a repo — scaffold `project-context.md` + agent overrides interactively |
 | `/auto <TICKET>` | The whole pipeline, end to end |
 | `/refine-feature`, `/refine-issue` | Sharpen a raw idea or ticket before work starts |
 | `/prd`, `/stories` | Product definition + story breakdown |
@@ -124,6 +125,8 @@ Standby roles activate only when your `project-context.md` says your project has
 ## 🔧 Configure your repo
 
 Each consuming repo supplies **one file** — `.claude/project/project-context.md` — declaring its constants. The plugin's SessionStart hook auto-loads it into every session; you never edit your `CLAUDE.md`.
+
+> **Onboarding a fresh repo?** Run `/init` — it checks the `gh`/`acli` prerequisites, walks you through Jira auth, and scaffolds `project-context.md` plus your active agents' override files interactively. The manual template below is what it produces.
 
 ```markdown
 # Project Context
@@ -167,7 +170,7 @@ repo** — no edits to the shipped plugin, so upstream updates never fight your 
 
 ## 🗺️ Roadmap
 
-- [ ] One-command `project-context.md` scaffolder (`/sdlc init`)
+- [x] One-command `project-context.md` scaffolder (`/sdlc:init`)
 - [ ] Additional language/stack starter configs
 - [ ] Metrics: cycle-time and review-pass-rate dashboards
 
