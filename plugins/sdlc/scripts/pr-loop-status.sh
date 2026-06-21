@@ -84,8 +84,19 @@ copilot_latest_state=$(printf '%s' "$copilot_latest" | cut -f2)
 # queued (reviewed-any=1, reviewed-head=0, pending=0 → a re-review may never come, e.g. when the
 # repo's Copilot review-on-push is limited/rate-limited → wait only a SHORT grace, then stop instead
 # of burning the full idle budget).
+# Derive from the COUNT of Copilot reviews (any commit), NOT from copilot_latest_commit: a review
+# can carry a null/empty commit_id (e.g. after a force-push orphans the reviewed commit, or for
+# certain bot summary reviews), and keying off the commit would then report reviewed-any=0 while a
+# review genuinely exists — wrongly routing the loop into the full-patience wait. Counting reviews
+# is independent of commit_id.
+copilot_review_count=$(printf '%s' "$reviews_raw" \
+  | jq --arg re "$COPILOT_LOGIN_RE" \
+    '[.[] | select((.user.login // "") | ascii_downcase | test($re))
+          | select((.state // "") | test("APPROVED|CHANGES_REQUESTED|COMMENTED"))] | length' \
+    2>/dev/null || echo 0)
+case "$copilot_review_count" in (''|*[!0-9]*) copilot_review_count=0 ;; esac
 copilot_reviewed_any=0
-[ -n "$copilot_latest_commit" ] && copilot_reviewed_any=1
+[ "$copilot_review_count" -gt 0 ] && copilot_reviewed_any=1
 
 copilot_reviewed_head=0
 copilot_changes_requested=0

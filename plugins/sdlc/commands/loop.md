@@ -171,7 +171,7 @@ How the loop requests **and** waits for Copilot review is configured per-repo in
 
 ```bash
 REVIEW_MODE=$(grep -iE '^\|[[:space:]]*Review mode[[:space:]]*\|' .claude/project/project-context.md 2>/dev/null \
-  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([a-z-]+)`?[[:space:]]*\|.*/\1/' | head -1)
+  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([A-Za-z-]+)`?[[:space:]]*\|.*/\1/' | head -1 | tr '[:upper:]' '[:lower:]')
 case "$REVIEW_MODE" in none|on-create|on-update) ;; *) REVIEW_MODE=on-update ;; esac
 ```
 

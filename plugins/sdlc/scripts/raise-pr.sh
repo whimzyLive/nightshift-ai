@@ -39,7 +39,7 @@ REVIEWER="${5:-@copilot}"
 # ⇒ request once here at creation (the /loop decides whether to re-request per update). Default
 # on-update when unset/unreadable — back-compatible.
 REVIEW_MODE=$(grep -iE '^\|[[:space:]]*Review mode[[:space:]]*\|' .claude/project/project-context.md 2>/dev/null \
-  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([a-z-]+)`?[[:space:]]*\|.*/\1/' | head -1)
+  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([A-Za-z-]+)`?[[:space:]]*\|.*/\1/' | head -1 | tr '[:upper:]' '[:lower:]')
 case "$REVIEW_MODE" in none|on-create|on-update) ;; *) REVIEW_MODE=on-update ;; esac
 
 [ -f "$BODY_FILE" ] || { echo "ERROR: body file not found: $BODY_FILE" >&2; exit 1; }
