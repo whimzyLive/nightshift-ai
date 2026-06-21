@@ -6,7 +6,7 @@ and `grep` are used. Never execute build scripts or install dependencies.
 
 ## Output contract
 
-Detection produces exactly these five fields:
+Detection produces exactly these seven fields:
 
 | Field | Description | Example values |
 | ----- | ----------- | -------------- |
@@ -15,6 +15,8 @@ Detection produces exactly these five fields:
 | `package_manager` | The package manager in use | `pnpm`, `npm`, `yarn`, `bun`, `cargo`, `poetry`, `uv`, `go`, `bundler` |
 | `test_runner` | Test command to run the suite | `pnpm test`, `pytest`, `cargo test`, `go test ./...` |
 | `typecheck` | Typecheck command, or empty string if not applicable | `pnpm typecheck`, `mypy .`, `pyright`, `` |
+| `runtime` | Language runtime + version where explicitly declared | `Node 20`, `Python 3.12`, `Go 1.22`, `Rust 2021` |
+| `commit_scopes` | Comma-separated valid conventional-commit scopes derived from workspace directories | `functions, config, web` |
 
 These field names are the canonical identifiers; `init.md` reads them by these exact names.
 
@@ -212,6 +214,62 @@ Map to `typecheck`:
 
 ---
 
+## Step 6 — Detect runtime
+
+Read the runtime version from version-declaration files only — do **not** probe the live environment
+or execute any command. Check in this order:
+
+```bash
+# Node — .nvmrc (exact version string, e.g. "20.11.1" or "lts/iron")
+[ -f .nvmrc ] && cat .nvmrc
+
+# Node — package.json engines.node field
+grep -o '"node"[[:space:]]*:[[:space:]]*"[^"]*"' package.json 2>/dev/null | head -1
+
+# Python — .python-version (pyenv / mise)
+[ -f .python-version ] && cat .python-version
+
+# Python — pyproject.toml requires-python
+grep -o 'requires-python[[:space:]]*=[[:space:]]*"[^"]*"' pyproject.toml 2>/dev/null | head -1
+
+# Go — go.mod go directive (first line containing "^go ")
+grep -m1 '^go ' go.mod 2>/dev/null
+
+# Rust — Cargo.toml edition (edition field)
+grep -o 'edition[[:space:]]*=[[:space:]]*"[^"]*"' Cargo.toml 2>/dev/null | head -1
+```
+
+Map the first matching signal to the `runtime` field:
+
+| Signal | `runtime` value |
+| ------ | --------------- |
+| `.nvmrc` or `engines.node` present | `Node <version>` (e.g. `Node 20`) — strip patch if only major/minor matters |
+| `.python-version` or `requires-python` present | `Python <version>` (e.g. `Python 3.12`) |
+| `go.mod` `go` directive | `Go <version>` (e.g. `Go 1.22`) |
+| `Cargo.toml` `edition` field | `Rust <edition>` (e.g. `Rust 2021`) |
+| None of the above | `` (empty — do not guess) |
+
+If no version declaration is found, leave `runtime` empty. Do **not** run `node --version`,
+`python --version`, or any other live-environment probe.
+
+---
+
+## Step 7 — Detect commit scopes
+
+Derive valid conventional-commit scopes from the immediate subdirectory names under `packages/`
+and `apps/`:
+
+```bash
+find packages apps -maxdepth 1 -mindepth 1 -type d 2>/dev/null | xargs -I{} basename {} | sort | tr '\n' ',' | sed 's/,$//'
+```
+
+Collect the resulting names as a comma-separated list (e.g. `functions, config, web`).
+
+If neither `packages/` nor `apps/` exists in the repo root, leave `commit_scopes` empty.
+Do not descend deeper than one level — only immediate children of `packages/` or `apps/` count.
+
+---
+
 ## Ambiguity rules (summary)
 
 1. **Multiple lockfiles at same tier** → `AskUserQuestion` with the top-2 candidates.
@@ -220,6 +278,8 @@ Map to `typecheck`:
 4. **No framework matched** → set `framework` to `none`; do not surface a question.
 5. **Test runner inconclusive** → leave `test_runner` empty; the user fills the free-text field.
 6. **Typecheck inconclusive** → leave `typecheck` empty; the user fills the free-text field.
+7. **No runtime declaration found** → leave `runtime` empty; do not guess or probe the live environment.
+8. **No `packages/` or `apps/` directory** → leave `commit_scopes` empty; do not infer from other paths.
 
 In every ambiguous case, prefer surfacing a pre-filled suggestion the user can confirm over
 asking a fully open question — reduce typing, never remove agency.

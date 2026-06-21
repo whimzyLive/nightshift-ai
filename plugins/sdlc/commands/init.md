@@ -99,7 +99,7 @@ acli jira auth status 2>&1 | tail -5
 ## Step 2.5 — Repository scan (read-only, sets defaults)
 
 Before prompting the user, scan the repository to detect the stack. Follow `refs/repo-detect.md`
-exactly. This step is **read-only** — no files are written here. Store the five detected values
+exactly. This step is **read-only** — no files are written here. Store the seven detected values
 for use as pre-filled defaults in Step 3:
 
 ```bash
@@ -109,6 +109,8 @@ for use as pre-filled defaults in Step 3:
 # Step 3 — framework
 # Step 4 — test runner
 # Step 5 — typecheck command
+# Step 6 — runtime (version declaration)
+# Step 7 — commit scopes (packages/ and apps/ subdirectory names)
 ```
 
 After the scan, you will have (or empty strings for inconclusive signals):
@@ -120,6 +122,8 @@ After the scan, you will have (or empty strings for inconclusive signals):
 | `DETECTED_PM` | e.g. `pnpm` |
 | `DETECTED_TEST` | e.g. `pnpm test` |
 | `DETECTED_TYPECHECK` | e.g. `pnpm typecheck` |
+| `DETECTED_RUNTIME` | e.g. `Node 20` (empty if no version declaration found) |
+| `DETECTED_COMMIT_SCOPES` | e.g. `functions, config, web` (empty if no `packages/`/`apps/` dir) |
 
 These values **pre-fill the matching Step-3 prompts** (the package-manager picker pre-selects the
 detected option; the typecheck and test free-text fields display the detected command as the
@@ -375,6 +379,8 @@ agent's domain:
 ## Tech rules
 - Language: <DETECTED_LANG>, strict mode — no `any`, no unsafe casts.
 - Framework: <DETECTED_FRAMEWORK> (or "none detected" if framework is none).
+- Runtime: <DETECTED_RUNTIME> (omit this line if no runtime was detected).
+- Commit scopes: <DETECTED_COMMIT_SCOPES> — use only these conventional-commit scopes (omit this line if none derived).
 - File naming: kebab-case for all source files.
 - Import order: external packages → internal aliases → relative paths → type-only imports.
 - <Add any repo-specific "always do X / never do Y" rules the user confirms.>
