@@ -82,40 +82,51 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 7. **[invoke `user-story-splitting` for any story >8 pts]** Apply the splitting patterns. Do NOT create the oversized story — split first.
 8. **Order by dependency** — stories that unblock others go first.
 9. Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
-10. Create stories — each entry in the bulk JSON **must** include `"parentKey": "<EPIC-KEY>"` so stories are linked to the Epic in Jira as children. Each entry **must also include** the `AI-Ready` label and the assessed Story Points (from step 6a):
+10. **Create stories — one `acli jira workitem create` call per story, each passing `--parent "<EPIC-KEY>"` so the story is linked to the Epic as a child at creation time.**
+
+    > ⚠️ **Do NOT use `acli ... create-bulk` for Epic-linked stories.** Its `--from-json` schema accepts only `summary`, `projectKey`, `issueType`, `label`, `assignee` — it has **no parent field**. A `parentKey`/`parent` entry in the bulk JSON is **silently dropped**, so every story is created **orphaned** (not under the Epic). Only `acli jira workitem create` links a child to its parent, via the `--parent` flag — `create-bulk`/`edit` cannot set the parent (and `edit` rejects a `parent` field outright). Use the per-story `create` loop below.
+
+    For each story, in the dependency order from step 8:
     ```bash
     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
-    bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
-    trap 'rm -f "$bulk_file"' EXIT
-    acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
+    desc=$(mktemp "$dir/acli-desc.XXXXXX")                 # ADF JSON or text per ${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md
+    trap 'rm -f "$desc"' EXIT
+    # write the story description to "$desc" first
+    key=$(acli jira workitem create \
+      --project "<PROJECT-KEY>" \
+      --type "Story" \
+      --parent "<EPIC-KEY>" \
+      --summary "<story summary>" \
+      --description-file "$desc" \
+      --label "AI-Ready" \
+      --json 2>&1 | jq -r '.key')
+    echo "Created $key under <EPIC-KEY>"
     ```
-    Example entry shape:
-    ```json
-    {
-      "summary": "...",
-      "projectKey": "<PROJECT-KEY>",
-      "issueType": "Story",
-      "parentKey": "<EPIC-KEY>",
-      "description": "...",
-      "labels": ["AI-Ready"],
-      "<STORY_POINTS_FIELD>": <points>
-    }
-    ```
+    Collect every returned `key` into a created-keys list — it drives steps 10a, 10b, and 12.
+
     Label rules:
-    - The label value is `"AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels).
+    - Pass the label via `--label "AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels). Multiple labels are comma-separated: `--label "AI-Ready,foo"`.
     - Decompose-created stories receive **only** `AI-Ready` — **never** `AI-Refine`.
-    Story Points field rules:
-    - Use the field **name** as the JSON key, not a `customfield_*` id. Probe both names per the "Reading story points" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) and use whichever the project recognises. If neither can be resolved, omit the field and surface a warning — do not fail the bulk-create.
-    **Note:** `parentKey` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
-10a. **Post-create: stamp the AI Workflow field on each created child story.** For each key returned by step 10:
-    - If `epicAiWorkflow` is `Auto` or `Assisted`: set the AI Workflow custom field by name via a follow-up `acli jira workitem edit <KEY>` (resolving the field by display name, never by `customfield_*` id):
+    **Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
+10a. **Post-create: stamp Story Points and the AI Workflow field on each created child story.** For each key in the created-keys list:
+    - **Story Points (best-effort):** set the points field by display **name** (never a `customfield_*` id) — probe both names per the "Reading story points" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) and use whichever the project recognises:
+      ```bash
+      acli jira workitem edit --key "<CHILD-KEY>" --custom-field "<Story Points field name>" --value <points> --yes
+      ```
+      If neither name resolves, omit and surface a warning — never fail the run over points.
+    - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted`, set the AI Workflow custom field by display name (never `customfield_*`):
       ```bash
       acli jira workitem edit --key "<CHILD-KEY>" --custom-field "AI Workflow" --value "<epicAiWorkflow>" --yes
       ```
-    - If `epicAiWorkflow` is `unset`: **skip the follow-up edit entirely** for that story and continue. Do not add an empty or null AI Workflow value.
-    - If the `edit` call fails for a story after successful bulk-create: surface the failing key in the agent return (non-silent) — the story exists but without the AI Workflow stamp. Do not abort the remaining stories. Example warning: `"Warning: AI Workflow stamp failed for <KEY> — story created without AI Workflow field."`
+      If `epicAiWorkflow` is `unset`: **skip this edit entirely** for that story. Do not write an empty or null value.
+    - If an `edit` call fails for a story: surface the failing key in the agent return (non-silent) — the story exists but without that stamp. Do not abort the remaining stories. Example: `"Warning: AI Workflow stamp failed for <KEY>."`
     - **Never add `AI-Refine` to a decompose-created story** in this step or any other.
-11. Capture issue keys — pipe `--json` output through `jq -r '.key'` to collect each key
+10b. **Verify every story is linked to the Epic — mandatory gate, never skip.** Confirm the children actually attached before proceeding to dependency links:
+    ```bash
+    acli jira workitem search --jql "parent = <EPIC-KEY> AND key in (<comma-joined created keys>) ORDER BY key" --json | jq -r '.[].key'
+    ```
+    The returned set **must equal** the created-keys list. If any created key is missing, the `create` did not link it — **FAIL LOUD**: surface the orphaned key(s) in the agent return and stop; do **not** silently continue to dependency-linking. (`acli workitem view --json` does **not** surface `parent`, so verify via this `parent = <EPIC-KEY>` JQL — never via `view`.)
+11. Issue keys are captured inline by the per-story `create` loop in step 10 (the `key=$(... | jq -r '.key')` capture) — no separate collection step is needed.
 12. **Link blocking dependencies.** Use the `link create` form (the positional `link <a> <b>` form is unreliable; do not use it). **acli's direction is counter-intuitive — verified against the Jira UI: `--in` is the BLOCKER, `--out` is the BLOCKED story.** So to express "**A blocks B**" (A is the prerequisite, B depends on A), put the blocker in `--in`:
     ```bash
     # A blocks B   →   --out <B, the blocked/downstream>   --in <A, the blocker/prerequisite>
@@ -218,14 +229,22 @@ Refine an unpolished story in-place OR create new stories from raw text.
 5. Apply the vertical-slice decomposition rules from `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`.
 6. Write each story using the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line + **checkbox** Acceptance Criteria (binary, 3–6 items), never Gherkin.
 7. **[invoke `user-story-splitting` for any story >8 pts]**
-8. Write to a mktemp file, create:
-   ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
-   bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
-   trap 'rm -f "$bulk_file"' EXIT
-   acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
-   ```
-9. Link to Epic if found: `acli jira workitem link <STORY-KEY> <EPIC-KEY> --type "is child of"`
+8. **Create the stories.**
+   - **If step 3 found a related Epic:** create each story with `acli jira workitem create --parent "<EPIC-KEY>" …` (per-story, same form as decompose Mode step 10) so it is linked as a child **at creation time**. Do **not** use `create-bulk` here — its `--from-json` schema has no parent field and silently creates orphaned stories.
+     ```bash
+     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+     desc=$(mktemp "$dir/acli-desc.XXXXXX"); trap 'rm -f "$desc"' EXIT
+     # write the description to "$desc" first
+     key=$(acli jira workitem create --project "<PROJECT-KEY>" --type "Story" --parent "<EPIC-KEY>" \
+       --summary "<summary>" --description-file "$desc" --json 2>&1 | jq -r '.key')
+     ```
+   - **If no Epic was found** (standalone stories): `create-bulk` is acceptable since there is no parent to set.
+     ```bash
+     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+     bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX"); trap 'rm -f "$bulk_file"' EXIT
+     acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
+     ```
+9. **If an Epic was found, verify the parent link (mandatory gate):** `acli jira workitem search --jql "parent = <EPIC-KEY> AND key in (<comma-joined created keys>)" --json | jq -r '.[].key'` must return every created key — **FAIL LOUD** on any orphan. Linkage happens at `create` time via `--parent`; do **not** use the post-create positional `link … --type "is child of"` form (unreliable, and `parent`/`view` JQL caveats from decompose step 10b apply here too).
 10. Link blocking dependencies using the `link create` form. **acli direction (verified): `--in` = blocker, `--out` = blocked.** For "A blocks B": `acli jira workitem link create --out <B-blocked> --in <A-blocker> --type Blocks --yes`
 11. Comment each story: `acli jira workitem comment create <KEY> --body "Created by /refine-issue triage | Source: raw input"`
 12. Return: list of created story keys + dependency order + any flags
