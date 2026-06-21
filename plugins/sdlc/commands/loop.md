@@ -162,6 +162,32 @@ own exit logic, so a converged PR is never held open by the timer.
 
 ## Pass steps
 
+### 0. Resolve the review mode (every pass — cheap)
+
+How the loop requests **and** waits for Copilot review is configured per-repo in
+`.claude/project/project-context.md` → a `## Copilot Review` section with a
+`Review mode` token. Default `on-update` when the section/token is absent
+(back-compatible with the historical behaviour):
+
+```bash
+REVIEW_MODE=$(grep -iE '^\|[[:space:]]*Review mode[[:space:]]*\|' .claude/project/project-context.md 2>/dev/null \
+  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([a-z-]+)`?[[:space:]]*\|.*/\1/' | head -1)
+case "$REVIEW_MODE" in none|on-create|on-update) ;; *) REVIEW_MODE=on-update ;; esac
+```
+
+- **`none`** — do NOT request a Copilot review and do NOT wait for one. Run the
+  `--on-clean` command (if any) exactly once, then go straight to the **Final
+  action — release the session**. The PR is still raised; `none` simply turns the
+  review-fix loop into a no-op (no review gate). Skip every step below.
+- **`on-create`** — Copilot review is requested ONCE at PR creation (by
+  `raise-pr.sh`). The loop does NOT re-request on later passes. It waits for that
+  one review and runs `/review-fix` **at most once** (rule 3), then completes —
+  it never waits for a re-review of the fix. (See the **Review-mode modifiers**
+  note under the decision table.)
+- **`on-update`** — request at creation AND re-request on every pass; keep fixing
+  and re-reviewing until clean. This is the full behaviour the decision table
+  below describes, and the default.
+
 ### 1. Resolve the target PR (first pass only, or always as a guard)
 
 ```bash
@@ -179,10 +205,13 @@ not list the Copilot bot (GitHub does not reliably expose bot reviewers here),
 so this detection is best-effort. When in doubt the loop treats the current HEAD
 as not-yet-reviewed and waits or re-requests (rule 2a/2b in the decision table).
 
-If @copilot is not detected as a pending reviewer, add it best-effort:
+If @copilot is not detected as a pending reviewer, add it best-effort — **but only
+in `on-update` mode**:
 
 ```bash
-gh pr edit <PR> --add-reviewer @copilot
+# Re-request only when the mode asks for per-update reviews. `on-create` relies on the
+# single create-time request (raise-pr.sh) and must NOT re-request; `none` never reaches here.
+[ "$REVIEW_MODE" = "on-update" ] && gh pr edit <PR> --add-reviewer @copilot
 ```
 
 Proceed without exiting regardless of outcome.
@@ -235,7 +264,7 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 | 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — see note). **WAIT** — check budget first (set `BLOCKED_BY="copilot-review-pending (copilot-pending=1, head=<head-oid>)"`), then schedule next iteration. No fix. |
 | 2a | `copilot-reviewed-head == 0 && copilot-pending == 0 && copilot-reviewed-any == 0` | Copilot has not reviewed ANY head of this PR yet — the **initial** review has not started (and may not show as `pending` while it queues). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT with full patience** — leave `BUDGET_SECS` at its 1200s default, set `BLOCKED_BY="Copilot has not started the initial review of <head-oid>"`, check budget first, then schedule next iteration. |
 | 2b | `copilot-reviewed-head == 0 && copilot-pending == 0 && copilot-reviewed-any == 1` | Copilot reviewed an **earlier** head but is NOT re-reviewing the current head and nothing is queued — a re-review **may never arrive** (e.g. the repo's Copilot review-on-push is limited/rate-limited). Re-request reviewer best-effort (`gh pr edit <PR> --add-reviewer @copilot`). **WAIT only a SHORT grace** — set `BUDGET_SECS="${REREVIEW_GRACE_SECS:-600}"` (the re-review grace, NOT the full idle budget) **before** running the budget block, set `BLOCKED_BY="Copilot has not queued a re-review of HEAD <head-oid> (it reviewed an earlier head) — review-on-push may be limited; merge/resolve manually or re-trigger"`, check budget first, then schedule next iteration. When the grace elapses with no re-review, the budget block STOPs the loop with that message instead of burning the full 20-minute idle budget. (If Copilot does pick the head up, the next pass sees `reviewed-head == 1` and moves to rule 3/4 before any budget check.) |
-| 3 | `copilot-reviewed-head == 1 && (unresolved-copilot > 0 \|\| copilot-changes-requested == 1)` | Copilot has actionable feedback on current HEAD — either unresolved inline threads **or** a `CHANGES_REQUESTED` review (including a summary-only one with no inline threads). Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release); `/review-fix` reads the review-summary body too, so a summary-only request is addressed. On success, schedule next iteration (the push moves HEAD, so next pass naturally re-enters rule 2a/2b while Copilot re-reviews). On error or `Status: blocked` → **HALT** (see step 5). |
+| 3 | `copilot-reviewed-head == 1 && (unresolved-copilot > 0 \|\| copilot-changes-requested == 1)` | Copilot has actionable feedback on current HEAD — either unresolved inline threads **or** a `CHANGES_REQUESTED` review (including a summary-only one with no inline threads). Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release); `/review-fix` reads the review-summary body too, so a summary-only request is addressed. On success, schedule next iteration **in `on-update` mode** (the push moves HEAD, so next pass naturally re-enters rule 2a/2b while Copilot re-reviews); **in `on-create` mode STOP after this single fix** (do not schedule a next iteration — see Review-mode modifiers). On error or `Status: blocked` → **HALT** (see step 5). |
 | 4 | `copilot-reviewed-head == 1 && copilot-changes-requested == 0 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — Copilot's latest head review is NOT `CHANGES_REQUESTED`, no unresolved comments, checks green. If an `--on-clean "<command>"` was provided, run it **exactly once now** (this rule is the ONLY place it runs); if it exits non-zero, surface the error in the report (the PR is still raised — the caller decides whether that is terminal). Then STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
 | 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — check budget first (set `BLOCKED_BY="checks still pending: P=<checks-pending value>"`), then schedule next iteration. |
 | 6 | `copilot-reviewed-head == 1 && copilot-changes-requested == 0 && unresolved-copilot == 0 && checks-failing > 0 && checks-pending == 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there are no unresolved Copilot comments left to fix. `/loop` cannot repair CI failures. Print: "Required check(s) failing (F=<checks-failing value>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. Budget is NOT checked here — this is an immediate terminal halt, same as AC-4. |
@@ -285,6 +314,20 @@ Evaluate the fields in the order below; the FIRST matching rule wins.
 > **Rule 7 (catch-all) is a safety net.** It must be the final rule. No
 > combination of field values may fall off the table silently and terminate the
 > loop without a surfaced reason.
+>
+> **Review-mode modifiers (from step 0).** The table above is written for
+> `on-update` (the default). The other modes adjust it:
+> - **`none`** — handled in step 0; the loop never reaches this table (no review
+>   request, no wait, immediate clean exit).
+> - **`on-create`** — the rule-2a/2b reviewer **re-request is SKIPPED** (the
+>   single create-time request from `raise-pr.sh` stands). Rule 2a still waits for
+>   the one initial review. When **rule 3** fires, run `/review-fix` **once** and
+>   then **STOP the loop** (do NOT schedule a next iteration): `on-create` caps the
+>   cycle at a single fix and never waits for a re-review. After that one fix the
+>   head moves, so a follow-up pass would see `reviewed-any == 1 && reviewed-head
+>   == 0` — in `on-create` that is a **terminal STOP** ("on-create: one fix
+>   applied; not waiting for a re-review"), NOT a rule-2b wait. Rule 4 (already
+>   clean on the initial review) stops clean as usual.
 
 #### Budget check detail for WAIT rules (1, 2a, 2b, 5)
 
