@@ -79,21 +79,42 @@ choice; ask plainly otherwise). Do not batch them into one wall of questions. Co
 | Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
 
-**Active agents** are the workspace-owning domain agents. Offer this set and let the user pick the
-ones that apply (multi-select):
+**Active agents** are the workspace-owning **domain** agents — the ones that touch this repo's code.
+Two tiers exist; only the domain tier is selectable:
 
-- `platform-engineer` — backend / serverless / infra
-- `web-engineer` — web frontend
-- `mobile-engineer` — mobile app
-- `database-administrator` — relational schema + migrations
-- `sync-engineer` — offline-sync layer
+- **Pipeline agents** — `product-manager`, `scrum-master`, `solutions-architect`, `tech-lead`,
+  `principal-engineer`, `qa-engineer`. Always active, own no code, need **no** override file. Do
+  **not** prompt for them.
+- **Domain agents** — own paths and write code. Selectable below; each selected one gets a
+  workspace→agent row and an override file.
 
-The pipeline agents (`product-manager`, `scrum-master`, `solutions-architect`, `tech-lead`,
-`principal-engineer`, `qa-engineer`) are always active and need **no** override file — do not prompt
-for them.
+**Selection guide — which domain agents does this repo need?** Present the options with this decision
+aid (multi-select), so the user picks by what the repo actually contains, not by guessing:
 
-For **each** active agent, also ask for its **owned path(s)** (e.g. `services/api/` for
-`platform-engineer`) so the workspace→agent table can be filled with real values.
+| Agent | Select it when the repo has… | Typical owned paths |
+| ----- | ---------------------------- | ------------------- |
+| `platform-engineer` | a backend, API, serverless handlers, or infra/IaC | `services/`, `src/api/`, `functions/`, `infra/` |
+| `web-engineer` | a web frontend (React/Vue/Svelte/etc.) | `apps/web/`, `src/web/`, `web/` |
+| `mobile-engineer` | a mobile app (React Native / native iOS-Android) | `apps/mobile/`, `mobile/` |
+| `database-administrator` | a relational schema you migrate (SQL, Prisma, Drizzle, TypeORM) | `db/`, `migrations/`, `prisma/` |
+| `sync-engineer` | an **offline-sync** layer (sync rules, transaction builders, DLQ) | `sync/`, `src/sync/` |
+
+Guidance to apply while prompting:
+
+- **Pick only what exists today.** A backend-only service selects `platform-engineer` alone; a
+  full-stack monorepo might select `platform-engineer` + `web-engineer` + `database-administrator`.
+  Unsure → leave it out; standby roles can be activated later by hand (add a row + override).
+- **`database-administrator`** is worth selecting separately from `platform-engineer` only when
+  schema/migrations are a distinct concern with their own directory — it runs **before** the backend
+  in the pipeline. A repo with no migrations does not need it.
+- **`sync-engineer`** is niche — select it **only** for genuine offline-first sync, not for ordinary
+  API calls. It runs after `database-administrator` and the backend.
+- At least one domain agent should be selected; if the user selects none, confirm the repo really
+  has no owned code (docs-only repo) before continuing.
+
+For **each** selected agent, ask for its **owned path(s)** (suggest the typical paths above as
+defaults, confirm against the repo) so the workspace→agent table and the override's Ownership line
+carry real values.
 
 ## Step 4 — Write the config files (real values, no placeholders)
 
@@ -181,6 +202,13 @@ the user exactly what to set up and how to verify. Print this checklist:
 >
 > Once both fields exist, the project is ready: run `/auto <KEY>-<n>` (or `/refine-feature` to start
 > a new idea).
+>
+> **Next, to teach an agent your stack:** each scaffolded override
+> (`.claude/project/agents/<agent>.md`) has an empty **Project skills** list. Write a skill at
+> `.claude/skills/<name>/SKILL.md` (an ORM convention, an API-routing pattern, a deploy recipe…) and
+> list its name in the relevant override — the agent invokes it via the Skill tool at runtime. To
+> **activate a standby role later** that you skipped here (e.g. `mobile-engineer`), add its row to
+> the workspace→agent table and create its override. Full walkthrough: `EXTENDING.md`.
 
 ## Final action — release the session
 
