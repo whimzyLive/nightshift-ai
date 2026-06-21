@@ -1,0 +1,250 @@
+---
+description: One-command onboarding for a new repo — interactively scaffolds .claude/project/project-context.md, the active agents' override files, and the plugin-root marker, after gating on the gh/acli prerequisites and walking you through acli authentication. Ends with a post-init checklist of the Jira custom fields you must configure by hand.
+---
+
+Onboard **this repository** to nightshift SDLC. Walk the user through prerequisites, authentication,
+and configuration, then write every file the plugin needs to run here. `$ARGUMENTS` is ignored —
+`/init` is always interactive.
+
+This command runs **in order**: a missing prerequisite must never leave half-written config, and
+authentication is verified **before** any file is generated. Do the steps below top to bottom and
+**STOP** at the first failure, surfacing an actionable message.
+
+> **Idempotency is out of scope.** This command assumes a fresh project. If
+> `.claude/project/project-context.md` already exists, tell the user it is already initialised and
+> STOP — do not overwrite it. (Re-init / migration is a separate story.)
+
+## Step 1 — Prerequisite gate (create nothing yet)
+
+Both the `gh` (GitHub) and `acli` (Jira) CLIs are required for the ticket/PR integrations. Detect
+them, and if **either** is missing, print the correct install command for the user's OS and **exit
+immediately without creating any files**:
+
+```bash
+MISSING=""
+command -v gh   >/dev/null 2>&1 || MISSING="$MISSING gh"
+command -v acli >/dev/null 2>&1 || MISSING="$MISSING acli"
+echo "OS=$(uname -s)"
+echo "MISSING=${MISSING:-none}"
+```
+
+If `MISSING` is not `none`, resolve the install instructions for the detected OS and STOP:
+
+- **macOS** (`uname -s` = `Darwin`): `brew install gh` · `brew tap atlassian/homebrew-acli && brew install acli`
+- **Debian/Ubuntu** (`uname -s` = `Linux`): `gh` → see <https://github.com/cli/cli/blob/trunk/docs/install_linux.md>; `acli` → download from <https://developer.atlassian.com/cloud/acli/guides/install-acli/>
+- **Other / unknown**: point at `gh` <https://cli.github.com/> and `acli` <https://developer.atlassian.com/cloud/acli/guides/install-acli/>
+
+Tell the user exactly which of `gh` / `acli` is missing, give the matching command(s), and stop:
+
+> Missing prerequisite(s): `<list>`. Install the above, then re-run `/init`. No files were created.
+
+Only when **both** are present, continue.
+
+## Step 2 — Verify acli authentication (before any write)
+
+File generation must not begin until Jira auth is confirmed. Probe the current status:
+
+```bash
+acli jira auth status 2>&1 | tail -5
+```
+
+- **Authenticated** → continue to Step 3.
+- **Not authenticated / error** → guide the user through login. Collect the **site** (e.g.
+  `your-org.atlassian.net`), **email**, and an **API token** (from
+  <https://id.atlassian.com/manage-profile/security/api-tokens>), then run the login and re-verify:
+
+  ```bash
+  acli jira auth login --site "<site>" --email "<email>" --token "<api-token>"
+  acli jira auth status 2>&1 | tail -5
+  ```
+
+  If the re-verify still fails, **STOP** with an actionable error naming the likely cause (wrong
+  site host, expired/incorrect token, or email mismatch) and tell the user to re-run `/init` after
+  fixing it. Do **not** proceed to file generation on an auth failure.
+
+## Step 3 — Collect configuration (one value at a time)
+
+Prompt the user for each value **individually** — one question at a time, never batched into a wall
+of prompts. Each field is **either** a picker **or** free text; the mechanics are mandatory, not a
+suggestion (see *Prompt mechanics* below). Collect:
+
+| Value | Notes |
+| ----- | ----- |
+| Project name | repo/display name, e.g. `acme-api` |
+| Jira project key | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`) |
+| Jira site | the authenticated host from Step 2 (offer it as the default) |
+| Base branch | the integration branch PRs target, e.g. `main` or `develop` |
+| Package manager | `npm` / `pnpm` / `yarn` / `bun` / other |
+| Typecheck command | the project's typecheck, e.g. `pnpm typecheck` (blank if none) |
+| Test command | the project's test runner, e.g. `pnpm test` (blank if none) |
+| Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
+| Active agents | the **domain** agents whose code lives in this repo (see below) |
+
+### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
+
+Every **finite-choice** field below MUST be asked with the `AskUserQuestion` tool (the native
+selectable picker), with **exactly** the `header`, `question`, `multiSelect`, and `options` given.
+`AskUserQuestion` always appends an "Other" escape, so options need not be exhaustive. The
+free-text fields MUST be asked as plain questions (no picker — open values have no finite set).
+
+**Picker fields (`AskUserQuestion`, one call each, in this order):**
+
+1. **Package manager** — `header: "Pkg mgr"`, `multiSelect: false`,
+   `options: [pnpm, npm, yarn, bun]` (each `label` the tool name; `description` one line). The
+   chosen label is the `Package manager` token and the prefix for the typecheck/test suggestions.
+2. **Base branch** — `header: "Base branch"`, `multiSelect: false`. Build `options` from the repo's
+   actual branches — run `git branch --format='%(refname:short)'` and offer `main`/`master`/`develop`
+   when present (put the repo's current default first); the user can pick "Other" to type another.
+3. **Lightweight threshold** — `header: "LW threshold"`, `multiSelect: false`,
+   `options: [3 (default), 2, 5, 1]` (labels are the point values; mark `3` recommended). The choice
+   is the `Lightweight threshold` value.
+4. **Active agents** — `header: "Agents"`, `multiSelect: true`, `options:` the five domain agents
+   below, each `label` the agent name and `description` its "select when…" row from the table. This
+   is the ONLY multi-select picker; the result is the active-agent set.
+
+**Free-text fields (plain questions, no picker):** Project name, Jira project key, Jira site (offer
+the Step-2 host as the default), Typecheck command, Test command, and each active agent's owned
+path(s). These accept open string values, so a picker would be wrong.
+
+**Active agents** are the workspace-owning **domain** agents — the ones that touch this repo's code.
+Two tiers exist; only the domain tier is selectable:
+
+- **Pipeline agents** — `product-manager`, `scrum-master`, `solutions-architect`, `tech-lead`,
+  `principal-engineer`, `qa-engineer`. Always active, own no code, need **no** override file. Do
+  **not** prompt for them.
+- **Domain agents** — own paths and write code. Selectable below; each selected one gets a
+  workspace→agent row and an override file.
+
+**Selection guide — which domain agents does this repo need?** Present the options with this decision
+aid (multi-select), so the user picks by what the repo actually contains, not by guessing:
+
+| Agent | Select it when the repo has… | Typical owned paths |
+| ----- | ---------------------------- | ------------------- |
+| `platform-engineer` | a backend, API, serverless handlers, or infra/IaC | `services/`, `src/api/`, `functions/`, `infra/` |
+| `web-engineer` | a web frontend (React/Vue/Svelte/etc.) | `apps/web/`, `src/web/`, `web/` |
+| `mobile-engineer` | a mobile app (React Native / native iOS-Android) | `apps/mobile/`, `mobile/` |
+| `database-administrator` | a relational schema you migrate (SQL, Prisma, Drizzle, TypeORM) | `db/`, `migrations/`, `prisma/` |
+| `sync-engineer` | an **offline-sync** layer (sync rules, transaction builders, DLQ) | `sync/`, `src/sync/` |
+
+Guidance to apply while prompting:
+
+- **Pick only what exists today.** A backend-only service selects `platform-engineer` alone; a
+  full-stack monorepo might select `platform-engineer` + `web-engineer` + `database-administrator`.
+  Unsure → leave it out; standby roles can be activated later by hand (add a row + override).
+- **`database-administrator`** is worth selecting separately from `platform-engineer` only when
+  schema/migrations are a distinct concern with their own directory — it runs **before** the backend
+  in the pipeline. A repo with no migrations does not need it.
+- **`sync-engineer`** is niche — select it **only** for genuine offline-first sync, not for ordinary
+  API calls. It runs after `database-administrator` and the backend.
+- At least one domain agent should be selected; if the user selects none, confirm the repo really
+  has no owned code (docs-only repo) before continuing.
+
+For **each** selected agent, ask for its **owned path(s)** (suggest the typical paths above as
+defaults, confirm against the repo) so the workspace→agent table and the override's Ownership line
+carry real values.
+
+## Step 4 — Write the config files (real values, no placeholders)
+
+Create the directories and write the files below. Every value must be the user's actual input — when
+you finish, **no placeholder tokens** (`<...>`, `acme`, `TODO`) may remain in any generated file.
+
+**4a. `.claude/.sdlc-plugin-root`** — the plugin-root marker the domain agents read to resolve
+`${CLAUDE_PLUGIN_ROOT}`. Write the absolute SDLC plugin root (this command's own
+`${CLAUDE_PLUGIN_ROOT}`) as a single line.
+
+**4b. `.claude/project/project-context.md`** — from the collected values:
+
+```markdown
+# Project Context
+
+| Token                | Value                  |
+| -------------------- | ---------------------- |
+| Project name         | <project name>         |
+| Jira project key     | <KEY>                  |
+| Jira site            | <site>                 |
+| Base branch          | <base branch>          |
+| Package manager      | <pm>                   |
+| Typecheck / Test     | <typecheck> / <test>   |
+
+## Workspace → agent
+| Path            | Owner             |
+| --------------- | ----------------- |
+<one row per active agent: its owned path → the agent>
+
+## Tooling
+| Typecheck | `<typecheck cmd>` |
+| Test      | `<test cmd>`      |
+
+## Triage
+
+| Token | Value |
+| ----- | ----- |
+| Lightweight threshold (story points, inclusive) | `<threshold>` |
+```
+
+Omit the Typecheck/Test rows the user left blank rather than writing an empty backtick pair.
+
+**4c. `.claude/project/agents/<agent>.md`** — one file **per active agent only**, from the override
+contract in `EXTENDING.md`. Fill the Ownership line with the real owned/forbidden paths and the
+run-order; leave the project-skill list as a commented starter the user fills in later:
+
+```markdown
+# <Agent display name> — <project name> bindings
+
+## Project skills (invoke in order via the Skill tool)
+# Add skills you write under .claude/skills/<name>/SKILL.md, then list them here.
+
+## Directory guides (read before coding)
+# - <owned path>/CLAUDE.md
+
+## Ownership
+- owns: <this agent's owned path(s)>
+- never: <other agents' owned paths>
+- runs after: <upstream agent or "—"> · before: <downstream agent or "—">
+
+## Tech rules
+# <Framework + runtime>, language strictness, file-naming, "always/never" rules.
+
+## Local dev (tokens from project-context Tooling)
+- Typecheck: `<typecheck cmd>` · Test: `<test cmd>`
+```
+
+Do not write override files for agents the user did not select.
+
+## Step 5 — Post-init checklist (Jira fields you must configure)
+
+Creating or modifying Jira custom fields is **out of scope** — but the pipeline needs them, so tell
+the user exactly what to set up and how to verify. Print this checklist:
+
+> ✅ Files written: `.claude/project/project-context.md`, agent overrides for `<active agents>`, and
+> `.claude/.sdlc-plugin-root`.
+>
+> **Configure these Jira custom fields on project `<KEY>` (the plugin reads but never creates them):**
+>
+> 1. **Story point estimate** (number) — the triage/route input. Verify it is on the story screen:
+>    `acli jira workitem view <KEY>-<n> --fields 'Story point estimate' --json`
+> 2. **AI Workflow** (single-select) with options `Full Auto`, `Auto`, `Assisted` — controls
+>    auto-merge vs human-merge. Verify a value reads back:
+>    `acli jira workitem search --jql 'project = <KEY> AND "AI Workflow" is not EMPTY' --fields key`
+>
+> Once both fields exist, the project is ready: run `/auto <KEY>-<n>` (or `/refine-feature` to start
+> a new idea).
+>
+> **Next, to teach an agent your stack:** each scaffolded override
+> (`.claude/project/agents/<agent>.md`) has an empty **Project skills** list. Write a skill at
+> `.claude/skills/<name>/SKILL.md` (an ORM convention, an API-routing pattern, a deploy recipe…) and
+> list its name in the relevant override — the agent invokes it via the Skill tool at runtime. To
+> **activate a standby role later** that you skipped here (e.g. `mobile-engineer`), add its row to
+> the workspace→agent table and create its override. Full walkthrough: `EXTENDING.md`.
+
+## Final action — release the session
+
+After everything above is complete (success, or a terminal STOP surfaced to the user), run this as
+your very last action:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+```
+
+It prints the completion signal the automation worker watches for. Outside the worker
+(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
