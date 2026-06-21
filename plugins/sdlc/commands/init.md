@@ -64,8 +64,9 @@ acli jira auth status 2>&1 | tail -5
 
 ## Step 3 — Collect configuration (one value at a time)
 
-Prompt the user for each value **individually** (use `AskUserQuestion` where there is a finite
-choice; ask plainly otherwise). Do not batch them into one wall of questions. Collect:
+Prompt the user for each value **individually** — one question at a time, never batched into a wall
+of prompts. Each field is **either** a picker **or** free text; the mechanics are mandatory, not a
+suggestion (see *Prompt mechanics* below). Collect:
 
 | Value | Notes |
 | ----- | ----- |
@@ -78,6 +79,32 @@ choice; ask plainly otherwise). Do not batch them into one wall of questions. Co
 | Test command | the project's test runner, e.g. `pnpm test` (blank if none) |
 | Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
+
+### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
+
+Every **finite-choice** field below MUST be asked with the `AskUserQuestion` tool (the native
+selectable picker), with **exactly** the `header`, `question`, `multiSelect`, and `options` given.
+`AskUserQuestion` always appends an "Other" escape, so options need not be exhaustive. The
+free-text fields MUST be asked as plain questions (no picker — open values have no finite set).
+
+**Picker fields (`AskUserQuestion`, one call each, in this order):**
+
+1. **Package manager** — `header: "Pkg mgr"`, `multiSelect: false`,
+   `options: [pnpm, npm, yarn, bun]` (each `label` the tool name; `description` one line). The
+   chosen label is the `Package manager` token and the prefix for the typecheck/test suggestions.
+2. **Base branch** — `header: "Base branch"`, `multiSelect: false`. Build `options` from the repo's
+   actual branches — run `git branch --format='%(refname:short)'` and offer `main`/`master`/`develop`
+   when present (put the repo's current default first); the user can pick "Other" to type another.
+3. **Lightweight threshold** — `header: "LW threshold"`, `multiSelect: false`,
+   `options: [3 (default), 2, 5, 1]` (labels are the point values; mark `3` recommended). The choice
+   is the `Lightweight threshold` value.
+4. **Active agents** — `header: "Agents"`, `multiSelect: true`, `options:` the five domain agents
+   below, each `label` the agent name and `description` its "select when…" row from the table. This
+   is the ONLY multi-select picker; the result is the active-agent set.
+
+**Free-text fields (plain questions, no picker):** Project name, Jira project key, Jira site (offer
+the Step-2 host as the default), Typecheck command, Test command, and each active agent's owned
+path(s). These accept open string values, so a picker would be wrong.
 
 **Active agents** are the workspace-owning **domain** agents — the ones that touch this repo's code.
 Two tiers exist; only the domain tier is selectable:
