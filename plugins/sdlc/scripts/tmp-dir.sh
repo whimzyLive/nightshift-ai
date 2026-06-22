@@ -10,7 +10,9 @@
 # abort with empty output — an empty $dir would turn a caller's `mktemp "$dir/x"` into a write
 # to the filesystem root.
 set -uo pipefail
-here="${BASH_SOURCE[0]%/*}"
+# Dir of this script. `%/*` is fork-free but leaves a slash-less invocation (e.g. `bash
+# tmp-dir.sh` from the scripts dir) unchanged — detect that and use "." so the sibling resolves.
+here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 key="$(bash "$here/session-key.sh" 2>/dev/null || true)"
 dir="./.tmp${key:+/$key}"
 mkdir -p "$dir" 2>/dev/null || true
