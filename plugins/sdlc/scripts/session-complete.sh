@@ -23,20 +23,23 @@
 #       Bare form:  <<<SDLC_SESSION_COMPLETE:KEY>>>
 #       PR form:    <<<SDLC_SESSION_COMPLETE:KEY|PR=URL>>>
 
-key="${SDLC_SESSION_KEY:-}"
-[ -z "$key" ] && exit 0
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || here="."
 
-# AC-2/AC-3: remove this session's scoped temp dir before signalling completion,
-# so no dangling temp files remain after a normally-completed session. Guard against path
-# traversal: only run rm -rf when $key is a single safe path segment (matches tmp-dir.sh).
-# An unsafe key (path separator or `..`) skips cleanup but STILL emits the sentinel below,
-# so the harness releases the slot — we never run rm -rf on a key that could escape ./.tmp.
-case "$key" in
-  */* | *..*) : ;;                 # unsafe key — skip cleanup, still signal completion
-  *) rm -rf "./.tmp/$key" ;;
-esac
+# Happy-path temp cleanup, BOTH modes: remove this session's scoped temp dir + sweep loose files.
+# Uses the shared resolver (SDLC_SESSION_KEY / CLAUDE_CODE_SESSION_ID) so an interactive session
+# is cleaned here too, not just a worker session. The traversal guard lives in session-key.sh, so
+# a malformed key resolves empty and no rm -rf runs. The SessionEnd hook (cleanup-tmp.sh) is the
+# safety net for sessions that never reach this final step; this is the normal-completion clean.
+clean_key="$(bash "$here/session-key.sh" 2>/dev/null || true)"
+[ -n "$clean_key" ] && rm -rf "./.tmp/$clean_key" 2>/dev/null || true
 rm -f ./.tmp/commit-msg.txt ./.tmp/acli-* ./.tmp/*.tmp 2>/dev/null || true
 rmdir ./.tmp 2>/dev/null || true
+
+# Completion sentinel — WORKER CONTRACT ONLY. Emitted solely when SDLC_SESSION_KEY is set (the
+# harness injects it). An interactive session (key unset) prints nothing and exits 0 here — but
+# its temp dir was already cleaned above, regardless of the sentinel.
+key="${SDLC_SESSION_KEY:-}"
+[ -z "$key" ] && exit 0
 
 pr_url="${1:-}"
 if [ -n "$pr_url" ]; then
