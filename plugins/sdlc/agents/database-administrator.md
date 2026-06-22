@@ -37,6 +37,8 @@ Generic skills are preloaded via frontmatter (`executing-plans`, `conventional-c
 
 Follow the conventions in your override and the directory `CLAUDE.md` guides. Defaults: strict TypeScript, no `any`, kebab-case files, import order external → internal → relative → types.
 
+Write self-explanatory code. Comment only the non-obvious — logic with unseen side-effects, a subtle invariant, a workaround and its reason. Do **not** narrate obvious functions or straightforward lines; redundant comments next to self-evident code are noise that make code harder to read, not easier. Be pragmatic, not exhaustive.
+
 ## Constraints
 
 - Touch only your owned paths (project-context + override). Never another agent's domain.
