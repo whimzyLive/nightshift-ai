@@ -1,0 +1,20 @@
+<svg width="360" height="96" viewBox="0 0 360 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="nightshift">
+  <!-- Light-background wordmark: "night" in night-800 ink, "shift" in terracotta. Transparent plate. -->
+  <defs>
+    <radialGradient id="lgLightGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d97757" stop-opacity="0.22"></stop>
+      <stop offset="60%" stop-color="#d97757" stop-opacity="0.05"></stop>
+      <stop offset="100%" stop-color="#d97757" stop-opacity="0"></stop>
+    </radialGradient>
+    <mask id="lgLightCrescent">
+      <rect x="16" y="16" width="64" height="64" fill="black"></rect>
+      <circle cx="46" cy="48" r="25" fill="white"></circle>
+      <circle cx="58" cy="40" r="22" fill="black"></circle>
+    </mask>
+  </defs>
+  <circle cx="48" cy="48" r="44" fill="url(#lgLightGlow)"></circle>
+  <rect x="16" y="16" width="64" height="64" rx="20" fill="#d97757" mask="url(#lgLightCrescent)"></rect>
+  <circle cx="68" cy="26" r="2" fill="#0d0d18"></circle>
+  <circle cx="76" cy="40" r="1.4" fill="#74738c" opacity="0.8"></circle>
+  <text x="100" y="59" font-family="'JetBrains Mono','SFMono-Regular',monospace" font-size="32" font-weight="700" letter-spacing="-0.5" fill="#0d0d18">night<tspan fill="#d97757">shift</tspan></text>
+</svg>

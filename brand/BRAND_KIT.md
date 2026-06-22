@@ -62,7 +62,8 @@ source of truth). Regenerate from there; don't edit copies here.
 
 | Asset | File | Use |
 | --- | --- | --- |
-| Wordmark lockup | [`assets/logo.svg`](./assets/logo.svg) | landing hero, README header, social-preview card |
+| Wordmark lockup (dark bg) | [`assets/logo.svg`](./assets/logo.svg) | landing hero, README header, social-preview card — on dark surfaces |
+| Wordmark lockup (light bg) | [`../.claude/skills/nightshift-design/assets/logo-light.svg`](../.claude/skills/nightshift-design/assets/logo-light.svg) | the same lockup for light/white surfaces — "night" in `--night-800` ink, "shift" in terracotta. Lives in the design system only |
 | Moon mark | [`assets/logomark.svg`](./assets/logomark.svg) | favicon-scale mark, nav (28px), avatar |
 | Favicon | [`assets/favicon.svg`](./assets/favicon.svg) | site favicon |
 
