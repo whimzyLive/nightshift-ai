@@ -154,6 +154,8 @@ suggestion (see *Prompt mechanics* below). Collect:
 | Test command | the project's test runner — **default: `DETECTED_TEST`** (blank if none) |
 | Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
+| Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default) or `github-copilot` |
+| Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
 
@@ -177,6 +179,16 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
 4. **Active agents** — `header: "Agents"`, `multiSelect: true`, `options:` the five domain agents
    below, each `label` the agent name and `description` its "select when…" row from the table. This
    is the ONLY multi-select picker; the result is the active-agent set.
+5. **Review agent** — `header: "Review agent"`, `multiSelect: false`,
+   `options: [claude-inline (Recommended), github-copilot]`. `claude-inline` (first/default) runs
+   `/code-review` in-session and works on ANY repo with no external setup; pick `github-copilot`
+   **only** when the repo has GitHub Copilot code review enabled and wants the bot to drive the loop.
+   The chosen label is the `Review agent` token.
+6. **Review trigger** — `header: "Review trigger"`, `multiSelect: false`,
+   `options: [on-update (Recommended), on-create, none]`. `on-update` (first/default) re-requests
+   review on every push until the head is clean; `on-create` reviews once at PR creation;
+   `none` raises the PR with no review gate (the loop is a no-op). The chosen label is the
+   `Review mode` token.
 
 **Free-text fields (plain questions, no picker):** Project name, Jira project key, Jira site (offer
 the Step-2 host as the default), Typecheck command (suggest `DETECTED_TYPECHECK` as the default),
@@ -299,6 +311,8 @@ are documented in that template file. Token slots to substitute:
 | `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
 | `<threshold>` | lightweight threshold (Step 3) |
+| `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
+| `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
 | workspace→agent rows | one row per active agent with its confirmed owned path(s) |
 
 **4c. `.claude/project/agents/<agent>.md`** — one file **per active agent only**. For each active
