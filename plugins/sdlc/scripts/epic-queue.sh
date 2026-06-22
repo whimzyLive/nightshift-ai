@@ -35,7 +35,10 @@ echo "EPIC=$epic"
 # 1. Children = all stories whose parent is the epic, ordered by created ASC so
 #    the natural input order already encodes the tie-break. JQL ORDER BY makes
 #    the oldest-first ordering authoritative regardless of acli's default sort.
-children="$(acli jira workitem search --jql "parent = $epic ORDER BY created ASC" --fields key --json 2>/dev/null \
+#    NB: do NOT pass `--fields key` — some acli versions emit an array of nulls
+#    when --fields is set, which would make every child key resolve to "null".
+#    Reading `.key` off the full work-item objects is version-stable.
+children="$(acli jira workitem search --jql "parent = $epic ORDER BY created ASC" --json 2>/dev/null \
               | jq -r '.[].key')"
 [ -z "$children" ] && fail "could not list children of $epic (no stories, or acli query failed — cannot build queue)"
 
