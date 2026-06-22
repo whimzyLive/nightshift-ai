@@ -74,10 +74,10 @@ inline, not the `/triage` command — so `/auto` and `/impl` share one definitio
 
 ---
 
-## Loop-after-raise + mode-conditioned terminal action (shared by A1, A2, B2)
+## Loop-after-raise + mode-conditioned terminal action (shared by A1, A2, B1)
 
 Every phase that raises a PR drives the Copilot review-fix loop on it **before** the phase finishes,
-then takes a terminal action that depends on the story's mode. A1, A2, and B2 below each invoke this
+then takes a terminal action that depends on the story's mode. A1, A2, and B1 below each invoke this
 procedure with their just-raised `<PR_URL>` and a `<PHASE>` of `spec` (advances to Phase 2 on
 merge), `plan+impl`, or `impl` (completes the story on merge).
 
@@ -280,9 +280,10 @@ deliberate fast-path for small (≤ threshold-points) stories — the spec/plan 
 
 Run the implementation exactly as `${CLAUDE_PLUGIN_ROOT}/commands/impl.md` specifies for `STORY_KEY`: execute
 the Principal Engineer playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`) **inline in this
-session** — dispatch the domain agents yourself with the `Agent` tool. The playbook **derives tasks
-directly from the story description** (its lightweight path treats a missing plan file as a non-blocker).
-Do NOT dispatch a `principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`.
+session** with **`LIGHTWEIGHT=true`** — dispatch the domain agents yourself with the `Agent` tool. On its
+lightweight path the playbook skips the plan-file STOP and **derives tasks inline from the Jira story**
+(Step 2), so no plan doc is needed. Do NOT dispatch a `principal-engineer` subagent (nesting is blocked).
+Capture the impl PR URL as `IMPL_PR_URL`.
 
 Then resolve `MODE`, post the mode-aware Jira comment (B2 below) **before** the loop, and run the
 **Loop-after-raise** procedure (above) for the impl PR as the session **tail**

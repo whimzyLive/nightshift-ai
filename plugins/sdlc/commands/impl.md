@@ -36,7 +36,10 @@ the Principal Engineer role directly.
 3. Fetch the Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for the
    summary, description, and context (comments, linked tickets, attachments).
 4. **Execute `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` inline**, start to finish, for
-   `<STORY-KEY>`. That playbook is the single source of truth for the implementation workflow:
+   `<STORY-KEY>` — passing **`LIGHTWEIGHT=true` when `TRIAGE=lightweight`** (else `false`). That flag is
+   what makes the playbook skip the plan-file STOP and derive tasks inline from the story on the
+   lightweight path; on the full path it leaves the merged-plan precondition intact.
+   That playbook is the single source of truth for the implementation workflow:
    pre-flight → branch → ordered domain-agent dispatch (`isolation: "worktree"`) → per-phase
    push/verify → **hand off to the QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`, run
    inline: code-review loop until clean → memory writes → quality gate → AC/plan verification) →

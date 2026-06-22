@@ -110,10 +110,12 @@ skill pattern. The prompt MUST include:
 
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
-- `PLAN_OR_REQUIREMENTS`: Story mode — full content of `docs/superpowers/plans/<STORY-KEY>.md`
-  **plus the story's acceptance criteria verbatim** (the reviewer must check the code against the
-  ACs, not just internal consistency). Diff mode — there are no ACs/plan; the requirement is the
-  change's stated intent.
+- `PLAN_OR_REQUIREMENTS`: Story mode — the story's **acceptance criteria verbatim** (the reviewer
+  must check the code against the ACs, not just internal consistency), **plus** the full content of
+  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists** (the full path). On the
+  **lightweight** path there is no plan doc — use the Jira story **description + acceptance criteria**
+  as the requirement source (the ACs are the contract). Diff mode — there are no ACs/plan; the
+  requirement is the change's stated intent.
 - The review target: Story mode — `BASE_SHA..HEAD_SHA`; Diff mode — the `git diff <BASE_SHA>`
   working-tree diff plus any untracked files (NOT a commit range).
 - Explicit instruction to review across all five axes: **correctness, readability,
@@ -277,8 +279,11 @@ Apply `verification-before-completion`. Produce TWO line-by-line checklists, eac
 with evidence (git log, file existence, or test output) — no item checked off on assertion alone:
 
 1. **Every plan task** in `docs/superpowers/plans/<STORY-KEY>.md` → has a corresponding commit/file/test.
+   *(Full path only. On the lightweight path there is no plan doc — skip this checklist; the AC
+   checklist below is the completion contract.)*
 2. **Every acceptance criterion** on the Jira story → is met by code that exists on the branch,
-   with the specific evidence (handler/test/file) named.
+   with the specific evidence (handler/test/file) named. *(Always — and the primary gate on the
+   lightweight path.)*
 
 ```bash
 git fetch origin feat/<STORY-KEY>

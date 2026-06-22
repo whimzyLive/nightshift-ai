@@ -23,6 +23,10 @@ verdict.
 ## Inputs
 
 - `<STORY-KEY>` — the Jira story key for this run
+- `LIGHTWEIGHT` — `true` when the caller (triage) routed this story **lightweight**; default `false`.
+  On `true` the plan doc is **optional** and tasks are derived **inline from the Jira story** (Step 1
+  skips the plan-file STOP; Step 2 derives from the story). On `false` (full path) the merged plan
+  doc is required, exactly as before.
 - Plan path derived deterministically: `docs/superpowers/plans/<STORY-KEY>.md`
 
 ## Project constants
@@ -52,9 +56,13 @@ Invoke, in order, before dispatching anything:
 ## Step 1 — Pre-flight checks
 
 ```bash
-# 1. Plan must exist (merged to develop)
-test -f "docs/superpowers/plans/<STORY-KEY>.md" \
-  || { echo "STOP: plan not found — merge the plan PR first"; exit 1; }
+# 1. Plan must exist (merged to develop) — REQUIRED on the full path ONLY.
+#    On the lightweight path (LIGHTWEIGHT=true) a missing plan doc is expected and NOT a STOP;
+#    Step 2 derives the task list inline from the Jira story instead.
+if [ "${LIGHTWEIGHT:-false}" != "true" ]; then
+  test -f "docs/superpowers/plans/<STORY-KEY>.md" \
+    || { echo "STOP: plan not found — merge the plan PR first"; exit 1; }
+fi
 
 # 2. Sync develop, capture base SHA BEFORE branching (needed for review range)
 git fetch origin develop
@@ -74,7 +82,7 @@ gh pr list --search "feat/<STORY-KEY>" --json number,title,headRefName,state
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PASS, exit 1 = GATE=STOP (REASON= printed)
 ```
 
-- Plan missing → **STOP**, tell user to merge the plan PR.
+- Plan missing on the **full** path (`LIGHTWEIGHT` unset/false) → **STOP**, tell user to merge the plan PR. On the **lightweight** path a missing plan doc is expected — **do not STOP**; proceed (Step 2 derives tasks from the story).
 - Implementation PR already merged → **STOP**, report it's already done.
 - An open `feat/<STORY-KEY>` PR/branch already exists → reuse it (check it out); do not create a duplicate.
 - **Any blocker has no `feat/<blocker>` PR (open or merged) → STOP the entire flow and REJECT.** Do not create a branch, do not dispatch any domain agent. Report to the user:
@@ -86,7 +94,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
   ```
   This gate enforces the Jira dependency graph (kept in the Epic PRD's "Story Dependency Graph" section) — never implement a story ahead of the work it depends on.
 
-## Step 2 — Read & parse the plan
+## Step 2 — Derive the task list (from the plan doc, or — on the lightweight path — from the story)
+
+**Full path (plan doc exists, `LIGHTWEIGHT` unset/false):**
 
 1. Read `docs/superpowers/plans/<STORY-KEY>.md`.
 2. Group tasks by agent tag: `[database-administrator]`, `[platform-engineer]`,
@@ -94,6 +104,21 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
 3. Cross-reference Active agents in project-context — drop Standby phases with no tasks.
 4. Note any "grounding corrections" / "open items" the plan flagged — pass them verbatim into
    the relevant domain-agent prompt so the implementer honors them.
+
+**Lightweight path (`LIGHTWEIGHT=true`, no plan doc):** there is no plan file to read — derive the
+task list **inline from the Jira story**:
+
+1. Fetch the story (summary + description + acceptance criteria) via
+   `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>`.
+2. Turn it into an ordered, agent-tagged task list the same way `tech-lead` would: map each piece of
+   work to the **Active** domain agent that owns its files (per project-context), in the standard
+   dependency order (database-administrator → platform-engineer → sync-engineer → web-engineer →
+   mobile-engineer). Keep it proportional — a lightweight story is small, usually one or two domain
+   agents and a handful of tasks.
+3. Treat the **acceptance criteria as the completion contract** — pass them verbatim into each
+   domain-agent prompt (there is no plan doc to carry them).
+
+Either way, Step 3+ (the phase ladder) is identical.
 
 ## Step 2.5 — Detect child sub-tasks (drives per-sub-task commit sequencing)
 
