@@ -6,14 +6,17 @@
 #   2. CLAUDE_CODE_SESSION_ID — interactive Claude Code session (stable, unique per session)
 #
 # This makes the temp scope unique-per-session in BOTH modes: a worker scopes by story key,
-# an interactive session scopes by its Claude Code session id. A key containing a path
-# separator or `..` is rejected (echoes empty) so a malformed/hostile value can never escape
-# ./.tmp. Pure env read, no stdin — safe to call from tmp-dir.sh on every temp write, and
-# from the cleanup/complete scripts at teardown, so all of them agree on the same dir.
-set -euo pipefail
+# an interactive session scopes by its Claude Code session id. The key is whitelist-validated
+# to a single safe path segment — only [A-Za-z0-9._-], and never "." or ".." — so path
+# separators, "..", glob metacharacters, or spaces in a malformed/hostile value can never
+# escape ./.tmp or expand unexpectedly when a caller interpolates the path. Anything else
+# resolves to empty (callers fall back to the bare ./.tmp). Pure env read, no stdin — safe to
+# call from tmp-dir.sh on every temp write and from the cleanup/complete scripts at teardown,
+# so all of them agree on the same dir.
+set -uo pipefail
 key="${SDLC_SESSION_KEY:-}"
 [ -z "$key" ] && key="${CLAUDE_CODE_SESSION_ID:-}"
 case "$key" in
-  */* | *..*) key='' ;;
+  '' | . | .. | *[!A-Za-z0-9._-]*) key='' ;;
 esac
 printf '%s\n' "$key"

@@ -102,9 +102,12 @@ Candidates: jira-fetch probes, git rev/diff comparisons, exit-marker echoes,
 DNS/auth checks (the `S293`/`S294` compound-shell blocks).
 
 ### R3 — kill commit-message churn
-Write the message to a file and `git commit -F ./.tmp/msg.txt`. Allow rule:
-`Bash(git commit -F *)`. Removes the per-message paren-escaping prompt and lets the
-~30 dead `git commit -m 'fix\(...\)'` rules be deleted.
+Write the message into the session-scoped temp dir and commit from there —
+`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh); ...; git commit -F "$dir/msg.txt"`.
+Allow rule: `Bash(git commit -F *)`. Removes the per-message paren-escaping prompt and lets the
+~30 dead `git commit -m 'fix\(...\)'` rules be deleted. Use the scoped `$dir` (not a bare
+`./.tmp/msg.txt`) so teardown removes it with the rest of the session's scratch — cleanup is
+scoped-only and does not sweep loose `./.tmp/*` files.
 
 ### R4 — never inline JSON / never inline `$()` or backticks on command line
 Already in CLAUDE.md for JSON. Extend the rule to: no backticks, no `$(...)`, no
