@@ -67,6 +67,12 @@ qa-engineer          → reviews against the spec, runs the quality gate, verifi
 
 You went from a ticket key to a reviewed PR — with a paper trail at every stage — without leaving the terminal.
 
+> **Complexity routing.** `/auto` triages every story by size first. A **small** story (at/under the
+> configurable lightweight threshold, default ≤3 points) takes the **fast-path: straight to
+> implementation — no spec, no plan doc, no review gate** (tasks are derived inline from the ticket).
+> The full spec → plan → review-gate ceremony shown above is reserved for **larger** stories. Raise a
+> story's points above the threshold if you want the full treatment.
+
 > 📹 **[Add a 30-second screencast here]** — the single highest-leverage thing you can do for this README. Show `/auto` running end to end.
 
 ## 🧠 How it works

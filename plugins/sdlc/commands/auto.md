@@ -66,7 +66,7 @@ block (e.g. an `acli` auth/DNS failure), **STOP** and surface that error — do 
 > `/auto`. (`refs/triage.md` is pure routing logic and emits no sentinel.)
 
 - `TRIAGE=full` → **Workflow A** (Phase 1: spec + review gate → Phase 2: plan + impl in a single PR)
-- `TRIAGE=lightweight` → **Workflow B** (direct impl, no spec/plan review gate)
+- `TRIAGE=lightweight` → **Workflow B** (direct impl — **no spec, no plan doc, no review gate**; tasks derived inline from the story)
 
 (Step 1's scrum-master `STORY_POINTS=N|missing` gates the `missing` stop **before** the triage step
 runs; the complexity routing itself is delegated to the shared `refs/triage.md` protocol — applied
@@ -113,7 +113,7 @@ runs the hook. The loop owns the single `session-complete`; `/auto` does **not**
 
 1. **Resolve `MODE`** (see above) — this decides whether an `--on-clean` hook is attached.
 2. **Post the phase's Jira comment FIRST** (the loop is the session's last act, so the comment is
-   posted before it — see A1/A3/B3 for the per-phase, mode-aware text).
+   posted before it — see A1/A3/B2 for the per-phase, mode-aware text).
 3. **Run the loop as the tail:**
    - **`MODE` = `Full Auto`** → attach the auto-merge hook; on the loop's clean exit it auto-merges
      `<PR_URL>`, whose merge event advances the pipeline (`<PHASE>=spec` → resumes Phase 2;
@@ -266,28 +266,31 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 ## Workflow B — `TRIAGE=lightweight`
 
-### B1 — Plan (lightweight)
+Lightweight stories go **straight from triage to implementation** — **no spec, no plan doc, and no
+review gate**. There is **no plan-generation step**: the implementation derives its tasks inline from
+the Jira story description (exactly as standalone `/impl` does on its lightweight path). This is the
+deliberate fast-path for small (≤ threshold-points) stories — the spec/plan ceremony is reserved for
+`full` stories (Workflow A).
 
-Dispatch the `tech-lead` agent for `STORY_KEY` with `LIGHTWEIGHT=true`.
+> **No `docs/superpowers/plans/STORY_KEY.md` is created or required on this path.** A plan doc is
+> neither generated (no `tech-lead` dispatch) nor a precondition. If you *want* a recorded plan and a
+> review gate, the story should be triaged `full` (raise its story points above the threshold).
 
-The tech-lead will derive tasks from the story description directly, create `docs/superpowers/plans/STORY_KEY.md`, and commit it to `develop` — no branch, no PR.
-
-Wait for completion. Capture the returned plan file path.
-
-### B2 — Implement
+### B1 — Implement (direct)
 
 Run the implementation exactly as `${CLAUDE_PLUGIN_ROOT}/commands/impl.md` specifies for `STORY_KEY`: execute
 the Principal Engineer playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`) **inline in this
-session** — dispatch the domain agents yourself with the `Agent` tool. Do NOT dispatch a
-`principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`.
+session** — dispatch the domain agents yourself with the `Agent` tool. The playbook **derives tasks
+directly from the story description** (its lightweight path treats a missing plan file as a non-blocker).
+Do NOT dispatch a `principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`.
 
-Then resolve `MODE`, post the mode-aware Jira comment (B3 below) **before** the loop, and run the
+Then resolve `MODE`, post the mode-aware Jira comment (B2 below) **before** the loop, and run the
 **Loop-after-raise** procedure (above) for the impl PR as the session **tail**
 (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`impl`): `Full Auto` → tail loop **with** the auto-merge hook
 (auto-merges on clean → completes the story); any other mode → tail loop **without** a hook (leave the
 PR open for human merge). The tail loop owns the release.
 
-### B3 — Complete (comment posted BEFORE the tail loop)
+### B2 — Complete (comment posted BEFORE the tail loop)
 
 Post the mode-aware comment now — before entering the loop, since the loop is the session's last act
 (intent tense; any merge happens inside the loop's clean exit):

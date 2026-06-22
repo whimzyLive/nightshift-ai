@@ -42,7 +42,13 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 ### Standard mode (called by `/plan`)
 Requires a merged spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `plan/<STORY-KEY>` branch + PR.
 
-### Lightweight mode (called by `/auto` for stories <3pts)
+### Lightweight mode (`LIGHTWEIGHT=true`) — manual / opt-in only
+> **Not invoked by the automated pipeline.** `/auto` Workflow B and standalone `/impl` now implement
+> lightweight (≤ threshold-points) stories **directly, with no plan doc** — neither dispatches the
+> tech-lead in this mode. This mode survives only for a human who deliberately wants a recorded
+> lightweight plan committed in-place (e.g. running the agent by hand); it is **not** part of the
+> default `/auto`/`/impl` flow.
+
 Caller passes `LIGHTWEIGHT=true`. No spec file required. Derive tasks from the Jira story description directly. Commit the plan file to `<BASE-BRANCH>` in-place — **no plan branch, no PR**. Comment on Jira only with the plan file path:
 ```bash
 acli jira workitem comment create --key <STORY-KEY> --body "Plan (lightweight): docs/superpowers/plans/<STORY-KEY>.md"
