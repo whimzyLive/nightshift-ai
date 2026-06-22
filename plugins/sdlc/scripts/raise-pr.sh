@@ -43,7 +43,13 @@ REVIEWER="${5:-@copilot}"
 #   there is NO bot to assign here, so skip the reviewer request (the loop owns the review).
 # - REVIEW_AGENT=github-copilot ⇒ request the bot here at creation, exactly as before (back-compat).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-eval "$(bash "$SCRIPT_DIR/read-review-config.sh")"
+eval "$(bash "$SCRIPT_DIR/read-review-config.sh" || true)"
+# Belt-and-suspenders: if the reader is missing/unreadable the eval sets nothing, and under
+# `set -u` the next REVIEW_MODE/REVIEW_AGENT read would abort the script AFTER the PR was already
+# created — breaking this file's "best-effort, NEVER fails PR creation" contract. Default both here
+# so a reader failure degrades to the safe github-copilot/on-update path instead of crashing.
+REVIEW_AGENT="${REVIEW_AGENT:-github-copilot}"
+REVIEW_MODE="${REVIEW_MODE:-on-update}"
 
 [ -f "$BODY_FILE" ] || { echo "ERROR: body file not found: $BODY_FILE" >&2; exit 1; }
 

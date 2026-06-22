@@ -36,11 +36,14 @@ CTX="${1:-.claude/project/project-context.md}"
 # Case-insensitive on the token name; strips optional surrounding backticks and
 # lower-cases the value. Empty when the row is absent or the file is unreadable.
 # The value charset `[A-Za-z-]+` is deliberately the enum alphabet of both tokens
-# (github-copilot|claude-inline, none|on-create|on-update). A value with any other
-# char (e.g. an underscore typo `github_copilot`) captures only the leading run,
-# which then fails the `case` match below and trips the AC-5 default+warning — the
-# intended outcome. If a future enum value contains a digit/other char, widen this
-# class too, or it would be silently clipped.
+# (github-copilot|claude-inline, none|on-create|on-update). If a value contains any
+# OTHER char (an underscore typo `github_copilot`, or a trailing phrase like
+# `claude-inline (when Copilot is down)`), the whole `s///` fails to match, so sed
+# emits the row VERBATIM — read_token then returns the entire (lower-cased) row,
+# which fails the `case` match below and trips the AC-5 default+warning. That is the
+# intended SAFE outcome (default + warn), but note it means such a value is rejected,
+# NOT parsed: a future enum value containing a digit/other char must widen this class
+# here, or it too would be silently rejected rather than honoured.
 read_token() {
   # `|| true` is load-bearing: under `set -e`/`pipefail`, grep exiting 1 on a no-match
   # (token row absent, or file unreadable) would abort the script mid-command-substitution
