@@ -139,7 +139,7 @@ React, namespace `window.NightshiftDesignSystem_983007`. Each component has a `.
 - `components/{core,terminal,site,data}/` — `.jsx` + `.d.ts` + `.prompt.md` + group `*.card.html`.
 - `guidelines/*.card.html` — color/type/spacing specimen cards.
 - `ui_kits/marketing/` and `ui_kits/docs/` — full-page references (hero, agent grid, install, docs sidebar).
-- `assets/` — `logomark.svg`, `logo.svg`, `favicon.svg`, `og-card.html`, `readme-banner.html`, `logo-card.html`.
+- `assets/` — `logomark.svg`, `logo.svg` (dark bg), `logo-light.svg` (light bg — "night" in ink, "shift" in terracotta), `favicon.svg`, `og-card.html`, `readme-banner.html`, `logo-card.html`.
 - `README.md` — full brand brief and product context. Source of truth: [whimzyLive/nightshift-ai](https://github.com/whimzyLive/nightshift-ai).
 
 **Caveats:** fonts via Google Fonts (self-host for production); Lucide + logomark are documented original substitutions.
