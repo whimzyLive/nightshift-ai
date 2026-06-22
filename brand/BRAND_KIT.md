@@ -18,8 +18,11 @@ to re-decide it.
 
 ## Name
 
-- **Name:** `nightshift` — **always lowercase**, even at the start of a sentence.
-  Never "Nightshift", "NightShift", or "NS".
+- **Name:** `nightshift` — **always lowercase**, even at sentence start where
+  possible. Never "Nightshift", "NightShift", or "NS".
+  - **Reword to avoid sentence-initial position** rather than capitalize. Not
+    "nightshift ships while you sleep." — instead "With nightshift, you sleep, it
+    ships." or "Your AI team ships while you sleep — that's nightshift."
 - **Agent and command names** are lowercase mono too: `product-manager`, `/auto`,
   `qa-engineer`.
 - **Wordmark:** the `shift` half sets in terracotta, the `night` half in moonlight,
