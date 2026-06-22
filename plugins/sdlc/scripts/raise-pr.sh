@@ -34,13 +34,16 @@ TITLE="${3:?title required}"
 BODY_FILE="${4:?body file required}"
 REVIEWER="${5:-@copilot}"
 
-# Review mode (per-repo): .claude/project/project-context.md "## Copilot Review" → "Review mode"
-# token. `none` ⇒ do not request the review bot at all (no review gate). `on-create`/`on-update`
-# ⇒ request once here at creation (the /loop decides whether to re-request per update). Default
-# on-update when unset/unreadable — back-compatible.
-REVIEW_MODE=$(grep -iE '^\|[[:space:]]*Review mode[[:space:]]*\|' .claude/project/project-context.md 2>/dev/null \
-  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([A-Za-z-]+)`?[[:space:]]*\|.*/\1/' | head -1 | tr '[:upper:]' '[:lower:]')
-case "$REVIEW_MODE" in none|on-create|on-update) ;; *) REVIEW_MODE=on-update ;; esac
+# Review config (per-repo) from .claude/project/project-context.md, via the shared reader so the
+# token regex + defaults live in one place (see read-review-config.sh):
+#   REVIEW_AGENT : github-copilot (default) | claude-inline
+#   REVIEW_MODE  : none | on-create | on-update (default)
+# - REVIEW_MODE=none      ⇒ no review gate — skip the reviewer request entirely.
+# - REVIEW_AGENT=claude-inline ⇒ the review runs in-session via /code-review during the /loop;
+#   there is NO bot to assign here, so skip the reviewer request (the loop owns the review).
+# - REVIEW_AGENT=github-copilot ⇒ request the bot here at creation, exactly as before (back-compat).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+eval "$(bash "$SCRIPT_DIR/read-review-config.sh")"
 
 [ -f "$BODY_FILE" ] || { echo "ERROR: body file not found: $BODY_FILE" >&2; exit 1; }
 
@@ -53,9 +56,13 @@ echo "pr-open: $PR_URL" >&2
 # 2. Mark ready for review (no-op if already non-draft). Best-effort.
 gh pr ready "$PR_URL" >/dev/null 2>&1 || echo "warn: gh pr ready failed (already ready?) — continuing" >&2
 
-# Review-mode gate: in `none` mode there is no review gate — skip the request + verification.
+# Review gate: skip the bot request + verification when there is no bot to request —
+# either `none` mode (no review gate) or `claude-inline` agent (the /loop runs /code-review
+# in-session instead of assigning a reviewer). Only github-copilot requests the bot here.
 if [ "$REVIEW_MODE" = "none" ]; then
   echo "review-mode=none — not requesting $REVIEWER (no review gate)" >&2
+elif [ "$REVIEW_AGENT" = "claude-inline" ]; then
+  echo "review-agent=claude-inline — not requesting $REVIEWER (review runs in-session via /code-review during the loop)" >&2
 else
 # 3. Request the review bot. Best-effort — NEVER fail the PR on this.
 gh pr edit "$PR_URL" --add-reviewer "$REVIEWER" >/dev/null 2>&1 \
