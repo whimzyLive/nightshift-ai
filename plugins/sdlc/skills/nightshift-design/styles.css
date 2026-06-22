@@ -1,0 +1,9 @@
+/* nightshift — design system entry point.
+ * Consumers link this single file. It is an @import manifest only —
+ * never add rules here. Everything reachable from these imports ships.
+ */
+@import url('./tokens/fonts.css');
+@import url('./tokens/colors.css');
+@import url('./tokens/typography.css');
+@import url('./tokens/spacing.css');
+@import url('./tokens/base.css');

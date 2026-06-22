@@ -1,0 +1,356 @@
+<!-- @dsCard group="Brand" viewport="1280x320" name="GitHub README banner" subtitle="1280×320 — repo header" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style id="ns-tokens">
+/* tokens/colors.css */
+/* nightshift — color tokens
+ * Dark-mode-first. A nocturnal night-sky base, warm terracotta accent,
+ * moonlight text, one cool secondary for links/states.
+ * All text pairings meet WCAG AA on their intended surfaces.
+ */
+:root {
+  /* ---- Base values: night-sky background layers (deepest → raised) ---- */
+  --night-900: #08080f;   /* page void — deepest */
+  --night-800: #0d0d18;   /* default page background */
+  --night-700: #12121f;   /* sunken / code well */
+  --night-600: #1a1a2e;   /* primary surface (cards, terminal body) */
+  --night-500: #22223a;   /* raised surface (hover, popovers) */
+  --night-400: #2c2c47;   /* overlay / active surface */
+
+  /* ---- Hairlines & dividers ---- */
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line:      rgba(255, 255, 255, 0.10);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- Moonlight text ---- */
+  --moon-100: #f5f3ef;   /* primary text — warm off-white */
+  --moon-200: #d8d6e0;   /* secondary text */
+  --moon-300: #a9a7bd;   /* muted / supporting */
+  --moon-400: #74738c;   /* dim / captions, code comments */
+  --moon-500: #4d4c63;   /* faintest / disabled */
+
+  /* ---- Terracotta accent (warm, Anthropic-aligned) ---- */
+  --terra-300: #f0a488;
+  --terra-400: #e58b6f;
+  --terra-500: #d97757;   /* brand accent */
+  --terra-600: #c2624a;
+  --terra-700: #9d4d3a;
+  --terra-glow: rgba(217, 119, 87, 0.28);
+  --terra-tint: rgba(217, 119, 87, 0.12);
+
+  /* ---- Cool secondary: moonlit indigo (links, focus, info states) ---- */
+  --indigo-300: #a5b4fc;
+  --indigo-400: #8b9cf7;
+  --indigo-500: #7c93f0;
+  --indigo-tint: rgba(124, 147, 240, 0.14);
+
+  /* ---- Cyan: a cooler accent for terminal/data highlights ---- */
+  --cyan-400: #62c4d3;
+  --cyan-500: #4fb3c4;
+
+  /* ---- Semantic (terminal-true) ---- */
+  --green-400: #6ec48a;   /* success / added / passing */
+  --green-tint: rgba(110, 196, 138, 0.14);
+  --amber-400: #e0a458;   /* warning / pending */
+  --amber-tint: rgba(224, 164, 88, 0.14);
+  --red-400: #e0656f;     /* error / removed / failing */
+  --red-tint: rgba(224, 101, 111, 0.14);
+
+  /* ============ SEMANTIC ALIASES — use these in components ============ */
+  /* Backgrounds */
+  --bg-page: var(--night-800);
+  --bg-void: var(--night-900);
+  --bg-sunken: var(--night-700);
+
+  /* Surfaces */
+  --surface-card: var(--night-600);
+  --surface-raised: var(--night-500);
+  --surface-overlay: var(--night-400);
+  --surface-terminal: #0b0b14;
+
+  /* Borders */
+  --border-soft: var(--line-soft);
+  --border-default: var(--line);
+  --border-strong: var(--line-strong);
+  --border-accent: rgba(217, 119, 87, 0.45);
+
+  /* Text */
+  --text-strong: var(--moon-100);
+  --text-body: var(--moon-200);
+  --text-muted: var(--moon-300);
+  --text-dim: var(--moon-400);
+  --text-disabled: var(--moon-500);
+  --text-on-accent: #1a0f0a;
+
+  /* Accent */
+  --accent: var(--terra-500);
+  --accent-hover: var(--terra-400);
+  --accent-press: var(--terra-600);
+  --accent-tint: var(--terra-tint);
+  --accent-glow: var(--terra-glow);
+
+  /* Links & focus */
+  --link: var(--indigo-400);
+  --link-hover: var(--indigo-300);
+  --focus-ring: var(--indigo-500);
+
+  /* Semantic */
+  --success: var(--green-400);
+  --warning: var(--amber-400);
+  --danger: var(--red-400);
+  --info: var(--cyan-400);
+
+  /* Code-token colors (terminal/code-block syntax) */
+  --code-comment: var(--moon-400);
+  --code-keyword: var(--indigo-400);
+  --code-string: var(--green-400);
+  --code-fn: var(--terra-400);
+  --code-num: var(--cyan-400);
+  --code-punct: var(--moon-300);
+  --code-prompt: var(--terra-500);
+}
+
+
+/* tokens/typography.css */
+/* nightshift — typography tokens
+ * Pairing: Inter (sans, headings + body) · JetBrains Mono (code, labels, UI chrome)
+ * Monospace carries the "terminal texture" — used for eyebrows, badges, metadata, commands.
+ */
+:root {
+  /* ---- Families ---- */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+
+  /* ---- Weights ---- */
+  --fw-regular: 400; /* @kind font */
+  --fw-medium: 500; /* @kind font */
+  --fw-semibold: 600; /* @kind font */
+  --fw-bold: 700; /* @kind font */
+  --fw-extra: 800; /* @kind font */
+
+  /* ---- Type scale (1.250 major-third-ish, tuned) ---- */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 25px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 72px;
+  --text-6xl: 92px;
+
+  /* ---- Line heights ---- */
+  --leading-tight: 1.06;
+  --leading-snug: 1.22;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* ---- Letter spacing ---- */
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-eyebrow: 0.16em;  /* mono eyebrows / labels, uppercase */
+
+  /* ---- Semantic roles ---- */
+  --display-font: var(--font-sans);
+  --display-weight: var(--fw-extra);
+  --display-tracking: var(--tracking-tight);
+
+  --heading-font: var(--font-sans);
+  --heading-weight: var(--fw-bold);
+
+  --body-font: var(--font-sans);
+  --body-weight: var(--fw-regular);
+
+  --eyebrow-font: var(--font-mono);
+  --eyebrow-weight: var(--fw-medium);
+  --eyebrow-tracking: var(--tracking-eyebrow);
+
+  --code-font: var(--font-mono);
+}
+
+
+/* tokens/spacing.css */
+/* nightshift — spacing, radius, elevation, motion tokens */
+:root {
+  /* ---- Spacing scale (4px base) ---- */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* ---- Radius ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation: shadows are deep & soft against the night bg.
+   * Pair with a 1px hairline border — the shadow alone won't read on dark. ---- */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --elev-4: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* ---- Glows: the "subtle light in the dark" — for accents & focus ---- */
+  --glow-accent: 0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
+  --glow-cool: 0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
+  --glow-focus: 0 0 0 3px rgba(124, 147, 240, 0.45);
+
+  /* ---- Motion ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* @kind other */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 200ms; /* @kind other */
+  --dur-slow: 360ms; /* @kind other */
+
+  /* ---- Layout ---- */
+  --container-max: 1200px;
+  --container-prose: 720px;
+  --nav-height: 64px;
+}
+
+
+/* tokens/base.css */
+/* nightshift — base element defaults & primitives.
+ * Applies the night-sky canvas, moonlight text, and a faint starfield-friendly
+ * dark scrollbar. Kept minimal — components carry their own styling.
+ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-weight: var(--fw-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--heading-font);
+  font-weight: var(--fw-bold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+}
+
+p { margin: 0; }
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: var(--link-hover); }
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+::selection {
+  background: var(--terra-tint);
+  color: var(--moon-100);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-focus);
+  border-radius: var(--radius-xs);
+}
+
+/* Nocturnal scrollbar */
+* { scrollbar-width: thin; scrollbar-color: var(--night-400) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--night-400);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--night-500); background-clip: content-box; }
+
+/* Mono eyebrow utility — the brand's signature label treatment */
+.ns-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+</style>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html, body { margin: 0; }
+  .banner {
+    width: 1280px; height: 320px; position: relative; overflow: hidden;
+    background:
+      radial-gradient(700px 360px at 88% -30%, rgba(217,119,87,0.20), transparent 60%),
+      radial-gradient(600px 400px at 0% 130%, rgba(124,147,240,0.12), transparent 55%),
+      var(--night-900);
+    font-family: var(--font-sans);
+    display: flex; align-items: center; gap: 56px;
+    padding: 0 80px; box-sizing: border-box;
+  }
+  .banner::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 24% 28%, rgba(245,243,239,0.9), transparent),
+      radial-gradient(1.5px 1.5px at 70% 22%, rgba(245,243,239,0.6), transparent),
+      radial-gradient(1px 1px at 84% 60%, rgba(124,147,240,0.9), transparent),
+      radial-gradient(1px 1px at 46% 74%, rgba(245,243,239,0.5), transparent),
+      radial-gradient(1.5px 1.5px at 92% 40%, rgba(245,243,239,0.5), transparent);
+    opacity: 0.7;
+  }
+  .mark { width: 132px; height: 132px; position: relative; z-index: 1; flex: none; }
+  .txt { position: relative; z-index: 1; }
+  .word { font-family: var(--font-mono); font-size: 52px; font-weight: 700; letter-spacing: -1px; color: var(--moon-100); }
+  .word b { color: var(--terra-500); }
+  .tagline { margin-top: 14px; font-size: 26px; font-weight: 600; color: var(--moon-200); letter-spacing: -0.01em; }
+  .pipe { margin-top: 16px; font-family: var(--font-mono); font-size: 17px; color: var(--moon-400); }
+  .pipe .a { color: var(--indigo-400); }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <img class="mark" src="logomark.svg" alt="">
+    <div class="txt">
+      <div class="word">night<b>shift</b></div>
+      <div class="tagline">Your AI software team that ships while you sleep.</div>
+      <div class="pipe">/auto PROJ-142 <span class="a">→</span> spec <span class="a">→</span> plan <span class="a">→</span> impl <span class="a">→</span> review <span class="a">→</span> PR</div>
+    </div>
+  </div>
+</body>
+</html>
