@@ -23,6 +23,8 @@
 #       Bare form:  <<<SDLC_SESSION_COMPLETE:KEY>>>
 #       PR form:    <<<SDLC_SESSION_COMPLETE:KEY|PR=URL>>>
 
+set -uo pipefail   # match the sibling scripts; all vars below are :-guarded so -u is safe
+
 # Dir of this script (fork-free; fall back to "." on a slash-less invocation, e.g. the documented
 # `bash session-complete.sh` from the scripts dir — otherwise the sibling resolve would miss and
 # cleanup would silently skip while the sentinel still emitted).
