@@ -73,7 +73,7 @@ not playful.
   (`#7c93f0`) for links/focus, with cyan for data highlights. Semantic colors are terminal-true
   (green `#6ec48a`, amber `#e0a458`, red `#e0656f`). See `tokens/colors.css`.
 - **Type.** Pairing of **Inter** (geometric sans — display, headings, body) and **JetBrains Mono**
-  (code, labels, UI chrome, eyebrows). Display is 800 weight with tight `-0.025em` tracking. The
+  (code, labels, UI chrome, eyebrows). Display is 800 weight with tight `-0.02em` tracking. The
   signature label is a mono `// uppercase eyebrow` in terracotta with `0.16em` tracking.
 - **Backgrounds.** Flat night fills, never busy. The one decorative motif is a faint **starfield**
   (tiny radial-gradient dots at low opacity) and a soft **moon glow** (a single blurred radial of

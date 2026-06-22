@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "sdlc@nightshift": true,
+    "superpowers@claude-plugins-official": true
+  }
+}

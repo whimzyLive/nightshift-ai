@@ -1,0 +1,13 @@
+{
+  "name": "nightshift-design-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "nightshift design system — agent-facing skill with an enforced adherence gate.",
+  "scripts": {
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "lint": "npx --yes oxlint@latest -c _adherence.oxlintrc.json components ui_kits",
+    "validate": "npm run check:tokens && npm run check:contrast && npm run lint"
+  }
+}

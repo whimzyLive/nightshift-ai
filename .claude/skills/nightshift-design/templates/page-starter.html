@@ -1,0 +1,77 @@
+<!doctype html>
+<!--
+  nightshift — static page starter.
+  Links the design system entry point (styles.css → fonts + all tokens + base resets).
+  Adjust the href if this file is moved relative to the design-system root.
+  Use this for throwaway mocks/slides/prototypes. For production, use the React components.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>nightshift — page</title>
+  <link rel="icon" href="../assets/favicon.svg" />
+  <!-- Single entry point: fonts + colors + type + spacing + base resets -->
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    /* Signature decorative motifs — not in token files, copied from references/patterns.md */
+    .ns-hero { position: relative; overflow: hidden; padding: var(--space-24) var(--space-6); }
+    .ns-moonglow {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none; filter: blur(8px);
+      background:
+        radial-gradient(60% 50% at 70% 20%, rgba(217,119,87,0.16), transparent 70%),
+        radial-gradient(45% 40% at 20% 0%, rgba(124,147,240,0.12), transparent 70%);
+    }
+    .ns-starfield {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5;
+      background-repeat: no-repeat;
+      background-image:
+        radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.35), transparent),
+        radial-gradient(1px 1px at 65% 15%, rgba(255,255,255,0.25), transparent),
+        radial-gradient(1px 1px at 85% 55%, rgba(255,255,255,0.30), transparent),
+        radial-gradient(1px 1px at 40% 75%, rgba(255,255,255,0.20), transparent),
+        radial-gradient(1px 1px at 10% 60%, rgba(255,255,255,0.22), transparent);
+    }
+    .ns-wrap { max-width: var(--container-max); margin: 0 auto; position: relative; z-index: 1; }
+    .ns-display {
+      font-weight: var(--fw-extra); font-size: var(--text-5xl);
+      line-height: var(--leading-tight); letter-spacing: var(--tracking-tight);
+      color: var(--text-strong); margin: var(--space-4) 0;
+    }
+    .ns-lede { font-size: var(--text-md); color: var(--text-muted); max-width: 56ch; }
+    .ns-row { display: flex; gap: var(--space-3); margin-top: var(--space-6); align-items: center; }
+    .ns-btn-primary {
+      background: var(--accent); color: var(--text-on-accent); font-weight: var(--fw-semibold);
+      border: none; border-radius: var(--radius-md); padding: var(--space-3) var(--space-5);
+      box-shadow: var(--glow-accent); cursor: pointer; font-family: var(--font-sans);
+      transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+    }
+    .ns-btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .ns-install {
+      font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-body);
+      background: var(--surface-terminal); border: 1px solid var(--border-default);
+      border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+    }
+    .ns-install .p { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <section class="ns-hero">
+    <div class="ns-moonglow"></div>
+    <div class="ns-starfield"></div>
+    <div class="ns-wrap">
+      <div class="ns-eyebrow">// your ai software team</div>
+      <h1 class="ns-display">Your AI software team that ships while you sleep.</h1>
+      <p class="ns-lede">A team, not a megaprompt — 11 specialized agents and 10 slash commands run
+        the lifecycle one verb at a time. A ticket goes in; a reviewed PR comes out.</p>
+      <div class="ns-row">
+        <button class="ns-btn-primary">Install in 60 seconds</button>
+        <span class="ns-install"><span class="p">$</span> /plugin install sdlc@nightshift</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Next sections: each opens with `// EYEBROW`, use .ns-card from references/patterns.md,
+       drop a terminal/pipeline mock for proof. See references/ for full rules. -->
+</body>
+</html>
