@@ -48,7 +48,7 @@ generated file — every slot must be replaced with an actual value.
 
 | Token | Value |
 | ----- | ----- |
-| Review agent | `github-copilot` |
+| Review agent | `claude-inline` |
 | Review mode | `on-update` |
 ```
 
@@ -66,11 +66,16 @@ generated file — every slot must be replaced with an actual value.
   `## Detected stack` reflects what was auto-detected.
 - **Workspace → agent rows** — write one row per active domain agent, mapping
   its confirmed owned path(s) to the agent name.
-- **Code Review defaults** — write `Review agent = github-copilot` and
-  `Review mode = on-update` unless the repo asked otherwise. `Review agent`
-  accepts `github-copilot` (Copilot bot reviews the PR) or `claude-inline` (the
-  `/loop` runs `/code-review` in-session — use when Copilot is unavailable or
-  disabled on the repo). `Review mode` accepts `none` / `on-create` /
-  `on-update`. An absent or unrecognised `Review agent` defaults to
-  `github-copilot` with a warning, so the section may be omitted entirely for
-  Copilot repos — but writing it explicitly is clearer.
+- **Code Review defaults** — write `Review agent = claude-inline` and
+  `Review mode = on-update` unless the repo asked otherwise. `claude-inline` is
+  the `/init` default because it works on ANY repo with no external setup: the
+  `/loop` runs `/code-review` in-session, so the review-fix cycle never silently
+  no-ops on a repo that has not enabled GitHub Copilot code review. Switch a repo
+  to `github-copilot` only when it has Copilot code review enabled and prefers the
+  bot to drive the loop. `Review mode` accepts `none` / `on-create` / `on-update`.
+  > Note this `/init`-written default is distinct from the runtime FALLBACK: when
+  > the `Review agent` token is **absent or unrecognised**, the loop falls back to
+  > `github-copilot` (with a warning) for back-compatibility with older
+  > project-context files. `/init` writes `claude-inline` **explicitly**, so new
+  > repos get the in-session reviewer; pre-existing repos without the token keep
+  > the historical Copilot behaviour.
