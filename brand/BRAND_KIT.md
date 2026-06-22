@@ -55,17 +55,18 @@ run, install in 60 seconds. Show the terminal output, not superlatives.
 
 ---
 
-## Assets (canonical — mirrored from the design system)
+## Assets (canonical — in the design system)
 
-These are verbatim mirrors of `.claude/skills/nightshift-design/assets/` (the
-source of truth). Regenerate from there; don't edit copies here.
+All brand assets live in the design system at
+[`.claude/skills/nightshift-design/assets/`](../.claude/skills/nightshift-design/assets/)
+— this kit references them, it does not copy them. Use the files there directly.
 
 | Asset | File | Use |
 | --- | --- | --- |
-| Wordmark lockup (dark bg) | [`assets/logo.svg`](./assets/logo.svg) | landing hero, README header, social-preview card — on dark surfaces |
-| Wordmark lockup (light bg) | [`../.claude/skills/nightshift-design/assets/logo-light.svg`](../.claude/skills/nightshift-design/assets/logo-light.svg) | the same lockup for light/white surfaces — "night" in `--night-800` ink, "shift" in terracotta. Lives in the design system only |
-| Moon mark | [`assets/logomark.svg`](./assets/logomark.svg) | favicon-scale mark, nav (28px), avatar |
-| Favicon | [`assets/favicon.svg`](./assets/favicon.svg) | site favicon |
+| Wordmark lockup (dark bg) | [`logo.svg`](../.claude/skills/nightshift-design/assets/logo.svg) | landing hero, README header, social-preview card — on dark surfaces |
+| Wordmark lockup (light bg) | [`logo-light.svg`](../.claude/skills/nightshift-design/assets/logo-light.svg) | the same lockup for light/white surfaces — "night" in `--night-800` ink, "shift" in terracotta |
+| Moon mark | [`logomark.svg`](../.claude/skills/nightshift-design/assets/logomark.svg) | favicon-scale mark, nav (28px), avatar |
+| Favicon | [`favicon.svg`](../.claude/skills/nightshift-design/assets/favicon.svg) | site favicon |
 
 Visual identity is intentionally **minimal** (per scope): the 🌙 crescent + warm
 glow + monospace type. No full design-system rebuild here, no Pro-tier branding.
