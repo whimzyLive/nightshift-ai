@@ -83,11 +83,15 @@ the CI / spare-machine context. This is the single highest-leverage fix.
 - Use `./.tmp/` not `/tmp`. Add to `.gitignore`.
 - Allow rules: `Read(./.tmp/**)`, `Write(./.tmp/**)`, `Bash(rm ./.tmp/*)`,
   `Bash(mkdir -p ./.tmp)`.
-- **Session-scoped subdir:** plugin temp files now go under `./.tmp/<SDLC_SESSION_KEY>/`
-  via `scripts/tmp-dir.sh` (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`, then
-  `mktemp "$dir/acli-XXXXXX.json"`). The `./.tmp/**` allow globs are **recursive**, so they already
-  cover nested `./.tmp/<key>/...` — **no new allow rule is required**. `scripts/session-complete.sh`
-  removes `./.tmp/<key>` at teardown. macOS: `XXXXXX` must be at end after a dot separator.
+- **Session-scoped subdir:** plugin temp files go under a per-session subdir via
+  `scripts/tmp-dir.sh` (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`, then
+  `mktemp "$dir/acli-XXXXXX.json"`). The dir is unique per session in BOTH modes — worker
+  → `./.tmp/<SDLC_SESSION_KEY>`, interactive → `./.tmp/<CLAUDE_CODE_SESSION_ID>` (resolved by
+  `scripts/session-key.sh`). The `./.tmp/**` allow globs are **recursive**, so they already
+  cover nested `./.tmp/<key>/...` — **no new allow rule is required**. Both the `SessionEnd` hook
+  (`scripts/cleanup-tmp.sh`) and `scripts/session-complete.sh` remove `./.tmp/<key>` at teardown,
+  so an errored or interrupted session leaves nothing behind. macOS: `XXXXXX` must be at end
+  after a dot separator.
 
 ### R2 — scriptify repeated dynamic shell
 Move any command containing `$(...)`, backticks, or compound `&&`/`|` logic into a
@@ -98,9 +102,12 @@ Candidates: jira-fetch probes, git rev/diff comparisons, exit-marker echoes,
 DNS/auth checks (the `S293`/`S294` compound-shell blocks).
 
 ### R3 — kill commit-message churn
-Write the message to a file and `git commit -F ./.tmp/msg.txt`. Allow rule:
-`Bash(git commit -F *)`. Removes the per-message paren-escaping prompt and lets the
-~30 dead `git commit -m 'fix\(...\)'` rules be deleted.
+Write the message into the session-scoped temp dir and commit from there —
+`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh); ...; git commit -F "$dir/msg.txt"`.
+Allow rule: `Bash(git commit -F *)`. Removes the per-message paren-escaping prompt and lets the
+~30 dead `git commit -m 'fix\(...\)'` rules be deleted. Use the scoped `$dir` (not a bare
+`./.tmp/msg.txt`) so teardown removes it with the rest of the session's scratch — cleanup is
+scoped-only and does not sweep loose `./.tmp/*` files.
 
 ### R4 — never inline JSON / never inline `$()` or backticks on command line
 Already in CLAUDE.md for JSON. Extend the rule to: no backticks, no `$(...)`, no

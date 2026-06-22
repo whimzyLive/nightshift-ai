@@ -234,9 +234,11 @@ Always follow this order to avoid creating orphaned stories:
 Description text often contains special characters. Use files instead of inline strings.
 
 Always use `mktemp` for temp files — write them under the session-scoped temp dir from
-`scripts/tmp-dir.sh` (`SDLC_SESSION_KEY` set → `./.tmp/<key>`, unset → `./.tmp`; inside the
-permission scope, gitignored), never `/tmp` (prompts on every access). This guarantees a
-unique path, keeps each session's temp files isolated, and pairs with a `trap` for cleanup:
+`scripts/tmp-dir.sh` (worker → `./.tmp/<SDLC_SESSION_KEY>`, interactive → `./.tmp/<CLAUDE_CODE_SESSION_ID>`;
+inside the permission scope, gitignored), never `/tmp` (prompts on every access). The dir is
+unique per session in BOTH modes, so the `SessionEnd` hook (`cleanup-tmp.sh`) and
+`session-complete.sh` reliably remove it at teardown. This guarantees a unique path, keeps each
+session's temp files isolated, and pairs with a `trap` for per-file cleanup:
 
 ```bash
 # Create a unique temp file in the session temp dir; clean it up automatically on exit
@@ -267,7 +269,7 @@ acli jira workitem create \
   --json 2>&1
 ```
 
-> `mktemp` returns a path like `./.tmp/acli-desc.A3f9kB` — unique per invocation, never collides with parallel runs. `trap ... EXIT` fires on normal exit, errors, and interrupts.
+> `mktemp` returns a path like `./.tmp/<session>/acli-desc.A3f9kB` — unique per invocation, never collides with parallel runs. `trap ... EXIT` fires on normal exit, errors, and interrupts.
 
 ## Capturing created issue keys
 
