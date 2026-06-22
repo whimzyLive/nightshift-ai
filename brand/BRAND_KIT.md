@@ -1,141 +1,184 @@
-# 🌙 Nightshift — Brand & Positioning Kit
+# 🌙 nightshift — brand & positioning kit
 
-The single source of truth for how Nightshift is named, described, and voiced
-across every launch asset. The brand is **locked** — this document does not
-re-decide it, it commits it so nothing downstream has to guess.
+The reusable brand reference for every launch asset (landing site, demo, blog,
+social). The brand is **locked** — this kit commits it so nothing downstream has
+to re-decide it.
 
-> **Rule:** No launch asset (landing site, README, demo, blog, social post)
-> invents brand copy outside this kit. Reuse the snippets below, or riff on the
-> voice guidelines — never start from scratch.
+> **Source of truth.** The design system lives in
+> [`.claude/skills/nightshift-design/`](../.claude/skills/nightshift-design/) —
+> color/type tokens in `tokens/*.css` (mirrored in `_ds_manifest.json`), canonical
+> assets in `assets/`, UI kit in `components/`, voice in
+> `references/voice-and-content.md`. This kit **summarizes and points at** that
+> system; it does not restate values as a second source. Never invent a value that
+> has a token, and never hand-roll a logo — query `tokens/colors.css` for an exact
+> hex and reuse the assets below. Run `npm run validate` in the design-system
+> directory before shipping any asset.
 
 ---
 
 ## Name
 
-- **Name:** `Nightshift`
-- **Wordmark styling:** lowercase `nightshift`, optionally prefixed with the 🌙
-  crescent. Set in a monospace face to read as "developer tool," with the
-  `shift` half in the signal color (see palette).
-- **Never:** "Night Shift" (two words), "NightShift" (camel case), "NS,"
-  or any pluralization.
-- **Asset:** [`nightshift-wordmark.svg`](./nightshift-wordmark.svg) — the
-  canonical wordmark used on the landing site, social-preview card, and README.
+- **Name:** `nightshift` — **always lowercase**, even at the start of a sentence.
+  Never "Nightshift", "NightShift", or "NS".
+- **Agent and command names** are lowercase mono too: `product-manager`, `/auto`,
+  `qa-engineer`.
+- **Wordmark:** the `shift` half sets in terracotta, the `night` half in moonlight,
+  in JetBrains Mono — see assets below. Don't typeset a new wordmark; use the file.
 
 ## Tagline
 
 > **you sleep, it ships**
 
-- Always lowercase. Used as the headline lockup beneath the wordmark.
-- This is the **locked** tagline — do not substitute variants in launch copy.
+- Always lowercase. This is the **locked** tagline (from the PRD) — don't
+  substitute variants in launch copy.
+- The voice guide's signature phrase **"ships while you sleep"** is the same idea
+  in prose form (e.g. README hero); the lockup tagline stays `you sleep, it ships`.
 
 ## Elevator pitch (one line)
 
-> **Nightshift is a free Claude Code plugin that turns one terminal into a full
-> software-delivery team — it reads a ticket and ships the spec, plan, code,
-> and review while you're away.**
+> **nightshift is a free Claude Code plugin that turns one terminal into a full
+> software-delivery team — it reads a ticket and ships the spec, plan, code, and
+> review while you sleep.**
 
-## What it is (positioning)
+## Positioning
 
-- A **drop-in, free, MIT-licensed** Claude Code plugin — not a paid product, not
-  a SaaS, not a code-writing wrapper.
-- A **process engine**: it makes a senior team's discipline the default —
-  spec before plan, plan before code, review before merge, tests as the gate.
-- **Issue-tracker native and repo-agnostic** — reads a ticket, derives the
-  branch/plan/PR, works in any repo from one config file.
+- A **free, MIT-licensed, drop-in** Claude Code plugin — not a paid product, not a
+  SaaS, not a code-writing wrapper.
+- The wedge is **not** "AI writes code" (commoditized) but **"AI runs your SDLC
+  with a real team's discipline"** — lead with the team-of-agents angle.
+- A **process engine**: spec before plan, plan before code, review before merge,
+  tests as the gate. The lifecycle is the product.
+- **Issue-tracker native, repo-agnostic** — generic agents, per-repo config.
 
-**Positioning line:** *AI assistants are great at the middle 20% — the code.
-Nightshift automates the other 80% — the process.*
+**Proof beats adjectives:** 11 specialized agents, 10 slash commands, one `/auto`
+run, install in 60 seconds. Show the terminal output, not superlatives.
 
 ---
 
+## Assets (canonical — mirrored from the design system)
+
+These are verbatim mirrors of `.claude/skills/nightshift-design/assets/` (the
+source of truth). Regenerate from there; don't edit copies here.
+
+| Asset | File | Use |
+| --- | --- | --- |
+| Wordmark lockup | [`assets/logo.svg`](./assets/logo.svg) | landing hero, README header, social-preview card |
+| Moon mark | [`assets/logomark.svg`](./assets/logomark.svg) | favicon-scale mark, nav (28px), avatar |
+| Favicon | [`assets/favicon.svg`](./assets/favicon.svg) | site favicon |
+
+Visual identity is intentionally **minimal** (per scope): the 🌙 crescent + warm
+glow + monospace type. No full design-system rebuild here, no Pro-tier branding.
+
 ## Color palette
 
-| Role | Name | Hex | Use |
-| --- | --- | --- | --- |
-| Background | **Night** | `#1A1A2E` | Dark surfaces, wordmark plate, social card background |
-| Deep background | **Ink** | `#0E0E1A` | Full-bleed page background, video letterbox |
-| Text / light | **Moonlight** | `#F5F5F7` | Body and headline text on dark |
-| Accent / signal | **Signal** | `#D97757` | The `shift` in the wordmark, links, CTAs, the moon mark |
-| Muted | **Dusk** | `#8A8AA3` | Secondary text, captions, borders |
+Exact values + semantic aliases live in
+[`tokens/colors.css`](../.claude/skills/nightshift-design/tokens/colors.css). The
+launch-relevant subset:
 
-- **Primary pairing:** Moonlight text on Night, Signal for one accent per view.
-- **Don't** introduce additional hues for launch assets — one accent (Signal)
-  keeps the identity recognizable across the site, card, and README.
+| Role | Token | Hex |
+| --- | --- | --- |
+| Page background | `--night-800` | `#0d0d18` |
+| Deepest void | `--night-900` | `#08080f` |
+| Card / surface | `--night-600` | `#1a1a2e` |
+| Terminal surface | `--surface-terminal` | `#0b0b14` |
+| Primary text (warm off-white) | `--moon-100` | `#f5f3ef` |
+| Body text | `--moon-200` | `#d8d6e0` |
+| Muted text | `--moon-300` | `#a9a7bd` |
+| **Brand accent (terracotta)** | `--terra-500` | `#d97757` |
+| Accent hover / press | `--terra-400` / `--terra-600` | `#e58b6f` / `#c2624a` |
+| Links / focus (indigo) | `--indigo-400` / `--indigo-500` | `#8b9cf7` / `#7c93f0` |
+| Data / info (cyan) | `--cyan-400` | `#62c4d3` |
+| success / warning / danger | `--green-400` / `--amber-400` / `--red-400` | `#6ec48a` / `#e0a458` / `#e0656f` |
 
-## Minimal visual identity
+- **One pointing color:** terracotta `--terra-500` is the single brand accent —
+  one accent per view. Indigo, cyan, and the semantic colors are functional
+  (links/focus, data, state), not decorative.
+- Use the **semantic aliases** (`--bg-page`, `--surface-card`, `--accent`,
+  `--text-strong`, …) in components, not raw scale values.
 
-- **Motif:** a crescent moon (night work) + monospace type (developer tool).
-- **Wordmark only** — no separate icon-only logo for launch. The crescent in the
-  SVG doubles as the favicon/social mark if cropped square.
-- This is intentionally a **minimal** identity (per scope): no full design
-  system, no component library, no Pro-tier branding.
+## Typography
+
+Tokens in
+[`tokens/fonts.css`](../.claude/skills/nightshift-design/tokens/fonts.css) +
+`typography.css`.
+
+- **Headings & body:** Inter (`--font-sans`). Headings are **sentence case**, never
+  Title Case.
+- **Anything you'd type** — commands, agent names, file paths, branch names,
+  Conventional Commit lines: JetBrains Mono (`--font-mono`). That's the terminal
+  texture. Section eyebrows use mono `//`, e.g. `// how it works`.
 
 ---
 
 ## Voice & tone
 
-Builder-to-builder. Confident, concrete, anti-hype. We respect the reader's time
-and intelligence; we never oversell.
+Technical peer, not marketer. Confident, dry, specific. Lead with mechanism and
+proof. Full guide:
+[`references/voice-and-content.md`](../.claude/skills/nightshift-design/references/voice-and-content.md).
 
 **Do**
 
-- Lead with the problem the reader already feels ("you lose time in the
-  connective tissue, not writing code").
-- Be specific and verifiable — name the stages, the agents, the outcome.
-- Keep it lowercase-casual for the wordmark/tagline; clear and plain for prose.
-- Say it's **free** and **open source** plainly — that's a feature, not a footnote.
-- Earn the star: show value, then ask ("if this saves you a sprint, star it").
+- Write to a senior dev who lives in the terminal and distrusts hype.
+- Structure: **thesis → mechanism → proof.** State the claim, explain how it
+  works, then show the `/auto` run.
+- Use numbers as proof: "11 agents, 10 commands," "the middle 20% / the other 80%,"
+  "install in 60 seconds."
+- Say it's **free** and **open source** plainly — that's a feature.
+- Reuse the signature phrases: "ships while you sleep", "a team, not a megaprompt",
+  "generic agents, per-repo config", "the lifecycle is the product", "connective
+  tissue", "spec before plan, plan before code, review before merge, tests as the
+  gate".
 
 **Don't**
 
-- Don't call it "magic," "revolutionary," "AGI," or "the future of coding."
-- Don't claim it writes code *for* you or replaces engineers — it automates the
-  *process*, with review as the gate.
-- Don't use enterprise filler ("synergy," "leverage," "seamless solution").
-- Don't promise autonomy without the guardrails (spec/plan/review are the point).
-- Don't restyle the name or swap the tagline.
+- Over-claim: "replaces your team", "powerful", "revolutionary", "next-gen", "the
+  future of coding".
+- Empty intensifiers or hype adjectives — show the run instead.
+- Title-case the brand, or restyle the wordmark / swap the tagline.
+- Sprinkle emoji through body copy — the 🌙 moon is the one load-bearing glyph; in
+  product UI prefer the SVG moon mark.
 
 ---
 
 ## Approved short-form copy (tweet-length)
 
-Agents reuse these verbatim or riff within the voice guidelines above. **No new
-brand copy is invented outside this kit.**
+Reuse verbatim or riff within the voice rules above. **No agent invents brand copy
+outside this kit.**
 
-1. **you sleep, it ships. 🌙** nightshift is a free Claude Code plugin that turns
-   one terminal into a full software-delivery team — PM, architect, tech lead,
-   engineers, QA — driven from your issue tracker.
+1. you sleep, it ships. 🌙 nightshift is a free Claude Code plugin that turns one
+   terminal into a full software-delivery team — `product-manager`,
+   `solutions-architect`, `tech-lead`, engineers, `qa-engineer` — driven from your
+   issue tracker.
 
-2. AI assistants nail the middle 20% — the code. nightshift automates the other
-   80%: the *process*. spec → plan → implement → review → PR, from a ticket.
-   free, MIT, drop-in. 🌙
+2. AI assistants nail the middle 20% — the code. nightshift runs the other 80%:
+   your SDLC, with a real team's discipline. spec → plan → implement → review → PR,
+   from a ticket. free, MIT.
 
-3. ticket in, PR out. nightshift reads the issue, writes the spec, plans the
-   work, implements it, and reviews it before merge — in any repo. you sleep,
-   it ships.
+3. ticket in, reviewed PR out. nightshift reads the issue, writes the spec, plans
+   the work, implements it, and reviews it before merge — in any repo. a team, not
+   a megaprompt.
 
-4. it's not a wrapper that "writes code for you." it's a process engine that
-   makes a senior team's discipline the default: spec before plan, plan before
-   code, review before merge. open source. 🌙
+4. it's not "AI writes code." it's AI that runs your lifecycle: spec before plan,
+   plan before code, review before merge, tests as the gate. 11 agents, 10
+   commands, one `/auto`. open source.
 
-5. install in 60 seconds, point it at a ticket, come back to a reviewed PR.
-   that's nightshift — your AI software team, working the night shift. free on
-   the Claude Code marketplace.
+5. install in 60 seconds, point it at a ticket, come back to a reviewed PR. generic
+   agents, per-repo config — install once, use everywhere. that's nightshift. 🌙
 
 ---
 
 ## Dependents
 
-Every downstream launch asset references this kit. Authors of the following must
-pull name, tagline, pitch, palette, wordmark, and copy from here — not reinvent:
+Every downstream launch asset pulls name, tagline, pitch, palette, wordmark, and
+copy from this kit and the design system — never reinvents them:
 
-- Landing site on the brand domain
+- landing site on the brand domain
 - 90-second launch demo video
-- Launch blog article (and cross-posts)
-- Launch-day social blast
+- launch blog article (and cross-posts)
+- launch-day social blast
 - Show HN / Product Hunt / Reddit assets
 - README SEO / social-preview card
-- Newsletter and aggregator submissions
+- newsletter and aggregator submissions
 
 > When a downstream story starts, link it back to this kit so the dependency is
 > explicit on both sides.
