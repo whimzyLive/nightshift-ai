@@ -1,15 +1,16 @@
 ---
 description: >
-  Per-pass logic for the Copilot review-and-fix cycle. Each invocation probes
+  Per-pass logic for the code review-and-fix cycle. Each invocation probes
   PR status, applies the decision table (wait / fix / stop), and returns — the
-  native /loop command handles re-invocation and pacing. Exits cleanly only
-  when Copilot has reviewed the current HEAD, all inline comments are resolved,
-  and all required status checks pass. Halts and surfaces the failure if
-  /review-fix errors or blocks. Does NOT merge the PR and does NOT process
-  non-Copilot review comments.
+  native /loop command handles re-invocation and pacing. The reviewer is
+  configurable per-repo (Review agent: github-copilot | claude-inline): Copilot
+  reviews asynchronously as a PR reviewer, claude-inline runs /code-review
+  in-session. Exits cleanly only when the current HEAD has been reviewed, all
+  inline comments are resolved, and all required status checks pass. Halts and
+  surfaces the failure if /review-fix errors or blocks. Does NOT merge the PR.
 ---
 
-# sdlc:loop — Copilot review-fix pass
+# sdlc:loop — code review-fix pass
 
 **Note:** This command surfaces as `sdlc:loop` (plugin-namespaced) and is
 distinct from the native `/loop`; it is designed as the per-pass body driven
@@ -162,31 +163,47 @@ own exit logic, so a converged PR is never held open by the timer.
 
 ## Pass steps
 
-### 0. Resolve the review mode (every pass — cheap)
+### 0. Resolve the review agent + mode (every pass — cheap)
 
-How the loop requests **and** waits for Copilot review is configured per-repo in
-`.claude/project/project-context.md` → a `## Copilot Review` section with a
-`Review mode` token. Default `on-update` when the section/token is absent
-(back-compatible with the historical behaviour):
+Who reviews **and** how the loop requests/waits for review is configured per-repo
+in `.claude/project/project-context.md` → a `## Copilot Review` (or `## Code
+Review`) section with two tokens. Read BOTH via the shared reader so the regex
+and defaults live in one place:
 
 ```bash
-REVIEW_MODE=$(grep -iE '^\|[[:space:]]*Review mode[[:space:]]*\|' .claude/project/project-context.md 2>/dev/null \
-  | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([A-Za-z-]+)`?[[:space:]]*\|.*/\1/' | head -1 | tr '[:upper:]' '[:lower:]')
-case "$REVIEW_MODE" in none|on-create|on-update) ;; *) REVIEW_MODE=on-update ;; esac
+eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh)"
+# -> sets REVIEW_AGENT (github-copilot | claude-inline) and REVIEW_MODE (none | on-create | on-update)
 ```
 
-- **`none`** — do NOT request a Copilot review and do NOT wait for one. Run the
+**`REVIEW_AGENT`** selects WHO reviews (default `github-copilot`; absent or
+unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reader):
+
+- **`github-copilot`** — the GitHub Copilot bot is assigned as a PR reviewer and
+  reviews **asynchronously**; the loop waits for it. This is the full behaviour
+  the **GitHub Copilot path** (steps 1–5 below) and the decision table describe.
+- **`claude-inline`** — there is no bot; the loop runs **`/code-review`
+  in-session** to produce the review, then fixes via the same `/review-fix`
+  machinery. Follow the **Claude-inline path** section (below the decision table)
+  instead of steps 2–5; step 1 (resolve the PR) still applies, and the Global
+  loop budget, `--on-clean` handling, and Final action are shared.
+
+**`REVIEW_MODE`** selects the cadence (orthogonal to the agent):
+
+- **`none`** — do NOT request a review and do NOT wait for one. Run the
   `--on-clean` command (if any) exactly once, then go straight to the **Final
   action — release the session**. The PR is still raised; `none` simply turns the
-  review-fix loop into a no-op (no review gate). Skip every step below.
-- **`on-create`** — Copilot review is requested ONCE at PR creation (by
-  `raise-pr.sh`). The loop does NOT re-request on later passes. It waits for that
-  one review and runs `/review-fix` **at most once** (rule 3), then completes —
-  it never waits for a re-review of the fix. (See the **Review-mode modifiers**
-  note under the decision table.)
-- **`on-update`** — request at creation AND re-request on every pass; keep fixing
-  and re-reviewing until clean. This is the full behaviour the decision table
-  below describes, and the default.
+  review-fix loop into a no-op (no review gate). Skip every step below, for BOTH
+  agents.
+- **`on-create`** — review is requested/produced ONCE: for `github-copilot` the
+  bot is requested at PR creation (by `raise-pr.sh`) and the loop does NOT
+  re-request; for `claude-inline` the loop runs `/code-review` once. Either way it
+  runs `/review-fix` **at most once** (rule 3), then completes — it never waits
+  for a re-review of the fix. (See the **Review-mode modifiers** note under the
+  decision table.)
+- **`on-update`** — review on every update: `github-copilot` re-requests each
+  pass; `claude-inline` re-runs `/code-review` on each new HEAD. Keep fixing and
+  re-reviewing until clean. This is the full behaviour the decision table below
+  describes, and the default.
 
 ### 1. Resolve the target PR (first pass only, or always as a guard)
 
@@ -196,6 +213,14 @@ gh pr view <PR> --json number,headRefName,baseRefName,url,state
 
 If the PR is not OPEN → STOP the loop: surface "PR <PR> is not open — nothing
 to loop on" and do NOT schedule a next iteration.
+
+## GitHub Copilot path (`REVIEW_AGENT=github-copilot`) — steps 2–5
+
+> **Routing.** Steps 2–5 and the decision table are the **github-copilot** path:
+> the bot reviews asynchronously and the loop waits for it. If
+> `REVIEW_AGENT=claude-inline`, SKIP steps 2–5 and follow the **Claude-inline
+> path** section (below the decision table) instead — it reuses step 1, the
+> budget, `--on-clean`, and the Final action.
 
 ### 2. Ensure @copilot is a reviewer (AC-1)
 
@@ -351,6 +376,130 @@ If the `/review-fix` run in rule 3 errors or returns `Status: blocked`, stop
 the loop immediately. Print the failure details (which comment / what error) to
 stdout and do NOT schedule a next iteration. Surface the error to the user.
 Budget is NOT checked here — this is an immediate halt.
+
+---
+
+## Claude-inline path (`REVIEW_AGENT=claude-inline`)
+
+Entered from step 0 when `REVIEW_AGENT=claude-inline`. Step 1 (resolve the PR)
+has already run; steps 2–5 and the github-copilot decision table do NOT apply.
+There is **no async reviewer** — the loop performs the review itself by running
+`/code-review`, then fixes via the **same** `/review-fix` machinery (which is
+agent-agnostic: `pr-unresolved-comments.sh` / `pr-resolve-comment.sh` do not
+filter by author), re-reviewing each new HEAD until clean. This gives
+`claude-inline` the **same** review → fix → re-review cycle as Copilot (AC-4);
+only the source of the review comments differs (AC-2/AC-3).
+
+Because the loop runs the review synchronously, "has the current HEAD been
+reviewed, and what did the review find?" is something the loop KNOWS rather than
+probes from a bot. Track BOTH in a marker file — the reviewed head oid **and**
+whether that review found anything (`clean=1` ⇒ `/code-review` reported zero
+findings on that head). The clean flag is the **authoritative** "were there
+findings?" signal: it comes straight from `/code-review`'s own report, so the
+fix/clean decision never depends on GitHub's eventually-consistent inline-comment
+indexing (a freshly-posted thread that the GraphQL read has not yet surfaced
+cannot cause a premature clean exit).
+
+### CI-1. Probe state (every pass)
+
+```bash
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+REVIEW_MARK="$dir/loop-review-mark"        # format: "<reviewed-head-oid> <clean 0|1>"
+read LAST_REVIEWED_HEAD LAST_REVIEW_CLEAN < "$REVIEW_MARK" 2>/dev/null || { LAST_REVIEWED_HEAD=-; LAST_REVIEW_CLEAN=-; }
+[ -n "${LAST_REVIEWED_HEAD:-}" ] || LAST_REVIEWED_HEAD=-
+# Validate the clean flag is exactly 0 or 1 (a half-written marker — CI-b's printf interrupted —
+# would otherwise feed a partial token into the CI-2 tests and fall through to CI-f HALT). Any
+# non-{0,1} value ⇒ treat this head as NOT cleanly reviewed: force a re-review via CI-b rather than
+# guess. Pair it with a head reset so reviewed-head==0 holds.
+case "$LAST_REVIEW_CLEAN" in 0|1) ;; *) LAST_REVIEW_CLEAN=-; LAST_REVIEWED_HEAD=- ;; esac
+CUR_HEAD=$(gh pr view <PR> --json headRefOid -q .headRefOid 2>/dev/null || echo -)
+
+# Unresolved inline review threads — the SAME agent-agnostic query the Copilot path's fixer uses.
+# One NDJSON object per unresolved comment; count the lines. `grep -c` already PRINTS 0 on a
+# no-match and exits 1; use `|| true` to swallow that exit — NOT `|| echo 0`, which would print a
+# SECOND "0" and make CUR_UNRESOLVED the multi-line string "0\n0" that breaks every numeric test.
+CUR_UNRESOLVED=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-unresolved-comments.sh <PR> 2>/dev/null | grep -c . || true)
+CUR_UNRESOLVED=${CUR_UNRESOLVED:-0}
+
+# CI checks: reuse pr-loop-status.sh ONLY for its checks-* fields (its Copilot review
+# fields are 0/irrelevant on this path and are ignored). Read checks-pending and checks-failing
+# from the `loop-status:` line.
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR> "$dir/loop-checks.json"
+```
+
+**Print progress to stdout:** pass number, head oid (first 8 chars),
+`reviewed-head` (1 if `CUR_HEAD == LAST_REVIEWED_HEAD` else 0),
+`review-clean=<LAST_REVIEW_CLEAN>`, `unresolved=<CUR_UNRESOLVED>`,
+`checks-pending`, `checks-failing`.
+Persist the printed status line to `$dir/loop-status-last` for budget messages.
+
+### CI-2. Decision table (claude-inline)
+
+Evaluate in order; the FIRST matching rule wins. `reviewed-head` below means
+`CUR_HEAD == LAST_REVIEWED_HEAD` (the loop already ran `/code-review` on this oid).
+`review-clean` is the marker's clean flag for that reviewed head.
+
+| # | Condition | Action |
+|---|-----------|--------|
+| CI-a | `checks-pending > 0` | CI still running. **WAIT** — set `BLOCKED_BY="checks still pending: P=<checks-pending>"`, run the **Global loop budget** block, then schedule next iteration. |
+| CI-b | `reviewed-head == 0` (`CUR_HEAD != LAST_REVIEWED_HEAD`) | Current HEAD not yet reviewed. Run **`/code-review --comment <PR>` INLINE** (in this session — do NOT dispatch a subagent; `--comment` posts findings as inline PR comments on this HEAD). Set `FOUND=1` if `/code-review` **reports ≥1 finding** (read its own summary/report count — NOT merely "did an inline thread appear", so a finding reported summary-only still records non-clean and cannot slip through as clean), else `0`. Record the marker — head **and** clean flag: `printf '%s %s\n' "$CUR_HEAD" "$([ "$FOUND" = 1 ] && echo 0 || echo 1)" > "$REVIEW_MARK"`. Run the budget block (pass-count backstop), then — because a review IS progress even when head/unresolved are unchanged — refresh the idle window so a long subsequent checks-pending wait isn't charged the review's time: `now=$(date +%s); read _pe pc h u < "$BUDGET_FILE"; printf '%s %s %s %s\n' "$now" "$pc" "$h" "$u" > "$BUDGET_FILE"`. Then schedule the next iteration. This is the review action — the synchronous analogue of waiting for Copilot. |
+| CI-c | `reviewed-head == 1 && review-clean == 0` | The loop's OWN review (`/code-review`) reported findings on this HEAD (authoritative marker flag — NOT the raw unresolved count, so the loop never chases threads it didn't raise). Run **`/review-fix <PR>` INLINE** (identical to github-copilot rule 3 — fixes, resolves accepted threads; do NOT let `/review-fix` run its own session-complete — this loop owns the slot release). On success the fix pushes a new HEAD → next pass re-enters CI-b and re-reviews (**`on-update`**); in **`on-create`** STOP after this single fix (do not re-review — see modifiers). On error or `Status: blocked` → **HALT** (step 5). |
+| CI-c2 | `reviewed-head == 1 && review-clean == 1 && unresolved > 0` | **NON-LOOP COMMENTS — STOP for a human.** The loop's review found nothing on this HEAD, yet unresolved inline threads remain — they were authored by someone other than the loop (a human reviewer, or threads `/review-fix` declined to resolve). The claude-inline loop does NOT process non-loop review comments (mirroring the github-copilot path, which counts only its reviewer's threads), and must NOT auto-merge over open human feedback. Print "<N> unresolved non-loop comment(s) on <head-oid> — review found nothing; leaving the PR open for a human." and do NOT schedule a next iteration (do NOT run `--on-clean`). This avoids burning the budget re-running `/review-fix` against comments it cannot resolve. |
+| CI-d | `reviewed-head == 1 && review-clean == 1 && unresolved == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — current HEAD reviewed, the review found nothing, no unresolved comments, checks green. If `--on-clean "<command>"` was provided, run it **exactly once now**; then **STOP** the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
+| CI-e | `reviewed-head == 1 && review-clean == 1 && unresolved == 0 && checks-failing > 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there is nothing left for `/review-fix` to do. Print "Required check(s) failing (F=<checks-failing>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. |
+| CI-f | _(catch-all)_ | **UNEXPECTED STATE — HALT.** Print the status line and "unexpected loop state — stopping to avoid a silent hang." Do NOT schedule a next iteration. |
+
+> **Budget.** The claude-inline path reuses the SAME **Global loop budget** block.
+> Run it before scheduling any next iteration (CI-a wait, and after the CI-b
+> review and CI-c fix), so both the idle timeout and the 30-pass runaway backstop
+> apply uniformly. The progress signals are `CUR_HEAD`, `CUR_UNRESOLVED`, **and a
+> CI-b review** (CI-b refreshes the budget file's idle epoch after running the
+> budget block, since a synchronous review is real work even when it finds nothing
+> and leaves head/unresolved unchanged).
+> A HEAD that advanced (a fix) or a changed unresolved count also resets the idle
+> window, so an actively-progressing review↔fix cycle runs as long as it
+> progresses, while a stall (checks pending with no review happening) or an
+> oscillation is bounded exactly as on the Copilot path. CI-d/CI-e/CI-f have their
+> own terminal exits and are never interrupted by the budget.
+>
+> **`/code-review` is the in-session reviewer (AC-3).** It reviews the PR's diff
+> and posts its findings as inline PR comments (`--comment`), which become the
+> unresolved threads CI-c then fixes through the existing `/review-fix` pipeline
+> — no Copilot bot, no reviewer assignment. The marker's `clean` flag (set from
+> `/code-review`'s **reported finding count**, not from whether a thread has
+> appeared) — NOT the eventually-consistent thread read — decides fix-vs-clean, so
+> a just-posted comment that GraphQL has not yet indexed can never trigger a
+> premature CI-d clean exit, and a finding reported summary-only still records
+> `clean=0`. When `/code-review` reports nothing on a HEAD, `clean=1` is recorded
+> and (checks permitting, no non-loop threads) the next pass reaches CI-d.
+>
+> **`unresolved` vs `clean` — two distinct signals.** `clean` (marker) answers
+> "did the loop's own review find anything?" and drives the **fix** decision
+> (CI-c). `unresolved` (raw thread count) answers "are there open threads from
+> anyone?" and only gates the **exit**: CI-c2 stops for a human when non-loop
+> threads remain, CI-d requires zero. The loop never runs `/review-fix` off the
+> raw count, so it cannot churn against human comments it didn't raise (CI-c2
+> stops instead).
+>
+> **Resolved `/code-review` contract.** `claude-inline` assumes the repo's
+> in-session `/code-review` (a) reports a finding count this command can read for
+> `FOUND`, and (b) posts those findings as **inline** review comments so
+> `/review-fix` can action them. If the resolved `/code-review` reports findings
+> but posts none inline, CI-c's `/review-fix` finds nothing to fix, the head does
+> not move, and the loop stops on the no-progress budget bound — a non-merge
+> (safe) outcome, never a false clean. A repo whose `/code-review` cannot post
+> inline comments should use `Review agent = github-copilot` instead.
+>
+> **Review-mode modifiers (claude-inline).**
+> - **`none`** — handled in step 0; this path is never entered (no review, no
+>   wait, immediate clean exit).
+> - **`on-create`** — run `/code-review` once (CI-b) and `/review-fix` **once**
+>   (CI-c), then **STOP** (do NOT re-review). After that single fix the head moves,
+>   so a follow-up pass would see `reviewed-head == 0` — in `on-create` that is a
+>   **terminal STOP** ("on-create: one review + fix applied; not re-reviewing"),
+>   NOT another CI-b review.
+> - **`on-update`** (default) — re-run `/code-review` on each new HEAD and keep
+>   fixing until CI-d (clean), bounded by the budget.
 
 ---
 
