@@ -44,7 +44,7 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
    - **Keep existing** → print a summary of what was found and **STOP** without writing any file.
    - **Merge new findings** → skip Steps 1–3; run Step 2.5 only, update only the fields that
      changed or were absent, then jump to Step 4b (write merged project-context), Step 4d (merge
-     skills.json), and Step 5.
+     skills.json), Step 4e (ensure .tmp/ is gitignored), and Step 5.
    - **Re-run full setup** → continue to Step 1 with all existing values offered as pre-filled
      defaults in each prompt.
 
@@ -336,6 +336,18 @@ Do not write override files for agents the user did not select.
   Never remove existing entries.
 - If the confirmed install list is empty (user accepted no suggestions), write an empty `skills`
   array on first write; on merge write leave the existing entries untouched.
+
+**4e. `.gitignore` — ensure `.tmp/` is excluded** — agent scratch files must never be committed.
+Run the following to add the entry when it is absent:
+
+```bash
+# 4e — ensure .tmp/ is git-ignored (agent scratch must never be committed)
+if [ ! -f .gitignore ] || ! grep -qxF '.tmp/' .gitignore; then
+  printf '\n# agent scratch — SDLC plugin temp files (auto-cleaned, never commit)\n.tmp/\n' >> .gitignore
+fi
+```
+
+This is idempotent — running it on a repo that already has `.tmp/` in `.gitignore` is a no-op.
 
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 

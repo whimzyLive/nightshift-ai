@@ -35,6 +35,8 @@ case "$key" in
   */* | *..*) : ;;                 # unsafe key — skip cleanup, still signal completion
   *) rm -rf "./.tmp/$key" ;;
 esac
+rm -f ./.tmp/commit-msg.txt ./.tmp/acli-* ./.tmp/*.tmp 2>/dev/null || true
+rmdir ./.tmp 2>/dev/null || true
 
 pr_url="${1:-}"
 if [ -n "$pr_url" ]; then
