@@ -35,16 +35,33 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
      multiSelect: false,
      options: [
        { label: "Keep existing",    description: "Stop now — no files will be changed." },
-       { label: "Merge new findings", description: "Add newly detected values that are missing; keep everything already set." },
+       { label: "Merge new findings", description: "Backfill any token the current template defines but the file is missing (prompting for new user-choice fields); keep everything already set." },
        { label: "Re-run full setup", description: "Walk through all prompts again and rewrite config (existing values offered as defaults)." }
      ]
    )
    ```
 
    - **Keep existing** → print a summary of what was found and **STOP** without writing any file.
-   - **Merge new findings** → skip Steps 1–3; run Step 2.5 only, update only the fields that
-     changed or were absent, then jump to Step 4b (write merged project-context), Step 4d (merge
-     skills.json), Step 4e (ensure .tmp/ is gitignored), and Step 5.
+   - **Merge new findings** → bring the existing file up to the current template **without
+     disturbing values already set**, via a schema-backfill pass:
+     1. Run Step 2.5 (re-detect) to refresh detected defaults.
+     2. **Diff against the template schema.** Treat `refs/project-context-template.md` as the
+        canonical set of sections/tokens `/init` is expected to write. For every token/section it
+        defines that is **absent** from the existing `.claude/project/project-context.md`:
+        - if the field has a **Step 3 prompt** (picker or free-text — e.g. Review agent, Review
+          trigger, Lightweight threshold), **prompt for it now using that exact Step 3 mechanic**
+          (same `header`/`options`), pre-filling the template default as the offered/selected default;
+        - otherwise (a detection-only or static field) fill it from Step 2.5 or the template default,
+          no prompt.
+
+        This is the mechanism that auto-onboards **any newly introduced parameter**: when a future
+        template adds a token, an existing repo that runs Merge picks it up here — prompted if it is a
+        user choice, defaulted otherwise — instead of silently missing it.
+     3. **Never touch values already present** — only missing tokens are added; existing values are
+        kept verbatim (the detected-value diff from step 3 of this guard may still be offered for
+        changed detections, as today).
+     4. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
+        (ensure .tmp/ is gitignored), and Step 5.
    - **Re-run full setup** → continue to Step 1 with all existing values offered as pre-filled
      defaults in each prompt.
 
@@ -314,6 +331,12 @@ are documented in that template file. Token slots to substitute:
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
 | workspace→agent rows | one row per active agent with its confirmed owned path(s) |
+
+> **On the Merge-new-findings path** (Step 0): do **not** regenerate the file from scratch — preserve
+> the existing `.claude/project/project-context.md` verbatim and only **inject the tokens/sections
+> that were missing** (the backfill set collected in Step 0). A token already present keeps its stored
+> value; a section the template defines but the file lacks is appended. This guarantees a re-init
+> never clobbers hand-tuned values while still onboarding any newly introduced parameter.
 
 **4c. `.claude/project/agents/<agent>.md`** — one file **per active agent only**. For each active
 agent, fill the template in `refs/agent-override-template.md` using:
