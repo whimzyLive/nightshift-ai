@@ -67,8 +67,12 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 ## Pre-flight checks (run before dispatching anything)
 
 ```bash
-# 1. Verify plan file exists (must be merged to <BASE-BRANCH>)
-test -f "docs/superpowers/plans/<STORY-KEY>.md" || { echo "STOP: plan not found at docs/superpowers/plans/<STORY-KEY>.md — is plan PR merged?"; exit 1; }
+# 1. Verify plan file exists (must be merged to <BASE-BRANCH>) — full path ONLY.
+#    On the lightweight path (LIGHTWEIGHT=true) a missing plan doc is expected; tasks are derived
+#    inline from the Jira story (see the playbook's Step 2 lightweight path). Do NOT STOP then.
+if [ "${LIGHTWEIGHT:-false}" != "true" ]; then
+  test -f "docs/superpowers/plans/<STORY-KEY>.md" || { echo "STOP: plan not found at docs/superpowers/plans/<STORY-KEY>.md — is plan PR merged?"; exit 1; }
+fi
 
 # 2. Verify working tree is on <BASE-BRANCH> and clean
 git fetch origin <BASE-BRANCH>

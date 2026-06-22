@@ -3,6 +3,10 @@
 Generic SDLC agent workflow for Claude Code. Drives Jira → spec → plan → impl → review
 using a per-repo config file the consumer supplies at `.claude/project/project-context.md`.
 
+`/auto` triages by complexity first: **small stories** (≤ the configurable lightweight threshold,
+default 3 points) skip spec+plan entirely and go **straight to implementation** (tasks derived inline
+from the ticket); the full spec → plan → review-gate flow is reserved for larger stories.
+
 ## Install
     /plugin marketplace add <path-or-git-url-to-this-repo>
     /plugin install sdlc@nightshift
