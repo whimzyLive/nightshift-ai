@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96" role="img" aria-label="nightshift">
+  <title>nightshift</title>
+  <rect width="420" height="96" rx="16" fill="#1A1A2E"/>
+  <!-- crescent moon mark: a light disc masked by an offset dark disc -->
+  <defs>
+    <mask id="crescent">
+      <rect width="96" height="96" fill="black"/>
+      <circle cx="48" cy="48" r="22" fill="white"/>
+      <circle cx="58" cy="42" r="20" fill="black"/>
+    </mask>
+  </defs>
+  <circle cx="48" cy="48" r="22" fill="#D97757" mask="url(#crescent)"/>
+  <text x="92" y="60" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="40" font-weight="700" letter-spacing="-1">
+    <tspan fill="#F5F5F7">night</tspan><tspan fill="#D97757">shift</tspan>
+  </text>
+</svg>
