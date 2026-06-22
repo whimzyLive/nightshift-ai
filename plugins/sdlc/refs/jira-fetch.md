@@ -40,16 +40,41 @@ From the JSON output collectively:
 
 Both fields can exist in the same Jira instance, but each project populates only one. Read by **JQL probe on the field NAME** — never by a hard-coded `customfield_*` id (ids vary by instance) and never by trusting `fields.*` in the view JSON.
 
-**Step 1 — detect the populated field (check BOTH names):**
+**Step 1 — detect the populated field (check BOTH names; retry across index lag):**
+
+JQL search reads Jira's Lucene **index**, which can **lag** a just-written field — and a cold-start
+or transient `acli` failure can also look like an empty result. (This is the same indexing lag seen
+elsewhere: a write returns `204` while a JQL read still shows the old state for a few seconds.) So a
+single empty probe must **never** be trusted as `missing`: retry a few times with a short back-off,
+and treat an `acli` **error** (non-zero exit) as *inconclusive*, not as `missing`.
 
 ```bash
-for FIELD in "Story point estimate" "Story Points"; do
-  n=$(acli jira workitem search --jql "key = <KEY> AND \"$FIELD\" is not EMPTY" --json 2>/dev/null | grep -c '"key": "<KEY>"')
-  [ "$n" != "0" ] && echo "POPULATED: $FIELD"
+FOUND_FIELD=""; LAST_ERR=0
+for attempt in 1 2 3; do
+  LAST_ERR=0
+  for FIELD in "Story point estimate" "Story Points"; do
+    out=$(acli jira workitem search --jql "key = <KEY> AND \"$FIELD\" is not EMPTY" --json 2>&1) || LAST_ERR=1
+    printf '%s' "$out" | grep -qE '"key":[[:space:]]*"<KEY>"' && { FOUND_FIELD="$FIELD"; break; }
+  done
+  [ -n "$FOUND_FIELD" ] && break
+  sleep 2   # no match yet — could be index lag or a transient error; back off and retry
 done
 ```
 
-If **neither** name returns a match → points are genuinely unset (`missing`). Only report `missing` when BOTH return nothing.
+Decide from the loop result — **only a clean, repeatable empty means `missing`**:
+
+- `FOUND_FIELD` set → the field is populated → go to Step 2.
+- `FOUND_FIELD` empty **and** `LAST_ERR=0` on the final attempt (a clean empty that persisted across
+  all retries) → points are genuinely unset → `missing`.
+- `FOUND_FIELD` empty **but** `LAST_ERR=1` persisted (every attempt errored — auth/DNS, or an
+  ambiguous-field error) → **inconclusive: STOP and surface the error; do NOT report `missing`.** A
+  transient/config error must never masquerade as "no points". A persistent *"field is ambiguous"*
+  error means the instance has duplicate field names — for that one instance, disambiguate with the
+  `cf[id]` form (the id from the project's field config) rather than the display name.
+
+> The same JQL/index caveat applies to **any** by-name field read in this plugin (e.g. the
+> `AI Workflow` mode probe). Before trusting an empty `… is not EMPTY` result as authoritative,
+> apply this retry + error-aware discipline; a single empty probe is not proof the field is unset.
 
 **Step 2 — read the value via candidate probe on the populated field:**
 
