@@ -10,8 +10,9 @@
 
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-d97757?logo=anthropic&logoColor=white)](https://code.claude.com/docs/en/plugins)
 [![Marketplace](https://img.shields.io/badge/marketplace-nightshift-1a1a2e)](https://github.com/whimzyLive/nightshift-ai)
-[![Stars](https://img.shields.io/github/stars/whimzyLive/nightshift-ai?style=social)](https://github.com/whimzyLive/nightshift-ai/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+[![⭐ Star this repo](https://img.shields.io/github/stars/whimzyLive/nightshift-ai?style=for-the-badge&label=%E2%AD%90%20Star%20this%20repo&labelColor=0d0d18&color=d97757)](https://github.com/whimzyLive/nightshift-ai)
 
 [**Install**](#-install-in-60-seconds) · [**How it works**](#-how-it-works) · [**The team**](#-meet-your-team) · [**Configure**](#-configure-your-repo) · [**Extend**](#-extend-the-agents-to-your-stack) · [**Contribute**](#-contributing)
 
