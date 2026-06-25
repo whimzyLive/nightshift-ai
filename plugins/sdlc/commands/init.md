@@ -173,6 +173,7 @@ suggestion (see *Prompt mechanics* below). Collect:
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
 | Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
+| Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
 

@@ -25,9 +25,14 @@ re-invokes this command after each pass and terminates the loop when this pass
 does not schedule a next iteration). This command NEVER merges the PR **itself**
 and ignores non-Copilot reviewers.
 
-**Arguments.** `$ARGUMENTS` is `<PR> [--on-clean "<command>"]`:
+**Arguments.** `$ARGUMENTS` is `<PR> [--phase <p>] [--on-clean "<command>"]`:
 
 - `<PR>` — the PR number or URL to loop on.
+- `--phase <p>` — OPTIONAL. A single phase-name token (`spec` | `plan` | `impl`)
+  threaded through to the review-config reader (step 0) so the per-repo **Review
+  gate** can downgrade this phase's effective `REVIEW_MODE` to `none`. The phase is
+  passed literally per-invocation (NOT an env var) so it survives `/loop`
+  re-invocation. Capture it as `PHASE` (empty when the flag is absent).
 - `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
   rule-4 clean exit** (head Copilot-reviewed, zero unresolved comments, checks
   green), immediately before the session release. It is **NOT** run on any halt
@@ -40,6 +45,8 @@ and ignores non-Copilot reviewers.
 **Parsing `$ARGUMENTS`.** Split it explicitly — do NOT pass the whole string to
 `gh`:
 - `PR` = the **first whitespace-delimited token** of `$ARGUMENTS`.
+- If the literal `--phase` appears, the **single token after it** is the phase;
+  capture it as `PHASE`. Otherwise `PHASE` is empty.
 - If the literal `--on-clean` appears, everything after it (the quoted command)
   is the hook; capture it as `ON_CLEAN`. Otherwise `ON_CLEAN` is empty.
 
@@ -173,9 +180,18 @@ Review`) section with two tokens. Read BOTH via the shared reader so the regex
 and defaults live in one place:
 
 ```bash
-eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh)"
-# -> sets REVIEW_AGENT (github-copilot | claude-inline | claude-superpowers) and REVIEW_MODE (none | on-create | on-update)
+# Pass the phase (when one was parsed) so the per-repo Review gate can downgrade
+# this phase's effective REVIEW_MODE to `none`; otherwise use the plain no-flag call.
+eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh --phase "$PHASE")"   # when PHASE was parsed
+# eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh)"                  # when no --phase was given
+# -> sets REVIEW_AGENT (github-copilot | claude-inline | claude-superpowers), REVIEW_MODE (none | on-create | on-update), REVIEW_GATE
 ```
+
+When a **Review gate** is configured and the current `PHASE` is **not** in it, the
+reader returns `REVIEW_MODE=none` — the existing `none` path below then runs
+`--on-clean` exactly once and releases. The phase's review is skipped and the
+pipeline advances; this is handled entirely by the existing `none` handling (no
+new decision-table rule).
 
 **`REVIEW_AGENT`** selects WHO reviews (default `github-copilot`; absent or
 unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reader):
