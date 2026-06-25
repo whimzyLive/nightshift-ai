@@ -171,7 +171,7 @@ suggestion (see *Prompt mechanics* below). Collect:
 | Test command | the project's test runner — **default: `DETECTED_TEST`** (blank if none) |
 | Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
-| Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default) or `github-copilot` |
+| Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
@@ -197,10 +197,12 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
    below, each `label` the agent name and `description` its "select when…" row from the table. This
    is the ONLY multi-select picker; the result is the active-agent set.
 5. **Review agent** — `header: "Review agent"`, `multiSelect: false`,
-   `options: [claude-inline (Recommended), github-copilot]`. `claude-inline` (first/default) runs
-   `/code-review` in-session and works on ANY repo with no external setup; pick `github-copilot`
-   **only** when the repo has GitHub Copilot code review enabled and wants the bot to drive the loop.
-   The chosen label is the `Review agent` token.
+   `options: [claude-inline (Recommended), github-copilot, claude-superpowers]`. `claude-inline`
+   (first/default) runs `/code-review` in-session and works on ANY repo with no external setup;
+   pick `github-copilot` **only** when the repo has GitHub Copilot code review enabled and wants the
+   bot to drive the loop; pick `claude-superpowers` for an in-session review that runs the superpowers
+   `requesting-code-review` skill (a focused reviewer subagent) instead of native `/code-review` —
+   same review→fix cycle, lower per-review token cost. The chosen label is the `Review agent` token.
 6. **Review trigger** — `header: "Review trigger"`, `multiSelect: false`,
    `options: [on-update (Recommended), on-create, none]`. `on-update` (first/default) re-requests
    review on every push until the head is clean; `on-create` reviews once at PR creation;

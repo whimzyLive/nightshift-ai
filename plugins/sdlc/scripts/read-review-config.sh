@@ -12,11 +12,13 @@ set -euo pipefail
 # Tokens (looked up in any "## ... Review" section — section name is not matched,
 # only the token row, so both "## Copilot Review" and "## Code Review" work):
 #
-#   Review agent : github-copilot | claude-inline   (default: github-copilot)
+#   Review agent : github-copilot | claude-inline | claude-superpowers   (default: github-copilot)
 #   Review mode  : none | on-create | on-update      (default: on-update)
 #
 # - Review agent selects WHO reviews: the GitHub Copilot bot (assigned as a PR
-#   reviewer, async) or Claude inline (the loop runs /code-review in-session).
+#   reviewer, async), Claude inline (the loop runs /code-review in-session), or
+#   claude-superpowers (the loop runs the superpowers requesting-code-review skill
+#   in-session — a focused reviewer subagent — instead of native /code-review).
 # - Review mode selects the cadence (request once / per-update / not at all) and
 #   is orthogonal to the agent.
 #
@@ -36,7 +38,7 @@ CTX="${1:-.claude/project/project-context.md}"
 # Case-insensitive on the token name; strips optional surrounding backticks and
 # lower-cases the value. Empty when the row is absent or the file is unreadable.
 # The value charset `[A-Za-z-]+` is deliberately the enum alphabet of both tokens
-# (github-copilot|claude-inline, none|on-create|on-update). If a value contains any
+# (github-copilot|claude-inline|claude-superpowers, none|on-create|on-update). If a value contains any
 # OTHER char (an underscore typo `github_copilot`, or a trailing phrase like
 # `claude-inline (when Copilot is down)`), the whole `s///` fails to match, so sed
 # emits the row VERBATIM — read_token then returns the entire (lower-cased) row,
@@ -60,7 +62,7 @@ REVIEW_MODE="$(read_token 'Review mode')"
 # Review agent — github-copilot is the only non-Copilot... i.e. the safe default.
 # Absent OR unrecognised both default to github-copilot WITH a warning (AC-5).
 case "$REVIEW_AGENT" in
-  github-copilot|claude-inline) ;;
+  github-copilot|claude-inline|claude-superpowers) ;;
   '')
     echo "WARNING: review-agent not set in $CTX — defaulting to github-copilot" >&2
     REVIEW_AGENT=github-copilot ;;
