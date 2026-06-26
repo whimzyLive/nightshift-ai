@@ -2,6 +2,23 @@
 description: Produce an implementation plan for a Jira story. Creates branch, writes docs/superpowers/plans/ doc, raises PR, and links back to the story. Run after /spec PR is reviewed and merged.
 ---
 
+## Step 0 — Issue-type guard (defects skip plan)
+
+Before dispatching anything, probe the issue type — **defects have no plan phase**. Use the canonical
+one-liner (same as `/auto` Step 0):
+
+```bash
+ITYPE="$(acli jira workitem view <STORY-KEY> --fields issuetype --json 2>/dev/null \
+           | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
+```
+
+If `ITYPE == bug` → **STOP** with: `defects skip spec/plan — run /impl`. Do **not** create a
+`plan/<STORY-KEY>` branch and do **not** dispatch the agent. Without this guard a Bug would
+false-fail on "run `/spec` first" (step 2) because a defect never has a spec doc. (Defence-in-depth;
+the `/auto` Step-0 gate + lightweight defect routing are the primary gate.) Otherwise continue.
+
+---
+
 Dispatch the `tech-lead` agent to produce an implementation plan for the Jira story.
 
 The agent should:

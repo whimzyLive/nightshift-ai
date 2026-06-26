@@ -71,8 +71,16 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
      (`PRE_FIX_HEAD..HEAD`) to confirm each accepted comment is resolved and nothing regressed;
      loop until clean.
    - **Quality gate (Step 6)** — the quality-gate commands from `.claude/project/project-context.md`, pasted evidence.
-   If a `feat/<STORY-KEY>` head branch has a merged plan, also run the AC/plan verification
-   (Step 7); otherwise skip it — the comments are the requirements.
+   **Gate the AC/plan verification (Step 7) purely on plan-doc existence** at
+   `docs/superpowers/plans/<STORY-KEY>.md` — **not** on the head-branch name. Run Step 7 when that
+   plan doc exists; otherwise skip it — the comments are the requirements. This single signal is
+   correct for every path: feature-full (plan exists) → verify; feature-lightweight (no plan) → skip;
+   defect (no plan) → skip — each for the right reason (no plan doc), not by an accidental
+   `feat/`-branch-name match (which would wrongly skip a `fix/<KEY>` defect head and mis-handle any
+   non-`feat/` feature head). Do **not** add an `OR WORK_KIND=feature` disjunct — it is redundant (a
+   lightweight feature with no plan correctly skips on plan-absence alone) and would wrongly force
+   plan verification when no plan exists. (On the defect path the QA playbook's regression-evidence
+   contract runs in place of the plan checklist.)
 
 5. **Close out the PR threads (only after fixes are pushed AND the gate is green).** For every
    triaged inline comment, post its justification back on the exact thread and resolve the

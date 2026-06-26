@@ -2,6 +2,23 @@
 description: Produce a technical design spec for a Jira story. Creates branch, writes docs/superpowers/specs/ doc, raises PR, and links back to the story. Run after /stories.
 ---
 
+## Step 0 — Issue-type guard (defects skip spec)
+
+Before dispatching anything, probe the issue type — **defects have no spec phase**. Use the canonical
+one-liner (same as `/auto` Step 0):
+
+```bash
+ITYPE="$(acli jira workitem view <STORY-KEY> --fields issuetype --json 2>/dev/null \
+           | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
+```
+
+If `ITYPE == bug` → **STOP** with: `defects skip spec/plan — run /impl`. Do **not** create a
+`spec/<STORY-KEY>` branch and do **not** dispatch the agent. (This is defence-in-depth: the `/auto`
+Step-0 entry gate + lightweight defect routing are the primary gate; this guards a human running
+`/spec` directly on a Bug.) Otherwise continue.
+
+---
+
 Dispatch the `solutions-architect` agent to produce a technical spec for the Jira story.
 
 The agent should:
