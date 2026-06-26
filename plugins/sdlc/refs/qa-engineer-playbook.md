@@ -3,7 +3,7 @@
 The code-quality lifecycle for a Jira story implementation. **This playbook is executed
 INLINE by the top-level session** — it is invoked by the Principal Engineer playbook
 (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`, Step 6) once all domain-agent
-implementation phases are pushed to `feat/<STORY-KEY>`. It is NOT dispatched as a subagent.
+implementation phases are pushed to `<BRANCH_PREFIX>/<STORY-KEY>`. It is NOT dispatched as a subagent.
 
 ## Why inline (read this first)
 
@@ -32,11 +32,23 @@ You return a single verdict (`clean` or `blocked`) to the Principal Engineer.
 - `<STORY-KEY>` — the Jira story key for this run
 - `BASE_SHA` — the review-range start. Both caller forms are valid: `/impl`'s principal playbook
   captures `git rev-parse origin/develop` before branching; `/review` Story mode uses
-  `git merge-base origin/develop origin/feat/<STORY-KEY>`. They differ only if `develop` advanced
+  `git merge-base origin/develop origin/<BRANCH_PREFIX>/<STORY-KEY>`. They differ only if `develop` advanced
   after branching; merge-base is the more precise start.
-- Branch `feat/<STORY-KEY>` exists on origin with all implementation phases pushed
+- Branch `<BRANCH_PREFIX>/<STORY-KEY>` exists on origin with all implementation phases pushed
 - Plan path: `docs/superpowers/plans/<STORY-KEY>.md`
 - Jira story summary + acceptance criteria (from the story body the caller already fetched)
+- `WORK_KIND` — `defect` | `feature`, handed in by the caller (default `feature` when absent).
+  Supplied by: the Principal Engineer playbook (inline `/auto`/`/impl`) and `commands/review.md`
+  (derived from the resolved branch prefix). **`BRANCH_PREFIX` is derived from it** — `fix` on
+  `defect`, `feat` on `feature` — so every `<BRANCH_PREFIX>/<STORY-KEY>` reference below resolves the
+  right branch (no Jira fetch). `WORK_KIND=defect` also re-points the Step-7 verification to the
+  defect regression-evidence contract (see Step 7). Without `WORK_KIND`, the defect contract cannot
+  fire — a defect would silently pass the feature AC checklist.
+  > **The `/review-fix` entry path does NOT supply `WORK_KIND`** (it defaults to `feature`). That is
+  > intentional: `/review-fix` gates its AC/plan verification on **plan-doc existence**, not on
+  > `WORK_KIND` (see `commands/review-fix.md`) — a defect has no plan doc, so that verification is
+  > correctly skipped. The defect regression-evidence contract is enforced on the `/auto`/`/impl` and
+  > `/review` paths, which do supply `WORK_KIND`.
 
 ## Modes
 
@@ -48,22 +60,22 @@ no Jira ticket, plan, or PR.
 | | Story mode | Diff mode (ad-hoc, no story key) |
 |---|---|---|
 | Trigger | `<STORY-KEY>` provided | no story key — review the current diff |
-| Review target | commit range `BASE_SHA..origin/feat/<STORY-KEY>` | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
+| Review target | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>` | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
 | Requirements given to reviewer (Step 1) | plan + acceptance criteria | the change's own intent (commit subjects + changed-file summary) — there are no ACs |
-| Fix commits (Step 3) | committed by domain agent, **pushed** by you to `feat/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user |
+| Fix commits (Step 3) | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user |
 | Learnings memory (Step 5) | required | **skip** — no story to key the entry to |
 | AC + plan verification (Step 7) | required | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green |
 | Verdict (Step 8) | full block incl. AC + learnings lines | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)` |
 
 Everything else (request review → triage → fix → re-review → quality gate → return verdict) is
-identical. In Diff mode, wherever a step says `feat/<STORY-KEY>`, operate on the current branch /
+identical. In Diff mode, wherever a step says `<BRANCH_PREFIX>/<STORY-KEY>`, operate on the current branch /
 working tree instead, and never push.
 
 ## Project constants
 
 All project constants — base branch, quality gate, package manager, infra stage flag, active
 agents — live in `.claude/project/project-context.md`. Read it first. This playbook references
-them as tokens (`<BASE-BRANCH>`, `feat/<STORY-KEY>`) and never hardcodes values.
+them as tokens (`<BASE-BRANCH>`, `<BRANCH_PREFIX>/<STORY-KEY>`) and never hardcodes values.
 
 Skip phases for agents marked **Standby** in project-context.
 
@@ -89,8 +101,8 @@ diffs a **committed** `BASE_SHA..HEAD_SHA` range and so cannot see uncommitted e
 **Story mode** — everything is already committed + pushed:
 
 ```bash
-git fetch origin feat/<STORY-KEY>
-HEAD_SHA=$(git rev-parse origin/feat/<STORY-KEY>)
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+HEAD_SHA=$(git rev-parse origin/<BRANCH_PREFIX>/<STORY-KEY>)
 ```
 
 Pass `BASE_SHA` (handed in) and `HEAD_SHA` to the reviewer as a `BASE_SHA..HEAD_SHA` range.
@@ -201,7 +213,7 @@ the `Agent` tool, **`isolation: "worktree"`** (it writes code). The prompt MUST 
 
 1. Story key.
 2. The reviewer findings for that domain, **verbatim**.
-3. "Branch `feat/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
+3. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
    commit (use the `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
 4. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit."
@@ -211,9 +223,9 @@ the `Agent` tool, **`isolation: "worktree"`** (it writes code). The prompt MUST 
 After the agent returns, push and confirm:
 
 ```bash
-git push origin feat/<STORY-KEY>
-git fetch origin feat/<STORY-KEY>
-git log origin/feat/<STORY-KEY> --oneline -3
+git push origin <BRANCH_PREFIX>/<STORY-KEY>
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
 - No new commit since pre-dispatch HEAD → agent failed silently. **Return `blocked`** to the
@@ -231,7 +243,7 @@ After review rounds are clean, sync and record what was learned so future implem
 the same mistakes.
 
 ```bash
-git fetch origin feat/<STORY-KEY> && git merge --ff-only origin/feat/<STORY-KEY>
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 DATE=$(date +%Y-%m-%d)
 ```
 
@@ -253,13 +265,13 @@ Pitfalls. Then commit and push:
 ```bash
 git add .claude/memories/
 git commit -m "chore: update learnings after <STORY-KEY> review"
-git push origin feat/<STORY-KEY>
+git push origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
 ## Step 6 — Quality gate
 
 ```bash
-git fetch origin feat/<STORY-KEY> && git merge --ff-only origin/feat/<STORY-KEY>
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 ```
 
 Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate). If the change touched infra, also run the infra build with the stage flag from project-context.
@@ -275,7 +287,7 @@ actual gate output — never claim a pass without it (`verification-before-compl
 
 ## Step 7 — Verification before completion (AC + plan check)
 
-Apply `verification-before-completion`. Produce TWO line-by-line checklists, each item confirmed
+Apply `verification-before-completion`. Produce line-by-line checklists, each item confirmed
 with evidence (git log, file existence, or test output) — no item checked off on assertion alone:
 
 1. **Every plan task** in `docs/superpowers/plans/<STORY-KEY>.md` → has a corresponding commit/file/test.
@@ -285,13 +297,44 @@ with evidence (git log, file existence, or test output) — no item checked off 
    with the specific evidence (handler/test/file) named. *(Always — and the primary gate on the
    lightweight path.)*
 
+**On the defect path (`WORK_KIND=defect`) — ALSO require the systematic-debugging completion
+contract (AC17).** A defect has **no plan doc**, so checklist 1 is skipped (as on any lightweight
+path); the AC checklist (2) still applies, and **in addition** the following regression-evidence
+contract MUST hold — without it, return `blocked` (never `clean`):
+
+1. **A regression test that FAILED before the fix and PASSES after.** Take the evidence from the
+   branch's **own commit sequence**, NOT a `BASE_SHA` checkout:
+   - at the **phase-3 commit** (regression test added, phase-4 fix not yet applied) the test **fails
+     as an assertion** against the still-buggy behaviour;
+   - at **HEAD** (fix applied) it **passes**.
+
+   > Why not `BASE_SHA`: at develop's merge-base the test file does not yet exist, so running it
+   > there fails to *compile/resolve* rather than *assert* — it cannot distinguish "failed because
+   > the bug is present" from "failed to build". The **phase-3 commit** is the correct pre-fix point:
+   > the test exists there and exercises code that compiles, failing only on the assertion the fix
+   > later satisfies.
+
+   ```bash
+   # Identify the phase-3 commit (regression test added, before the fix), then show fail→pass.
+   git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+   git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
+   # at the phase-3 commit the new test FAILS (assertion); at HEAD it PASSES — paste both outputs.
+   ```
+2. **The full test suite passes with no regressions** (the Step-6 gate output covers this).
+
+This is **in addition** to the existing lightweight ACs-as-contract fallback — the defect path
+*adds* the failing→passing regression-test requirement. (No double-verify: systematic-debugging
+phase-4 is the *implementer's* inner check that the fix works; this Step-7 contract is QA's *outer*
+gate proving the regression evidence + clean suite.)
+
 ```bash
-git fetch origin feat/<STORY-KEY>
-git log ${BASE_SHA}..origin/feat/<STORY-KEY> --oneline
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
 ```
 
 Any plan task or AC with no corresponding evidence → dispatch the owning domain agent to
-complete it (Step 3 protocol), then re-run Steps 6–7. Do not return `clean` with an unmet AC.
+complete it (Step 3 protocol), then re-run Steps 6–7. On the defect path, a regression test that
+does **not** fail-before / pass-after → return `blocked`. Do not return `clean` with an unmet AC.
 
 ## Step 8 — Return verdict to the Principal Engineer
 

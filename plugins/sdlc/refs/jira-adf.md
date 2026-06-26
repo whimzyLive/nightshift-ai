@@ -335,6 +335,98 @@ Use for `/refine-issue`, `/stories`, and any Story create/update. See `jira-stor
 
 ---
 
+## Bug description template
+
+Use for `/refine-issue` and any **Bug** (`issuetype == Bug`) create/update. See
+`jira-bug-template.md` for the 7-section structure and the required-vs-best-effort gate rules. A Bug
+uses **headings + ordered/bullet lists — NOT the user-story `taskList`** (a bug has no Mike-Cohn ACs).
+Render the 7 sections as: `heading` (level 3) per section title; `orderedList` for **Steps to
+Reproduce**; `paragraph` for **Actual Result**, **Expected Result**, **Severity/Impact**, and
+**Environment**; `bulletList` for **Attachments/Proof**. Best-effort sections absent (Environment,
+Attachments/Proof) → render a `paragraph` / `listItem` with the text `not provided`.
+
+```json
+{
+  "version": 1,
+  "type": "doc",
+  "content": [
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Environment" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "OS / device / browser or app version — or \"not provided\"" }]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Steps to Reproduce" }]
+    },
+    {
+      "type": "orderedList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "First explicit action" }] }]
+        },
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Second explicit action" }] }]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Actual Result" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Neutral statement of what currently happens." }]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Expected Result" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Clear, testable, neutral statement of what should happen." }]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Severity / Impact" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Importance level + affected audience." }]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Attachments / Proof" }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Screenshot / recording / error log — or \"not provided\"" }] }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+The **Summary / Title** (section 1) is the Jira issue summary field, not part of the description ADF —
+set it via `--summary` (e.g. `[iOS] Cart checkout button unresponsive`).
+
+---
+
 ## Minimal sub-task description
 
 When refining a story that has child sub-tasks, the parent story's own description folds each sub-task's scope into its **existing Acceptance Criteria** `taskList` (one extra `taskItem` per sub-task, derived from the sub-task summary) — there is **no separate "Sub-tasks" section, heading, or second `taskList`**. Re-use the single AC `taskList` (`localId` scheme `tl-1` / `ti-*`).
