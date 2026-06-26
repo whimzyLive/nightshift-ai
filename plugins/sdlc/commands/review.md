@@ -23,7 +23,13 @@ fix agents it needs. You play the QA Engineer role directly, in the top-level se
    encodes how the work was built — so the branch that exists is authoritative. A Jira fetch here
    would re-introduce the fail-safe-to-`feature` false-STOP the branch-probe exists to avoid.
    ```bash
-   git fetch origin "fix/<STORY-KEY>" "feat/<STORY-KEY>" develop 2>/dev/null || git fetch origin develop
+   # Fetch each candidate INDEPENDENTLY — a single combined `git fetch` of all three refs aborts
+   # whole if ANY ref is absent (the normal case: only one prefix exists), which would leave the
+   # other prefix's remote-tracking ref stale/absent and yield a false "neither exists" STOP. Per-ref
+   # fetch with `|| true` updates whichever refs DO exist and ignores the misses.
+   git fetch origin develop 2>/dev/null || true
+   git fetch origin "fix/<STORY-KEY>"  2>/dev/null || true
+   git fetch origin "feat/<STORY-KEY>" 2>/dev/null || true
    FIX_EXISTS=$(git rev-parse --verify -q origin/fix/<STORY-KEY>  >/dev/null 2>&1 && echo yes || echo no)
    FEAT_EXISTS=$(git rev-parse --verify -q origin/feat/<STORY-KEY> >/dev/null 2>&1 && echo yes || echo no)
    ```

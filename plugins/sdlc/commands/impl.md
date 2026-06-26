@@ -13,11 +13,16 @@ the Principal Engineer role directly.
 ## Steps
 
 1. **Triage gate.** Run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE**
-   (in this same session) and capture `TRIAGE` (`lightweight` | `full`). This decides whether the
-   merged plan file is a hard precondition (Step 2). `STORY_POINTS=missing` resolves to `TRIAGE=full`
-   (fail-safe). If the triage step **STOPs without emitting a `TRIAGE=` line** (e.g. an `acli`
-   auth/DNS failure), **STOP** here and surface that error — do NOT proceed to implementation without
-   a valid triage decision.
+   (in this same session) and capture **both** `TRIAGE` (`lightweight` | `full`) **and `WORK_KIND`
+   (`defect` | `feature`)**. `TRIAGE` decides whether the merged plan file is a hard precondition
+   (Step 2). `WORK_KIND` is threaded into the playbook (Step 4): `WORK_KIND=defect` activates the
+   systematic-debugging defect variant on a `fix/<STORY-KEY>` branch and re-points QA's Step-7
+   verification — so a Bug routed to `/impl` gets the defect workflow, identical to `/auto`'s
+   Workflow B. (A Bug always triages `WORK_KIND=defect` + `TRIAGE=lightweight`.) `STORY_POINTS=missing`
+   resolves to `TRIAGE=full` (fail-safe) for a **feature**; a Bug stays `TRIAGE=lightweight`. If the
+   triage step **STOPs without emitting the `WORK_KIND=`/`TRIAGE=` lines** (e.g. an `acli` auth/DNS
+   failure), **STOP** here and surface that error — do NOT proceed to implementation without a valid
+   triage decision.
 
    > **Do NOT invoke the `/triage` slash command here.** Its final action runs `session-complete.sh`,
    > which under the automation harness emits the session-complete sentinel and releases this worker
@@ -36,9 +41,15 @@ the Principal Engineer role directly.
 3. Fetch the Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for the
    summary, description, and context (comments, linked tickets, attachments).
 4. **Execute `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` inline**, start to finish, for
-   `<STORY-KEY>` — passing **`LIGHTWEIGHT=true` when `TRIAGE=lightweight`** (else `false`). That flag is
-   what makes the playbook skip the plan-file STOP and derive tasks inline from the story on the
-   lightweight path; on the full path it leaves the merged-plan precondition intact.
+   `<STORY-KEY>` — passing **`LIGHTWEIGHT=true` when `TRIAGE=lightweight`** (else `false`) **and the
+   `WORK_KIND` captured in Step 1**. `LIGHTWEIGHT` makes the playbook skip the plan-file STOP and
+   derive tasks inline from the story on the lightweight path; on the full path it leaves the
+   merged-plan precondition intact. **`WORK_KIND=defect`** activates the playbook's systematic-debugging
+   defect variant (reproduce → root-cause → failing regression test → fix+verify, dispatching domain
+   agents) on a `fix/<STORY-KEY>` branch, and the playbook threads `WORK_KIND` on to the QA Engineer
+   (re-pointing Step-7 to the defect regression-evidence contract); `WORK_KIND=feature` keeps the
+   normal feature ladder. The two flags are orthogonal — a lightweight *feature* keeps the feature
+   ladder.
    That playbook is the single source of truth for the implementation workflow:
    pre-flight → branch → ordered domain-agent dispatch (`isolation: "worktree"`) → per-phase
    push/verify → **hand off to the QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`, run

@@ -38,12 +38,17 @@ You return a single verdict (`clean` or `blocked`) to the Principal Engineer.
 - Plan path: `docs/superpowers/plans/<STORY-KEY>.md`
 - Jira story summary + acceptance criteria (from the story body the caller already fetched)
 - `WORK_KIND` — `defect` | `feature`, handed in by the caller (default `feature` when absent).
-  Supplied by: the Principal Engineer playbook (inline `/auto`/`/impl`), `commands/review.md`
-  (derived from the resolved branch prefix), and `commands/review-fix.md`. **`BRANCH_PREFIX` is
-  derived from it** — `fix` on `defect`, `feat` on `feature` — so every `<BRANCH_PREFIX>/<STORY-KEY>`
-  reference below resolves the right branch (no Jira fetch). `WORK_KIND=defect` also re-points the
-  Step-7 verification to the defect regression-evidence contract (see Step 7). Without `WORK_KIND`,
-  the defect contract cannot fire — a defect would silently pass the feature AC checklist.
+  Supplied by: the Principal Engineer playbook (inline `/auto`/`/impl`) and `commands/review.md`
+  (derived from the resolved branch prefix). **`BRANCH_PREFIX` is derived from it** — `fix` on
+  `defect`, `feat` on `feature` — so every `<BRANCH_PREFIX>/<STORY-KEY>` reference below resolves the
+  right branch (no Jira fetch). `WORK_KIND=defect` also re-points the Step-7 verification to the
+  defect regression-evidence contract (see Step 7). Without `WORK_KIND`, the defect contract cannot
+  fire — a defect would silently pass the feature AC checklist.
+  > **The `/review-fix` entry path does NOT supply `WORK_KIND`** (it defaults to `feature`). That is
+  > intentional: `/review-fix` gates its AC/plan verification on **plan-doc existence**, not on
+  > `WORK_KIND` (see `commands/review-fix.md`) — a defect has no plan doc, so that verification is
+  > correctly skipped. The defect regression-evidence contract is enforced on the `/auto`/`/impl` and
+  > `/review` paths, which do supply `WORK_KIND`.
 
 ## Modes
 
