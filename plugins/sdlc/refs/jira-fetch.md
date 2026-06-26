@@ -107,4 +107,17 @@ acli jira workitem search --jql "parent = <KEY> AND issuetype in subTaskIssueTyp
 
 ## Tooling rule
 
-Always use `acli` via Bash. Never call Atlassian MCP tools — token cost is significantly higher.
+`acli` via Bash is the **only** Jira transport. Never call Atlassian MCP tools, and never reach for
+direct HTTP to `api.atlassian.com` (or any other Jira REST endpoint) — not as a default, and **not as
+a fallback**. Two independent reasons:
+
+1. **Token cost** — an MCP call returns full JSON payloads into context (≈ 500–2000 tokens) vs `acli`'s
+   ≈ 10–50 tokens.
+2. **Reachability** — agent sandboxes routinely **network-block** `api.atlassian.com` while `acli`
+   stays functional in the same sandbox. So MCP/HTTP is not just costlier, it is frequently the one
+   path that does **not** work — falling back to it converts a working `acli` setup into a spurious
+   "Jira unreachable" failure.
+
+An `acli` failure is therefore a **STOP** (surface the error and let the operator fix `acli` access),
+**never** a signal to switch to MCP or HTTP. Do not interpret "`acli` returned an error" or "the
+network looks blocked" as permission to try another transport — there is exactly one transport.
