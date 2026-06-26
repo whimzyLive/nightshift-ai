@@ -5,7 +5,7 @@ description: Use acli (Atlassian CLI) to interact with Jira Cloud — create, se
 
 # acli — Atlassian CLI for Jira
 
-Use `acli` for all Jira operations. Never use Atlassian MCP tools when acli can do the same job.
+`acli` via Bash is the only Jira transport. Never use Atlassian MCP tools or direct HTTP to `api.atlassian.com` — not even as a fallback. An `acli` failure is a STOP (surface it), not a signal to switch transports.
 
 ## ⚠️ Description formatting — ADF JSON required
 
