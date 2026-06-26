@@ -81,6 +81,12 @@ then takes a terminal action that depends on the story's mode. A1, A2, and B1 be
 procedure with their just-raised `<PR_URL>` and a `<PHASE>` of `spec` (advances to Phase 2 on
 merge), `plan+impl`, or `impl` (completes the story on merge).
 
+The loop is also handed a **`--phase <GATE_PHASE>`** flag so the per-repo **Review gate** can skip
+this phase's review (see **Review Gate** below). The gate-phase maps from the workflow branch:
+**A1 spec PR → `spec`**, **A2 combined plan+impl PR → `impl`**, **B impl PR → `impl`**. (The combined
+plan+impl PR uses `impl`: there is no separate plan PR in `/auto`.) `<GATE_PHASE>` is passed
+literally per-invocation, so there is no cross-phase state bleed.
+
 ### Resolving the working issue's mode
 
 The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode. Do
@@ -119,12 +125,12 @@ runs the hook. The loop owns the single `session-complete`; `/auto` does **not**
      `<PR_URL>`, whose merge event advances the pipeline (`<PHASE>=spec` → resumes Phase 2;
      `plan+impl`/`impl` → completes the story):
      ```bash
-     /loop /sdlc:loop <PR_URL> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
+     /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
      ```
    - **Any other mode** → no hook; the loop just drives the PR to Copilot-clean and stops for a human
      merge:
      ```bash
-     /loop /sdlc:loop <PR_URL>
+     /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE>
      ```
 
 The loop drives review-fix to convergence (or halts on review-fix-blocked / CI-red / idle-budget),
@@ -139,6 +145,21 @@ protection, conflict), the loop surfaces it and the PR stays open.
 
 `sdlc:loop` stays mode-agnostic — it only drives review-fix and runs whatever `--on-clean` hook it
 was handed; `/auto` decides (via `MODE`) whether to attach the auto-merge hook.
+
+### Review Gate
+
+The optional **`Review gate`** token in the repo's `## Code Review` section is a comma-separated
+subset of `spec,plan,impl` listing which phases trigger the configured automated review:
+
+- A phase listed in the gate reviews as usual; a phase **not** listed has its review skipped (the
+  reader returns effective `REVIEW_MODE=none`, so `raise-pr.sh` requests no reviewer and the tail
+  loop runs `--on-clean` once and releases — the pipeline advances without waiting for a review).
+- **Token absent or empty ⇒ all phases review** — the default, fully back-compatible behaviour
+  (no regression).
+- The combined plan+impl PR is gated by the **`impl`** value (there is no separate plan PR in
+  `/auto`); the spec PR is gated by `spec`.
+- The phase is passed per-invocation as `--phase <GATE_PHASE>`, so each PR is gated independently and
+  there is no cross-phase state bleed.
 
 ---
 

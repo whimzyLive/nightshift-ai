@@ -36,7 +36,7 @@ The agent should:
    # write "$dir/pr-body.md" with your file-write tool, e.g.:
    #   Spec for <STORY-KEY>. See docs/superpowers/specs/<STORY-KEY>.md.
    PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
-     "spec/<STORY-KEY>" develop "docs(spec): <STORY-KEY> <story summary>" "$dir/pr-body.md")
+     "spec/<STORY-KEY>" develop "docs(spec): <STORY-KEY> <story summary>" "$dir/pr-body.md" --phase spec)
    ```
 8. Comment the story with the spec reference. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
    ```bash

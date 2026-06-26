@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# raise-pr.sh <head> <base> <title> <body_file> [reviewer]
+# raise-pr.sh [--phase <p>] <head> <base> <title> <body_file> [reviewer]
 #
 # Atomically opens the implementation PR and wires up review, so the three steps that must
 # always happen together — create, mark-ready, request the review bot — cannot be half-done
@@ -27,6 +27,23 @@ set -euo pipefail
 #
 # Idempotent: re-running for a head branch that already has an open PR reuses it.
 # Reviewer assignment is best-effort and NEVER fails PR creation.
+#
+# OPTIONAL `--phase <p>` flag (p ∈ {spec,plan,impl}): passed through to
+# read-review-config.sh so the per-repo "Review gate" can downgrade this phase's
+# effective REVIEW_MODE to `none` (skip the reviewer request) when the phase is
+# not gated. It is parsed and stripped BEFORE the positional args, so the
+# positional contract <head> <base> <title> <body_file> [reviewer] is preserved.
+
+# Parse + strip the optional --phase flag first; everything else stays positional.
+PHASE=""
+ARGS=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --phase) PHASE="${2:-}"; shift 2 ;;
+    *)       ARGS+=("$1"); shift ;;
+  esac
+done
+set -- "${ARGS[@]}"
 
 HEAD="${1:?head branch required}"
 BASE="${2:?base branch required}"
@@ -42,8 +59,14 @@ REVIEWER="${5:-@copilot}"
 # - REVIEW_AGENT=claude-inline ⇒ the review runs in-session via /code-review during the /loop;
 #   there is NO bot to assign here, so skip the reviewer request (the loop owns the review).
 # - REVIEW_AGENT=github-copilot ⇒ request the bot here at creation, exactly as before (back-compat).
+# When --phase was passed, thread it through so the per-repo Review gate can downgrade THIS phase's
+# effective REVIEW_MODE to `none` (the same reviewer-skip path) when the phase is not gated.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-eval "$(bash "$SCRIPT_DIR/read-review-config.sh" || true)"
+if [ -n "$PHASE" ]; then
+  eval "$(bash "$SCRIPT_DIR/read-review-config.sh" --phase "$PHASE" || true)"
+else
+  eval "$(bash "$SCRIPT_DIR/read-review-config.sh" || true)"
+fi
 # Belt-and-suspenders: if the reader is missing/unreadable the eval sets nothing, and under
 # `set -u` the next REVIEW_MODE/REVIEW_AGENT read would abort the script AFTER the PR was already
 # created — breaking this file's "best-effort, NEVER fails PR creation" contract. Default both here
@@ -66,7 +89,11 @@ gh pr ready "$PR_URL" >/dev/null 2>&1 || echo "warn: gh pr ready failed (already
 # either `none` mode (no review gate) or `claude-inline` agent (the /loop runs /code-review
 # in-session instead of assigning a reviewer). Only github-copilot requests the bot here.
 if [ "$REVIEW_MODE" = "none" ]; then
-  echo "review-mode=none — not requesting $REVIEWER (no review gate)" >&2
+  if [ -n "$PHASE" ]; then
+    echo "review-gate: phase '$PHASE' not gated (effective review-mode=none) — not requesting $REVIEWER" >&2
+  else
+    echo "review-mode=none — not requesting $REVIEWER (no review gate)" >&2
+  fi
 elif [ "$REVIEW_AGENT" = "claude-inline" ]; then
   echo "review-agent=claude-inline — not requesting $REVIEWER (review runs in-session via /code-review during the loop)" >&2
 else

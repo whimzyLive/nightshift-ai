@@ -50,6 +50,7 @@ generated file — every slot must be replaced with an actual value.
 | ----- | ----- |
 | Review agent | `<review-agent>` |
 | Review mode | `<review-mode>` |
+| Review gate | `<review-gate>` |
 ```
 
 ---
@@ -86,3 +87,8 @@ generated file — every slot must be replaced with an actual value.
   > project-context files. `/init` writes `claude-inline` **explicitly**, so new
   > repos get the in-session reviewer; pre-existing repos without the token keep
   > the historical Copilot behaviour.
+- **Review gate** — OPTIONAL. A comma-separated subset of `spec,plan,impl` listing
+  which phases trigger the configured review (e.g. `Review gate | spec, impl`). A
+  phase not listed has its review skipped (effective review-mode `none` for that
+  phase). **OMIT the row entirely when not gating** — an omitted/empty gate means
+  all phases review, the default and back-compatible behaviour.

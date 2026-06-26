@@ -231,7 +231,7 @@ dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
 # write "$dir/pr-body.md" with your file-write tool, e.g.:
 #   Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed.
 PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
-  "feat/<STORY-KEY>" "<BASE-BRANCH>" "feat(<STORY-KEY>): <story summary>" "$dir/pr-body.md")
+  "feat/<STORY-KEY>" "<BASE-BRANCH>" "feat(<STORY-KEY>): <story summary>" "$dir/pr-body.md" --phase impl)
 ```
 
 `raise-pr.sh` prints only the PR URL on stdout; a `warn:` on stderr means `@copilot` did not attach
