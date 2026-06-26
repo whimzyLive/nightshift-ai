@@ -74,8 +74,12 @@ generated file — every slot must be replaced with an actual value.
   repo with no external setup: the `/loop` runs `/code-review` in-session, so the
   review-fix cycle never silently no-ops on a repo that has not enabled GitHub Copilot
   code review. `github-copilot` is chosen only when the repo has Copilot code review
-  enabled and prefers the bot to drive the loop. `Review agent` accepts
-  `claude-inline` / `github-copilot`; `Review mode` accepts `none` / `on-create` / `on-update`.
+  enabled and prefers the bot to drive the loop. `claude-superpowers` is a second
+  in-session option: the `/loop` runs the superpowers `requesting-code-review` skill
+  (a focused reviewer subagent) instead of native `/code-review`, cutting per-review
+  token cost while keeping the same review → fix → re-review cycle. `Review agent`
+  accepts `claude-inline` / `github-copilot` / `claude-superpowers`; `Review mode`
+  accepts `none` / `on-create` / `on-update`.
   > Note this `/init`-written default is distinct from the runtime FALLBACK: when
   > the `Review agent` token is **absent or unrecognised**, the loop falls back to
   > `github-copilot` (with a warning) for back-compatibility with older
