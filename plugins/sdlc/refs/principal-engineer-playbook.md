@@ -27,15 +27,38 @@ verdict.
   On `true` the plan doc is **optional** and tasks are derived **inline from the Jira story** (Step 1
   skips the plan-file STOP; Step 2 derives from the story). On `false` (full path) the merged plan
   doc is required, exactly as before.
+- `WORK_KIND` — `defect` | `feature`, handed in by the caller (`/auto`/`/impl` apply `refs/triage.md`
+  inline first, so `WORK_KIND` is already resolved); default `feature` when absent. `WORK_KIND=defect`
+  activates the **systematic-debugging defect variant** of the phase ladder (Step 4) and selects the
+  `fix/` branch prefix. `LIGHTWEIGHT` and `WORK_KIND` are **orthogonal**: `LIGHTWEIGHT` controls only
+  plan-doc-optional behaviour; `WORK_KIND` controls debugging activation + branch prefix. A lightweight
+  **feature** (`LIGHTWEIGHT=true`, `WORK_KIND=feature`) keeps the normal feature ladder — it is never
+  misrouted into debugging.
 - Plan path derived deterministically: `docs/superpowers/plans/<STORY-KEY>.md`
 
 ## Project constants
 
 All project constants — base branch, quality gate, package manager, infra stage flag, active
 agents — live in `.claude/project/project-context.md`. Read it first. This playbook references
-them as tokens (`<BASE-BRANCH>`, `feat/<STORY-KEY>`) and never hardcodes values.
+them as tokens (`<BASE-BRANCH>`, `<BRANCH_PREFIX>/<STORY-KEY>`) and never hardcodes values.
 
 Skip phases for agents marked **Standby** in project-context.
+
+### Branch-prefix convention (derived from `WORK_KIND`)
+
+The implementation branch prefix is a **convention computed from `WORK_KIND`**, never a per-repo
+config token:
+
+```
+BRANCH_PREFIX = (WORK_KIND == defect) ? "fix" : "feat"
+```
+
+→ a defect implements on `fix/<STORY-KEY>`; a feature on `<BRANCH_PREFIX>/<STORY-KEY>`. Correspondingly the
+conventional-commit type and PR title use `fix` on the defect path, `feat` on the feature path
+(Steps 4, 7). Throughout this playbook `<BRANCH_PREFIX>/<STORY-KEY>` denotes the story branch —
+resolve it from the `WORK_KIND` in hand (no Jira fetch, no config token). Every story-branch
+reference below (pre-flight PR-exists check, branch create/push, domain-agent prompt contract,
+push/verify, PR `--head`, final report) uses this derived prefix.
 
 ---
 
@@ -53,6 +76,13 @@ Invoke, in order, before dispatching anything:
 (The review/quality skills — `requesting-code-review`, `receiving-code-review`,
 `verification-before-completion` — are owned and invoked by the QA Engineer at Step 6, not here.)
 
+**On the defect path (`WORK_KIND=defect`) — also confirm `systematic-debugging` is invocable.**
+`systematic-debugging` is a **global superpowers skill**, intentionally **not** listed in the
+plugin's `skills-manifest.md` / `skills-map.yml` — that absence is **by design** (the skill is not
+stack-gated), NOT a signal it is missing. Before phase 1 of the defect variant (Step 4), confirm the
+skill loads. If it is genuinely uninvocable → **STOP and report** (`blocked`); never silently skip
+the debugging phases. On the feature path this skill is not used.
+
 ## Step 1 — Pre-flight checks
 
 ```bash
@@ -69,13 +99,14 @@ git fetch origin develop
 BASE_SHA=$(git rev-parse origin/develop)
 
 # 3. No implementation PR already open
-gh pr list --search "feat/<STORY-KEY>" --json number,title,headRefName,state
+gh pr list --search "<BRANCH_PREFIX>/<STORY-KEY>" --json number,title,headRefName,state
 
-# 4. Dependency gate — every story that BLOCKS this one must already have a feat/* PR.
+# 4. Dependency gate — every story that BLOCKS this one must already have a feat/* OR fix/* PR.
 #    Deterministic, single statically-analyzable call (allowlisted Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)).
 #    The script resolves the parent epic, derives blockers by sibling-inversion
 #    (a sibling S blocks <STORY-KEY> iff S's links have outwardIssueKey == <STORY-KEY>),
-#    and verifies each blocker has a feat/<blocker> PR. acli is the only source of truth —
+#    and verifies each blocker has a feat/<blocker> OR fix/<blocker> PR (dual-prefix: a blocker that
+#    shipped as a defect on fix/<blocker> counts). acli is the only source of truth —
 #    any acli query error => GATE=STOP. See ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh.
 #    NOTE: resolving the epic REQUIRES `acli workitem view KEY --fields parent` — the default
 #    `view --json` strips `parent` and returns empty (this was a real gate-failure bug).
@@ -84,12 +115,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
 
 - Plan missing on the **full** path (`LIGHTWEIGHT` unset/false) → **STOP**, tell user to merge the plan PR. On the **lightweight** path a missing plan doc is expected — **do not STOP**; proceed (Step 2 derives tasks from the story).
 - Implementation PR already merged → **STOP**, report it's already done.
-- An open `feat/<STORY-KEY>` PR/branch already exists → reuse it (check it out); do not create a duplicate.
-- **Any blocker has no `feat/<blocker>` PR (open or merged) → STOP the entire flow and REJECT.** Do not create a branch, do not dispatch any domain agent. Report to the user:
+- An open `<BRANCH_PREFIX>/<STORY-KEY>` PR/branch already exists → reuse it (check it out); do not create a duplicate.
+- **Any blocker has no `feat/<blocker>` or `fix/<blocker>` PR (open or merged) → STOP the entire flow and REJECT.** Do not create a branch, do not dispatch any domain agent. Report to the user:
   ```
   BLOCKED — <STORY-KEY> cannot be implemented yet.
-  Missing upstream work: <blocker-key(s) with no feat/* PR>.
-  These dependencies must reach at least an open feat/* PR before <STORY-KEY> starts.
+  Missing upstream work: <blocker-key(s) with no feat/* or fix/* PR>.
+  These dependencies must reach at least an open feat/* or fix/* PR before <STORY-KEY> starts.
   Next step: implement <blocker-key> first (or remove the Jira "Blocks" link if stale).
   ```
   This gate enforces the Jira dependency graph (kept in the Epic PRD's "Story Dependency Graph" section) — never implement a story ahead of the work it depends on.
@@ -144,15 +175,63 @@ Branch on the count:
 Branch creation (Step 3) stays **once per story** regardless of `subtaskCount` — sub-tasks are
 **never** given their own branches.
 
+## Defect variant — `WORK_KIND=defect` drives the ladder via `systematic-debugging`
+
+**Activation keys off `WORK_KIND=defect`, NOT `TRIAGE=lightweight`.** A lightweight *feature*
+(`LIGHTWEIGHT=true`, `WORK_KIND=feature`) keeps the **normal feature ladder** below and is never
+misrouted into debugging. When `WORK_KIND=defect`, the `systematic-debugging` skill becomes the
+**impl driver** for the work Steps 2 and 4 do on the feature path — the rest of the ladder is
+unchanged:
+
+| Playbook step | Feature path (default) | Defect path (`WORK_KIND=defect`) |
+| ------------- | ---------------------- | -------------------------------- |
+| Step 2 (derive tasks) | derive agent-tagged task list from plan/story | **replaced** by systematic-debugging **phase 1 (reproduce)** + **phase 2 (root-cause/isolate)** — these *discover* the work; there is no plan doc and no pre-derived task list |
+| Step 3 (branch) | `feat/<STORY-KEY>` | `fix/<STORY-KEY>` (`BRANCH_PREFIX`) — same structure, defect prefix |
+| Step 4 (domain dispatch) | dispatch agents to write feature code | **replaced** by systematic-debugging **phase 3 (failing regression test)** + **phase 4 (fix + verify)**, where phase-3/4 *code-writing* is performed by **dispatching the same Active domain agents** (the skill orchestrates; the owning domain agent writes the test and the fix) |
+| Step 5 (push/verify) | per-phase push + silent-failure STOP | **unchanged** — applied after each debugging-phase domain-agent commit |
+| Step 6 (QA loop) | QA Engineer playbook inline | **unchanged in structure**; QA Step-7 verification is re-pointed to the defect regression-evidence contract (see `qa-engineer-playbook.md`) |
+| Step 7 (PR) | `feat/<STORY-KEY>` PR, `feat` type | `fix/<STORY-KEY>` PR, `fix` type |
+
+So debugging replaces the **"decide what to do + write the code" middle of the ladder (Steps 2+4)**;
+branch (3), push/verify (5), QA (6), and PR (7) remain. Phase 4's fix is **not** the skill writing
+code directly — it dispatches the owning domain agent exactly as Step 4 would, preserving the
+multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contract.
+
+### The 4 phases mapped onto dispatch + verify
+
+1. **Phase 1 — reproduce.** YOU (the top-level Principal Engineer session) reproduce the bug:
+   establish the failing condition from the Jira Bug's **Steps to Reproduce / Actual Result**. No
+   domain agent yet. **If reproduction is impossible → STOP / `blocked`** — do not guess a fix.
+2. **Phase 2 — root-cause / isolate.** Identify the owning file(s)/domain. This determines which
+   Active domain agent owns phases 3–4 for each affected slice.
+3. **Phase 3 — add a failing regression test.** Dispatch the owning domain agent (`isolation:
+   "worktree"`, **commit not push**) to add a test that **FAILS** against current `develop` behaviour
+   and pins the bug.
+4. **Phase 4 — fix + verify.** Dispatch the owning domain agent to implement the fix so the phase-3
+   test now **PASSES**, then run the project quality gate (`typecheck` + `test`). Multiple affected
+   domains run **sequentially in the normal dependency order** (database-administrator →
+   platform-engineer → sync-engineer → web-engineer → mobile-engineer), one agent at a time, each on
+   the single `fix/<STORY-KEY>` branch.
+
+Per-phase **Step-5 push/verify** runs after each domain-agent commit, exactly as on the feature path.
+The phase-3 commit (test added, fix not yet applied) and HEAD (fix applied) are the QA Step-7
+before/after evidence points (see `qa-engineer-playbook.md` §defect verification). Confirm the
+`systematic-debugging` skill is invocable (Step 0) before phase 1.
+
+> On the defect path **skip Step 2's task-derivation** (debugging phases 1–2 discover the work
+> instead) and **replace Step 4's feature dispatch** with the phase-3/4 dispatch above. Steps 0, 1,
+> 2.5, 3, 5, 6, 7, 8 run as written (Step 1's plan-file STOP is already relaxed by `LIGHTWEIGHT=true`,
+> which the defect path always carries since a Bug triages lightweight).
+
 ## Step 3 — Create the implementation branch (YOU do this)
 
 ```bash
-git checkout -b feat/<STORY-KEY> origin/develop 2>/dev/null \
-  || git checkout feat/<STORY-KEY>
-git push -u origin feat/<STORY-KEY>
+git checkout -b <BRANCH_PREFIX>/<STORY-KEY> origin/develop 2>/dev/null \
+  || git checkout <BRANCH_PREFIX>/<STORY-KEY>
+git push -u origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
-One branch per story — even when `subtaskCount > 0`, you create `feat/<STORY-KEY>` exactly once
+One branch per story — even when `subtaskCount > 0`, you create `<BRANCH_PREFIX>/<STORY-KEY>` exactly once
 here; the sub-task loop in Step 4 is commit-only (no per-sub-task `git checkout -b`). Domain agents
 never create branches or PRs. PR is opened only in Step 7, after QA returns `clean`.
 
@@ -179,15 +258,16 @@ with no work in this phase produces no commit here; see the third bullet):
 
 - Iterate `SUBTASKS` top-to-bottom (`ORDER BY created ASC`); **do not re-sort**.
 - For each sub-task **whose work touches the current phase's domain**, make **≥1 commit** on the
-  single `feat/<STORY-KEY>` branch, with a conventional-commit message that **embeds the sub-task
-  key**, e.g. `feat(<scope>): [<SUBTASK-KEY>] <sub-task summary>` (scope from the changed directory
+  single `<BRANCH_PREFIX>/<STORY-KEY>` branch, with a conventional-commit message that **embeds the sub-task
+  key**, e.g. `<type>(<scope>): [<SUBTASK-KEY>] <sub-task summary>` where `<type>` is **`fix` on the
+  defect path (`WORK_KIND=defect`), `feat` on the feature path** (scope from the changed directory
   per the `conventional-commit` skill). Across the whole run every sub-task lands **≥1 commit** —
   in whichever phase(s) own its files — but within any single phase only the sub-tasks that phase
   touches get a commit.
 - A sub-task whose work does not touch the current phase's domain contributes **no commit in that
   phase** — it lands its commits in whichever phase(s) own its files. Sequencing is within the
   ladder; it never breaks it.
-- **No branch per sub-task** — every commit lands on the one `feat/<STORY-KEY>` branch (Step 3).
+- **No branch per sub-task** — every commit lands on the one `<BRANCH_PREFIX>/<STORY-KEY>` branch (Step 3).
 - **Sequential only** — one sub-task at a time; no parallel sub-task work.
 - **No Jira status transitions** on sub-tasks — `/impl` does not move sub-task status.
 
@@ -211,16 +291,18 @@ Agent({
 2. The full phase section from the plan, verbatim.
 3. Relevant spec/plan context — entity names, field types, route paths, class/interface names,
    secret keys, SSM helper names — plus any plan "grounding corrections" verbatim.
-4. "Branch `feat/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new
+4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new
    branch. Check it out, do your work, and commit."
 5. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
 6. "Commit your changes (use the `conventional-commit` skill; scope from the directory
-   name). Do NOT push — the orchestrator handles pushes."
+   name; **commit type `fix` on the defect path (`WORK_KIND=defect`), `feat` otherwise** — the
+   orchestrator tells you which). Do NOT push — the orchestrator handles pushes."
    - **When the story has sub-tasks** (`subtaskCount > 0`): you are given the ordered `SUBTASKS`
      list. Implement your phase's slice **one sub-task at a time, in that order**, and make **a
      separate commit per sub-task** whose message embeds the sub-task key —
-     `feat(<scope>): [<SUBTASK-KEY>] <sub-task summary>`. All commits go on the already-checked-out
-     `feat/<STORY-KEY>` branch (no new branch, no push). A sub-task with no work in your domain
+     `<type>(<scope>): [<SUBTASK-KEY>] <sub-task summary>` (`<type>` = `fix` for a defect / `feat` for
+     a feature — the orchestrator tells you which). All commits go on the already-checked-out
+     `<BRANCH_PREFIX>/<STORY-KEY>` branch (no new branch, no push). A sub-task with no work in your domain
      gets no commit in your phase — it is implemented in whichever phase owns its files, not
      dropped. When `subtaskCount === 0`, commit once for the phase as normal.
 7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
@@ -233,9 +315,9 @@ Never send just a task title.
 ## Step 5 — Phase completion verification (after EACH phase)
 
 ```bash
-git log feat/<STORY-KEY> --oneline -5      # local HEAD must have advanced
-git push origin feat/<STORY-KEY>           # YOU push
-git fetch origin feat/<STORY-KEY>
+git log <BRANCH_PREFIX>/<STORY-KEY> --oneline -5      # local HEAD must have advanced
+git push origin <BRANCH_PREFIX>/<STORY-KEY>           # YOU push
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
 - No new commits since pre-dispatch HEAD → agent failed silently. **STOP**, report. (With
@@ -263,8 +345,11 @@ must dispatch the `agent-skills:code-reviewer` subagent and domain fix agents, w
 
 - `<STORY-KEY>`
 - `BASE_SHA` (captured in Step 1, before branching — the review-range start)
-- The pushed `feat/<STORY-KEY>` branch
+- The pushed `<BRANCH_PREFIX>/<STORY-KEY>` branch
 - The Jira story summary + acceptance criteria (fetched by the caller)
+- `WORK_KIND` (`defect` | `feature`) — re-points QA's Step-7 verification: on `defect`, QA requires
+  the systematic-debugging regression-evidence contract (failing-before/passing-after test) instead
+  of the plan-task checklist (see `qa-engineer-playbook.md`).
 
 The QA playbook runs: request review → triage → fix loop (dispatching domain agents) →
 re-review until clean → write learnings to memory → quality gate (the quality-gate commands from `.claude/project/project-context.md`)
@@ -286,11 +371,13 @@ Status: clean | blocked
 
 Only after Step 6 returns `Status: clean`:
 
-The PR **title always keeps the parent `<STORY-KEY>`** (never a sub-task key). When
-`subtaskCount > 0`, the PR **body lists every sub-task key** from `SUBTASKS` (the parent PR
-enumerates the sequenced work); when `subtaskCount === 0`, the body has no sub-tasks section
-(unchanged from today). Write the body to a file first when it includes the sub-task list, then
-pass it by reference (`--body-file`):
+The PR **title always keeps the parent `<STORY-KEY>`** (never a sub-task key), and the PR opens from
+the `<BRANCH_PREFIX>/<STORY-KEY>` head (`fix/` on a defect, `feat/` on a feature). Where the repo's
+PR-title convention embeds a conventional-commit type, use `fix` on the defect path / `feat`
+otherwise (matching the commit type from Step 4). When `subtaskCount > 0`, the PR **body lists every
+sub-task key** from `SUBTASKS` (the parent PR enumerates the sequenced work); when
+`subtaskCount === 0`, the body has no sub-tasks section (unchanged from today). Write the body to a
+file first when it includes the sub-task list, then pass it by reference (`--body-file`):
 
 ```bash
 # subtaskCount === 0 — inline short body (today's behaviour):
@@ -298,7 +385,7 @@ PR_URL=$(gh pr create \
   --title "[<STORY-KEY>] <story summary>" \
   --body "Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed." \
   --base develop \
-  --head feat/<STORY-KEY>)
+  --head <BRANCH_PREFIX>/<STORY-KEY>)
 
 # subtaskCount > 0 — write the enumerated body to the session temp dir, then pass by reference.
 # Use the session-scoped temp dir (tmp-dir.sh) so session-complete.sh cleans it up — never a bare
@@ -311,7 +398,7 @@ PR_URL=$(gh pr create \
 #     - <SUBTASK-KEY> — <summary>
 #     - <SUBTASK-KEY> — <summary>
 #   PR_URL=$(gh pr create --title "[<STORY-KEY>] <story summary>" \
-#     --body-file "$dir/pr-body.md" --base develop --head feat/<STORY-KEY>)
+#     --body-file "$dir/pr-body.md" --base develop --head <BRANCH_PREFIX>/<STORY-KEY>)
 gh pr ready "$PR_URL"
 # Extra review layer (independent of the QA Engineer's Claude review loop in Step 6): request a
 # Copilot code review on the new PR. Best-effort — NEVER let it fail PR creation. Needs gh >= 2.88.0 + Copilot code review
@@ -326,7 +413,7 @@ Capture `PR_URL` (full `https://github.com/...`) for the caller (`/impl` posts i
 Carry the QA verdict fields (Step 6) into the report — do not re-derive them.
 
 ```
-## Feature: <name>  (Branch: feat/<STORY-KEY>)
+## Feature: <name>  (Branch: <BRANCH_PREFIX>/<STORY-KEY>)
 ### Phases: <agents that ran + one-line summaries>
 ### QA: rounds <N>; fixed <Critical/Important list>; minor noted <list>; ACs <met — all N evidenced>
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
@@ -336,7 +423,7 @@ Carry the QA verdict fields (Step 6) into the report — do not re-derive them.
 
 ## Constraints
 
-- Never start a story whose Jira blockers lack a `feat/*` PR — the Step 1 dependency gate STOPs and rejects (no branch, no agents).
+- Never start a story whose Jira blockers lack a `feat/*` or `fix/*` PR — the Step 1 dependency gate STOPs and rejects (no branch, no agents).
 - Never skip the dependency order; never run two domain agents at once.
 - YOU create the branch and push; domain agents only commit.
 - The code-quality loop (review/fix/learn/gate/AC-verify) is owned by the QA Engineer (Step 6) — run it inline, do not duplicate it here.

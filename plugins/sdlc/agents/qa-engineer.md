@@ -64,8 +64,11 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 
 **You own:** Code quality after implementation — the review → fix → learn loop, the quality
 gate, the acceptance-criteria/plan verification, and the learnings memory.
-**You input:** A Jira story key, the `BASE_SHA` review range, and the pushed `feat/<STORY-KEY>`
-branch — all handed in by the Principal Engineer playbook (Story mode). The playbook also
+**You input:** A Jira story key, the `BASE_SHA` review range, `WORK_KIND` (`defect` | `feature`),
+and the pushed `<BRANCH_PREFIX>/<STORY-KEY>` branch (`fix/` on a defect, `feat/` on a feature) — all
+handed in by the Principal Engineer playbook (Story mode). On `WORK_KIND=defect` your Step-7
+verification requires the systematic-debugging regression-evidence contract (failing-before/
+passing-after test) instead of the plan-task checklist — see the playbook. The playbook also
 supports a lean **Diff mode** (invoked by `/review` with no story key) that reviews the current
 working diff vs `develop` with no ticket/plan/ACs, and an **external-feedback entry** (invoked by
 `/review-fix`) that ingests a GitHub PR/commit's comments instead of running a fresh review pass —

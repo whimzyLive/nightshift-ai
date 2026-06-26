@@ -57,6 +57,13 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 - Active agents list — skip phases for agents listed as Standby
 - Quality gate commands
 
+> **Branch prefix is derived from `WORK_KIND`.** The caller hands in `WORK_KIND` (`defect` | `feature`,
+> default `feature`). `BRANCH_PREFIX = (WORK_KIND == defect) ? "fix" : "feat"` — a defect implements on
+> `fix/<STORY-KEY>`, a feature on `feat/<STORY-KEY>`; the conventional-commit type and PR title use
+> `fix` / `feat` to match. `<BRANCH_PREFIX>/<STORY-KEY>` below denotes that branch. `WORK_KIND=defect`
+> also activates the systematic-debugging defect variant — the canonical description is in the
+> playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`).
+
 ## Role & Scope
 
 **You own:** Execution coordination — dispatching implementation agents in the correct dependency order, collecting results, and reporting status.
@@ -79,7 +86,7 @@ git fetch origin <BASE-BRANCH>
 git status --short
 
 # 3. Confirm no implementation branch already exists
-gh pr list --search "feat/<STORY-KEY>" --json number,title,headRefName 2>&1
+gh pr list --search "<BRANCH_PREFIX>/<STORY-KEY>" --json number,title,headRefName 2>&1
 ```
 
 If plan file is missing → STOP. Tell user to merge the plan PR first.
@@ -97,8 +104,8 @@ If implementation PR already exists → STOP. Tell user which phases are already
 ```bash
 git fetch origin <BASE-BRANCH>
 BASE_SHA=$(git rev-parse origin/<BASE-BRANCH>)   # capture before branching — needed for code review range
-git checkout -b feat/<STORY-KEY> origin/<BASE-BRANCH>
-git push -u origin feat/<STORY-KEY>
+git checkout -b <BRANCH_PREFIX>/<STORY-KEY> origin/<BASE-BRANCH>
+git push -u origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
 The PR is created AFTER all phases, review, and the quality gate are clean — not here.
@@ -141,7 +148,7 @@ Each agent prompt MUST include all of the following (agent starts cold — no co
 1. Story key: e.g. `ED-456`
 2. The specific tasks from the plan (verbatim — paste the full phase section)
 3. Relevant spec context (entity names, field types, API shapes, route paths)
-4. "Branch `feat/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new branch. Check out this branch, do your work, and commit."
+4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new branch. Check out this branch, do your work, and commit."
 5. "Do NOT create a PR — the Principal Engineer will open one after all phases and review are complete."
 6. "Commit your changes. Do NOT push — the Principal Engineer handles all pushes to origin."
 7. "Return in this exact format (3 lines max):\n  Status: complete|blocked\n  Note: <one line if blocked>"
@@ -150,9 +157,10 @@ Never send an agent just a task title — include enough context to work without
 
 **Sub-task-bearing stories.** When the story has child sub-tasks, the domain agent commits **once
 per sub-task that touches its phase** (sub-task key embedded in the message,
-`feat(<scope>): [<SUBTASK-KEY>] <summary>`) — a sub-task with no work in this phase produces no
+`<type>(<scope>): [<SUBTASK-KEY>] <summary>` where `<type>` is `fix` on the defect path / `feat`
+otherwise) — a sub-task with no work in this phase produces no
 commit here and lands in whichever phase owns its files (every sub-task gets ≥1 commit across the
-run). It implements them **in Jira fetch order, sequentially, on the single `feat/<STORY-KEY>`
+run). It implements them **in Jira fetch order, sequentially, on the single `<BRANCH_PREFIX>/<STORY-KEY>`
 branch** — never a branch per sub-task. The authoritative description of this sequencing lives in
 `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` (Step 2.5 detection + Step 4 commit
 sequencing); pass the ordered sub-task slice into the agent prompt per that playbook. Do not
@@ -165,14 +173,14 @@ After each phase, before dispatching the next, verify the agent committed and th
 
 ```bash
 # 1. Check that local branch HEAD advanced since before dispatch
-git log feat/<STORY-KEY> --oneline -5
+git log <BRANCH_PREFIX>/<STORY-KEY> --oneline -5
 
 # 2. Push to origin (YOU push — domain agents do not push)
-git push origin feat/<STORY-KEY>
+git push origin <BRANCH_PREFIX>/<STORY-KEY>
 
 # 3. Confirm remote is current
-git fetch origin feat/<STORY-KEY>
-git log origin/feat/<STORY-KEY>..feat/<STORY-KEY> --oneline
+git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+git log origin/<BRANCH_PREFIX>/<STORY-KEY>..<BRANCH_PREFIX>/<STORY-KEY> --oneline
 ```
 
 If no new commits since pre-dispatch HEAD → agent failed silently. STOP and report to user before continuing.
@@ -206,7 +214,7 @@ fix agents, so it runs at the top level — never as a subagent), passing:
 
 - `<STORY-KEY>`
 - `BASE_SHA` (captured before branch creation — the review-range start)
-- The pushed `feat/<STORY-KEY>` branch
+- The pushed `<BRANCH_PREFIX>/<STORY-KEY>` branch
 - The Jira story summary + acceptance criteria
 
 The QA Engineer runs: request review → triage → fix loop (dispatching domain agents) →
@@ -231,7 +239,8 @@ dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
 # write "$dir/pr-body.md" with your file-write tool, e.g.:
 #   Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed.
 PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
-  "feat/<STORY-KEY>" "<BASE-BRANCH>" "feat(<STORY-KEY>): <story summary>" "$dir/pr-body.md" --phase impl)
+  "<BRANCH_PREFIX>/<STORY-KEY>" "<BASE-BRANCH>" "<type>(<STORY-KEY>): <story summary>" "$dir/pr-body.md" --phase impl)
+# <type> = fix on the defect path (WORK_KIND=defect), feat otherwise — matches BRANCH_PREFIX.
 ```
 
 `raise-pr.sh` prints only the PR URL on stdout; a `warn:` on stderr means `@copilot` did not attach
@@ -242,7 +251,7 @@ PR is still created. Reviewer assignment is best-effort and never fails PR creat
 
 ```
 ## Feature: <name>
-### Branch: feat/<STORY-KEY>
+### Branch: <BRANCH_PREFIX>/<STORY-KEY>
 
 ### Phases completed
 - <list of phases that ran, with agent names and summaries>

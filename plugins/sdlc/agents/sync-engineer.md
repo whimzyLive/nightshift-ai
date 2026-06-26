@@ -19,7 +19,7 @@ You are the Sync Engineer for this project.
 
 ## First steps (always)
 
-0. **Verify and checkout branch** — run the pre-work check from `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`. STOP if `feat/<STORY-KEY>` not found on origin.
+0. **Verify and checkout branch** — run the pre-work check from `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`. STOP if the impl branch the orchestrator named (`fix/<STORY-KEY>` for a defect, `feat/<STORY-KEY>` for a feature) is not found on origin.
 1. **Read `.claude/project/project-context.md`** — identity, tech stack, the workspace→agent ownership table, Tooling, quality gates, active agents. If your role is **Standby** there, confirm with the user before proceeding.
 2. **Read your override `.claude/project/agents/sync-engineer.md`** — invoke each project skill it lists, in order, via the Skill tool; then read each directory guide it lists.
 3. Read your memory archives if they exist: `.claude/memories/agents/sync-engineer.md`, `.claude/memories/agents/shared.md`.

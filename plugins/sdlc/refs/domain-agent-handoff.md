@@ -4,19 +4,23 @@ Shared completion protocol for domain engineers dispatched by `principal-enginee
 
 ## Pre-work: verify and checkout branch — BEFORE reading or writing any file
 
+> **`<BRANCH_PREFIX>/<STORY-KEY>` is the impl branch the orchestrator named in your dispatch
+> prompt** — `fix/<STORY-KEY>` for a defect (`WORK_KIND=defect`), `feat/<STORY-KEY>` for a feature.
+> Use the exact branch name the orchestrator gave you; do **not** assume `feat/`.
+
 ```bash
 git fetch origin
-git checkout feat/<STORY-KEY> 2>/dev/null \
-  || { echo "STOP: feat/<STORY-KEY> not found on origin — is principal-engineer dispatching correctly?"; exit 1; }
-[ "$(git branch --show-current)" = "feat/<STORY-KEY>" ] \
-  || { echo "STOP: checkout failed — on $(git branch --show-current) instead of feat/<STORY-KEY>"; exit 1; }
+git checkout <BRANCH_PREFIX>/<STORY-KEY> 2>/dev/null \
+  || { echo "STOP: <BRANCH_PREFIX>/<STORY-KEY> not found on origin — is principal-engineer dispatching correctly?"; exit 1; }
+[ "$(git branch --show-current)" = "<BRANCH_PREFIX>/<STORY-KEY>" ] \
+  || { echo "STOP: checkout failed — on $(git branch --show-current) instead of <BRANCH_PREFIX>/<STORY-KEY>"; exit 1; }
 ```
 
-If either check fails → return immediately: `Status: blocked` / `Note: branch feat/<STORY-KEY> not found — principal-engineer must push it before dispatching`.
+If either check fails → return immediately: `Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching`.
 
 ## Branch and PR — do not create
 
-The Principal Engineer has already created branch `feat/<STORY-KEY>` on origin and will open the PR after all phases complete. Your responsibility is to add commits on this branch — nothing else.
+The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Your responsibility is to add commits on this branch — nothing else.
 
 ## Memory write (before committing)
 
@@ -49,7 +53,7 @@ Then invoke the `conventional-commit` skill to construct and execute the commit 
 
 Do not split memory updates into a separate commit — they belong with the work that produced them.
 
-**Do NOT push.** The Principal Engineer pushes `feat/<STORY-KEY>` to origin after verifying your commits landed locally. Your job ends at commit.
+**Do NOT push.** The Principal Engineer pushes `<BRANCH_PREFIX>/<STORY-KEY>` to origin after verifying your commits landed locally. Your job ends at commit.
 
 ## Return format
 
@@ -65,7 +69,7 @@ Large outputs are dropped at the dispatch boundary — keep it to the three line
 
 ## Things you never do
 
-- Never create a branch yourself. `feat/<STORY-KEY>` already exists.
+- Never create a branch yourself. `<BRANCH_PREFIX>/<STORY-KEY>` already exists.
 - Never open a PR. The Principal Engineer opens it after all phases pass.
 - Never run any agent or skill from outside your declared domain — escalate by returning `Status: blocked` with a one-line note instead.
 - Never update the package lockfile or modify dependency versions without explicit instruction.
