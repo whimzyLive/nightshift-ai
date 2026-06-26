@@ -413,7 +413,7 @@ Capture `PR_URL` (full `https://github.com/...`) for the caller (`/impl` posts i
 Carry the QA verdict fields (Step 6) into the report — do not re-derive them.
 
 ```
-## Feature: <name>  (Branch: <BRANCH_PREFIX>/<STORY-KEY>)
+## <Feature|Fix>: <name>  (Branch: <BRANCH_PREFIX>/<STORY-KEY>)   # "Fix" on the defect path, "Feature" otherwise
 ### Phases: <agents that ran + one-line summaries>
 ### QA: rounds <N>; fixed <Critical/Important list>; minor noted <list>; ACs <met — all N evidenced>
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
