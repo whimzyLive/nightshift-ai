@@ -20,14 +20,19 @@ ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null
 
 Route on `ITYPE`:
 
-- `story` (or any non-epic *implementable* type your project routes through `/auto` as a single
-  story) → **continue to Step 1 below — the single-story flow is UNCHANGED.**
+- `story` **or** `bug` (or any non-epic *implementable* type your project routes through `/auto` as a
+  single story) → **continue to Step 1 below — the single-story flow is UNCHANGED.** A `bug` is an
+  implementable single-story type: it flows the same single-story path as `story`, and the inline
+  triage step (Step 2) classifies it `WORK_KIND=defect` + forces `TRIAGE=lightweight` → Workflow B
+  (the systematic-debugging defect path). **Retain `ITYPE` for Steps 1–2** — it is threaded into the
+  inline triage step (so triage derives `WORK_KIND` with zero extra Jira I/O) and gates the Step-2
+  missing-points bypass.
 - `epic` → **go to the [Epic orchestration](#epic-orchestration--drive-every-child-story) section
   and do NOT run Steps 1+ for the epic key itself.** Each child story runs its own full `/auto`
   single-story flow in a child session.
 - `sub-task` / any other type / an empty/unreadable probe → **STOP** with `unsupported input type`.
-  Tell the user: "STORY_KEY is not a Story or Epic (issuetype=`<name>`) — `/auto` drives a single
-  story or a whole epic; unsupported input type." Spawn **no** session. Then run the direct
+  Tell the user: "STORY_KEY is not a Story, Bug, or Epic (issuetype=`<name>`) — `/auto` drives a single
+  story/bug or a whole epic; unsupported input type." Spawn **no** session. Then run the direct
   `session-complete.sh` release (see **Final action**) and exit.
 
 > Everything from **Step 1** onward is the **single-story** flow. It is entered only for a Story-type
@@ -47,16 +52,33 @@ STORY_POINTS=N|missing
 
 ## Step 2 — Route
 
-**First, short-circuit on missing points from Step 1.** If scrum-master returned
-`STORY_POINTS=missing`, **stop here** — do NOT run the triage step (it would only re-fetch Jira and
-return `full` + a warning, and a transient triage `acli` failure could then leave `/auto` unable
-to route despite Step 1 having already succeeded). Tell the user: "Story points not set on
-STORY_KEY — story has been triaged. Set story points in Jira, then re-run `/auto STORY_KEY`."
+**First, short-circuit on missing points from Step 1 — but BYPASS this for Bugs.** If `ITYPE == bug`
+(from Step 0), **skip the missing-points short-circuit entirely** and proceed to the inline triage
+step: a Bug needs no points to route (triage forces `WORK_KIND=defect` + `TRIAGE=lightweight`
+regardless of points). Otherwise — `ITYPE != bug` **and** scrum-master returned `STORY_POINTS=missing`
+— **stop here**: do NOT run the triage step (it would only re-fetch Jira and return `full` + a
+warning, and a transient triage `acli` failure could then leave `/auto` unable to route despite Step 1
+having already succeeded). Tell the user: "Story points not set on STORY_KEY — story has been triaged.
+Set story points in Jira, then re-run `/auto STORY_KEY`."
+
+> **Why this bypass keys off `ITYPE`, not `WORK_KIND` (load-bearing ordering).** `WORK_KIND` is
+> produced by `refs/triage.md`, which runs **after** this short-circuit — so `WORK_KIND` does **not
+> yet exist** here. Keying the bypass off `WORK_KIND` would be unimplementable; it keys off the issue
+> type already detected at Step 0 (`ITYPE == bug`). **Transient-failure note:** skipping the
+> short-circuit for Bugs means a Bug now always reaches the inline triage call, so a transient `acli`
+> failure there surfaces as the standard acli-failure STOP (no `WORK_KIND`/`TRIAGE` block) — a clean,
+> **re-runnable** STOP, not a silent misroute (a re-run routes the Bug correctly because `ITYPE == bug`
+> is known from Step 0). The short-circuit's real guarantee (never *silently* mis-route) is preserved;
+> only the "avoid the triage call entirely" optimisation is traded away for Bugs, by design.
 
 Otherwise, run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE** (in
-this same session) and route on its `TRIAGE` outcome — the single shared definition of the
+this same session), **threading the Step-0 `ITYPE` in as the optional `<ISSUE_TYPE>` input** (so
+triage derives `WORK_KIND` from it with zero extra Jira I/O — do not let triage re-fetch the issue
+type on the `/auto` path), and route on its `TRIAGE` outcome — the single shared definition of the
 lightweight/full decision (default threshold `<= 3` points ⇒ lightweight, inclusive; configurable
-per-repo). If the triage step STOPs **without** emitting the required `TRIAGE=`/`STORY_POINTS=`
+per-repo). The inline triage step now also emits `WORK_KIND=defect|feature` — capture it and thread
+it into the Workflow's impl phase (it drives the playbook's defect variant + branch prefix). If the
+triage step STOPs **without** emitting the required `WORK_KIND=`/`TRIAGE=`/`STORY_POINTS=`
 block (e.g. an `acli` auth/DNS failure), **STOP** and surface that error — do not guess a route.
 
 > **Do NOT invoke the `/triage` slash command here.** `/triage` is a top-level command whose final
@@ -301,10 +323,13 @@ deliberate fast-path for small (≤ threshold-points) stories — the spec/plan 
 
 Run the implementation exactly as `${CLAUDE_PLUGIN_ROOT}/commands/impl.md` specifies for `STORY_KEY`: execute
 the Principal Engineer playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`) **inline in this
-session** with **`LIGHTWEIGHT=true`** — dispatch the domain agents yourself with the `Agent` tool. On its
-lightweight path the playbook skips the plan-file STOP and **derives tasks inline from the Jira story**
-(Step 2), so no plan doc is needed. Do NOT dispatch a `principal-engineer` subagent (nesting is blocked).
-Capture the impl PR URL as `IMPL_PR_URL`.
+session** with **`LIGHTWEIGHT=true`** **and the `WORK_KIND` captured from Step 2's inline triage**
+(`defect` for a Bug, `feature` otherwise) — dispatch the domain agents yourself with the `Agent` tool. On
+its lightweight path the playbook skips the plan-file STOP and **derives tasks inline from the Jira story**
+(Step 2), so no plan doc is needed. **`WORK_KIND=defect` activates the playbook's systematic-debugging
+defect variant** (reproduce → root-cause → failing regression test → fix+verify) on a `fix/STORY_KEY`
+branch; `WORK_KIND=feature` keeps the normal feature ladder on `feat/STORY_KEY`. Do NOT dispatch a
+`principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`.
 
 Then resolve `MODE`, post the mode-aware Jira comment (B2 below) **before** the loop, and run the
 **Loop-after-raise** procedure (above) for the impl PR as the session **tail**

@@ -11,13 +11,15 @@ Triage the Jira story **`$ARGUMENTS`** and emit the shared routing contract so c
 1. Parse `$ARGUMENTS` → `STORY_KEY`.
 2. **Resolve the threshold.** Read `.claude/project/project-context.md` (already the mandated first read for every SDLC command) and resolve the lightweight threshold `T` per `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` "Threshold resolution" — per-repo `## Triage` override if present, else the built-in default `3`. A malformed override falls back to `3` and emits a `WARNING:` line.
 3. **Read the story points.** Apply the `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` "Reading story points" protocol for `STORY_KEY` (JQL-probe BOTH `Story point estimate` and `Story Points`; `missing` only when neither is populated). If the `acli` fetch fails (auth/DNS), **STOP** and surface the error — do NOT guess a route.
-4. **Decide.** Apply the `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` decision table to compute `TRIAGE` (`points <= T ⇒ lightweight`, `points > T ⇒ full`, `missing ⇒ full`).
-5. **Emit the contract block** exactly per the ref's output contract — the two required lines, preceded by an optional `WARNING:` line only on the missing-points or malformed-threshold paths:
+4. **Classify the work kind.** Apply the `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` "Work-kind derivation" — standalone, so triage fetches the issue type itself via the canonical one-liner — to compute `WORK_KIND` (`issuetype` is Bug ⇒ `defect`, else ⇒ `feature`; unreadable ⇒ `feature` fail-safe).
+5. **Decide.** Apply the `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` decision table to compute `TRIAGE`. The Bug row is highest priority: `WORK_KIND=defect` forces `TRIAGE=lightweight` regardless of points. Otherwise points-based (`points <= T ⇒ lightweight`, `points > T ⇒ full`, `missing ⇒ full`).
+6. **Emit the contract block** exactly per the ref's output contract — the three required lines, preceded by an optional `WARNING:` line only on the missing-points or malformed-threshold paths:
    ```
+   WORK_KIND=defect|feature
    TRIAGE=lightweight|full
    STORY_POINTS=N|missing
    ```
-   On the `acli`-failure STOP path (Step 3), emit **no** `TRIAGE=` block — surface the error instead, so callers never parse a guessed route.
+   `WORK_KIND=` is the new third line; parsers reading only `TRIAGE=`/`STORY_POINTS=` are unaffected. On the `acli`-failure STOP path (Step 3), emit **no** contract block — surface the error instead, so callers never parse a guessed route.
 
 ## Final action — release the session (required when run standalone)
 
