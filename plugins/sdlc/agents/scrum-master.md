@@ -185,6 +185,9 @@ Refine an unpolished story in-place OR create new stories from raw text.
 ### Mode 2A — Jira key provided
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<STORY-KEY>`. If this fails, STOP.
+1a. **Idempotency guard — exit early if already refined AND sized (no overwrite).** Resolve two facts from the fetched issue: (a) whether `AI-Ready` is present in `fields.labels`, and (b) whether story points are set — probe via the **"Reading story points"** section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (JQL-probe BOTH field names; an `acli` **error** is inconclusive → STOP, never treat as `missing`).
+   - **`AI-Ready` present AND points set** → the ticket is already refined and sized. **Make NO modifications** — do not rewrite the description, do not touch labels, do not stamp points. Skip steps 2–10 and return the **no-op** result (see step 11). This is what makes a repeated `/refine-issue` (and `/auto`, which delegates here on gaps) idempotent.
+   - **Otherwise** (`AI-Ready` absent, OR points `missing`) → proceed to step 2. The presence of `AI-Ready` (captured here as `alreadyRefined`) and the points state (`pointsPreset`) are **carried forward**: `alreadyRefined` gates the description rewrite (step 6), and `pointsPreset` gates point stamping (step 7a).
 2. If the story has a parent Epic, apply the same protocol with `<KEY>=<EPIC-KEY>`; check Epic comments for `PRD: docs/features/...`; read PRD ONLY if the exact path appears in a comment. Do NOT search for PRD files. Missing PRD comment is non-fatal in triage mode — proceed without it.
 3. **Detect sub-tasks** — apply the "Fetching sub-tasks" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`: JQL-probe `parent = <STORY-KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC` for `key,summary` (use the `subTaskIssueTypes()` function, not a literal `issuetype = Sub-task`, so renamed/instance-specific sub-task types are matched and the no-sub-task-type case stays a clean empty result). Let `subtaskCount` = number returned, in the explicit creation order.
    - An empty array is the **no-op path** (not an error): proceed exactly as today — no AC fold-in, no annotation. Only a non-empty `acli` error STOPs.
@@ -196,7 +199,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
      - Missing Out of Scope section
      - Missing Dependencies section
 5. **[invoke `user-story-splitting` if story is >8 pts]** (Story only — a Bug is not split by user-story patterns.)
-6. Rewrite (or confirm) the ticket using the EXACT structure for its `issuetype`:
+6. **Rewrite the description — gated on `alreadyRefined` (step 1a).** When `alreadyRefined` is **false** (`AI-Ready` was absent), run the full description rewrite below. When `alreadyRefined` is **true** (the ticket already carries `AI-Ready` but reached here because points were `missing`), **SKIP this rewrite and steps 7–8 entirely** — the description is already in refined form, so re-writing it would clobber an already-good ticket; jump straight to step 7a (stamp the missing points) then step 10 (label swap). Run the rewrite using the EXACT structure for its `issuetype`:
    - **`issuetype == Bug`** → the 7-section Agile Bug Template (`${CLAUDE_PLUGIN_ROOT}/refs/jira-bug-template.md`), rendered via the **Bug description template** in `jira-adf.md` (headings + ordered/bullet lists, **no** `taskList`). Synthesise any missing REQUIRED section from available input; render absent best-effort sections as "not provided". Set the Jira **summary** to the Summary/Title (e.g. `[<platform>] <symptom>`) via `--summary`. Do NOT impose the Mike-Cohn line or acceptance criteria on a bug.
    - **`issuetype == Story` (or other)** → the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line + **checkbox** Acceptance Criteria (binary, 3–6 items), never Gherkin. Ensure it is a vertical slice covering all required layers.
    - **When `subtaskCount > 0`:** fold each sub-task's scope into the parent's **Acceptance Criteria** — add one `taskItem` per sub-task to the single AC `taskList` (`localId` scheme `tl-1` / `ti-*`), derived from the sub-task summary, in Jira's returned order. There is **NO separate "Sub-tasks" section, heading, or second `taskList`** (per `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task ACs sit alongside the standard story ACs.
@@ -207,6 +210,13 @@ Refine an unpolished story in-place OR create new stories from raw text.
    trap 'rm -f "$refined"' EXIT
    acli jira workitem edit <STORY-KEY> --description-file "$refined"
    ```
+7a. **Stamp story points — ONLY when none pre-exist (`pointsPreset` is `missing` from step 1a).** Sizing is part of refinement, but a refine must never overwrite a points value a human (or a prior run) already set.
+   - **`pointsPreset` was a real value** → **do NOT stamp.** The pre-existing points survive untouched; only the description was updated. Skip to step 8.
+   - **`pointsPreset` was `missing`** → estimate a Fibonacci value from the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` (snap to one of {1, 2, 3, 5, 8}; split first per `user-story-splitting` if >8 — never stamp >8) and set it **by display name** (never a `customfield_*` id), probing both names per the "Reading story points" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and using whichever the project recognises:
+     ```bash
+     acli jira workitem edit --key "<STORY-KEY>" --custom-field "<Story Points field name>" --value <points> --yes
+     ```
+     If neither field name resolves, omit and surface a warning — never fail the refine over points. (A Bug needs no points to route; `pointsPreset=missing` on a Bug may be left unstamped — report it honestly rather than forcing an estimate.)
 8. **Annotate each sub-task (only when `subtaskCount > 0`).** For each sub-task, write a **minimal** ADF description (purpose sentence + `Part of <STORY-KEY>` reference; the shape is in `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task MUST NOT receive the full story template. Use the **session-scoped** temp dir, one file per sub-task. Do **NOT** register a per-iteration `trap '... EXIT'` inside the loop — an EXIT trap set in a loop overwrites the prior handler and fires only once at exit, so it would clean up just the last file; instead `rm -f "$file"` at the end of each iteration (or rely on the single session-dir teardown):
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
@@ -227,7 +237,9 @@ Refine an unpolished story in-place OR create new stories from raw text.
    - Labels are hyphenated single tokens — **never** `"AI Ready"` / `"AI Refine"`: Jira splits a label on any space into two separate labels.
    - The label swap is **parent-story-only** — sub-tasks never receive `AI-Ready` / `AI-Refine`.
    - Only swap when refining an EXISTING Jira ticket (this mode). Do NOT add these labels to brand-new stories created in Mode 2B.
-11. Return: updated story key + bullet summary of what changed (including sub-task count folded into ACs + annotated)
+11. Return:
+   - **No-op exit (step 1a guard fired)** → state the ticket was already refined and sized and that **no modifications** were made (description, labels, and points all untouched) — the idempotent re-run path.
+   - **Refined** → updated story key + bullet summary of what changed: whether the description was rewritten (vs skipped because `AI-Ready` already present), whether points were stamped (only when none pre-existed) or left intact, the sub-task count folded into ACs + annotated, and the `AI-Refine` → `AI-Ready` label swap.
 
 ### Mode 2B — Raw text blob
 
