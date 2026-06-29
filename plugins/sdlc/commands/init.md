@@ -182,6 +182,19 @@ selectable picker), with **exactly** the `header`, `question`, `multiSelect`, an
 `AskUserQuestion` always appends an "Other" escape, so options need not be exhaustive. The
 free-text fields MUST be asked as plain questions (no picker — open values have no finite set).
 
+> **Minimum-options invariant (applies to EVERY `AskUserQuestion` call — batched or one-at-a-time).**
+> `AskUserQuestion` requires **every** question in the call to carry **≥2 `options`**, and it rejects
+> the **entire call** — every question in it, including the static ones — if *any single* question has
+> fewer (`too_small: expected array to have >=2 items`). So one runtime field that computes to a single
+> option fails the whole prompt, even fields batched alongside it. **Therefore, before issuing any
+> `AskUserQuestion` call, compute each question's `options` and EXCLUDE any question that resolves to
+> fewer than 2 options** — ask those as a plain free-text question instead (pre-fill the single
+> candidate as the default when exactly one exists; skip the field entirely when none). Never place a
+> <2-option question into an `AskUserQuestion` array. This holds whether you ask one question per call
+> (the documented default below) **or** batch several into one call. The only fields whose option count
+> is computed at runtime are **Base branch** and **Suggested skills**; every other picker has a fixed
+> ≥2 static list and is always safe.
+
 **Picker fields (`AskUserQuestion`, one call each, in this order):**
 
 1. **Package manager** — `header: "Pkg mgr"`, `multiSelect: false`,
