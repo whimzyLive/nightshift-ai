@@ -191,6 +191,11 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
 2. **Base branch** — `header: "Base branch"`, `multiSelect: false`. Build `options` from the repo's
    actual branches — run `git branch --format='%(refname:short)'` and offer `main`/`master`/`develop`
    when present (put the repo's current default first); the user can pick "Other" to type another.
+   **Guard the option count:** `AskUserQuestion` requires **at least 2 options**, so a repo with a
+   single base-branch candidate (e.g. a fresh repo with only `main`) would crash the picker. When
+   **fewer than 2 candidates** are found, do **not** call `AskUserQuestion` — instead skip the picker:
+   use the single candidate directly as the base branch when exactly one exists, or ask as a plain
+   free-text question when none are found. Only call the picker when **2 or more** candidates exist.
 3. **Lightweight threshold** — `header: "LW threshold"`, `multiSelect: false`,
    `options: [3 (default), 2, 5, 1]` (labels are the point values; mark `3` recommended). The choice
    is the `Lightweight threshold` value.
