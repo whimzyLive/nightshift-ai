@@ -68,11 +68,12 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
      declares a `source` or `plugin`; scaffolded stubs and custom skills (no source) are user-owned and
      left untouched. Steps:
      1. Read `.claude/project/skills.json` for the installed skill list.
-     2. For each installed skill, look up its `refs/skills-map.yml` entry and **run Step 4f in refresh
-        mode** (see Step 4f): a `source` skill is cleanly replaced (remove `.claude/skills/<name>/`,
-        then re-download the latest upstream content); a `plugin` skill is updated via
-        `claude plugin marketplace add` then `claude plugin update <plugin>@<marketplace> --scope
-        project`; a sourceless skill is skipped.
+     2. Group the installed managed skills by their `refs/skills-map.yml` entry and **run Step 4f in
+        refresh mode** (see Step 4f): a `source` skill is cleanly replaced via stage-then-swap (download
+        the latest upstream into a temp dir, then swap it into `.claude/skills/<name>/` only on success
+        — never delete before a fetch that may fail), cloning each shared source repo once; a `plugin`
+        skill is updated via `claude plugin marketplace add` then `claude plugin update
+        <plugin>@<marketplace> --scope project`; a sourceless skill is skipped.
      3. Leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
         untouched. Print a summary of which skills were refreshed (and which were skipped as
         user-owned), then run the Final action release. Do **not** continue to Steps 1–5.
@@ -519,12 +520,20 @@ Rules:
 - **Refresh mode** (entered from Step 0's "Refresh skills"): the skip-if-exists guard is lifted **only
   for managed skills** — a skill whose `refs/skills-map.yml` entry declares a `source` or `plugin`. For
   those, re-fetch to pick up upstream changes:
-  - A `source` skill is **cleanly replaced**, not merged. `cp -R` alone would leave behind files that
-    upstream renamed or deleted, so first remove the destination, then re-download:
+  - A `source` skill is **cleanly replaced**, not merged — but **stage-then-swap**, never delete first.
+    `cp -R` alone leaves behind files upstream renamed/deleted, yet `rm -rf` *before* a re-fetch that
+    might fail (transient network, renamed `ref`/`path`, auth) would destroy a working skill. So fetch
+    into a temp staging dir and swap into place **only after the download succeeds**:
     ```bash
-    rm -rf ".claude/skills/<name>"           # drop stale/renamed files before re-fetch
-    # …then run the Direct-source download (above) to repopulate from latest upstream
+    stage="$(mktemp -d)"
+    # …run the Direct-source download (above) but copy into "$stage/<name>" instead of
+    #   .claude/skills/<name>; if any clone/checkout/copy step fails, abort and keep the old skill…
+    rm -rf ".claude/skills/<name>" && mkdir -p ".claude/skills" \
+      && mv "$stage/<name>" ".claude/skills/<name>"   # atomic-ish swap, only on success
+    rm -rf "$stage"
     ```
+    **De-duplicate by repo** (as on the install path): when several refreshed skills share one `source`
+    repo, clone it once and stage each skill's `path` from that single clone — do not re-clone per skill.
   - A `plugin` skill is refreshed with `claude plugin update`. As on the install path, **register the
     marketplace first** (it may be absent on a fresh checkout where only committed settings record the
     plugin), then update:

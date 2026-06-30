@@ -7,7 +7,7 @@ set -euo pipefail
 #   src/routes/<name>/route.ts   — createRoute() + OpenAPIHono().openapi(...)
 # Never overwrites an existing file.
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -ne 1 ] || [ -z "${1:-}" ]; then
   echo "usage: new-route.sh <name>   (e.g. new-route.sh orders)" >&2
   exit 1
 fi

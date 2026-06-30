@@ -12,10 +12,14 @@ fi
 
 migration_name="$1"
 
-# Millisecond timestamp where supported, else fall back to seconds (portable).
-timestamp="$(date +%s%3N 2>/dev/null || true)"
+# Millisecond timestamp, consistent magnitude on every platform so TypeORM orders
+# migrations correctly across a mixed (macOS/Linux) team. Prefer Node's Date.now()
+# (always present in a TypeORM project); fall back to seconds*1000 — still a 13-digit
+# millisecond-magnitude value, unlike a bare `date +%s` (10 digits) which would sort
+# before any ms value.
+timestamp="$(node -e 'process.stdout.write(String(Date.now()))' 2>/dev/null || true)"
 case "$timestamp" in
-  *N|'') timestamp="$(date +%s)" ;;
+  ''|*[!0-9]*) timestamp="$(date +%s)000" ;;
 esac
 
 target_dir="src/migrations"
@@ -32,12 +36,12 @@ cat > "$target_file" <<EOF
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class ${migration_name}${timestamp} implements MigrationInterface {
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    // TODO: implement forward migration
+  public async up(_queryRunner: QueryRunner): Promise<void> {
+    // TODO: implement forward migration (rename _queryRunner -> queryRunner when used)
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    // TODO: implement rollback
+  public async down(_queryRunner: QueryRunner): Promise<void> {
+    // TODO: implement rollback (rename _queryRunner -> queryRunner when used)
   }
 }
 EOF

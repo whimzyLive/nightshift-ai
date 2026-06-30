@@ -8,7 +8,7 @@ set -euo pipefail
 #   src/services/<noun>/service.ts           — class <Noun>Service implements I<Noun>Service (+ singleton)
 # Never overwrites an existing file.
 
-if [ "$#" -ne 1 ]; then
+if [ "$#" -ne 1 ] || [ -z "${1:-}" ]; then
   echo "usage: new-service.sh <noun>   (e.g. new-service.sh order)" >&2
   exit 1
 fi
