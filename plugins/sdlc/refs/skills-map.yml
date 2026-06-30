@@ -7,6 +7,26 @@
 #   when        — detection conditions that cause this skill to be suggested
 #                 (any matching condition adds the skill to the candidate list;
 #                  the skill appears at most once even if multiple conditions match)
+#
+# Install source — how /init Step 4f gets the skill content. Resolved in this
+# precedence order; declare the first that applies:
+#   source      — (preferred) the EXACT location of the skill content, so /init
+#                 downloads the real skill (not a stub). Either a git repository
+#                 ref (https or github:owner/repo) or a raw URL to a single
+#                 SKILL.md. /init fetches it into `.claude/skills/<name>/`.
+#   path        — (optional, with a git `source`) the skill's subdirectory inside
+#                 that repo (e.g. `skills/hono-api`). Only that directory is copied.
+#   ref         — (optional, with a git `source`) branch / tag / commit to fetch;
+#                 defaults to the repo's default branch.
+#   plugin      — (optional, alternative to `source`) a marketplace plugin that
+#                 bundles this skill, as `<plugin>@<marketplace>`. When set (and no
+#                 `source`), /init installs that plugin (`claude plugin install
+#                 <plugin>@<marketplace> --scope project`) — Claude Code has no
+#                 per-skill install, skills ship inside plugins.
+#   marketplace — (optional) the marketplace source to `claude plugin marketplace
+#                 add` before installing `plugin`. Required whenever `plugin` is set.
+# Declare none of the above for project-convention skills with no published
+# location; those are scaffolded as a local starter at `.claude/skills/<name>/SKILL.md`.
 
 skills:
   - name: hono-api

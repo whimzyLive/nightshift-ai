@@ -417,13 +417,96 @@ fi
 
 This is idempotent — running it on a repo that already has `.tmp/` in `.gitignore` is a no-op.
 
+**4f. Install each confirmed skill into project scope.** Steps 4c and 4d only *record* the confirmed
+skills (in the agent overrides and `skills.json`); neither makes a skill discoverable. A skill is only
+invocable when its content is actually installed on disk. Without this step, `/init` leaves the
+selected skills tracked but absent and unavailable to the domain agents (the reported defect). Resolve
+each skill in the confirmed install list (Step 3.5) by the **first** matching path below — `source`
+is preferred because it installs the skill's real content from an exact location:
+
+- **Direct source (preferred)** — the skill's `refs/skills-map.yml` entry declares a `source` (the
+  exact location of the skill content: a git repository ref, or a raw URL to a single `SKILL.md`),
+  optionally with `path` (subdirectory of the skill within that repo) and `ref` (branch/tag/SHA,
+  default the repo's default branch). Download that exact content into `.claude/skills/<name>/` so the
+  installed skill is the **real** skill, not a stub:
+
+  ```bash
+  # git source with an in-repo path — fetch only that skill's directory
+  tmp="$(mktemp -d)"
+  git clone --depth 1 ${ref:+--branch "$ref"} "<source>" "$tmp"
+  mkdir -p ".claude/skills/<name>"
+  cp -R "$tmp/<path>/." ".claude/skills/<name>/"
+  rm -rf "$tmp"
+  ```
+
+  If `source` is a raw URL to a single file, fetch it directly instead:
+
+  ```bash
+  mkdir -p ".claude/skills/<name>"
+  curl -fsSL "<source>" -o ".claude/skills/<name>/SKILL.md"
+  ```
+
+  The downloaded `SKILL.md`'s `name` must match the confirmed skill `name`. If a fetch fails (network,
+  bad ref, missing path), do **not** silently fall through to a stub — surface the failure for that
+  skill so the gap is visible, and continue with the remaining skills.
+
+- **Marketplace plugin** — the entry declares `plugin` (`<plugin>@<marketplace>`) + `marketplace`
+  instead of a `source`. **Claude Code has no per-skill install — skills ship inside plugins** — so
+  install the **providing plugin** at project scope (de-duplicate: install each distinct plugin once
+  even when several confirmed skills come from it):
+
+  ```bash
+  # idempotent: register the marketplace, then install the providing plugin at project scope
+  claude plugin marketplace add <marketplace-source>
+  claude plugin install <plugin>@<marketplace> --scope project
+  ```
+
+  Project scope records the plugin in `.claude/settings.json` `enabledPlugins` (committed), so every
+  teammate gets the skill on checkout. Do **not** write any file under `.claude/skills/` for these —
+  the plugin owns the skill content.
+
+- **No source declared** (custom skills, and any entry with neither `source` nor `plugin`) — scaffold
+  a local starter skill at `.claude/skills/<name>/SKILL.md`, substituting the skill's real `name` and
+  `description` (from `refs/skills-map.yml`, or the user's stated purpose for a custom skill):
+
+  ```markdown
+  ---
+  name: <name>
+  description: <description>
+  ---
+
+  # <name>
+
+  Project-scoped skill installed by `/init` for this repository's stack. It is discoverable
+  immediately via the Skill tool. Extend this body with the conventions, patterns, and examples this
+  project expects when the skill applies — the frontmatter `description` drives when agents reach for it.
+  ```
+
+Rules:
+
+- **Idempotent — skip-if-exists / already-installed.** If `.claude/skills/<name>/SKILL.md` already
+  exists, or the providing plugin is already installed, leave it **untouched** — never re-download,
+  re-install, or clobber a hand-authored skill. `git clone` into a fresh temp dir, `claude plugin
+  marketplace add` / `install`, and the stub write are all otherwise safe to re-run.
+- The `name` in an installed/downloaded/scaffolded `SKILL.md` frontmatter and the `name` in
+  `skills.json` / the agent override **must match exactly** (case-sensitive) — they are the same
+  identifier across the sync trio.
+- A scaffolded stub body is a starter, not a placeholder token: once `<name>`/`<description>` are
+  substituted, no `<...>` slot remains, so it satisfies the Step 4 no-placeholder rule. Teammates
+  fill in the body later (or replace the stub with a richer skill).
+- If the confirmed install list is empty (no suggestions accepted, no custom skills), this step is a
+  no-op — install nothing, write no files.
+
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 
 Creating or modifying Jira custom fields is **out of scope** — but the pipeline needs them, so tell
 the user exactly what to set up and how to verify. Print this checklist:
 
 > Files written: `.claude/project/project-context.md`, agent overrides for `<active agents>`,
-> `.claude/.sdlc-plugin-root`, and `.claude/project/skills.json`.
+> `.claude/.sdlc-plugin-root`, and `.claude/project/skills.json`. Confirmed skills are installed
+> (Step 4f): from their declared `source` into `.claude/skills/<name>/`, or via `claude plugin install
+> … --scope project` for plugin-backed ones, the rest as
+> `.claude/skills/<name>/SKILL.md` scaffolds.
 >
 > **Configure these Jira custom fields on project `<KEY>` (the plugin reads but never creates them):**
 >
@@ -437,11 +520,14 @@ the user exactly what to set up and how to verify. Print this checklist:
 > a new idea).
 >
 > **Next, to teach an agent your stack:** the scaffolded overrides
-> (`.claude/project/agents/<agent>.md`) already list any skills confirmed during `/init`. To add more,
-> write a skill at `.claude/skills/<name>/SKILL.md` (an ORM convention, an API-routing pattern, a
-> deploy recipe…), list its name in the relevant override, and add it to `.claude/project/skills.json`
-> manually — or re-run `/init` to go through the suggestion flow again (existing entries are
-> preserved). To **activate a standby role later** that you skipped here (e.g. `mobile-engineer`),
+> (`.claude/project/agents/<agent>.md`) already list any skills confirmed during `/init`. Skills with
+> a declared `source` were downloaded into `.claude/skills/<name>/`, plugin-backed ones were installed
+> as plugins, and project-convention skills got a starter `.claude/skills/<name>/SKILL.md` — fill in
+> those bodies with your project's conventions. To add a
+> skill not suggested, write `.claude/skills/<name>/SKILL.md` (an ORM convention, an API-routing
+> pattern, a deploy recipe…), list its name in the relevant override, and add it to
+> `.claude/project/skills.json` — or re-run `/init` to go through the suggestion flow again (existing
+> skill files, installed plugins, and manifest entries are preserved). To **activate a standby role later** that you skipped here (e.g. `mobile-engineer`),
 > add its row to the workspace→agent table and create its override. Full walkthrough: `EXTENDING.md`.
 
 ## Final action — release the session

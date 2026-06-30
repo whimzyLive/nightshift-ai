@@ -105,6 +105,21 @@ Each domain agent override (`.claude/project/agents/<agent>.md`) lists skills by
 manifest entries whose domain relevance matches the agent — platform-facing skills go into
 `platform-engineer.md`, frontend skills into `web-engineer.md`, and so on.
 
-The override file is the runtime source of truth (agents invoke skills by reading the override);
-`skills.json` is the sharing and deduplication source of truth (teammates read it to know what is
-installed). Both must stay in sync — `/init` writes them together.
+The override file is the runtime source of truth (agents invoke skills by reading the override) and
+`skills.json` is the sharing/deduplication source of truth (teammates read it to know what is
+installed). Recording a name in either is **not** an install — the skill must also be made
+discoverable to the Skill tool. `/init` Step 4f does that install via one of two paths, depending on
+whether the skill is published:
+
+- **Direct source** (its `refs/skills-map.yml` entry declares `source`, optionally `path`/`ref`) →
+  `/init` downloads the real skill content from that exact location into `.claude/skills/<name>/`.
+- **Marketplace plugin** (entry declares `plugin`/`marketplace`, no `source`) → `/init` installs the
+  providing plugin at project scope (`claude plugin install … --scope project`); the plugin owns the
+  skill content, so **no `.claude/skills/<name>/SKILL.md` is written**.
+- **No source declared** (custom / project-convention skills) → `/init` scaffolds
+  `.claude/skills/<name>/SKILL.md` locally (skip-if-exists, so re-running never clobbers a
+  hand-authored skill).
+
+A name listed in the override or `skills.json` with neither an installed providing plugin nor an
+on-disk `SKILL.md` is a tracked-but-uninstalled skill: invisible to agents. `/init` writes the
+records (Steps 4c/4d) and performs the matching install (Step 4f) together so they never drift.
