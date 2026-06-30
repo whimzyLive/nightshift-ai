@@ -17,10 +17,13 @@ migration_name="$(printf '%s' "$1" \
   | tr '_-' '  ' \
   | awk '{ out=""; for (i=1; i<=NF; i++) out = out toupper(substr($i,1,1)) substr($i,2); print out }')"
 
-if [ -z "$migration_name" ]; then
-  echo "Error: <MigrationName> must contain at least one alphanumeric character." >&2
-  exit 1
-fi
+case "$migration_name" in
+  [A-Za-z]*) : ;;
+  *)
+    echo "Error: <MigrationName> must start with a letter (got '$1')." >&2
+    exit 1
+    ;;
+esac
 
 # Millisecond timestamp, consistent magnitude on every platform so TypeORM orders
 # migrations correctly across a mixed (macOS/Linux) team. Prefer Node's Date.now()

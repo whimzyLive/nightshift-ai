@@ -18,10 +18,13 @@ dir="src/routes/${name}"
 # PascalCase the name for schema/type identifiers (orders -> Orders, user-profile -> UserProfile).
 pascal="$(printf '%s' "$name" | awk -F'[-_ ]' '{ out=""; for (i=1; i<=NF; i++) out = out toupper(substr($i,1,1)) substr($i,2); print out }')"
 
-if [ -z "$pascal" ]; then
-  echo "error: <name> must contain at least one alphanumeric character" >&2
-  exit 1
-fi
+case "$pascal" in
+  [A-Za-z]*) : ;;
+  *)
+    echo "error: <name> must start with a letter (got '$name')" >&2
+    exit 1
+    ;;
+esac
 
 # camelCase identifier for JS variable names (user-profile -> userProfile); the path keeps the raw name.
 camel="$(printf '%s' "$pascal" | awk '{ print tolower(substr($0,1,1)) substr($0,2) }')"

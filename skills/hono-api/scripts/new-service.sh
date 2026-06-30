@@ -19,10 +19,13 @@ dir="src/services/${noun}"
 # PascalCase the noun for type/class identifiers (order -> Order, payment-intent -> PaymentIntent).
 pascal="$(printf '%s' "$noun" | awk -F'[-_ ]' '{ out=""; for (i=1; i<=NF; i++) out = out toupper(substr($i,1,1)) substr($i,2); print out }')"
 
-if [ -z "$pascal" ]; then
-  echo "error: <noun> must contain at least one alphanumeric character" >&2
-  exit 1
-fi
+case "$pascal" in
+  [A-Za-z]*) : ;;
+  *)
+    echo "error: <noun> must start with a letter (got '$noun')" >&2
+    exit 1
+    ;;
+esac
 
 # camelCase singleton name (first char of PascalCase lowercased).
 camel="$(printf '%s' "$pascal" | awk '{ print tolower(substr($0,1,1)) substr($0,2) }')"
