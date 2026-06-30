@@ -36,6 +36,7 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
      options: [
        { label: "Keep existing",    description: "Stop now — no files will be changed." },
        { label: "Merge new findings", description: "Backfill any token the current template defines but the file is missing (prompting for new user-choice fields); keep everything already set." },
+       { label: "Refresh skills", description: "Re-fetch source- and plugin-backed skills to their latest upstream; config and hand-authored/stub skills are left untouched." },
        { label: "Re-run full setup", description: "Walk through all prompts again and rewrite config (existing values offered as defaults)." }
      ]
    )
@@ -62,6 +63,18 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         changed detections, as today).
      4. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
         (ensure .tmp/ is gitignored), and Step 5.
+   - **Refresh skills** → re-fetch the **managed** skills to their latest upstream, then **STOP** —
+     no prompts, no other config rewritten. A managed skill is one whose `refs/skills-map.yml` entry
+     declares a `source` or `plugin`; scaffolded stubs and custom skills (no source) are user-owned and
+     left untouched. Steps:
+     1. Read `.claude/project/skills.json` for the installed skill list.
+     2. For each installed skill, look up its `refs/skills-map.yml` entry and **run Step 4f in refresh
+        mode** (see Step 4f): a `source` skill is re-downloaded (its `.claude/skills/<name>/` directory
+        overwritten with the latest upstream content); a `plugin` skill is updated via
+        `claude plugin update <plugin>@<marketplace> --scope project`; a sourceless skill is skipped.
+     3. Leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
+        untouched. Print a summary of which skills were refreshed (and which were skipped as
+        user-owned), then run the Final action release. Do **not** continue to Steps 1–5.
    - **Re-run full setup** → continue to Step 1 with all existing values offered as pre-filled
      defaults in each prompt.
 
@@ -495,6 +508,14 @@ Rules:
   exists, or the providing plugin is already installed, leave it **untouched** — never re-download,
   re-install, or clobber a hand-authored skill. `git clone` into a fresh temp dir, `claude plugin
   marketplace add` / `install`, and the stub write are all otherwise safe to re-run.
+- **Refresh mode** (entered from Step 0's "Refresh skills"): the skip-if-exists guard is lifted **only
+  for managed skills** — a skill whose `refs/skills-map.yml` entry declares a `source` or `plugin`. For
+  those, re-fetch to pick up upstream changes: a `source` skill is re-downloaded and its
+  `.claude/skills/<name>/` directory **overwritten** with the latest content; a `plugin` skill is
+  refreshed with `claude plugin update <plugin>@<marketplace> --scope project`. A **sourceless** skill
+  (scaffolded stub / custom) is user-owned and is **always skipped** in refresh mode — never
+  overwritten. Because downloaded content is left byte-identical to upstream (no normalization), an
+  overwrite is a clean replacement, not a merge.
 - **The directory name `<name>` is the identifier across the sync trio** — it is what Claude Code
   resolves the skill by, and what `skills.json` / the agent override record. The `SKILL.md` frontmatter
   `name` is a cosmetic display label (it need not match), so downloaded content is left byte-identical
