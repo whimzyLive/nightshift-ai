@@ -44,14 +44,11 @@ var_name="$(printf '%s' "$kebab" | awk -F'-' '{
   print out
 }')"
 
-# The export const must be a valid identifier — reject a name that starts with a digit.
-case "$var_name" in
-  [A-Za-z]*) : ;;
-  *)
-    echo "Error: <EntityName> must start with a letter (got '$raw_name')." >&2
-    exit 1
-    ;;
-esac
+# The export const must be a valid identifier — a letter followed by letters/digits.
+if ! printf '%s' "$var_name" | grep -qE '^[A-Za-z][A-Za-z0-9]*$'; then
+  echo "Error: <EntityName> must resolve to a valid identifier — a letter followed by letters/digits (got '$raw_name')." >&2
+  exit 1
+fi
 
 # camelCase id attribute base (e.g. order-item -> orderItem).
 camel="$(printf '%s' "$var_name" | awk '{ print tolower(substr($0, 1, 1)) substr($0, 2) }')"

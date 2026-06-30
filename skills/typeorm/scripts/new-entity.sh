@@ -17,13 +17,10 @@ entity_name="$(printf '%s' "$1" \
   | tr '_-' '  ' \
   | awk '{ out=""; for (i=1; i<=NF; i++) out = out toupper(substr($i,1,1)) substr($i,2); print out }')"
 
-case "$entity_name" in
-  [A-Za-z]*) : ;;
-  *)
-    echo "Error: <EntityName> must start with a letter (got '$1')." >&2
-    exit 1
-    ;;
-esac
+if ! printf '%s' "$entity_name" | grep -qE '^[A-Za-z][A-Za-z0-9]*$'; then
+  echo "Error: <EntityName> must resolve to a valid identifier — a letter followed by letters/digits (got '$1')." >&2
+  exit 1
+fi
 
 target_dir="src/entities"
 target_file="${target_dir}/${entity_name}.ts"
