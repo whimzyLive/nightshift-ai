@@ -1,6 +1,6 @@
 ---
 name: typeorm
-description: Guidelines for developing with TypeORM, a full-featured ORM for TypeScript and JavaScript supporting multiple databases
+description: Use when defining TypeORM entities, writing migrations, or building repository/query-builder code in TypeScript. Covers entity and relation decorators, the Data Mapper pattern, migrations, the query builder, transactions, and multi-database configuration.
 ---
 
 # TypeORM Development Guidelines
