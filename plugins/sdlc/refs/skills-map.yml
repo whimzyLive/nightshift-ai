@@ -30,8 +30,10 @@
 
 skills:
   - name: hono-api
-    description: Hono route patterns, middleware, and Zod validation conventions
+    description: Schema-first Hono + @hono/zod-openapi architecture — composable routers, class-based service layer, webhook strategy pattern, typed validation
     domains: [platform-engineer]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/hono-api
     when:
       - framework: Hono
 
@@ -46,6 +48,9 @@ skills:
   - name: vercel-react-best-practices
     description: Next.js / React patterns optimised for Vercel deployment
     domains: [web-engineer]
+    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
+    source: https://github.com/vercel-labs/agent-skills.git
+    path: skills/react-best-practices
     when:
       - framework: Next.js
       - framework: Remix
@@ -54,6 +59,9 @@ skills:
   - name: vercel-composition-patterns
     description: Vercel monorepo workspace layout and composition patterns
     domains: [web-engineer]
+    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
+    source: https://github.com/vercel-labs/agent-skills.git
+    path: skills/composition-patterns
     when:
       - framework: Next.js
       # Also suggested when pnpm monorepo is detected (see monorepo_detection below).
@@ -63,6 +71,9 @@ skills:
   - name: react-components
     description: React component patterns, hooks, and composition conventions
     domains: [web-engineer]
+    # Third-party: Google Labs' Stitch skill — downloaded from upstream, not copied.
+    source: https://github.com/google-labs-code/stitch-skills.git
+    path: plugins/stitch-build/skills/react-components
     when:
       - framework: React
       # Vue has no dedicated built-in skill; react-components is the closest match.
@@ -70,13 +81,20 @@ skills:
       - framework: Vue
 
   - name: typeorm
-    description: ORM entity, migration, and query conventions
+    description: TypeORM entity, migration, query, and Data Mapper conventions for TypeScript
     domains: [platform-engineer, database-administrator]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/typeorm
     when:
-      # Prisma and Drizzle detected in package.json deps trigger this suggestion.
-      # Note: covers migration-layer conventions; confirm relevance with the user.
-      - dep: prisma
-      - dep: drizzle-orm
+      - dep: typeorm
+
+  - name: electrodb
+    description: ElectroDB DynamoDB ORM — entity schema, index/access-pattern modeling, CRUD and update expressions, single-table design
+    domains: [platform-engineer, database-administrator]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/electrodb
+    when:
+      - dep: electrodb
 
 # Frameworks with no built-in skill suggestion — user must add via "Other":
 #   Svelte       → no built-in suggestion
@@ -94,10 +112,10 @@ skills:
 # Each skill's `domains` list above is the authoritative source;
 # this summary lists the built-in skills per agent for quick reference.
 #
-# platform-engineer  : hono-api, api-routes, typeorm
+# platform-engineer  : hono-api, api-routes, typeorm, electrodb
 # web-engineer       : react-components, vercel-react-best-practices, vercel-composition-patterns
 # mobile-engineer    : (no built-in suggestions; add custom mobile skills via "Other")
-# database-administrator : typeorm
+# database-administrator : typeorm, electrodb
 # sync-engineer      : (no built-in suggestions; add custom sync skills via "Other")
 
 # Monorepo detection used for the vercel-composition-patterns / pnpm condition above.
