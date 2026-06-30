@@ -10,13 +10,24 @@ if [ "$#" -ne 1 ] || [ -z "${1:-}" ]; then
   exit 1
 fi
 
-entity_name="$1"
+# Normalize the argument to a valid PascalCase class identifier (order-item / user_profile
+# / "User Profile" -> OrderItem / UserProfile), so the generated TypeScript always compiles.
+entity_name="$(printf '%s' "$1" \
+  | sed -E 's/([a-z0-9])([A-Z])/\1 \2/g' \
+  | tr '_-' '  ' \
+  | awk '{ out=""; for (i=1; i<=NF; i++) out = out toupper(substr($i,1,1)) substr($i,2); print out }')"
+
+if [ -z "$entity_name" ]; then
+  echo "Error: <EntityName> must contain at least one alphanumeric character." >&2
+  exit 1
+fi
+
 target_dir="src/entities"
 target_file="${target_dir}/${entity_name}.ts"
 
 if [ -e "$target_file" ]; then
-  echo "Error: $target_file already exists; refusing to overwrite." >&2
-  exit 1
+  echo "Skipping: $target_file already exists (not overwriting)." >&2
+  exit 0
 fi
 
 mkdir -p "$target_dir"

@@ -443,9 +443,11 @@ is preferred because it installs the skill's real content from an exact location
   exact location of the skill content: a git repository ref, or a raw URL to a single `SKILL.md`),
   optionally with `path` (subdirectory of the skill within that repo) and `ref` (branch/tag/SHA,
   default the repo's default branch). Download that exact content into `.claude/skills/<name>/` so the
-  installed skill is the **real** skill, not a stub. **De-duplicate by repo:** when several confirmed
-  skills share one `source` URL, clone that repo **once** and copy each skill's `path` out of the
-  single clone — never clone the same repo per skill.
+  installed skill is the **real** skill, not a stub. **De-duplicate by `source` + `ref`:** when several
+  confirmed skills share one `source` URL **and** the same `ref`, clone that repo **once** and copy each
+  skill's `path` out of the single clone. Skills from the same repo pinned to **different** `ref`s need
+  a separate clone each (one clone can only be checked out at a single ref) — group by the (`source`,
+  `ref`) pair, not by `source` alone.
 
   ```bash
   # git source — partial + sparse clone of ONE repo (shared across skills from the same source):
@@ -522,18 +524,27 @@ Rules:
   those, re-fetch to pick up upstream changes:
   - A `source` skill is **cleanly replaced**, not merged — but **stage-then-swap**, never delete first.
     `cp -R` alone leaves behind files upstream renamed/deleted, yet `rm -rf` *before* a re-fetch that
-    might fail (transient network, renamed `ref`/`path`, auth) would destroy a working skill. So fetch
-    into a temp staging dir and swap into place **only after the download succeeds**:
+    might fail (transient network, renamed `ref`/`path`, auth) would destroy a working skill. Stage the
+    new content **on the same filesystem** as the destination (so the swap is a real rename, not a
+    cross-device copy that can fail mid-write), and swap **only after the staged dir is confirmed
+    populated**:
     ```bash
-    stage="$(mktemp -d)"
-    # …run the Direct-source download (above) but copy into "$stage/<name>" instead of
-    #   .claude/skills/<name>; if any clone/checkout/copy step fails, abort and keep the old skill…
-    rm -rf ".claude/skills/<name>" && mkdir -p ".claude/skills" \
-      && mv "$stage/<name>" ".claude/skills/<name>"   # atomic-ish swap, only on success
+    mkdir -p ".claude/skills"
+    stage="$(mktemp -d -p .claude/skills)"            # same filesystem as the destination
+    # …run the Direct-source download (above) but copy into "$stage/<name>".
+    # Guard the swap on a successfully populated staging dir — only then remove + rename:
+    if [ -e "$stage/<name>/SKILL.md" ]; then
+      rm -rf ".claude/skills/<name>"
+      mv "$stage/<name>" ".claude/skills/<name>"      # same-fs rename = atomic
+    else
+      echo "refresh: download failed for <name>; keeping existing install" >&2
+    fi
     rm -rf "$stage"
     ```
-    **De-duplicate by repo** (as on the install path): when several refreshed skills share one `source`
-    repo, clone it once and stage each skill's `path` from that single clone — do not re-clone per skill.
+    **De-duplicate by repo + ref** (as on the install path): when several refreshed skills share one
+    `source` repo *and* the same `ref`, clone it once and stage each skill's `path` from that single
+    clone. Skills from the same repo pinned to **different** `ref`s need separate clones (one per ref)
+    — a single clone can only be checked out at one ref.
   - A `plugin` skill is refreshed with `claude plugin update`. As on the install path, **register the
     marketplace first** (it may be absent on a fresh checkout where only committed settings record the
     plugin), then update:

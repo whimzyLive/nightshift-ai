@@ -10,7 +10,17 @@ if [ "$#" -ne 1 ] || [ -z "${1:-}" ]; then
   exit 1
 fi
 
-migration_name="$1"
+# Normalize to a valid PascalCase class identifier (add-users / add_users -> AddUsers),
+# so the generated migration class always compiles.
+migration_name="$(printf '%s' "$1" \
+  | sed -E 's/([a-z0-9])([A-Z])/\1 \2/g' \
+  | tr '_-' '  ' \
+  | awk '{ out=""; for (i=1; i<=NF; i++) out = out toupper(substr($i,1,1)) substr($i,2); print out }')"
+
+if [ -z "$migration_name" ]; then
+  echo "Error: <MigrationName> must contain at least one alphanumeric character." >&2
+  exit 1
+fi
 
 # Millisecond timestamp, consistent magnitude on every platform so TypeORM orders
 # migrations correctly across a mixed (macOS/Linux) team. Prefer Node's Date.now()
@@ -26,8 +36,8 @@ target_dir="src/migrations"
 target_file="${target_dir}/${timestamp}-${migration_name}.ts"
 
 if [ -e "$target_file" ]; then
-  echo "Error: $target_file already exists; refusing to overwrite." >&2
-  exit 1
+  echo "Skipping: $target_file already exists (not overwriting)." >&2
+  exit 0
 fi
 
 mkdir -p "$target_dir"
