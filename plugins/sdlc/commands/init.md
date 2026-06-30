@@ -446,9 +446,23 @@ is preferred because it installs the skill's real content from an exact location
   curl -fsSL "<source>" -o ".claude/skills/<name>/SKILL.md"
   ```
 
-  The downloaded `SKILL.md`'s `name` must match the confirmed skill `name`. If a fetch fails (network,
-  bad ref, missing path), do **not** silently fall through to a stub — surface the failure for that
-  skill so the gap is visible, and continue with the remaining skills.
+  **Normalize the installed skill's identity to the skills-map `<name>`.** The upstream content may use
+  a different directory name or frontmatter `name` (e.g. `composition-patterns`, or a colon form like
+  `react:components`). The on-disk directory is already `.claude/skills/<name>/` (that is where the copy
+  lands); also **rewrite the downloaded `SKILL.md`'s frontmatter `name` to `<name>`** so it matches
+  `skills.json` and the agent override across the sync trio:
+
+  ```bash
+  # rewrite the first (frontmatter) `name:` line to the skills-map <name>
+  nf="$(mktemp)"
+  awk -v n="<name>" '!done && /^name:/ { print "name: " n; done=1; next } { print }' \
+    ".claude/skills/<name>/SKILL.md" > "$nf" && mv "$nf" ".claude/skills/<name>/SKILL.md"
+  ```
+
+  Leave the rest of the downloaded content (body, supporting files such as `AGENTS.md` / `rules/`)
+  untouched — only the identity is normalized. If a fetch fails (network, bad ref, missing path), do
+  **not** silently fall through to a stub — surface the failure for that skill so the gap is visible,
+  and continue with the remaining skills.
 
 - **Marketplace plugin** — the entry declares `plugin` (`<plugin>@<marketplace>`) + `marketplace`
   instead of a `source`. **Claude Code has no per-skill install — skills ship inside plugins** — so
@@ -490,7 +504,9 @@ Rules:
   marketplace add` / `install`, and the stub write are all otherwise safe to re-run.
 - The `name` in an installed/downloaded/scaffolded `SKILL.md` frontmatter and the `name` in
   `skills.json` / the agent override **must match exactly** (case-sensitive) — they are the same
-  identifier across the sync trio.
+  identifier across the sync trio. Downloaded skills are **normalized** to `<name>` (directory and
+  frontmatter `name`, above) so an upstream that uses a different identifier still matches; scaffolded
+  stubs are written with `<name>` directly.
 - A scaffolded stub body is a starter, not a placeholder token: once `<name>`/`<description>` are
   substituted, no `<...>` slot remains, so it satisfies the Step 4 no-placeholder rule. Teammates
   fill in the body later (or replace the stub with a richer skill).
