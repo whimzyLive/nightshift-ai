@@ -17,8 +17,10 @@ fi
 
 raw_name="$1"
 
-# Strip a trailing "Entity" suffix if the caller included it, then normalise.
-base="$(printf '%s' "$raw_name" | sed -E 's/[Ee]ntity$//')"
+# Strip a trailing PascalCase "Entity" suffix if the caller included it (e.g.
+# "OrderItemEntity" -> "OrderItem"), then normalise. Capital-E only, so names that
+# merely end in the letters "entity" (e.g. "Identity") are left intact.
+base="$(printf '%s' "$raw_name" | sed -E 's/Entity$//')"
 if [ -z "$base" ]; then
   base="$raw_name"
 fi
@@ -59,6 +61,7 @@ fi
 mkdir -p "$out_dir"
 
 cat > "$out_file" <<EOF
+import { randomUUID } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { Entity } from "electrodb";
@@ -76,7 +79,7 @@ export const ${var_name} = new Entity(
       ${camel}Id: {
         type: "string",
         required: true,
-        default: () => crypto.randomUUID(),
+        default: () => randomUUID(),
       },
       ownerId: { type: "string", required: true },
       status: {

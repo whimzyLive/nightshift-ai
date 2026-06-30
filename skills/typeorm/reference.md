@@ -423,7 +423,7 @@ await AppDataSource.transaction(async (manager) => {
 // app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
+import { User } from './entities/User';
 import { UsersModule } from './users/users.module';
 
 @Module({

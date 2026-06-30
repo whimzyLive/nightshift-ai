@@ -69,9 +69,10 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
      left untouched. Steps:
      1. Read `.claude/project/skills.json` for the installed skill list.
      2. For each installed skill, look up its `refs/skills-map.yml` entry and **run Step 4f in refresh
-        mode** (see Step 4f): a `source` skill is re-downloaded (its `.claude/skills/<name>/` directory
-        overwritten with the latest upstream content); a `plugin` skill is updated via
-        `claude plugin update <plugin>@<marketplace> --scope project`; a sourceless skill is skipped.
+        mode** (see Step 4f): a `source` skill is cleanly replaced (remove `.claude/skills/<name>/`,
+        then re-download the latest upstream content); a `plugin` skill is updated via
+        `claude plugin marketplace add` then `claude plugin update <plugin>@<marketplace> --scope
+        project`; a sourceless skill is skipped.
      3. Leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
         untouched. Print a summary of which skills were refreshed (and which were skipped as
         user-owned), then run the Final action release. Do **not** continue to Steps 1–5.
@@ -441,14 +442,21 @@ is preferred because it installs the skill's real content from an exact location
   exact location of the skill content: a git repository ref, or a raw URL to a single `SKILL.md`),
   optionally with `path` (subdirectory of the skill within that repo) and `ref` (branch/tag/SHA,
   default the repo's default branch). Download that exact content into `.claude/skills/<name>/` so the
-  installed skill is the **real** skill, not a stub:
+  installed skill is the **real** skill, not a stub. **De-duplicate by repo:** when several confirmed
+  skills share one `source` URL, clone that repo **once** and copy each skill's `path` out of the
+  single clone — never clone the same repo per skill.
 
   ```bash
-  # git source with an in-repo path — fetch only that skill's directory
+  # git source — partial + sparse clone of ONE repo (shared across skills from the same source):
+  # --filter=blob:none + sparse-checkout transfer only the needed path(s), not the whole tree.
   tmp="$(mktemp -d)"
-  git clone --depth 1 ${ref:+--branch "$ref"} "<source>" "$tmp"
+  git clone --filter=blob:none --sparse "<source>" "$tmp"
+  git -C "$tmp" sparse-checkout set "<path>"        # add every needed <path> for this repo
+  # `ref` may be a branch, tag, OR commit SHA — check it out explicitly. Do NOT use
+  # `git clone --branch`, which only resolves branch/tag names and rejects a SHA. Skip when unset.
+  [ -n "<ref>" ] && git -C "$tmp" checkout --quiet "<ref>"
   mkdir -p ".claude/skills/<name>"
-  cp -R "$tmp/<path>/." ".claude/skills/<name>/"
+  cp -R "$tmp/<path>/." ".claude/skills/<name>/"     # repeat the copy per skill from this repo
   rm -rf "$tmp"
   ```
 
@@ -510,12 +518,22 @@ Rules:
   marketplace add` / `install`, and the stub write are all otherwise safe to re-run.
 - **Refresh mode** (entered from Step 0's "Refresh skills"): the skip-if-exists guard is lifted **only
   for managed skills** — a skill whose `refs/skills-map.yml` entry declares a `source` or `plugin`. For
-  those, re-fetch to pick up upstream changes: a `source` skill is re-downloaded and its
-  `.claude/skills/<name>/` directory **overwritten** with the latest content; a `plugin` skill is
-  refreshed with `claude plugin update <plugin>@<marketplace> --scope project`. A **sourceless** skill
-  (scaffolded stub / custom) is user-owned and is **always skipped** in refresh mode — never
-  overwritten. Because downloaded content is left byte-identical to upstream (no normalization), an
-  overwrite is a clean replacement, not a merge.
+  those, re-fetch to pick up upstream changes:
+  - A `source` skill is **cleanly replaced**, not merged. `cp -R` alone would leave behind files that
+    upstream renamed or deleted, so first remove the destination, then re-download:
+    ```bash
+    rm -rf ".claude/skills/<name>"           # drop stale/renamed files before re-fetch
+    # …then run the Direct-source download (above) to repopulate from latest upstream
+    ```
+  - A `plugin` skill is refreshed with `claude plugin update`. As on the install path, **register the
+    marketplace first** (it may be absent on a fresh checkout where only committed settings record the
+    plugin), then update:
+    ```bash
+    claude plugin marketplace add <marketplace-source>   # idempotent; needed if not yet registered
+    claude plugin update <plugin>@<marketplace> --scope project
+    ```
+  - A **sourceless** skill (scaffolded stub / custom) is user-owned and is **always skipped** in
+    refresh mode — never overwritten.
 - **The directory name `<name>` is the identifier across the sync trio** — it is what Claude Code
   resolves the skill by, and what `skills.json` / the agent override record. The `SKILL.md` frontmatter
   `name` is a cosmetic display label (it need not match), so downloaded content is left byte-identical

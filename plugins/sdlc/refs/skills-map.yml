@@ -17,7 +17,15 @@
 #   path        — (optional, with a git `source`) the skill's subdirectory inside
 #                 that repo (e.g. `skills/hono-api`). Only that directory is copied.
 #   ref         — (optional, with a git `source`) branch / tag / commit to fetch;
-#                 defaults to the repo's default branch.
+#                 defaults to the repo's default branch. /init checks the ref out
+#                 explicitly (so a commit SHA works, unlike `git clone --branch`).
+#                 NOTE on version lockstep: an entry that sources a skill from THIS
+#                 repo (the plugin's own repo) with no `ref` tracks the moving default
+#                 branch, so two consumers on the same pinned plugin version can fetch
+#                 different skill content over time. For reproducible, version-locked
+#                 installs, pin `ref` to a release tag (or commit) cut alongside each
+#                 plugin release. (No release tags exist yet — adopt tagging to close
+#                 this fully; until then these entries intentionally track the branch.)
 #   plugin      — (optional, alternative to `source`) a marketplace plugin that
 #                 bundles this skill, as `<plugin>@<marketplace>`. When set (and no
 #                 `source`), /init installs that plugin (`claude plugin install
@@ -96,7 +104,7 @@ skills:
     when:
       - dep: electrodb
 
-# Frameworks with no built-in skill suggestion — user must add via "Other":
+# Frameworks / ORMs with no built-in skill suggestion — user must add via "Other":
 #   Svelte       → no built-in suggestion
 #   FastAPI      → no built-in suggestion
 #   Flask        → no built-in suggestion
@@ -106,6 +114,9 @@ skills:
 #   Python       → no built-in suggestion
 #   Rust / Go    → no built-in suggestion
 #   TypeScript   → no extra suggestion (strictness rules go in the agent override)
+#   Prisma       → no built-in suggestion (the typeorm skill is TypeORM-specific and
+#                  does NOT transfer; add a Prisma skill via "Other" when one exists)
+#   Drizzle      → no built-in suggestion (same — not covered by the typeorm skill)
 
 # Agent-to-skill domain mapping.
 # Used by /init Step 4c to filter the confirmed install list per agent.
