@@ -263,3 +263,7 @@ const AppService = new Service({ Task, Employee });
 | Raw `DynamoDBClient` for DynamoDB ops | Always use entity methods; raw client bypasses type safety |
 | Bumping `model.version` without migration | Changes key format — old items become invisible |
 | `set` on a `readOnly` attribute | Throws at runtime; set defaults only via `default` |
+
+## Additional resources
+
+- `scripts/new-entity.sh <EntityName>` — scaffolds `src/entities/<entity-name>.entity.ts` with a ready-to-edit `new Entity({...})` skeleton (model namespace, `createdAt`/`updatedAt`/`ttl` attributes, a primary `pk`/`sk` composite index, and one GSI). Derives a kebab-case filename and a PascalCase export from the argument, and never overwrites an existing file. Use it to start a new entity instead of hand-copying the boilerplate above.

@@ -231,6 +231,19 @@ router.openapi(route, async (c) => {
 | Error | `throw new HTTPException(status, { message })` |
 | OpenAPI | auto-generated from routes — never hand-write YAML/JSON |
 
+## Additional resources
+
+Portable bash scaffolders (coreutils only, never overwrite existing files) live in `scripts/`. Run
+them from a consumer project's root:
+
+- `scripts/new-route.sh <name>` — scaffolds `src/routes/<name>/route.ts` + `schema.ts` following the
+  route + schema pattern (`createRoute` + `OpenAPIHono` + a co-located Zod schema). Use when adding a
+  new feature route; then mount the exported router in `app.ts`.
+- `scripts/new-service.sh <noun>` — scaffolds `src/services/<noun>/service.interface.ts` + `service.ts`
+  + `schema.ts` following the class-based noun-service pattern (`class <Noun>Service implements
+  I<Noun>Service`, exported as an interface-typed singleton). Use when adding business logic for a new
+  noun, kept out of the routes.
+
 ## Common mistakes
 
 | Mistake | Fix |

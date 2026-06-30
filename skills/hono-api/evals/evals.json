@@ -1,0 +1,52 @@
+{
+  "skill_name": "hono-api",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a POST /orders route to our Hono API that validates the request body (a customer id and a list of line items) and returns the created order with a 201.",
+      "expected_output": "A feature-grouped route under src/routes/orders/ where the Zod request and response schemas live in a separate schema.ts, the route is declared with createRoute including a request body schema, the handler reads validated input via c.req.valid('json') and returns 201, and the router is an OpenAPIHono mounted on the root app.",
+      "assertions": [
+        "Defines the route with createRoute, not a bare app.post handler",
+        "Request and response Zod schemas live in a separate schema.ts file co-located in the route's feature directory",
+        "Handler reads the body via c.req.valid('json') rather than c.req.json()",
+        "Route declares a request body schema and a 201 response in createRoute",
+        "Router is an OpenAPIHono instance mounted via app.route() rather than registered on the root app directly"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We receive several event types (payment.succeeded, payment.failed, refund.created) on a single /webhooks/payments endpoint. Wire it up so adding a new event type later doesn't touch the route or grow a switch statement.",
+      "expected_output": "A single webhook endpoint that verifies the signature, parses the payload, and delegates to a dispatcher which routes by event type to one strategy class per event, each implementing a shared strategy interface, with a typed NoopStrategy fallback that returns 200 for unhandled-but-valid events.",
+      "assertions": [
+        "Uses one endpoint with a dispatcher keyed on the event type, not one endpoint per event",
+        "Each event type is a separate strategy class implementing a shared strategy interface",
+        "The handler contains no if/switch chain over event types",
+        "A typed NoopStrategy (or equivalent default) returns 200 for valid events with no registered strategy",
+        "Strategy classes delegate I/O to service classes and contain only flow logic"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create a payments service to hold our charge/refund business logic, kept out of the route handlers and unit-testable in isolation.",
+      "expected_output": "A noun-grouped service under src/services/payments/ with a service.interface.ts declaring an IPaymentService (or IPaymentsService) contract and a service.ts whose class implements that interface, exporting a singleton typed as the interface, containing no Hono Context references.",
+      "assertions": [
+        "Service is a class implementing an I<Noun>Service interface declared in a separate service.interface.ts",
+        "Service directory is named by the noun (e.g. services/payments/), not by a verb",
+        "The service contains no Hono imports, Context, or 'c' references",
+        "Exports a singleton instance typed as the interface for consumers to import",
+        "Service schemas live in a co-located schema.ts within the service directory"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Expose auto-generated OpenAPI documentation for the API so we never hand-maintain the spec.",
+      "expected_output": "The root OpenAPIHono app serves the OpenAPI document via app.doc(), generated from the existing createRoute definitions, with no hand-written YAML or JSON spec file.",
+      "assertions": [
+        "OpenAPI document is served via app.doc() on an OpenAPIHono app",
+        "The spec is derived from createRoute definitions, not hand-written",
+        "No standalone hand-maintained openapi.yaml/openapi.json spec file is authored",
+        "Routes contributing to the docs are declared with createRoute and Zod schemas"
+      ]
+    }
+  ]
+}

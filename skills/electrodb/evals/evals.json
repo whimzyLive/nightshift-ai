@@ -1,0 +1,51 @@
+{
+  "skill_name": "electrodb",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Define an ElectroDB entity called Order with an orderId, customerId, status, and createdAt. I need to be able to query all orders for a given customer, so add a secondary index for that access pattern.",
+      "expected_output": "A TypeScript entity using ElectroDB's Entity constructor with a model block, typed attributes, a primary table index keyed on orderId, and a GSI keyed on customerId so orders can be queried per customer.",
+      "assertions": [
+        "imports and uses `new Entity` from the `electrodb` package",
+        "declares a `model` block with `entity`, `service`, and `version` fields",
+        "defines a primary index plus a separate GSI that carries an `index` property",
+        "all index pk and sk definitions use `composite` arrays",
+        "the GSI partition key composite includes `customerId`"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Using my single-table-design ElectroDB setup, write a query that fetches every task for project 'proj-x' assigned to employees whose id starts with 'emp-'.",
+      "expected_output": "An ElectroDB query that selects the access pattern (index) by its logical name, supplies the partition-key composite, narrows the sort key with a begins_with operation, and executes with .go().",
+      "assertions": [
+        "calls `query.<indexName>(...)` to select the access pattern by logical name",
+        "passes the partition-key composite (the project id) as an object argument",
+        "uses `.begins({ ... })` to filter the sort key by prefix",
+        "terminates the chain with `.go()`"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write an ElectroDB conditional update that sets an order's status to 'shipped' only if its current status is 'paid'.",
+      "expected_output": "An ElectroDB update call that targets the item by key, sets the new status, and attaches a condition that the existing status equals 'paid' so the write fails when the condition is not met.",
+      "assertions": [
+        "uses `.update({ ... })` keyed by the item's identifiers",
+        "uses `.set({ ... })` to assign the new status value",
+        "uses `.where((attr, op) => ...)` to express the conditional check",
+        "the condition compares the status attribute with `op.eq` against 'paid'",
+        "ends the chain with `.go()`"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Show me how to page through ElectroDB query results 25 at a time, including how to fetch the next page.",
+      "expected_output": "An ElectroDB query executed with a limit option that destructures the returned cursor, then a follow-up query that passes that cursor back in to retrieve the next page.",
+      "assertions": [
+        "passes a `limit` option inside `.go({ ... })`",
+        "destructures `cursor` from the query result",
+        "feeds the saved `cursor` into a subsequent `.go({ cursor })` call",
+        "both query executions terminate with `.go()`"
+      ]
+    }
+  ]
+}
