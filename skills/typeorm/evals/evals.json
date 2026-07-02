@@ -1,0 +1,53 @@
+{
+  "skill_name": "typeorm",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Define a TypeORM Post entity with an auto-increment primary key, a title column, and a many-to-one relation to a User entity (a User has many Posts). Include the explicit foreign key column.",
+      "expected_output": "A TypeScript entity file using TypeORM decorators where Post has a @PrimaryGeneratedColumn id, a @Column title, a @ManyToOne relation back to User, and User exposes the inverse @OneToMany posts collection.",
+      "assertions": [
+        "Uses the @Entity() decorator on the Post class",
+        "Declares the relation with @ManyToOne(() => User, (user) => user.posts)",
+        "Declares the inverse side with @OneToMany(() => Post, (post) => post.author) on User",
+        "Includes an explicit foreign key column (e.g. authorId) and/or @JoinColumn",
+        "Uses @PrimaryGeneratedColumn() for the id"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write a TypeORM migration that creates a users table with id, email (unique), and created_at columns, and drops the table on rollback.",
+      "expected_output": "A migration class implementing MigrationInterface with an up() that creates the users table and a down() that drops it.",
+      "assertions": [
+        "Class implements MigrationInterface",
+        "Defines async up(queryRunner: QueryRunner) and async down(queryRunner: QueryRunner) methods",
+        "up() creates the table (e.g. queryRunner.createTable with a new Table)",
+        "down() drops the table (e.g. queryRunner.dropTable('users'))",
+        "Marks the email column as unique (isUnique: true)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Using the TypeORM query builder, fetch active users together with their posts, ordered by user creation date descending, returning at most 10 rows.",
+      "expected_output": "A query that uses createQueryBuilder with a join to posts, a parameterized where clause, ordering, and a take/limit.",
+      "assertions": [
+        "Calls createQueryBuilder('user')",
+        "Joins the posts relation with leftJoinAndSelect('user.posts', 'post')",
+        "Uses a parameterized where clause such as .where('user.isActive = :isActive', { isActive: true })",
+        "Orders results with .orderBy('user.createdAt', 'DESC')",
+        "Limits results with .take(10) and resolves with .getMany()"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Show how to create a User and a related Post inside a single TypeORM transaction so both are saved atomically.",
+      "expected_output": "Code wrapping both saves in a transaction, either via AppDataSource.transaction(manager => ...) or a QueryRunner with explicit commit/rollback.",
+      "assertions": [
+        "Opens a transaction via AppDataSource.transaction(...) or queryRunner.startTransaction()",
+        "Saves both the User and the Post using the transaction's manager",
+        "Commits on success (commitTransaction or implicit via the transaction callback)",
+        "Handles failure with rollbackTransaction (when using QueryRunner) or relies on the callback's automatic rollback",
+        "Releases the QueryRunner in a finally block when the QueryRunner approach is used"
+      ]
+    }
+  ]
+}

@@ -50,10 +50,10 @@ reference summary; do not duplicate or diverge the skill assignments here.
 
 | Agent | Relevant skill domains |
 | ----- | ---------------------- |
-| `platform-engineer` | API/backend skills: `hono-api`, `api-routes`, `typeorm`, and any custom backend skills |
+| `platform-engineer` | API/backend skills: `hono-api`, `api-routes`, `typeorm`, `electrodb`, and any custom backend skills |
 | `web-engineer` | Frontend skills: `react-components`, `vercel-react-best-practices`, `vercel-composition-patterns` |
 | `mobile-engineer` | Mobile skills: any custom mobile skills; no built-in suggestions map here |
-| `database-administrator` | ORM/migration skills: `typeorm`, and any custom DB skills |
+| `database-administrator` | ORM/migration skills: `typeorm`, `electrodb`, and any custom DB skills |
 | `sync-engineer` | Sync-layer skills: no built-in suggestions; any custom sync skills |
 
 ---

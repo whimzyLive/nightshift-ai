@@ -7,11 +7,41 @@
 #   when        — detection conditions that cause this skill to be suggested
 #                 (any matching condition adds the skill to the candidate list;
 #                  the skill appears at most once even if multiple conditions match)
+#
+# Install source — how /init Step 4f gets the skill content. Resolved in this
+# precedence order; declare the first that applies:
+#   source      — (preferred) the EXACT location of the skill content, so /init
+#                 downloads the real skill (not a stub). Either a git repository
+#                 ref (https or github:owner/repo) or a raw URL to a single
+#                 SKILL.md. /init fetches it into `.claude/skills/<name>/`.
+#   path        — (optional, with a git `source`) the skill's subdirectory inside
+#                 that repo (e.g. `skills/hono-api`). Only that directory is copied.
+#   ref         — (optional, with a git `source`) branch / tag / commit to fetch;
+#                 defaults to the repo's default branch. /init checks the ref out
+#                 explicitly (so a commit SHA works, unlike `git clone --branch`).
+#                 NOTE on version lockstep: an entry that sources a skill from THIS
+#                 repo (the plugin's own repo) with no `ref` tracks the moving default
+#                 branch, so two consumers on the same pinned plugin version can fetch
+#                 different skill content over time. For reproducible, version-locked
+#                 installs, pin `ref` to a release tag (or commit) cut alongside each
+#                 plugin release. (No release tags exist yet — adopt tagging to close
+#                 this fully; until then these entries intentionally track the branch.)
+#   plugin      — (optional, alternative to `source`) a marketplace plugin that
+#                 bundles this skill, as `<plugin>@<marketplace>`. When set (and no
+#                 `source`), /init installs that plugin (`claude plugin install
+#                 <plugin>@<marketplace> --scope project`) — Claude Code has no
+#                 per-skill install, skills ship inside plugins.
+#   marketplace — (optional) the marketplace source to `claude plugin marketplace
+#                 add` before installing `plugin`. Required whenever `plugin` is set.
+# Declare none of the above for project-convention skills with no published
+# location; those are scaffolded as a local starter at `.claude/skills/<name>/SKILL.md`.
 
 skills:
   - name: hono-api
-    description: Hono route patterns, middleware, and Zod validation conventions
+    description: Schema-first Hono + @hono/zod-openapi architecture — composable routers, class-based service layer, webhook strategy pattern, typed validation
     domains: [platform-engineer]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/hono-api
     when:
       - framework: Hono
 
@@ -26,6 +56,9 @@ skills:
   - name: vercel-react-best-practices
     description: Next.js / React patterns optimised for Vercel deployment
     domains: [web-engineer]
+    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
+    source: https://github.com/vercel-labs/agent-skills.git
+    path: skills/react-best-practices
     when:
       - framework: Next.js
       - framework: Remix
@@ -34,6 +67,9 @@ skills:
   - name: vercel-composition-patterns
     description: Vercel monorepo workspace layout and composition patterns
     domains: [web-engineer]
+    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
+    source: https://github.com/vercel-labs/agent-skills.git
+    path: skills/composition-patterns
     when:
       - framework: Next.js
       # Also suggested when pnpm monorepo is detected (see monorepo_detection below).
@@ -43,6 +79,9 @@ skills:
   - name: react-components
     description: React component patterns, hooks, and composition conventions
     domains: [web-engineer]
+    # Third-party: Google Labs' Stitch skill — downloaded from upstream, not copied.
+    source: https://github.com/google-labs-code/stitch-skills.git
+    path: plugins/stitch-build/skills/react-components
     when:
       - framework: React
       # Vue has no dedicated built-in skill; react-components is the closest match.
@@ -50,15 +89,22 @@ skills:
       - framework: Vue
 
   - name: typeorm
-    description: ORM entity, migration, and query conventions
+    description: TypeORM entity, migration, query, and Data Mapper conventions for TypeScript
     domains: [platform-engineer, database-administrator]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/typeorm
     when:
-      # Prisma and Drizzle detected in package.json deps trigger this suggestion.
-      # Note: covers migration-layer conventions; confirm relevance with the user.
-      - dep: prisma
-      - dep: drizzle-orm
+      - dep: typeorm
 
-# Frameworks with no built-in skill suggestion — user must add via "Other":
+  - name: electrodb
+    description: ElectroDB DynamoDB ORM — entity schema, index/access-pattern modeling, CRUD and update expressions, single-table design
+    domains: [platform-engineer, database-administrator]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/electrodb
+    when:
+      - dep: electrodb
+
+# Frameworks / ORMs with no built-in skill suggestion — user must add via "Other":
 #   Svelte       → no built-in suggestion
 #   FastAPI      → no built-in suggestion
 #   Flask        → no built-in suggestion
@@ -68,16 +114,19 @@ skills:
 #   Python       → no built-in suggestion
 #   Rust / Go    → no built-in suggestion
 #   TypeScript   → no extra suggestion (strictness rules go in the agent override)
+#   Prisma       → no built-in suggestion (the typeorm skill is TypeORM-specific and
+#                  does NOT transfer; add a Prisma skill via "Other" when one exists)
+#   Drizzle      → no built-in suggestion (same — not covered by the typeorm skill)
 
 # Agent-to-skill domain mapping.
 # Used by /init Step 4c to filter the confirmed install list per agent.
 # Each skill's `domains` list above is the authoritative source;
 # this summary lists the built-in skills per agent for quick reference.
 #
-# platform-engineer  : hono-api, api-routes, typeorm
+# platform-engineer  : hono-api, api-routes, typeorm, electrodb
 # web-engineer       : react-components, vercel-react-best-practices, vercel-composition-patterns
 # mobile-engineer    : (no built-in suggestions; add custom mobile skills via "Other")
-# database-administrator : typeorm
+# database-administrator : typeorm, electrodb
 # sync-engineer      : (no built-in suggestions; add custom sync skills via "Other")
 
 # Monorepo detection used for the vercel-composition-patterns / pnpm condition above.
