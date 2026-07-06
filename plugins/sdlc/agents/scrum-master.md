@@ -82,7 +82,7 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 4. **[invoke `user-story-mapping`]** Map the user journey for this Epic: identify persona, narrative, activities, and steps. Use the output as the structural skeleton for story decomposition.
 5. Apply the vertical-slice decomposition rules from `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`: each story cuts through ALL layers required (per .claude/project/project-context.md active agents) — never split horizontally by layer. Draft ALL stories before creating any.
 6. For each drafted story, write it using the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line (As a / I want / So that) + **checkbox** Acceptance Criteria (binary, 3–6 items). Never use Gherkin.
-6a. **Assess a Fibonacci estimate for each drafted story.** Using the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`, assign each story a `points` value from {1, 2, 3, 5, 8} — snap any computed value to the nearest Fibonacci number in that set. Capture the `points` value per story; it will be stamped in step 10. The existing >8 split rule in step 7 already guarantees no story exceeds 8 points before creation — a story estimated >8 is split in step 7 and the resulting sub-stories are each re-estimated, never created oversized.
+6a. **Assess a Fibonacci estimate for each drafted story.** Using the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`, assign each story a `points` value from {1, 2, 3, 5, 8} — snap any computed value to the nearest Fibonacci number in that set. Capture the `points` value per story; it is **reported for manual entry** (step 10a and the final return) — the plugin does **not** write the points field. The existing >8 split rule in step 7 already guarantees no story exceeds 8 points before creation — a story estimated >8 is split in step 7 and the resulting sub-stories are each re-estimated, never created oversized.
 7. **[invoke `user-story-splitting` for any story >8 pts]** Apply the splitting patterns. Do NOT create the oversized story — split first.
 8. **Order by dependency** — stories that unblock others go first.
 9. Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
@@ -112,14 +112,9 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
     - Pass the label via `--label "AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels). Multiple labels are comma-separated: `--label "AI-Ready,foo"`.
     - Decompose-created stories receive **only** `AI-Ready` — **never** `AI-Refine`.
     **Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
-10a. **Post-create: stamp Story Points and the AI Workflow field on each created child story.** For each key in the created-keys list:
+10a. **Post-create: stamp the AI Workflow field on each created child story; report Story Points for manual entry.** For each key in the created-keys list:
     - **Custom-field stamps go through `jira-set-field.sh`, never `acli workitem edit`** — acli has no flag for setting custom-field values (verified through 1.3.22), so the plugin ships a REST helper. It authenticates via the same `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract as the acli skill's headless auth; when those are absent it exits 2 (skip) rather than failing.
-    - **Story Points (best-effort):** set the points field by display **name** (never a `customfield_*` id) — pass both names as a preference list (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum); the helper uses the first that exists. Swallow a non-zero exit (warn and continue) — never fail the run over points:
-      ```bash
-      bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "Story point estimate,Story Points" <points> number --if-empty \
-        || echo "WARN: story-points stamp skipped for <CHILD-KEY> (exit $?) — continuing"
-      ```
-      (`--if-empty` is a no-op on a just-created story but makes the stamp idempotent and overwrite-safe if the step is retried.)
+    - **Story Points are NOT written.** The plugin does not set the points field — auto-stamping is dropped until acli exposes custom-field values natively (the REST-token env contract proved too fragile to require of every consumer). Instead, surface each story's step-6a estimate in the final return (step 15) as `<CHILD-KEY>: estimated N pts — set Story Points manually in Jira`.
     - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted`, set the AI Workflow custom field by display name (never `customfield_*`); best-effort, same swallow pattern:
       ```bash
       bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "AI Workflow" "<epicAiWorkflow>" option --if-empty \
@@ -147,7 +142,7 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 
     Every edge in this table MUST have a matching Jira link from step 12, and every Jira link MUST appear as a row — the doc and Jira must never drift.
 14. Comment each story: `acli jira workitem comment create <KEY> --body "Epic: <EPIC-KEY>"`
-15. Return: list of created story keys + dependency order + any flags
+15. Return: list of created story keys + dependency order + per-story points estimates (`<KEY>: estimated N pts — set Story Points manually in Jira`) + any flags
 
 ---
 
@@ -188,9 +183,9 @@ Refine an unpolished story in-place OR create new stories from raw text.
 ### Mode 2A — Jira key provided
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<STORY-KEY>`. If this fails, STOP.
-1a. **Idempotency guard — exit early if already refined AND sized (no overwrite).** Resolve two facts from the fetched issue: (a) whether `AI-Ready` is present in `fields.labels`, and (b) whether story points are set — probe via the **"Reading story points"** section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (JQL-probe BOTH field names; an `acli` **error** is inconclusive → STOP, never treat as `missing`).
-   - **`AI-Ready` present AND points set** → the ticket is already refined and sized. **Make NO modifications** — do not rewrite the description, do not touch labels, do not stamp points. Skip steps 2–10 and return the **no-op** result (see step 11). This is what makes a repeated `/refine-issue` (and `/auto`, which delegates here on gaps) idempotent.
-   - **Otherwise** (`AI-Ready` absent, OR points `missing`) → proceed to step 2. The presence of `AI-Ready` (captured here as `alreadyRefined`) and the points state (`pointsPreset`) are **carried forward**: `alreadyRefined` gates the description rewrite (step 6), and `pointsPreset` gates point stamping (step 7a).
+1a. **Idempotency guard — exit early if already refined (no overwrite).** Resolve two facts from the fetched issue: (a) whether `AI-Ready` is present in `fields.labels`, and (b) whether story points are set — probe via the **"Reading story points"** section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (JQL-probe BOTH field names; an `acli` **error** is inconclusive → STOP, never treat as `missing`).
+   - **`AI-Ready` present** → the ticket is already refined. **Make NO modifications** — do not rewrite the description, do not touch labels, make no Jira writes at all. Skip steps 2–10 and return the **no-op** result (see step 11). If the points probe came back `missing`, the no-op return must additionally warn that Story Points are unset and must be entered manually in Jira (the plugin never writes the points field — see step 7a). This is what makes a repeated `/refine-issue` (and `/auto`, which delegates here on gaps) idempotent.
+   - **`AI-Ready` absent** → proceed to step 2. The points state (`pointsPreset`) is **carried forward** to step 7a (estimate-and-report).
 2. If the story has a parent Epic, apply the same protocol with `<KEY>=<EPIC-KEY>`; check Epic comments for `PRD: docs/features/...`; read PRD ONLY if the exact path appears in a comment. Do NOT search for PRD files. Missing PRD comment is non-fatal in triage mode — proceed without it.
 3. **Detect sub-tasks** — apply the "Fetching sub-tasks" section of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`: JQL-probe `parent = <STORY-KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC` for `key,summary` (use the `subTaskIssueTypes()` function, not a literal `issuetype = Sub-task`, so renamed/instance-specific sub-task types are matched and the no-sub-task-type case stays a clean empty result). Let `subtaskCount` = number returned, in the explicit creation order.
    - An empty array is the **no-op path** (not an error): proceed exactly as today — no AC fold-in, no annotation. Only a non-empty `acli` error STOPs.
@@ -202,7 +197,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
      - Missing Out of Scope section
      - Missing Dependencies section
 5. **[invoke `user-story-splitting` if story is >8 pts]** (Story only — a Bug is not split by user-story patterns.)
-6. **Rewrite the description — gated on `alreadyRefined` (step 1a).** When `alreadyRefined` is **false** (`AI-Ready` was absent), run the full description rewrite below. When `alreadyRefined` is **true** (the ticket already carries `AI-Ready` but reached here because points were `missing`), **SKIP this rewrite and steps 7–8 entirely** — the description is already in refined form, so re-writing it would clobber an already-good ticket; jump straight to step 7a (stamp the missing points) then step 10 (label swap). Run the rewrite using the EXACT structure for its `issuetype`:
+6. **Rewrite the description.** (Reaching this step means `AI-Ready` was absent — an already-refined ticket exits at the step-1a guard and never gets here.) Run the rewrite using the EXACT structure for its `issuetype`:
    - **`issuetype == Bug`** → the 7-section Agile Bug Template (`${CLAUDE_PLUGIN_ROOT}/refs/jira-bug-template.md`), rendered via the **Bug description template** in `jira-adf.md` (headings + ordered/bullet lists, **no** `taskList`). Synthesise any missing REQUIRED section from available input; render absent best-effort sections as "not provided". Set the Jira **summary** to the Summary/Title (e.g. `[<platform>] <symptom>`) via `--summary`. Do NOT impose the Mike-Cohn line or acceptance criteria on a bug.
    - **`issuetype == Story` (or other)** → the EXACT structure in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` — Mike Cohn user-story line + **checkbox** Acceptance Criteria (binary, 3–6 items), never Gherkin. Ensure it is a vertical slice covering all required layers.
    - **When `subtaskCount > 0`:** fold each sub-task's scope into the parent's **Acceptance Criteria** — add one `taskItem` per sub-task to the single AC `taskList` (`localId` scheme `tl-1` / `ti-*`), derived from the sub-task summary, in Jira's returned order. There is **NO separate "Sub-tasks" section, heading, or second `taskList`** (per `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task ACs sit alongside the standard story ACs.
@@ -213,14 +208,9 @@ Refine an unpolished story in-place OR create new stories from raw text.
    trap 'rm -f "$refined"' EXIT
    acli jira workitem edit <STORY-KEY> --description-file "$refined"
    ```
-7a. **Stamp story points — ONLY when none pre-exist (`pointsPreset` is `missing` from step 1a).** Sizing is part of refinement, but a refine must never overwrite a points value a human (or a prior run) already set.
-   - **`pointsPreset` was a real value** → **do NOT stamp.** The pre-existing points survive untouched; only the description was updated. Skip to step 8.
-   - **`pointsPreset` was `missing`** → estimate a Fibonacci value from the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` (snap to one of {1, 2, 3, 5, 8}; split first per `user-story-splitting` if >8 — never stamp >8) and set it **by display name** (never a `customfield_*` id) via the plugin's REST helper — `acli workitem edit` cannot set custom-field values (no such flag through 1.3.22). Pass both points field names as a preference list (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) — the helper uses the first that exists. This step is **best-effort**: swallow a non-zero exit (warn and continue), never let it fail the refine:
-     ```bash
-     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<STORY-KEY>" "Story point estimate,Story Points" <points> number --if-empty \
-       || echo "WARN: story-points stamp skipped (exit $?) — continuing without points"
-     ```
-     `--if-empty` enforces the no-overwrite rule at the tool layer: if points were set between the step-1a probe and this stamp (or the probe was misread), the helper prints `SKIP` and succeeds without writing. The helper authenticates via the `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract (same as the acli skill's headless auth); exit 2 = credentials absent, exit 3 = no listed field name exists, exit 1 = REST error — all swallowed by the `|| echo` above, surfaced as the warning. (A Bug needs no points to route; `pointsPreset=missing` on a Bug may be left unstamped — report it honestly rather than forcing an estimate.)
+7a. **Estimate story points — REPORT ONLY, never write the field.** The plugin does **not** set Story Points in Jira: acli cannot set custom-field values (no such flag through 1.3.22), and requiring the REST-token env contract of every consumer proved too fragile — auto-stamping is dropped until acli exposes custom fields natively. Sizing is still part of refinement, so estimate and hand the value to the human:
+   - **`pointsPreset` was a real value** (from step 1a) → nothing to do — the human-set points stand. Skip to step 8.
+   - **`pointsPreset` was `missing`** → estimate a Fibonacci value from the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` (snap to one of {1, 2, 3, 5, 8}; split first per `user-story-splitting` if >8). Carry the estimate into the step-9 comment and the final return so the human can enter it manually. (A Bug needs no points to route; skip the estimate on a Bug and report `missing` honestly rather than forcing one.)
 8. **Annotate each sub-task (only when `subtaskCount > 0`).** For each sub-task, write a **minimal** ADF description (purpose sentence + `Part of <STORY-KEY>` reference; the shape is in `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task MUST NOT receive the full story template. Use the **session-scoped** temp dir, one file per sub-task. Do **NOT** register a per-iteration `trap '... EXIT'` inside the loop — an EXIT trap set in a loop overwrites the prior handler and fires only once at exit, so it would clean up just the last file; instead `rm -f "$file"` at the end of each iteration (or rely on the single session-dir teardown):
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
@@ -232,7 +222,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
    done
    ```
    Sub-task edits are idempotent-friendly: re-running `/refine-issue` overwrites the minimal description with the same generated content — no duplicate content appended.
-9. Comment: `acli jira workitem comment create <STORY-KEY> --body "Refined — story template applied, ACs formalised, scope boundaries added"`
+9. Comment: `acli jira workitem comment create <STORY-KEY> --body "Refined — story template applied, ACs formalised, scope boundaries added"`. When step 7a produced an estimate, append it to the same comment body: `. Estimated: <N> pts — set Story Points manually in Jira (the plugin does not write this field).`
 10. **Swap the refinement label — REQUIRED on every successful refine of an existing ticket, and GATED on sub-task annotation.** When `subtaskCount > 0`, swap the label **only after every sub-task edit in step 8 has succeeded**; if any sub-task edit failed, do NOT swap — leave the story in `AI-Refine` for retry and surface the failure. Add `AI-Ready` and remove `AI-Refine` in one call. This is the single signal the rest of the pipeline relies on: `/auto`'s Mode 3 reads `AI-Ready` to skip re-triage, and the worker/assessment treats the story as refined.
    ```bash
    acli jira workitem edit --key "<STORY-KEY>" --labels "AI-Ready" --remove-labels "AI-Refine" --yes
@@ -242,8 +232,8 @@ Refine an unpolished story in-place OR create new stories from raw text.
    - The label swap is **parent-story-only** — sub-tasks never receive `AI-Ready` / `AI-Refine`.
    - Only swap when refining an EXISTING Jira ticket (this mode). Do NOT add these labels to brand-new stories created in Mode 2B.
 11. Return:
-   - **No-op exit (step 1a guard fired)** → state the ticket was already refined and sized and that **no modifications** were made (description, labels, and points all untouched) — the idempotent re-run path.
-   - **Refined** → updated story key + bullet summary of what changed: whether the description was rewritten (vs skipped because `AI-Ready` already present), whether points were stamped (only when none pre-existed) or left intact, the sub-task count folded into ACs + annotated, and the `AI-Refine` → `AI-Ready` label swap.
+   - **No-op exit (step 1a guard fired)** → state the ticket was already refined and that **no modifications** were made (description, labels, and points all untouched) — the idempotent re-run path. If the step-1a points probe returned `missing`, include the warning that Story Points are unset and must be entered manually in Jira.
+   - **Refined** → updated story key + bullet summary of what changed: the description rewrite, the points state (pre-existing value left intact, or the step-7a estimate reported for manual entry — the field is never written), the sub-task count folded into ACs + annotated, and the `AI-Refine` → `AI-Ready` label swap.
 
 ### Mode 2B — Raw text blob
 
