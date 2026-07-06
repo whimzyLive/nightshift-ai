@@ -170,7 +170,7 @@ acli jira workitem edit CER-456 \
 **⚠️ acli cannot set custom-field VALUES** (verified through 1.3.22 — there is no `--custom-field` flag, and the `--from-json` schema exposes no custom fields; `acli jira field update` edits field *definitions*, not values). To stamp a custom field (story points, workflow-mode selects), use the plugin's REST helper instead:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh <ISSUE-KEY> "<Field Display Name>" <value> [number|string|option]
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh <ISSUE-KEY> "<Field Display Name>[,<Alt Name>...]" <value> [number|string|option] [--if-empty]
 ```
 
 ### Link work items (dependencies)

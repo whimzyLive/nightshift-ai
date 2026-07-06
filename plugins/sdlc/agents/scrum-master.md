@@ -114,15 +114,16 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
     **Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
 10a. **Post-create: stamp Story Points and the AI Workflow field on each created child story.** For each key in the created-keys list:
     - **Custom-field stamps go through `jira-set-field.sh`, never `acli workitem edit`** — acli has no flag for setting custom-field values (verified through 1.3.22), so the plugin ships a REST helper. It authenticates via the same `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract as the acli skill's headless auth; when those are absent it exits 2 (skip) rather than failing.
-    - **Story Points (best-effort):** set the points field by display **name** (never a `customfield_*` id) — try `Story point estimate` first (team-managed/Kanban projects), then `Story Points` (scrum projects); exit code 3 means that name doesn't exist, so try the other:
+    - **Story Points (best-effort):** set the points field by display **name** (never a `customfield_*` id) — pass both names as a preference list (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum); the helper uses the first that exists. Swallow a non-zero exit (warn and continue) — never fail the run over points:
       ```bash
-      bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "Story point estimate" <points> number --if-empty \
-        || bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "Story Points" <points> number --if-empty
+      bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "Story point estimate,Story Points" <points> number --if-empty \
+        || echo "WARN: story-points stamp skipped for <CHILD-KEY> (exit $?) — continuing"
       ```
-      If neither name resolves (or credentials are absent — exit 2), omit and surface a warning — never fail the run over points. (`--if-empty` is a no-op on a just-created story but makes the stamp idempotent and overwrite-safe if the step is retried.)
-    - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted`, set the AI Workflow custom field by display name (never `customfield_*`):
+      (`--if-empty` is a no-op on a just-created story but makes the stamp idempotent and overwrite-safe if the step is retried.)
+    - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted`, set the AI Workflow custom field by display name (never `customfield_*`); best-effort, same swallow pattern:
       ```bash
-      bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "AI Workflow" "<epicAiWorkflow>" option --if-empty
+      bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "AI Workflow" "<epicAiWorkflow>" option --if-empty \
+        || echo "WARN: AI Workflow stamp failed for <CHILD-KEY> (exit $?) — continuing"
       ```
       If `epicAiWorkflow` is `unset`: **skip this edit entirely** for that story. Do not write an empty or null value.
     - If an `edit` call fails for a story: surface the failing key in the agent return (non-silent) — the story exists but without that stamp. Do not abort the remaining stories. Example: `"Warning: AI Workflow stamp failed for <KEY>."`
@@ -214,12 +215,12 @@ Refine an unpolished story in-place OR create new stories from raw text.
    ```
 7a. **Stamp story points — ONLY when none pre-exist (`pointsPreset` is `missing` from step 1a).** Sizing is part of refinement, but a refine must never overwrite a points value a human (or a prior run) already set.
    - **`pointsPreset` was a real value** → **do NOT stamp.** The pre-existing points survive untouched; only the description was updated. Skip to step 8.
-   - **`pointsPreset` was `missing`** → estimate a Fibonacci value from the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` (snap to one of {1, 2, 3, 5, 8}; split first per `user-story-splitting` if >8 — never stamp >8) and set it **by display name** (never a `customfield_*` id) via the plugin's REST helper — `acli workitem edit` cannot set custom-field values (no such flag through 1.3.22). Try `Story point estimate` first (team-managed/Kanban projects), then `Story Points` (scrum projects); exit code 3 means that name doesn't exist, so try the other:
+   - **`pointsPreset` was `missing`** → estimate a Fibonacci value from the sizing-guidance table in `${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md` (snap to one of {1, 2, 3, 5, 8}; split first per `user-story-splitting` if >8 — never stamp >8) and set it **by display name** (never a `customfield_*` id) via the plugin's REST helper — `acli workitem edit` cannot set custom-field values (no such flag through 1.3.22). Pass both points field names as a preference list (`Story point estimate` for team-managed/Kanban projects, `Story Points` for scrum projects) — the helper uses the first that exists. This step is **best-effort**: swallow a non-zero exit (warn and continue), never let it fail the refine:
      ```bash
-     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<STORY-KEY>" "Story point estimate" <points> number --if-empty \
-       || bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<STORY-KEY>" "Story Points" <points> number --if-empty
+     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<STORY-KEY>" "Story point estimate,Story Points" <points> number --if-empty \
+       || echo "WARN: story-points stamp skipped (exit $?) — continuing without points"
      ```
-     `--if-empty` enforces the no-overwrite rule at the tool layer: if points were set between the step-1a probe and this stamp (or the probe was misread), the helper prints `SKIP` and succeeds without writing. The helper authenticates via the `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract (same as the acli skill's headless auth) and exits 2 when they are absent. If neither field name resolves, or credentials are absent, omit and surface a warning — never fail the refine over points. (A Bug needs no points to route; `pointsPreset=missing` on a Bug may be left unstamped — report it honestly rather than forcing an estimate.)
+     `--if-empty` enforces the no-overwrite rule at the tool layer: if points were set between the step-1a probe and this stamp (or the probe was misread), the helper prints `SKIP` and succeeds without writing. The helper authenticates via the `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract (same as the acli skill's headless auth); exit 2 = credentials absent, exit 3 = no listed field name exists, exit 1 = REST error — all swallowed by the `|| echo` above, surfaced as the warning. (A Bug needs no points to route; `pointsPreset=missing` on a Bug may be left unstamped — report it honestly rather than forcing an estimate.)
 8. **Annotate each sub-task (only when `subtaskCount > 0`).** For each sub-task, write a **minimal** ADF description (purpose sentence + `Part of <STORY-KEY>` reference; the shape is in `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task MUST NOT receive the full story template. Use the **session-scoped** temp dir, one file per sub-task. Do **NOT** register a per-iteration `trap '... EXIT'` inside the loop — an EXIT trap set in a loop overwrites the prior handler and fires only once at exit, so it would clean up just the last file; instead `rm -f "$file"` at the end of each iteration (or rely on the single session-dir teardown):
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
