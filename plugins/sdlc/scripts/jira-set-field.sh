@@ -61,8 +61,11 @@ FIELDS_JSON=$(curl -sf -u "$AUTH" "${BASE}/rest/api/3/field") \
 FIELD_ID="" FIELD_NAME=""
 IFS=',' read -ra NAME_LIST <<< "$FIELD_NAMES"
 for name in "${NAME_LIST[@]}"; do
+  name="${name#"${name%%[![:space:]]*}"}"   # trim leading/trailing whitespace so
+  name="${name%"${name##*[![:space:]]}"}"   # "A, B" probes "B", not " B"
   FIELD_ID=$(printf '%s' "$FIELDS_JSON" \
-    | jq -r --arg n "$name" '[.[] | select(.name == $n)][0].id // empty')
+    | jq -r --arg n "$name" '[.[] | select(.name == $n)][0].id // empty') \
+    || { echo "ERROR: unparseable field-list JSON from ${BASE}" >&2; exit 1; }
   if [ -n "$FIELD_ID" ]; then FIELD_NAME="$name"; break; fi
 done
 if [ -z "$FIELD_ID" ]; then
@@ -75,7 +78,8 @@ if [ "$IF_EMPTY" = true ]; then
   # transient error would silently bypass the no-overwrite guard.
   ISSUE_JSON=$(curl -sf -u "$AUTH" "${BASE}/rest/api/3/issue/${KEY}?fields=${FIELD_ID}") \
     || { echo "ERROR: could not read ${KEY} to check existing \"$FIELD_NAME\" value" >&2; exit 1; }
-  CURRENT=$(printf '%s' "$ISSUE_JSON" | jq -r --arg f "$FIELD_ID" '.fields[$f] // empty')
+  CURRENT=$(printf '%s' "$ISSUE_JSON" | jq -r --arg f "$FIELD_ID" '.fields[$f] // empty') \
+    || { echo "ERROR: unparseable issue JSON for ${KEY}" >&2; exit 1; }
   if [ -n "$CURRENT" ]; then
     echo "SKIP: ${KEY} ${FIELD_NAME} (${FIELD_ID}) already set — not overwriting"
     exit 0
