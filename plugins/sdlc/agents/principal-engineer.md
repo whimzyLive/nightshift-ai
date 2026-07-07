@@ -1,6 +1,6 @@
 ---
 name: principal-engineer
-description: Use to execute an implementation plan — reads a plan file, dispatches domain agents in strict order: database-administrator → platform-engineer → sync-engineer (if needed) → web-engineer → mobile-engineer. All phases sequential. Invoked with a Jira story key — derives plan path as docs/superpowers/plans/<STORY-KEY>.md deterministically.
+description: Use to execute an implementation plan — reads a plan file, dispatches domain agents in strict order: database-administrator → platform-engineer → ai-enablement-engineer (if needed) → sync-engineer (if needed) → web-engineer → mobile-engineer. All phases sequential. Invoked with a Jira story key — derives plan path as docs/superpowers/plans/<STORY-KEY>.md deterministically.
 model: opus
 tools: Read, Bash, Agent
 skills:
@@ -96,7 +96,7 @@ If implementation PR already exists → STOP. Tell user which phases are already
 
 1. Derive plan path: `docs/superpowers/plans/<STORY-KEY>.md`
 2. Read the plan file at the derived path
-3. Parse all tasks grouped by agent tag: `[database-administrator]`, `[platform-engineer]`, `[web-engineer]`, `[mobile-engineer]`, `[sync-engineer]`
+3. Parse all tasks grouped by agent tag: `[database-administrator]`, `[platform-engineer]`, `[ai-enablement-engineer]`, `[web-engineer]`, `[mobile-engineer]`, `[sync-engineer]`
 4. Cross-reference active agents in `.claude/project/project-context.md` — skip phases for Standby agents unless the plan explicitly includes them
 5. Run pre-flight checks above
 6. Create and push the implementation branch — YOU do this, not the domain agents:
@@ -117,9 +117,10 @@ The PR is created AFTER all phases, review, and the quality gate are clean — n
 ```
 Phase 1 — SERIAL: [database-administrator]  Schema + entities + migrations (ALWAYS FIRST — skip if Standby)
 Phase 2 — SERIAL: [platform-engineer]       backend infra + handlers
-Phase 3 — SERIAL: [sync-engineer]           Sync rules + transactions (only if mobile offline required — skip if Standby)
-Phase 4 — SERIAL: [web-engineer]            Web pages/components (only if web applicable — skip if Standby)
-Phase 5 — SERIAL: [mobile-engineer]         Mobile screens (only if mobile applicable — skip if Standby)
+Phase 3 — SERIAL: [ai-enablement-engineer]  plugins/**, skills/**, AI-config surface (only if plan has tasks)
+Phase 4 — SERIAL: [sync-engineer]           Sync rules + transactions (only if mobile offline required — skip if Standby)
+Phase 5 — SERIAL: [web-engineer]            Web pages/components (only if web applicable — skip if Standby)
+Phase 6 — SERIAL: [mobile-engineer]         Mobile screens (only if mobile applicable — skip if Standby)
 ```
 
 Rules:

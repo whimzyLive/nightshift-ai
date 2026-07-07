@@ -301,3 +301,36 @@
   them as a starting point and grep the exact stale substring across the whole file before declaring
   the fix complete — under-fixing a few of N repeated occurrences reintroduces the same
   inconsistency the finding was raised to close.
+
+## 2026-07-08 — Story NA-12 re-review — dispatch-ladder slot missed in sibling files
+**Learnings:**
+- A single grep scoped to one file (`principal-engineer-playbook.md`) is not a "grep the whole
+  tree" pass — the same stale 5-agent enumeration existed independently in `tech-lead.md` (the plan
+  agent's own "Execution order" ladder), `principal-engineer.md` (front-matter description, tag list,
+  and its own execution-order ladder — 3 separate spots in one file), and `commands/plan.md` (the
+  plan-doc phase list `tech-lead` is instructed to emit) — four files the playbook ref doesn't
+  `grep -r` catch since each has its own independently-authored copy of the same ladder rather than
+  including the ref. Fixed by repo-wide `grep -rn` across `plugins/sdlc/` for the exact arrow-chain
+  and `Phase 1 —`/`[database-administrator]` substrings, not just the one ref file the original
+  finding named.
+- Not every hit on the "5 agent names co-occurring" grep is a dispatch-ladder enumeration needing
+  the same fix: `refs/agent-override-template.md`'s run-order table and `refs/solutions-architect.md`'s
+  "if X applicable" spec-section headers are structurally different (the override-template run-order
+  table is explicitly out of scope for `ai-enablement-engineer` per its earlier phase's design — it
+  uses a fixed, non-table-derived override — and the architect's conditional headers aren't an
+  ordering/dispatch list at all). `refs/domain-agent-handoff.md`'s "Referenced from ..." sentence
+  *did* need the addition since `ai-enablement-engineer.md` genuinely references that ref (branch/
+  memory/commit/return + pre-work checkout). Triage each hit against "is this actually a dispatch
+  order, and does ai-enablement-engineer actually participate in/reference it" before editing —
+  blind find-and-add-to-every-hit would have wrongly touched the override-template table.
+- Auto.md's own "Phase 1 (Spec) / Phase 2 (Plan+Impl)" and the defect path's "Phase 1-4 (reproduce/
+  root-cause/test/fix)" numbering schemes share the word "Phase" with the domain-dispatch ladder but
+  are unrelated axes (workflow stage vs. debugging step vs. domain-agent order) — grepping bare
+  `Phase 1` across the tree surfaces all three; only the domain-agent-order ones needed the edit.
+
+**Patterns:**
+- "Grep the whole plugin tree" instructions after a review finding should search for the *exact
+  repeated substrings* (the arrow chain, the bracketed tag list, the `Phase N — [agent]` line shape)
+  across every file in the plugin, not just the one ref file a finding happened to cite — independent
+  same-content copies (not `${CLAUDE_PLUGIN_ROOT}` includes) are exactly what make partial fixes
+  drift out of sync with each other.

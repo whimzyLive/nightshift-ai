@@ -31,9 +31,10 @@ The agent should:
 7. Break the spec into concrete, ordered, agent-tagged tasks saved to `docs/superpowers/plans/<STORY-KEY>.md`:
    - Phase 1 — `database-administrator` (schema + entities + migrations — ALWAYS FIRST)
    - Phase 2 — `platform-engineer` (backend infra + handlers + config)
-   - Phase 3 — `sync-engineer` (only if spec has an offline-sync section)
-   - Phase 4 — `web-engineer` (only if spec has Web UI section)
-   - Phase 5 — `mobile-engineer` (only if spec has Mobile UI section)
+   - Phase 3 — `ai-enablement-engineer` (plugins/**, skills/**, AI-config surface — only if plan has tasks)
+   - Phase 4 — `sync-engineer` (only if spec has an offline-sync section)
+   - Phase 5 — `web-engineer` (only if spec has Web UI section)
+   - Phase 6 — `mobile-engineer` (only if spec has Mobile UI section)
    - All phases sequential — principal-engineer dispatches one agent at a time
 8. Each task must be completable without questions — include entity names, field names, route paths from spec
 9. End each phase with a verification step (typecheck + lint + validate)
