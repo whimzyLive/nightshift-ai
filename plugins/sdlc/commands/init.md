@@ -582,9 +582,12 @@ the user exactly what to set up and how to verify. Print this checklist:
 > 2. **AI Workflow** (single-select) with options `Full Auto`, `Auto`, `Assisted` — controls
 >    auto-merge vs human-merge. Verify a value reads back:
 >    `acli jira workitem search --jql 'project = <KEY> AND "AI Workflow" is not EMPTY' --fields key`
+>    *No admin access to create custom fields?* Issues can opt in with an
+>    `AI-Workflow:<full-auto|auto|assisted>` label instead — the field, when set, always wins; with
+>    multiple such labels the most conservative mode applies (`assisted` > `auto` > `full-auto`).
 >
-> Once both fields exist, the project is ready: run `/auto <KEY>-<n>` (or `/refine-feature` to start
-> a new idea).
+> Once both fields exist (or the label convention is adopted), the project is ready: run
+> `/auto <KEY>-<n>` (or `/refine-feature` to start a new idea).
 >
 > **Next, to teach an agent your stack:** the scaffolded overrides
 > (`.claude/project/agents/<agent>.md`) already list any skills confirmed during `/init`. Skills with
