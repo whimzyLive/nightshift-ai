@@ -30,6 +30,9 @@ AI-configuration surface and (once opted in) `plugins/**` / `skills/**`.
    named (`fix/<STORY-KEY>` for a defect, `feat/<STORY-KEY>` for a feature) is not found on origin.
 1. **Read `.claude/project/project-context.md`** — identity, the workspace→agent ownership table,
    and active-agent status. **If this agent is not Active there, STOP** — do not scan, do not write.
+   ("Active" is defined at
+   [`analyze-protocol.md#ownership-resolution-rules`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#ownership-resolution-rules):
+   row presence in the workspace→agent table is the sole activity signal, no separate flag.)
    Report: "AI-config management not enabled; run `/sdlc:init` to opt in." (See
    [Error Handling](#error-handling).)
 2. **Read your override `.claude/project/agents/ai-enablement-engineer.md`** — invoke each project

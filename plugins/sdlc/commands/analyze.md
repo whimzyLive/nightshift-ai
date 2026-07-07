@@ -13,6 +13,9 @@ The agent should:
 
 1. Read `.claude/project/project-context.md`. **If `ai-enablement-engineer` is not Active there,
    stop** and report: "AI-config management not enabled; run `/sdlc:init` to opt in." Write nothing.
+   ("Active" is defined at
+   [`analyze-protocol.md#ownership-resolution-rules`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#ownership-resolution-rules):
+   row presence in the workspace→agent table is the sole activity signal, no separate flag.)
 2. Resolve effective write-scope per
    `${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#ownership-resolution-rules` and print it first.
 3. Narrow the scan to `$ARGUMENTS` when an area/glob is given; otherwise scan the full resolved

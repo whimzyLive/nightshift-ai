@@ -131,7 +131,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
 
 1. Read `docs/superpowers/plans/<STORY-KEY>.md`.
 2. Group tasks by agent tag: `[database-administrator]`, `[platform-engineer]`,
-   `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`.
+   `[ai-enablement-engineer]`, `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`.
 3. Cross-reference Active agents in project-context — drop Standby phases with no tasks.
 4. Note any "grounding corrections" / "open items" the plan flagged — pass them verbatim into
    the relevant domain-agent prompt so the implementer honors them.
@@ -143,9 +143,9 @@ task list **inline from the Jira story**:
    `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>`.
 2. Turn it into an ordered, agent-tagged task list the same way `tech-lead` would: map each piece of
    work to the **Active** domain agent that owns its files (per project-context), in the standard
-   dependency order (database-administrator → platform-engineer → sync-engineer → web-engineer →
-   mobile-engineer). Keep it proportional — a lightweight story is small, usually one or two domain
-   agents and a handful of tasks.
+   dependency order (database-administrator → platform-engineer → ai-enablement-engineer →
+   sync-engineer → web-engineer → mobile-engineer). Keep it proportional — a lightweight story is
+   small, usually one or two domain agents and a handful of tasks.
 3. Treat the **acceptance criteria as the completion contract** — pass them verbatim into each
    domain-agent prompt (there is no plan doc to carry them).
 
@@ -210,8 +210,8 @@ multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contra
 4. **Phase 4 — fix + verify.** Dispatch the owning domain agent to implement the fix so the phase-3
    test now **PASSES**, then run the project quality gate (`typecheck` + `test`). Multiple affected
    domains run **sequentially in the normal dependency order** (database-administrator →
-   platform-engineer → sync-engineer → web-engineer → mobile-engineer), one agent at a time, each on
-   the single `fix/<STORY-KEY>` branch.
+   platform-engineer → ai-enablement-engineer → sync-engineer → web-engineer → mobile-engineer), one
+   agent at a time, each on the single `fix/<STORY-KEY>` branch.
 
 Per-phase **Step-5 push/verify** runs after each domain-agent commit, exactly as on the feature path.
 The phase-3 commit (test added, fix not yet applied) and HEAD (fix applied) are the QA Step-7
@@ -240,9 +240,10 @@ never create branches or PRs. PR is opened only in Step 7, after QA returns `cle
 ```
 Phase 1 — [database-administrator]  schema + entities + migrations (ALWAYS FIRST; skip if Standby/no tasks)
 Phase 2 — [platform-engineer]       backend infra + handlers + config
-Phase 3 — [sync-engineer]           offline-sync rules + transactions (only if plan has tasks)
-Phase 4 — [web-engineer]            web pages/components (only if plan has tasks)
-Phase 5 — [mobile-engineer]         mobile screens (only if plan has tasks)
+Phase 3 — [ai-enablement-engineer]  plugins/**, skills/**, AI-config surface (only if plan has tasks)
+Phase 4 — [sync-engineer]           offline-sync rules + transactions (only if plan has tasks)
+Phase 5 — [web-engineer]            web pages/components (only if plan has tasks)
+Phase 6 — [mobile-engineer]         mobile screens (only if plan has tasks)
 ```
 
 - Sequential only — never two domain agents at once.

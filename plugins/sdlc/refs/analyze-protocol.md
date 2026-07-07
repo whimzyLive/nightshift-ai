@@ -9,6 +9,12 @@ the drift/gap rules, ownership resolution, and apply flow are defined exactly on
 **Runtime rule (verbatim):** effective write-scope = (config-driven AI-config surface ∪
 table-assigned areas) − read-only carve-outs.
 
+**Active (definition):** `ai-enablement-engineer` is Active in a repo if and only if the current
+repo's workspace→agent table in `.claude/project/project-context.md` assigns at least one area to
+it — row presence is the sole activity signal; no separate `Active: true`/opt-in flag exists
+anywhere. Every "if not Active, STOP" gate in this agent/command's runtime path (First steps,
+scan protocol, `/sdlc:analyze`) resolves against this one definition.
+
 - **Config-driven AI-config surface** — the baseline globs below ship with the agent definition;
   a per-repo override may add more. This list is illustrative-but-comprehensive, never exhaustive,
   and never hard-coded into the resolution logic:

@@ -266,3 +266,38 @@
   using the *same* derivation the ref file's own internal links already use (found by grepping the
   ref for its own `](#...)` occurrences) — cheaper and more reliable than trusting hand-derived
   slugs from memory of GitHub's algorithm.
+
+## 2026-07-08 — Story NA-12 review fixes — dispatch-ladder slot, Active-definition centralization
+**Learnings:**
+- "Add the new agent to the classic 5-agent dependency order" review findings named only 2 of the
+  3 occurrences in `principal-engineer-playbook.md` (~L133, ~L146) plus the Step-4 ladder — grepping
+  the whole file for the repeated arrow-chain (`database-administrator.*platform-engineer.*sync-
+  engineer`) surfaced a third, unlisted instance inside the defect-path Phase-4 prose (~L212-213).
+  Fixed all three for internal consistency rather than only the two literally named — a finding's
+  line numbers are illustrative of the *pattern*, not necessarily an exhaustive location list; a
+  repo-wide grep for the exact stale string is the cheap way to confirm nothing else matching the
+  same defect was left behind.
+- Renumbering a "Phase N — [agent] ..." ladder when inserting a new phase in the middle (after
+  platform-engineer, before sync-engineer) requires renumbering every phase after the insertion
+  point (3→4, 4→5, 5→6) — checked no other part of the same doc referenced those old phase numbers
+  by number (the defect-path's own "Phase 1-4" debugging cycle is a separate, differently-scoped
+  numbering scheme in the same file and must NOT be touched/renumbered).
+- Centralizing a repeated informal definition ("Active") at its one canonical anchor
+  (`analyze-protocol.md#ownership-resolution-rules`) only needs a same-file pointer-free fix for
+  occurrences *below* the definition in the same doc (scan-protocol's own "if not Active, STOP" step
+  already reads correctly in-file without an extra cross-reference) — but occurrences in *other*
+  files (`agents/ai-enablement-engineer.md`, `commands/analyze.md`) still need an explicit anchor
+  link, since a reader of those files has no reason to already know where the definition lives.
+- Two nearly-identical "Project skills (invoke via the Skill tool)" headings existed for
+  `ai-enablement-engineer` (the live `.claude/project/agents/` override and the `init.md` scaffold
+  template that generates it) listing skills that are actually preloaded via the agent's own
+  front-matter `skills:` key, not runtime Skill-tool invocations like other agents' overrides. Fixed
+  both to the same corrected heading/wording rather than picking one canonical file and drifting
+  from it — a scaffold template and its generated artifact must stay textually identical or the next
+  `/sdlc:init` regenerates the stale wording.
+
+**Patterns:**
+- When a review finding gives approximate line numbers (`~L###`) for "this pattern repeats", treat
+  them as a starting point and grep the exact stale substring across the whole file before declaring
+  the fix complete — under-fixing a few of N repeated occurrences reintroduces the same
+  inconsistency the finding was raised to close.

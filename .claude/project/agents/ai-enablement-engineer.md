@@ -1,6 +1,6 @@
 # AI Workflow Manager — nightshift-ai bindings
 
-## Project skills (invoke in order via the Skill tool)
+## Skills (plugin-bundled, preloaded via this agent's front-matter — no Skill-tool invocation needed)
 1. skill-creator
 2. find-skills
 3. conventional-commit
