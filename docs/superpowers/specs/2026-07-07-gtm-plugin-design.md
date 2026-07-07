@@ -48,7 +48,7 @@ unmodified.
 
 ```
 plugins/gtm/
-├── .claude-plugin/plugin.json   # deps: superpowers@claude-plugins-official, postiz@postiz-agent, marketing-skills@marketingskills — NO sdlc dep
+├── .claude-plugin/plugin.json   # deps: postiz@postiz-agent, marketing-skills@marketingskills — NO superpowers, NO sdlc dep
 ├── agents/
 │   ├── product-marketing-manager.md # PMM — marketing mirror of sdlc's product-manager: vague request → GTM brief
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
@@ -68,13 +68,15 @@ plugins/gtm/
 └── scripts/                    # vendored standalone set: session-complete.sh, cleanup-tmp.sh, tmp-dir.sh, session-key.sh (no sdlc dependency)
 ```
 
-**Dependencies (manifest):** three cross-marketplace plugins —
-`superpowers@claude-plugins-official`, `postiz@postiz-agent`, and
+**Dependencies (manifest):** two cross-marketplace plugins — `postiz@postiz-agent` and
 `marketing-skills@marketingskills` (marketplace `marketingskills`, repo `coreyhaines31/marketingskills`,
-v2.6.x). There is **no `sdlc` dependency**: gtm vendors the shared script set
+v2.6.x). **No `superpowers` dependency** — nothing in gtm invokes a superpowers skill (the earlier
+inclusion copied sdlc's manifest shape without the usage; add it back only when a future story
+actually uses one). There is **no `sdlc` dependency**: gtm vendors the shared script set
 (`session-complete.sh` / `cleanup-tmp.sh` / `tmp-dir.sh` / `session-key.sh`) into
 `plugins/gtm/scripts/`. `sdlc` stays an **optional build-handoff integration** (site / docs), not a
-manifest dep.
+manifest dep. (`marketplace.json` `allowCrossMarketplaceDependenciesOn` gains `postiz-agent` +
+`marketingskills`; the pre-existing `claude-plugins-official` entry stays for sdlc's superpowers dep.)
 
 ### `product-marketing-manager` agent (PMM)
 
