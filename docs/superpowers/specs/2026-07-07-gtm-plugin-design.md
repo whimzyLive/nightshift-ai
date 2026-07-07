@@ -8,16 +8,17 @@
 
 Developer founders ship products that nobody sees. nightshift's `sdlc` plugin automates the build
 side (Jira → spec → plan → impl → review → PR); nothing automates the distribution side. nightshift
-itself is the first proof case: ET-51 ("Nightshift growth — publish free plugin, build following")
-needs a landing site, demo, brand kit, launch posts, and a continuous content stream — with GitHub
-stars as the primary KPI and agent ownership of every channel that allows it.
+itself is the first proof case: its growth push (tracked under Epic NA-2, the source of truth for
+all nightshift-ai work) needs a landing site, demo, brand kit, launch posts, and a continuous
+content stream — with GitHub stars as the primary KPI and agent ownership of every channel that
+allows it.
 
 ## Solution
 
 A second nightshift plugin, `gtm` — a continuous marketing engine ("marketing while you sleep")
 that mirrors the sdlc architecture: agents + commands + refs + per-repo config. It turns shipped
 work (git activity) into channel-ready content, publishes through Postiz, tracks the KPI, and
-tunes its own calendar. sdlc builds; gtm distributes.
+tunes its own calendar. sdlc builds; gtm distributes. Tracked as Epic NA-2.
 
 ### Division of labor
 
@@ -36,7 +37,7 @@ so upstream skills work unmodified.
 
 ```
 plugins/gtm/
-├── .claude-plugin/plugin.json   # deps: marketingskills; sdlc optional
+├── .claude-plugin/plugin.json   # deps: marketingskills (pinned tag; init verifies, degrades); sdlc optional
 ├── agents/
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
 │   ├── content-writer.md        # per-channel drafts + media, obeys integrationSchema
@@ -44,7 +45,7 @@ plugins/gtm/
 ├── commands/
 │   ├── init.md      # scaffold config, verify Postiz, channel picker
 │   ├── pulse.md     # one engine pass — THE loop body
-│   ├── launch.md    # launch campaign (ET-51 asset list)
+│   ├── launch.md    # launch campaign (nightshift launch asset list)
 │   ├── report.md    # analytics digest + recommendations
 │   ├── site.md      # landing page: copy → brand → build handoff
 │   └── docs.md      # docs-SEO: audit → doc-improvement PRs
@@ -59,22 +60,30 @@ plugins/gtm/
 
 ### `/gtm:init`
 
-1. Prereq gate: `gh` auth OK; Postiz MCP reachable (backend URL + API key env var).
+1. Prereq gate: Postiz MCP reachable (backend URL + API key env var).
 2. Detect product info from README/repo.
 3. If `.agents/product-marketing.md` missing → run marketingskills `product-marketing` interview.
 4. `integrationList` → channel picker: per channel set ownership (`auto|draft|manual`), account
    voice (`brand|founder`), cadence, content types.
-5. Write `marketing-context.md` + `.agents/product-marketing.md` + `docs/gtm/` scaffold.
-6. Re-init guard identical to sdlc `/init` (keep / merge / rerun).
+5. KPI setup orchestration — founder defines the metric, picks its source from the provider
+   catalogue: managed provider (v1: GitHub via `gh`) or **custom source** (founder-supplied shell
+   command or endpoint returning the metric's current value). Init walks through that source's
+   auth/env needs, then runs a verification probe (reads one value) before accepting. Same for
+   optional engagement sources. Nothing hardcoded to GitHub; provider auth (e.g. `gh`) checked
+   only when that provider is selected.
+6. Write `marketing-context.md` + `.agents/product-marketing.md` + `docs/gtm/` scaffold.
+7. Re-init guard identical to sdlc `/init` (keep / merge / rerun).
 
 ### `/gtm:pulse` — core loop pass
 
 1. **Read config** — marketing-context + product-marketing.
 2. **Git scan** — `git log --since=<watermark>`: releases, merged PRs, changelog → shipped-work
    candidates.
-3. **Engagement poll** (non-fatal) — GitHub-side listening via `gh api`: new stars/forks, issues,
-   discussions, praise mentions. Praise → `docs/gtm/social-proof.md`. Questions worth answering →
-   reply drafts in `queue/` (drafts only — replies are NEVER auto-sent).
+3. **Engagement poll** (non-fatal, optional) — polls the engagement sources configured in
+   marketing-context; skipped when none configured. v1 ships one provider: GitHub via `gh api`
+   (new stars/forks, issues, discussions, praise mentions) — nightshift's choice, not a plugin
+   default. Praise → `docs/gtm/social-proof.md`. Questions worth answering → reply drafts in
+   `queue/` (drafts only — replies are NEVER auto-sent).
 4. **Calendar fill** — strategist merges candidates with evergreen calendar
    (`docs/gtm/calendar.md`), picks items due this pass.
 5. **Draft** — content-writer per item per channel: pulls `integrationSchema` (limits, media
@@ -93,9 +102,11 @@ Designed idempotent + resumable → runnable via native `/loop`, scheduled cloud
 
 ### `/gtm:launch`
 
-Positioning locked first (ECC ordering), then the ET-51 asset list: landing site (delegates to
-`/gtm:site`), ~90s demo **script + storyboard** (production is `manual` — Postiz video tool is
-short-form social, not terminal demos; record with asciinema/VHS/Remotion or human), brand kit
+Positioning locked first (ECC ordering), then the launch asset list: landing site (delegates to
+`/gtm:site`), ~90s demo via the **VHS + Remotion pipeline** — engine generates a VHS `.tape`
+script (deterministic terminal recording, re-recordable each release, CI-able) plus a Remotion
+composition that wraps the capture into the final cut (captions, brand frames, pacing); human
+voiceover optional. Brand kit
 (reuses `brand/` + `nightshift-design`), launch post batch across channels,
 `directory-submissions` checklist, coordinated launch-day calendar (Show HN + Product Hunt +
 social blast + article cross-posts). Human-owned channels (HN, PH, aged-account Reddit) always
@@ -103,8 +114,11 @@ land in `queue/`.
 
 ### `/gtm:report`
 
-Primary KPI from config (nightshift: `github_stars` via `gh api`) + Postiz analytics secondary.
-Correlates KPI deltas with post timing via UTM convention. Harvests testimonials. Outputs digest +
+User-defined primary KPI from config — metric + source, no plugin default (nightshift:
+`github_stars` via `gh api`) — + Postiz analytics secondary.
+Correlates KPI deltas with post timing via UTM convention. Harvests testimonials. Tracks per-channel
+approve-without-edit streaks and recommends draft→auto promotion after a sustained streak (default
+10 consecutive untouched drafts) — never promotes on its own. Outputs digest +
 calendar adjustments (feeds next pulse).
 
 ### `/gtm:site`
@@ -120,20 +134,25 @@ marketingskills `ai-seo` + `content-strategy` + `schema` audit docs → doc-impr
 ## Config schema — `.claude/project/marketing-context.md`
 
 - **Product**: name, one-liner, repo, landing URL
-- **KPI**: primary metric + source; secondary = Postiz analytics
-- **Postiz**: backend URL, API key **env var name** (never the key)
+- **KPI**: user-defined primary metric + source (no plugin default; nightshift picks `github_stars`); source is a provider reference — managed (v1: `github`) or `custom` with a command/endpoint that returns the current value; secondary = Postiz analytics. Engagement sources listed separately, optional
+- **Postiz**: backend URL (default: `api.postiz.com` cloud; self-hosted overrides), API key **env var name** (never the key)
 - **Channels**: one row per Postiz integration — ownership `auto|draft|manual`, voice
   `brand|founder`, cadence, content types
-- **Voice**: project voice + hard-bans pointer
-- **Cadence**: pulse frequency, quiet days
+- **Voice**: project voice layered over the plugin's ECC-derived anti-slop defaults
+  (`refs/voice-rules.md`); projects may extend or override — copy gate enforces the merged result
+- **Cadence**: pulse frequency (default: daily pulse; calendar gates output at ~3 posts/week/channel),
+  quiet days (default: weekends)
 - **UTM convention**
 
 State lives in repo (`docs/gtm/`), not `.claude/`: reviewable, committable, PR-able, survives
-machine changes.
+machine changes. Content log is append-only JSONL (dedupe key: item+channel) with a git
+union-merge attribute so concurrent appends merge cleanly; watermark resolves to the newest SHA on
+merge. The publish stage runs only on the default branch — elsewhere pulse auto-degrades to
+dry-run. Pulse digests print in-session AND append under `docs/gtm/digests/` for unattended runs.
 
 ## Autonomy model
 
-Three-state per channel, mirroring ET-51's agent-vs-human channel ownership:
+Three-state per channel, honest about agent-vs-human channel ownership:
 
 | State | Behavior |
 |---|---|
@@ -143,8 +162,11 @@ Three-state per channel, mirroring ET-51's agent-vs-human channel ownership:
 
 Graduation path draft → auto is a one-word config change per channel.
 
-**Never automated:** reply sending, HN/Reddit posting, Product Hunt launch-day presence, demo
-video recording.
+**Never automated:** reply sending, HN/Product Hunt posting (no Postiz integration; live presence
+required), publishing the demo video without human review. Reddit is Postiz-supported and defaults
+to `manual`, but is config-overridable to `draft`/`auto` by a founder who accepts the
+subreddit-rules risk. Demo video is machine-rendered (VHS + Remotion) but human-reviewed before it
+ships; voiceover optional/human.
 
 ## Companion change (sdlc-side)
 
@@ -164,7 +186,7 @@ not part of the gtm plugin build.
 
 - `--dry-run` on pulse/launch.
 - Copy-review gate mandatory before any `schedulePostTool` call.
-- **Acceptance = ET-51**: the plugin executes nightshift's own launch (`/gtm:init` →
+- **Acceptance = nightshift's own launch**: the plugin executes it (`/gtm:init` →
   `/gtm:launch` → `/gtm:pulse` on loop), dogfooding "we market nightshift with nightshift".
 
 ## Build order (each phase shippable)
@@ -180,13 +202,13 @@ not part of the gtm plugin build.
 - Email / newsletter sequences (no list yet; Postiz is not email)
 - Paid ads
 - Community ops (Discord/Slack)
-- X/Reddit listening APIs (GitHub-side listening only in v1)
+- X/Reddit listening APIs (GitHub engagement provider is the only listening source in v1 — optional, config-enabled)
 - Automated reply sending (never, not just v1)
-- Long-form video production (scripts/storyboards only)
+- Free-form/long-form video beyond the VHS + Remotion demo pipeline (YouTube tutorials, talking-head)
 
 ## Key references
 
-- ET-51 — Nightshift growth epic (first workload; KPI: maximize GitHub stars)
+- NA-2 — GTM plugin Epic, source of truth (first workload = nightshift launch; KPI: maximize GitHub stars)
 - [marketingskills](https://github.com/coreyhaines31/marketingskills) — skill dependency
 - [Postiz MCP](https://docs.postiz.com/mcp/introduction) — 9 tools; `schedulePostTool` supports draft/schedule/publish
 - [ECC marketing-agent](https://github.com/affaan-m/ECC/blob/main/agents/marketing-agent.md) — copy-review gate, positioning-first ordering, hard-bans quality bar
