@@ -43,9 +43,11 @@ marketing by hand.
 
 ## Acceptance Criteria
 
-1. A founder can run an init command that verifies prerequisites (GitHub auth, Postiz reachability),
-   detects product info, presents a channel picker, and writes the marketing config plus a docs
-   scaffold — with a re-init guard that offers keep / merge / rerun when config already exists.
+1. A founder can run an init command that verifies prerequisites (Postiz reachability, plus provider
+   auth for whichever KPI/engagement source the founder selects — e.g. GitHub auth when GitHub is
+   chosen), detects product info, presents a channel picker plus a KPI picker (metric + source), and
+   writes the marketing config plus a docs scaffold — with a re-init guard that offers keep / merge /
+   rerun when config already exists.
 2. A pulse pass reads config, scans git since the last watermark, drafts per-channel content in the
    configured voice, and passes every item through a copy-review gate before anything is published;
    no item reaches a channel without passing the gate.
@@ -61,9 +63,9 @@ marketing by hand.
 7. A launch command produces the full launch asset set (landing-site handoff, ~90s demo script and
    storyboard, brand kit reuse, launch-post batch, directory-submission checklist, coordinated
    launch-day calendar), with all trust-sensitive channels routed to the human queue.
-8. A report command reads the primary KPI (GitHub stars for nightshift) plus secondary analytics,
-   correlates KPI movement with published content, harvests social proof, and outputs a digest with
-   calendar adjustments.
+8. A report command reads the user-defined primary KPI from config (metric + source — GitHub stars
+   is nightshift's choice, not a plugin default) plus secondary analytics, correlates KPI movement
+   with published content, harvests social proof, and outputs a digest with calendar adjustments.
 9. Reply sending, Hacker News / Product Hunt posting, and demo-video recording are never automated —
    no Postiz integration exists for HN/PH and both demand live human presence; the engine only ever
    prepares drafts or queue items for a human on those. Reddit (a supported Postiz channel) defaults
@@ -77,27 +79,33 @@ marketing by hand.
 ### Flow A — Init (happy path)
 
 1. Founder installs `gtm` alongside `sdlc` and runs the init command.
-2. Engine checks prerequisites: GitHub auth OK, Postiz reachable (backend URL + API key present).
+2. Engine checks prerequisites: Postiz reachable (backend URL + API key present).
 3. Engine detects product info (name, one-liner, repo, landing URL) from the repository.
 4. If the product-marketing context is missing, engine runs the product-marketing interview.
 5. Engine lists available Postiz channels and presents a picker; founder sets per channel: ownership
-   (`auto` / `draft` / `manual`), voice (`brand` / `founder`), cadence, and content types.
+   (`auto` / `draft` / `manual`), voice (`brand` / `founder`), cadence, and content types. Founder
+   then picks the primary KPI (metric + source) and optional engagement sources; the engine verifies
+   auth for whichever providers were chosen (e.g. `gh` auth when GitHub is selected).
 6. Engine writes the marketing config, the product-marketing context, and the docs scaffold.
 7. Founder commits the config — marketing setup is now version-controlled.
 
 **Edge — config already exists:** engine detects existing config and offers keep / merge / rerun;
 nothing is overwritten without the founder choosing.
 
-**Edge — prerequisite missing:** GitHub auth or Postiz unreachable → engine stops at the gate with a
-clear message on what to fix; no partial config is written.
+**Edge — prerequisite missing:** Postiz unreachable, or auth missing for a selected KPI/engagement
+provider → engine stops at the gate with a clear message on what to fix; no partial config is
+written.
 
 ### Flow B — Pulse pass (happy path)
 
 1. Engine reads the marketing config and product context.
 2. Engine scans git since the last watermark for releases, merged PRs, and changelog entries →
    shipped-work candidates.
-3. Engine polls GitHub-side engagement (new stars/forks, issues, discussions, praise) — non-fatal;
-   praise is recorded as social proof, answerable questions become reply *drafts* in the queue.
+3. Engine polls the engagement sources defined in config — non-fatal; praise is recorded as social
+   proof, answerable questions become reply *drafts* in the queue. (v1 ships a GitHub provider —
+   stars/forks, issues, discussions; nightshift configures it. A product not centered on GitHub
+   disables it or configures a different source; the poll is skipped entirely when no source is
+   configured.)
 4. Strategist merges candidates with the evergreen calendar and picks items due this pass.
 5. Writer drafts each item per channel in the channel's voice, respecting each platform's limits and
    media rules, attaching generated image/short-video where the channel wants it; every link gets UTM
@@ -153,7 +161,8 @@ Carried from the Epic's Out of Scope (v1):
 - Email / newsletter sequences (no list yet; Postiz is not email).
 - Paid ads.
 - Community ops (Discord / Slack).
-- Off-platform listening APIs for X / Reddit — GitHub-side listening only in v1.
+- Off-platform listening APIs for X / Reddit — the GitHub engagement provider is the only listening
+  source shipped in v1 (optional, config-enabled).
 - Automated reply sending — never, not just v1; replies are drafted for a human to send.
 - Long-form / terminal-demo video production — scripts and storyboards only.
 - The `sdlc` PR-badge viral-loop change — a related companion improvement tracked as its own ticket,
@@ -167,8 +176,10 @@ Carried from the Epic (6) plus new ones surfaced during PRD:
    expected deployment before init is specced. — Owner: Solutions Architect
 2. Channel graduation policy — what signals justify promoting a channel from `draft` to `auto`? —
    Owner: Product
-3. KPI configurability beyond GitHub stars — which metric sources are supported at v1 for
-   non-nightshift consumers? — Owner: Product
+3. KPI provider catalogue at v1 — the KPI is user-defined (metric + source) with no plugin default;
+   GitHub is the only provider shipped at v1. Which additional sources (npm downloads, site
+   analytics, waitlist signups, marketplace installs) come next, and can a founder point at a
+   custom command/endpoint as a source? — Owner: Product
 4. Voice / quality-bar ownership — reuse the ECC hard-bans anti-slop rules vs project-specific voice;
    who approves the final bar? — Owner: Product
 5. Demo-video production path (asciinema / VHS / Remotion / human) — which is the default
@@ -190,7 +201,8 @@ Carried from the Epic (6) plus new ones surfaced during PRD:
 - **Postiz instance + API key** — reachable backend (self-hosted) and an API key exposed via an env
   var (never the key itself in config). Provides channel discovery, platform rules, draft/schedule/
   publish, and AI image / short-video generation.
-- **GitHub CLI (`gh`)** — for GitHub auth, git-side engagement polling, and KPI (stars) reads.
+- **GitHub CLI (`gh`)** — required only when the configured KPI or engagement source is GitHub
+  (as it is for nightshift); products tracking a different metric skip this dependency.
 - **`sdlc` plugin (optional)** — used for the landing-site and docs build handoff; when absent, the
   engine writes a brief instead of dispatching a build.
 

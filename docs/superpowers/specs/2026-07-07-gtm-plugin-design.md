@@ -73,9 +73,11 @@ plugins/gtm/
 1. **Read config** — marketing-context + product-marketing.
 2. **Git scan** — `git log --since=<watermark>`: releases, merged PRs, changelog → shipped-work
    candidates.
-3. **Engagement poll** (non-fatal) — GitHub-side listening via `gh api`: new stars/forks, issues,
-   discussions, praise mentions. Praise → `docs/gtm/social-proof.md`. Questions worth answering →
-   reply drafts in `queue/` (drafts only — replies are NEVER auto-sent).
+3. **Engagement poll** (non-fatal, optional) — polls the engagement sources configured in
+   marketing-context; skipped when none configured. v1 ships one provider: GitHub via `gh api`
+   (new stars/forks, issues, discussions, praise mentions) — nightshift's choice, not a plugin
+   default. Praise → `docs/gtm/social-proof.md`. Questions worth answering → reply drafts in
+   `queue/` (drafts only — replies are NEVER auto-sent).
 4. **Calendar fill** — strategist merges candidates with evergreen calendar
    (`docs/gtm/calendar.md`), picks items due this pass.
 5. **Draft** — content-writer per item per channel: pulls `integrationSchema` (limits, media
@@ -104,7 +106,8 @@ land in `queue/`.
 
 ### `/gtm:report`
 
-Primary KPI from config (nightshift: `github_stars` via `gh api`) + Postiz analytics secondary.
+User-defined primary KPI from config — metric + source, no plugin default (nightshift:
+`github_stars` via `gh api`) — + Postiz analytics secondary.
 Correlates KPI deltas with post timing via UTM convention. Harvests testimonials. Outputs digest +
 calendar adjustments (feeds next pulse).
 
@@ -121,7 +124,7 @@ marketingskills `ai-seo` + `content-strategy` + `schema` audit docs → doc-impr
 ## Config schema — `.claude/project/marketing-context.md`
 
 - **Product**: name, one-liner, repo, landing URL
-- **KPI**: primary metric + source; secondary = Postiz analytics
+- **KPI**: user-defined primary metric + source (no plugin default; nightshift picks `github_stars`); secondary = Postiz analytics. Engagement sources listed separately, optional
 - **Postiz**: backend URL, API key **env var name** (never the key)
 - **Channels**: one row per Postiz integration — ownership `auto|draft|manual`, voice
   `brand|founder`, cadence, content types
