@@ -41,7 +41,7 @@ The `.agents/product-marketing.md` path is nonetheless kept as-is (per AC-3) so 
 
 ## Deliverables — Plugin Machinery (committed under `plugins/gtm/`)
 
-Mirror the `plugins/sdlc/` layout exactly. `gtm` has **no hard dependency on the `sdlc` plugin** — it vendors the shared scripts it needs into its own `scripts/` directory so it is standalone. New files:
+Mirror the `plugins/sdlc/` layout exactly. `gtm` has **no hard dependency on the `sdlc` plugin** — it vendors the **complete** shared script set it needs into its own `scripts/` directory so it is standalone, and every reference resolves via `${CLAUDE_PLUGIN_ROOT}/scripts/…` (never an sdlc path). New files:
 
 | File | Purpose |
 | ---- | ------- |
@@ -50,8 +50,10 @@ Mirror the `plugins/sdlc/` layout exactly. `gtm` has **no hard dependency on the
 | `plugins/gtm/agents/product-marketing.md` | Bundled `product-marketing` agent definition — the interviewer dispatched to fill product-info gaps. |
 | `plugins/gtm/hooks/hooks.json` | SessionStart hook registration (points at the loader below); SessionEnd → the **vendored** `plugins/gtm/scripts/cleanup-tmp.sh`. |
 | `plugins/gtm/hooks/load-marketing-context.sh` | SessionStart loader: (a) writes the `.claude/.gtm-plugin-root` marker so subagents/later commands can resolve `${CLAUDE_PLUGIN_ROOT}`; (b) injects `.claude/project/marketing-context.md` as additionalContext when present. Inert-safe (emits nothing, exit 0) in a repo without gtm config. Modeled on `plugins/sdlc/hooks/load-project-context.sh`. |
-| `plugins/gtm/scripts/session-complete.sh` | **Vendored** copy of the session-release script (functional equivalent of `plugins/sdlc/scripts/session-complete.sh`) — so gtm depends on nothing outside its own package. Called by the Release-session step. |
-| `plugins/gtm/scripts/cleanup-tmp.sh` | **Vendored** copy of the SessionEnd temp-cleanup script (functional equivalent of `plugins/sdlc/scripts/cleanup-tmp.sh`). Referenced by `hooks.json`. |
+| `plugins/gtm/scripts/session-complete.sh` | **Vendored** copy of the session-release script (functional equivalent of `plugins/sdlc/scripts/session-complete.sh`) — so gtm depends on nothing outside its own package. Calls the sibling `session-key.sh`. Invoked by the Release-session step. |
+| `plugins/gtm/scripts/cleanup-tmp.sh` | **Vendored** copy of the SessionEnd temp-cleanup script (functional equivalent of `plugins/sdlc/scripts/cleanup-tmp.sh`). Calls the sibling `session-key.sh`. Referenced by `hooks.json`. |
+| `plugins/gtm/scripts/tmp-dir.sh` | **Vendored** copy of the session-scoped temp-dir resolver (functional equivalent of `plugins/sdlc/scripts/tmp-dir.sh`). Calls the sibling `session-key.sh`. Used by the atomic-write staging in Step 4. |
+| `plugins/gtm/scripts/session-key.sh` | **Vendored** copy of the session-key resolver (functional equivalent of `plugins/sdlc/scripts/session-key.sh`). Sibling dependency of all three scripts above — vendored so a literal copy of them never reaches back into `plugins/sdlc/`. |
 | `plugins/gtm/refs/postiz-verify.md` | The Postiz reachability + auth probe protocol (see Postiz Verification). |
 | `plugins/gtm/refs/product-detect.md` | The read-only product-info detection procedure (see Product Info Detection). |
 | `plugins/gtm/refs/marketing-context-template.md` | The `marketing-context.md` token template `/gtm:init` fills. |
@@ -125,7 +127,7 @@ Single-line absolute plugin root, written by the SessionStart hook so later gtm 
 
 ### Atomic-write requirement (Step 4)
 
-`/gtm:init` must never leave a half-written config set. Stage **all** artifact writes under the session temp dir (`scripts/tmp-dir.sh` → `./.tmp/<session>`), and only **after every staged write succeeds** move them into their final paths (same-filesystem rename where possible). On **any** failure mid-write: delete the staging area and leave the repo **untouched** — no partial `marketing-context.md`, no orphan `.agents/` or `docs/gtm/` files.
+`/gtm:init` must never leave a half-written config set. Stage **all** artifact writes under the session temp dir (resolved via the vendored `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` → `./.tmp/<session>`), and only **after every staged write succeeds** move them into their final paths (same-filesystem rename where possible). On **any** failure mid-write: delete the staging area and leave the repo **untouched** — no partial `marketing-context.md`, no orphan `.agents/` or `docs/gtm/` files.
 
 ### Post-init checklist (Step 5)
 
@@ -179,10 +181,10 @@ When `.claude/project/marketing-context.md` already exists, **never silently ove
 1. Create the `plugins/gtm/` package skeleton mirroring `plugins/sdlc/` (manifest, `commands/`, `agents/`, `hooks/`, `scripts/`, `refs/`, `README.md`).
 2. Author `plugins/gtm/commands/init.md` implementing Steps 0–5 + Final above. Use `plugins/sdlc/commands/init.md` as the structural reference (re-init guard, prerequisite gate, read-only scan, one-question-at-a-time prompts, no-placeholder write rule, atomic staged writes, session-complete release).
 3. Author the four refs (`postiz-verify.md`, `product-detect.md`, `marketing-context-template.md`, `agent-binding-template.md`) and the bundled `product-marketing` agent.
-4. Vendor `scripts/session-complete.sh` and `scripts/cleanup-tmp.sh` into `plugins/gtm/scripts/` (functional equivalents of the sdlc scripts) so gtm is standalone.
+4. Vendor the **complete** script set into `plugins/gtm/scripts/` — `session-complete.sh`, `cleanup-tmp.sh`, `tmp-dir.sh`, **and** their shared sibling `session-key.sh` (functional equivalents of the sdlc scripts) — so gtm is standalone. All three top-level scripts shell out to `session-key.sh`; omitting it would break them or silently reintroduce an sdlc-path dependency. Keep every invocation resolving via `${CLAUDE_PLUGIN_ROOT}/scripts/…`.
 5. Author `hooks/hooks.json` + `hooks/load-marketing-context.sh` mirroring sdlc's SessionStart loader, using a `.claude/.gtm-plugin-root` marker (distinct filename so gtm and sdlc markers never collide).
 6. Register the plugin in `.claude-plugin/marketplace.json`.
-7. Portability: run `tools/portability-lint.sh` — no absolute/user-specific paths hardcoded in bundled files.
+7. Portability: run `tools/portability-lint.sh` — no absolute/user-specific paths hardcoded in bundled files, and no residual `plugins/sdlc/` path references in the vendored scripts.
 
 ## Error Handling
 
@@ -220,5 +222,5 @@ No RBAC model exists in this repo — the only actor is the founder running `/gt
 
 - **`marketing-context.md` location — Decided:** `.claude/project/marketing-context.md` (mirrors `project-context.md`; auto-loaded by the SessionStart hook).
 - **`.agents/product-marketing.md` path — Decided:** repo-root `.agents/product-marketing.md`, per AC-3 (kept for future `marketingskills` compatibility, see Deviations).
-- **`session-complete.sh` — Decided:** gtm has **no** sdlc dependency; vendor `session-complete.sh` (and `cleanup-tmp.sh`) into `plugins/gtm/scripts/` and call via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh`.
+- **Vendored script set — Decided:** gtm has **no** sdlc dependency; vendor the complete set — `session-complete.sh`, `cleanup-tmp.sh`, `tmp-dir.sh`, and the shared sibling `session-key.sh` — into `plugins/gtm/scripts/`, and resolve every call via `${CLAUDE_PLUGIN_ROOT}/scripts/…`.
 - **Plugin version — Decided:** `plugins/gtm/.claude-plugin/plugin.json` starts at `0.1.0` (independent of sdlc's version line).
