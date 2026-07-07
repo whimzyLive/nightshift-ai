@@ -8,16 +8,17 @@
 
 Developer founders ship products that nobody sees. nightshift's `sdlc` plugin automates the build
 side (Jira → spec → plan → impl → review → PR); nothing automates the distribution side. nightshift
-itself is the first proof case: ET-51 ("Nightshift growth — publish free plugin, build following")
-needs a landing site, demo, brand kit, launch posts, and a continuous content stream — with GitHub
-stars as the primary KPI and agent ownership of every channel that allows it.
+itself is the first proof case: its growth push (tracked under Epic NA-2, the source of truth for
+all nightshift-ai work) needs a landing site, demo, brand kit, launch posts, and a continuous
+content stream — with GitHub stars as the primary KPI and agent ownership of every channel that
+allows it.
 
 ## Solution
 
 A second nightshift plugin, `gtm` — a continuous marketing engine ("marketing while you sleep")
 that mirrors the sdlc architecture: agents + commands + refs + per-repo config. It turns shipped
 work (git activity) into channel-ready content, publishes through Postiz, tracks the KPI, and
-tunes its own calendar. sdlc builds; gtm distributes.
+tunes its own calendar. sdlc builds; gtm distributes. Tracked as Epic NA-2.
 
 ### Division of labor
 
@@ -44,7 +45,7 @@ plugins/gtm/
 ├── commands/
 │   ├── init.md      # scaffold config, verify Postiz, channel picker
 │   ├── pulse.md     # one engine pass — THE loop body
-│   ├── launch.md    # launch campaign (ET-51 asset list)
+│   ├── launch.md    # launch campaign (nightshift launch asset list)
 │   ├── report.md    # analytics digest + recommendations
 │   ├── site.md      # landing page: copy → brand → build handoff
 │   └── docs.md      # docs-SEO: audit → doc-improvement PRs
@@ -93,7 +94,7 @@ Designed idempotent + resumable → runnable via native `/loop`, scheduled cloud
 
 ### `/gtm:launch`
 
-Positioning locked first (ECC ordering), then the ET-51 asset list: landing site (delegates to
+Positioning locked first (ECC ordering), then the launch asset list: landing site (delegates to
 `/gtm:site`), ~90s demo **script + storyboard** (production is `manual` — Postiz video tool is
 short-form social, not terminal demos; record with asciinema/VHS/Remotion or human), brand kit
 (reuses `brand/` + `nightshift-design`), launch post batch across channels,
@@ -133,7 +134,7 @@ machine changes.
 
 ## Autonomy model
 
-Three-state per channel, mirroring ET-51's agent-vs-human channel ownership:
+Three-state per channel, honest about agent-vs-human channel ownership:
 
 | State | Behavior |
 |---|---|
@@ -164,7 +165,7 @@ not part of the gtm plugin build.
 
 - `--dry-run` on pulse/launch.
 - Copy-review gate mandatory before any `schedulePostTool` call.
-- **Acceptance = ET-51**: the plugin executes nightshift's own launch (`/gtm:init` →
+- **Acceptance = nightshift's own launch**: the plugin executes it (`/gtm:init` →
   `/gtm:launch` → `/gtm:pulse` on loop), dogfooding "we market nightshift with nightshift".
 
 ## Build order (each phase shippable)
@@ -186,7 +187,7 @@ not part of the gtm plugin build.
 
 ## Key references
 
-- ET-51 — Nightshift growth epic (first workload; KPI: maximize GitHub stars)
+- NA-2 — GTM plugin Epic, source of truth (first workload = nightshift launch; KPI: maximize GitHub stars)
 - [marketingskills](https://github.com/coreyhaines31/marketingskills) — skill dependency
 - [Postiz MCP](https://docs.postiz.com/mcp/introduction) — 9 tools; `schedulePostTool` supports draft/schedule/publish
 - [ECC marketing-agent](https://github.com/affaan-m/ECC/blob/main/agents/marketing-agent.md) — copy-review gate, positioning-first ordering, hard-bans quality bar
