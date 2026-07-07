@@ -1,12 +1,17 @@
 {
   "name": "nightshift",
   "owner": { "name": "nightshift" },
-  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"],
+  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official", "postiz-agent", "marketingskills"],
   "plugins": [
     {
       "name": "sdlc",
       "source": "./plugins/sdlc",
       "description": "Repo-agnostic SDLC agent workflow (Jira→spec→plan→impl→review) for Claude Code"
+    },
+    {
+      "name": "gtm",
+      "source": "./plugins/gtm",
+      "description": "GTM marketing plugin — Postiz-backed channel publishing and marketingskills-driven positioning, brief authoring, and marketing foundation bootstrap for Claude Code"
     }
   ]
 }
