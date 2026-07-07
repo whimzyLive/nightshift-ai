@@ -24,26 +24,38 @@ tunes its own calendar. sdlc builds; gtm distributes. Tracked as Epic NA-2.
 
 | Layer | Provides |
 |---|---|
-| [marketingskills](https://github.com/coreyhaines31/marketingskills) (cross-marketplace dep) | Expertise: copywriting, cro, launch, ai-seo, content-strategy, directory-submissions, copy-editing, product-marketing |
+| [marketing-skills@marketingskills](https://github.com/coreyhaines31/marketingskills) (cross-marketplace dep) | Expertise: copywriting, cro, launch, ai-seo, content-strategy, directory-submissions, copy-editing, product-marketing |
 | `gtm` plugin | Orchestration: agent roles, git-driven loop, state, gates, KPI tracking |
-| Postiz (MCP, 9 tools) | Hands: channel discovery (`integrationList`), platform rules (`integrationSchema`), draft/schedule/publish (`schedulePostTool`), AI images + short video (`generateImageTool`, `generateVideoTool`) |
-| `sdlc` plugin (optional) | Build handoff for landing site / docs PRs |
+| [`postiz@postiz-agent`](https://github.com/gitroomhq/postiz-agent) — the `postiz` skill/CLI | Hands: channel discovery (`postiz integrations`), platform rules (integration schema via the CLI), draft/schedule/publish (`postiz posts:create`), media upload (`postiz upload`). The mechanism is the postiz **CLI/skill**, not MCP. |
+| `sdlc` plugin (optional) | Build handoff for landing site / docs PRs — an integration only, **not** a manifest dependency |
 | `.claude/project/marketing-context.md` | Per-repo config (same pattern as sdlc's `project-context.md`) |
 
-`/gtm:init` also writes `.agents/product-marketing.md` — marketingskills' expected context file —
-so upstream skills work unmodified.
+> **AI image / short-video generation** (the old Postiz MCP `generateImageTool` / `generateVideoTool`)
+> has **no postiz-CLI equivalent**. The generation mechanism is an **open decision for the
+> content-writer story**: either local generation + `postiz upload`, or adding the Postiz MCP server
+> alongside the `postiz` skill. Not decided here; not needed by `/gtm:init`.
+
+> **Rejected option:** the `deepline-gtm` skill (skills.sh / code.deepline.com) was evaluated and
+> **rejected** — it is a sales-outbound prospecting/enrichment vendor (paid API, account required),
+> not marketing-brief authoring, and its install path relies on sandbox-bypass npm-prefix +
+> custom-registry patterns that fail our supply-chain bar.
+
+`/gtm:init` also writes `.agents/product-marketing.md` — the marketingskills `product-marketing`
+skill's expected context file, which that skill creates and maintains — so upstream skills work
+unmodified.
 
 ## Plugin layout
 
 ```
 plugins/gtm/
-├── .claude-plugin/plugin.json   # deps: marketingskills (pinned tag; init verifies, degrades); sdlc optional
+├── .claude-plugin/plugin.json   # deps: superpowers@claude-plugins-official, postiz@postiz-agent, marketing-skills@marketingskills — NO sdlc dep
 ├── agents/
+│   ├── product-marketing-manager.md # PMM — marketing mirror of sdlc's product-manager: vague request → GTM brief
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
-│   ├── content-writer.md        # per-channel drafts + media, obeys integrationSchema
+│   ├── content-writer.md        # per-channel drafts + media, obeys postiz integration schema
 │   └── growth-analyst.md        # KPI + analytics pull, digest, calendar tuning, social-proof harvest
 ├── commands/
-│   ├── init.md      # scaffold config, verify Postiz, channel picker
+│   ├── init.md      # scaffold config, verify Postiz via postiz CLI, product-marketing context
 │   ├── pulse.md     # one engine pass — THE loop body
 │   ├── launch.md    # launch campaign (nightshift launch asset list)
 │   ├── report.md    # analytics digest + recommendations
@@ -51,28 +63,61 @@ plugins/gtm/
 │   └── docs.md      # docs-SEO: audit → doc-improvement PRs
 ├── refs/
 │   ├── marketing-context-template.md
-│   ├── postiz.md            # MCP wiring, auth, schedulePostTool conventions
-│   └── voice-rules.md       # hard bans / anti-AI-slop quality bar (adapted from ECC marketing-agent)
-└── scripts/
+│   ├── postiz-verify.md        # postiz CLI/skill gate: auth:status, env-var contract, posts:create conventions
+│   └── voice-rules.md          # hard bans / anti-AI-slop quality bar (adapted from ECC marketing-agent)
+└── scripts/                    # vendored standalone set: session-complete.sh, cleanup-tmp.sh, tmp-dir.sh, session-key.sh (no sdlc dependency)
 ```
+
+**Dependencies (manifest):** three cross-marketplace plugins —
+`superpowers@claude-plugins-official`, `postiz@postiz-agent`, and
+`marketing-skills@marketingskills` (marketplace `marketingskills`, repo `coreyhaines31/marketingskills`,
+v2.6.x). There is **no `sdlc` dependency**: gtm vendors the shared script set
+(`session-complete.sh` / `cleanup-tmp.sh` / `tmp-dir.sh` / `session-key.sh`) into
+`plugins/gtm/scripts/`. `sdlc` stays an **optional build-handoff integration** (site / docs), not a
+manifest dep.
+
+### `product-marketing-manager` agent (PMM)
+
+The marketing mirror of sdlc's `product-manager` (vague feature → PRD): the PMM takes a vague
+marketing request / product context → a **GTM brief** (positioning, messaging, target audience,
+channel rationale, launch angle), written to `docs/gtm/briefs/<date>-<slug>.md`. It uses the
+marketingskills skills (`product-marketing` for context; `launch` / `content-strategy` /
+`copywriting` as needed) and the `postiz` skill for any Postiz operation (**never raw HTTP**). NA-3
+ships the agent definition; the brief-producing workflows belong to downstream stories
+(NA-4..NA-8, NA-11).
 
 ## Commands
 
 ### `/gtm:init`
 
-1. Prereq gate: Postiz MCP reachable (backend URL + API key env var).
-2. Detect product info from README/repo.
-3. If `.agents/product-marketing.md` missing → run marketingskills `product-marketing` interview.
-4. `integrationList` → channel picker: per channel set ownership (`auto|draft|manual`), account
-   voice (`brand|founder`), cadence, content types.
-5. KPI setup orchestration — founder defines the metric, picks its source from the provider
-   catalogue: managed provider (v1: GitHub via `gh`) or **custom source** (founder-supplied shell
-   command or endpoint returning the metric's current value). Init walks through that source's
-   auth/env needs, then runs a verification probe (reads one value) before accepting. Same for
-   optional engagement sources. Nothing hardcoded to GitHub; provider auth (e.g. `gh`) checked
-   only when that provider is selected.
-6. Write `marketing-context.md` + `.agents/product-marketing.md` + `docs/gtm/` scaffold.
-7. Re-init guard identical to sdlc `/init` (keep / merge / rerun).
+`/gtm:init` does **all its own setup work in-command** (mirrors sdlc's `/init`) — no agent dispatch.
+Step ladder (matches the NA-3 spec, `docs/superpowers/specs/NA-3.md`):
+
+0. **Re-init guard** — identical to sdlc `/init` (keep / merge / rerun); never silently overwrites.
+1. **Dependency check** — verify the `postiz@postiz-agent` (postiz skill) and
+   `marketing-skills@marketingskills` (product-marketing skill) plugins are installed; install
+   (`claude plugin marketplace add … → claude plugin install …@… --scope project`) or instruct the
+   user; STOP if either cannot be installed.
+2. **Postiz gate** — via the postiz CLI: env vars `POSTIZ_API_URL` + `POSTIZ_API_KEY` present
+   (names-only persisted, values never written to disk) **and** `postiz auth:status` reports
+   authenticated. STOP + write nothing on failure.
+3. **Product detection** — read-only scan of README / repo / `package.json` for name, one-liner,
+   repo, landing URL.
+4. **Product-marketing context** — invoke the marketingskills `product-marketing` **skill** (seeded
+   with the Step-3 detection) to create/maintain `.agents/product-marketing.md` (auto-draft →
+   founder-corrects, or from-scratch interview). The skill owns that file.
+5. **Atomic write** of init's own artifacts — `marketing-context.md` + the `docs/gtm/` scaffold +
+   the gitignored `.claude/.gtm-plugin-root` marker; staged then moved only if all writes succeed;
+   verifies `.agents/product-marketing.md` exists.
+6. **Post-init checklist** — env vars to keep set, how to commit, and the follow-up stories.
+7. **Release** the session.
+
+> **Re-homed from the old init design:** the **channel picker** (old step 4 — `integrationList` →
+> per-channel ownership/voice/cadence) and **KPI setup orchestration** (old step 5 — metric +
+> provider-catalogue source + verification probe) are **not** part of NA-3's init. They are
+> later-story extensions of init (or their own commands): the channel picker belongs to **NA-4**
+> (channel ownership/voice/cadence) and KPI setup to **NA-6** (KPI metric + source). The capability
+> is not dropped — it is re-homed to the stories that own it.
 
 ### `/gtm:pulse` — core loop pass
 
@@ -86,13 +131,14 @@ plugins/gtm/
    `queue/` (drafts only — replies are NEVER auto-sent).
 4. **Calendar fill** — strategist merges candidates with evergreen calendar
    (`docs/gtm/calendar.md`), picks items due this pass.
-5. **Draft** — content-writer per item per channel: pulls `integrationSchema` (limits, media
-   rules), writes copy in channel's account voice, attaches generated image/short-video where the
-   channel wants it. All links carry `?utm_source=<channel>&utm_campaign=<item-slug>`.
+5. **Draft** — content-writer per item per channel: pulls the channel's postiz integration schema
+   (limits, media rules), writes copy in channel's account voice, attaches generated image/short-video
+   where the channel wants it (generation mechanism per the open decision above). All links carry
+   `?utm_source=<channel>&utm_campaign=<item-slug>`.
 6. **Copy-review gate** — marketingskills `copy-editing` + `refs/voice-rules.md`. Nothing reaches
    Postiz without passing.
-7. **Publish stage** — `schedulePostTool`: `auto` → scheduled post; `draft` → Postiz draft;
-   `manual` → asset file in `docs/gtm/queue/`.
+7. **Publish stage** — via the postiz CLI (`postiz posts:create`; media via `postiz upload`):
+   `auto` → scheduled post; `draft` → Postiz draft; `manual` → asset file in `docs/gtm/queue/`.
 8. **State update** — `docs/gtm/state.json`: watermark SHA, content log (an item never posts twice
    to the same channel).
 9. **Digest** — N drafted / N scheduled / N queued for human / what needs approval.
@@ -135,7 +181,7 @@ marketingskills `ai-seo` + `content-strategy` + `schema` audit docs → doc-impr
 
 - **Product**: name, one-liner, repo, landing URL
 - **KPI**: user-defined primary metric + source (no plugin default; nightshift picks `github_stars`); source is a provider reference — managed (v1: `github`) or `custom` with a command/endpoint that returns the current value; secondary = Postiz analytics. Engagement sources listed separately, optional
-- **Postiz**: backend URL (default: `api.postiz.com` cloud; self-hosted overrides), API key **env var name** (never the key)
+- **Postiz**: `POSTIZ_API_URL` env-var **name** (default `POSTIZ_API_URL`; backend URL — cloud or self-hosted — read from the env var by the postiz CLI) + API key **env-var name** (default `POSTIZ_API_KEY`; never the key). Names-only persisted.
 - **Channels**: one row per Postiz integration — ownership `auto|draft|manual`, voice
   `brand|founder`, cadence, content types
 - **Voice**: project voice layered over the plugin's ECC-derived anti-slop defaults
@@ -185,7 +231,7 @@ not part of the gtm plugin build.
 ## Testing & acceptance
 
 - `--dry-run` on pulse/launch.
-- Copy-review gate mandatory before any `schedulePostTool` call.
+- Copy-review gate mandatory before any postiz publish (`posts:create`) call.
 - **Acceptance = nightshift's own launch**: the plugin executes it (`/gtm:init` →
   `/gtm:launch` → `/gtm:pulse` on loop), dogfooding "we market nightshift with nightshift".
 
@@ -209,6 +255,7 @@ not part of the gtm plugin build.
 ## Key references
 
 - NA-2 — GTM plugin Epic, source of truth (first workload = nightshift launch; KPI: maximize GitHub stars)
-- [marketingskills](https://github.com/coreyhaines31/marketingskills) — skill dependency
-- [Postiz MCP](https://docs.postiz.com/mcp/introduction) — 9 tools; `schedulePostTool` supports draft/schedule/publish
+- NA-3 — `docs/superpowers/specs/NA-3.md` — `/gtm:init` technical spec (the locked init/deps decisions this doc aligns to)
+- [marketing-skills@marketingskills](https://github.com/coreyhaines31/marketingskills) — marketing-skills plugin dependency (marketplace `marketingskills`, v2.6.x)
+- [postiz@postiz-agent](https://github.com/gitroomhq/postiz-agent) — the `postiz` skill/CLI: `auth:status`, `posts:create`, `upload`, `integrations`, `analytics` across 28+ platforms (env: `POSTIZ_API_URL` + `POSTIZ_API_KEY`)
 - [ECC marketing-agent](https://github.com/affaan-m/ECC/blob/main/agents/marketing-agent.md) — copy-review gate, positioning-first ordering, hard-bans quality bar
