@@ -127,9 +127,12 @@ The mode has two sources, in strict precedence order:
    wins (`assisted` > `auto` > `full-auto`) — the label probes below check most-conservative first,
    so the ladder's order encodes that rule.
 
-`MODE` always resolves to a **real mode string** (`Full Auto` / `Auto` / `Assisted`) or empty for
-unset/unreadable — never a placeholder — because callers interpolate it into operator-facing text
-(e.g. the epic loop's E2b gate prompt via `storyMode(S)`):
+`MODE` always resolves to a **real mode string** (`Full Auto` / `Auto` / `Assisted`), or empty when
+**neither source is set** — never a placeholder — because callers interpolate it into
+operator-facing text (e.g. the epic loop's E2b gate prompt via `storyMode(S)`). One deliberate
+asymmetry: a field that is **set but whose value can't be read back** defaults to `Auto` (a real,
+gated mode string) rather than empty — "set to something non-Full-Auto" is known even when the
+value isn't:
 
 ```bash
 # Definitive, format-agnostic mode resolution: field first, then label fallback.
@@ -149,7 +152,7 @@ elif acli jira workitem search --jql 'key = STORY_KEY AND labels = "AI-Workflow:
 elif acli jira workitem search --jql 'key = STORY_KEY AND labels = "AI-Workflow:full-auto"' --fields key 2>/dev/null | grep -qw STORY_KEY; then
   MODE="Full Auto"
 else
-  MODE=""   # neither field nor label set, or unreadable — human-merge path
+  MODE=""   # neither field nor label set (or the probes themselves failed) — human-merge path
 fi
 ```
 
@@ -419,9 +422,11 @@ most-conservative label wins) — applied to `EPIC_KEY`:
 
 ```bash
 # epicFallback = the Epic's ACTUAL AI Workflow value (e.g. Full Auto / Auto /
-# Assisted), or empty if neither the field nor a fallback label is set/readable.
-# It must be a real mode string: later sections interpolate <effectiveMode(S)>
-# into operator-facing prompts, so a placeholder here would leak into output.
+# Assisted), or empty when NEITHER the field nor a fallback label is set. A field
+# that is set but whose value can't be read back defaults to "Auto" (a real, gated
+# mode) rather than empty — "set to something non-Full-Auto" is known even when the
+# value isn't. It must be a real mode string: later sections interpolate
+# <effectiveMode(S)> into operator-facing prompts, so a placeholder would leak.
 if acli jira workitem search --jql 'key = EPIC_KEY AND "AI Workflow" = "Full Auto"' --fields key 2>/dev/null | grep -qw EPIC_KEY; then
   epicFallback="Full Auto"
 elif acli jira workitem search --jql 'key = EPIC_KEY AND "AI Workflow" is not EMPTY' --fields key 2>/dev/null | grep -qw EPIC_KEY; then
