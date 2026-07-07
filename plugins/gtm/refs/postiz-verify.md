@@ -23,8 +23,11 @@ echo "MISSING=${MISSING:-none}"
 
 If `MISSING` is not `none`, **STOP** — name the exact missing variable(s):
 
-> Postiz is not configured: environment variable(s)<MISSING> are not set. Set them in your shell
+> Postiz is not configured: environment variable(s) `$MISSING` are not set. Set them in your shell
 > (or `.env`, sourced before this session) and re-run `/gtm:init`. No files were written.
+
+Substitute the actual `$MISSING` value computed above (e.g. `POSTIZ_API_URL POSTIZ_API_KEY`) —
+do not print the literal string `$MISSING`.
 
 Do **not** proceed to Condition 2 when any env var is missing.
 

@@ -116,7 +116,7 @@ session temp dir first, and only move them into place after **every** staged wri
 1. Resolve the staging dir:
 
    ```bash
-   stage="$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)"
+   stage="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh")"
    ```
 
 2. Write the following into `$stage`, mirroring the final repo-relative layout:
@@ -135,7 +135,8 @@ session temp dir first, and only move them into place after **every** staged wri
    [ -f ".agents/product-marketing.md" ] && echo "PMM_DOC=yes" || echo "PMM_DOC=no"
    ```
 
-   If `PMM_DOC=no`, delete the staging area and **STOP** — the marketing-context doc is missing:
+   If `PMM_DOC=no`, delete the staging area and **STOP** — the product-marketing context doc
+   (`.agents/product-marketing.md`) is missing:
 
    ```bash
    rm -rf "$stage"
@@ -218,7 +219,7 @@ After everything above is complete (success, or a terminal STOP surfaced to the 
 your very last action:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh"
 ```
 
 It prints the completion signal an automation worker watches for. Outside such a worker

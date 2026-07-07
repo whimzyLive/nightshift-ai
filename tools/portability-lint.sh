@@ -48,7 +48,7 @@ lint_plugin() { # $1=plugin root (absolute)
 
   # 1. machine-absolute paths
   report "no machine-absolute paths" \
-    "$(grep -rInE '/Users/|/home/[A-Za-z]|[A-Za-z]:\\\\' "$root" 2>/dev/null || true)"
+    "$(grep -rInE '/Users/|/home/[A-Za-z]|(^|[^A-Za-z])[A-Za-z]:\\' "$root" 2>/dev/null || true)"
 
   # 2. broken ./${CLAUDE_PLUGIN_ROOT}
   report "no ./\${CLAUDE_PLUGIN_ROOT} regression" \
@@ -57,7 +57,7 @@ lint_plugin() { # $1=plugin root (absolute)
   # 3. emails / PII (allow placeholder/example domains)
   report "no author emails / PII" \
     "$(grep -rInE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$root" 2>/dev/null \
-       | grep -viE 'noreply|example\.|your-org|@your|ATLASSIAN_EMAIL' || true)"
+       | grep -viE 'noreply|example\.|your-org|@your|ATLASSIAN_EMAIL|git@github\.com' || true)"
 
   # 4. forbidden plugin-agent frontmatter
   report "no forbidden agent frontmatter (hooks/mcpServers/permissionMode)" \

@@ -40,7 +40,12 @@ First non-empty result wins. If none resolve, `one-liner` is an interview gap.
 ## Step 3 — `repo`
 
 ```bash
-git remote get-url origin 2>/dev/null
+url="$(git remote get-url origin 2>/dev/null)"
+case "$url" in
+  git@github.com:*) repo="${url#git@github.com:}"; repo="${repo%.git}" ;;
+  https://github.com/*) repo="${url#https://github.com/}"; repo="${repo%.git}" ;;
+  *) repo="$url" ;;   # non-GitHub remote: keep raw URL
+esac
 ```
 
 Normalize to `owner/name` when the remote is a GitHub-style URL (SSH or HTTPS); otherwise keep the

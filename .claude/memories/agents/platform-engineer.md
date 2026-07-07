@@ -86,3 +86,42 @@
   whether any of the script's checks assume a *single* root implicitly beyond the obvious `root=`
   var (e.g. a shared manifest check that should run once, not once per scanned unit) — collapsing
   everything into one blind per-unit loop over-scans some checks and duplicates their output.
+
+## 2026-07-07 — Story NA-3 Copilot review fixes round 2 — lint regex + quoting hardening
+**Learnings:**
+- Assigned worktree was on the wrong local branch again (branch `worktree-agent-<id>`, `feat/NA-3`
+  checked out only in the shared main checkout). Instead of `git merge --ff-only` (prior pattern),
+  this time freed the branch by detaching the shared checkout (`git -C <shared-path> checkout
+  --detach`, safe since it was clean and at the exact same commit) then `git checkout feat/NA-3` in
+  the assigned worktree. Both approaches work; detach-then-checkout is simpler when the shared
+  checkout is clean and doesn't need to keep the branch ref itself.
+- A review finding's own suggested regex fix can be under-verified. Finding: single-quoted ERE
+  `[A-Za-z]:\\` (single backslash, meant to catch `C:\Users\...`) was proposed as a straight
+  swap-in for the old (broken, double-backslash) pattern. Applying it verbatim broke the lint on
+  *pre-existing, unrelated* content: any prose containing an escaped-newline-in-a-doc-string like
+  `"...exactly:\n  Status: ..."` or `"Criteria:\n"` also matches `letter:\` and false-positives as a
+  "Windows path". Fixed by requiring the char before the drive letter be a non-letter (i.e. not
+  mid-word): `(^|[^A-Za-z])[A-Za-z]:\\` — real paths are preceded by whitespace/quote/start-of-line
+  (`" C:\Users"`), whereas the false positives are always mid-word (`...tly:\n`, `...ia:\n`) with a
+  letter immediately before the "drive letter". Verified both the intended catch (`printf 'x
+  C:\\Users\\y\n'`) and the two false-positive shapes found in `plugins/sdlc/refs/*-playbook.md`
+  and `skills/user-story/scripts/user-story-template.py` before trusting it.
+- A fix that adds new legitimate content can itself trip an *unrelated* existing lint check.
+  Adding an SSH-remote-normalization snippet (`git@github.com:*` case-glob) to `product-detect.md`
+  tripped check #3 ("no author emails / PII") because `git@github.com` is syntactically
+  indistinguishable from a real email address to the generic `word@word.tld` regex. This is not a
+  new lint bug — `git@github.com` genuinely looks like PII to a naive regex — so extended the
+  existing allowlist (`grep -viE 'noreply|example\.|...'`) with `git@github\.com`, matching how the
+  script already carves out other known-safe non-PII shapes (`noreply`, `your-org`) rather than
+  weakening the base email regex itself.
+
+**Pitfalls:**
+- Always re-run the full lint/verification command after a "surgical" one-line regex fix, even when
+  the fix looks obviously correct in isolation and matches the review finding's own suggested
+  snippet — the surrounding repo's existing content is the real test bed, not just the reviewer's
+  one example input.
+
+**Patterns:**
+- For "make detector X more precise" findings on grep-based lint scripts: after tightening a regex
+  to catch more true positives, immediately grep the *whole* scanned tree with the new pattern and
+  triage every hit — don't assume the reviewer's one verification snippet is exhaustive.
