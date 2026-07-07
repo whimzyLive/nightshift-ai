@@ -72,11 +72,16 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
    ```bash
    acli jira workitem search --jql "key = <EPIC-KEY> AND \"AI Workflow\" is not EMPTY" --fields "key,\"AI Workflow\"" --json 2>/dev/null
    ```
-   If the result is non-empty, read the `"AI Workflow"` field value from the returned JSON. Do NOT use a hard-coded `customfield_*` id (ids vary per Jira instance). Capture the result as `epicAiWorkflow`:
+   If the result is non-empty, read the `"AI Workflow"` field value from the returned JSON. Do NOT use a hard-coded `customfield_*` id (ids vary per Jira instance). Capture the result as `epicAiWorkflow`, plus its source as `epicAiWorkflowSource=field`:
    - `Auto` → capture `epicAiWorkflow=Auto`
    - `Assisted` → capture `epicAiWorkflow=Assisted`
    - Any other value (null, empty, or unrecognised string) → treat as **unset**: set `epicAiWorkflow=unset` and continue. Do NOT error on unrecognised values.
-   - If the field cannot be resolved by name at all (API error, field absent on this instance) → treat as **unset**, surface a warning in the agent return ("Warning: AI Workflow field could not be resolved — omitting from child stories"), and continue decomposition without blocking. This is non-fatal (unset Epic tolerance).
+   - If the field probe yields **no value** (field unset, or it cannot be resolved by name at all — API error, field absent on this instance) → **fall back to the Epic's `AI-Workflow:*` labels** before treating the mode as unset. Probe most-conservative first, mirroring `/auto`'s label precedence:
+     ```bash
+     acli jira workitem search --jql "key = <EPIC-KEY> AND labels = \"AI-Workflow:assisted\"" --fields key --json 2>/dev/null   # → epicAiWorkflow=Assisted
+     acli jira workitem search --jql "key = <EPIC-KEY> AND labels = \"AI-Workflow:auto\"" --fields key --json 2>/dev/null       # → epicAiWorkflow=Auto
+     ```
+     First probe that matches wins; capture `epicAiWorkflowSource=label`. (An `AI-Workflow:full-auto` label is treated like the field's `Full Auto` — not propagated to children, same as today's unrecognised-value rule.) If neither label matches either → `epicAiWorkflow=unset`, `epicAiWorkflowSource=none`, surface the existing warning ("Warning: AI Workflow mode could not be resolved — omitting from child stories"), and continue decomposition without blocking. This is non-fatal (unset Epic tolerance).
 2. Find the PRD file path from Epic comments ONLY (format: `PRD: docs/features/...`). If no such comment exists on the Epic, STOP: "Cannot decompose — no PRD found on <EPIC-KEY>. Run /prd first." If the comment exists, verify the file exists on disk: `test -f <path> || { echo "STOP: PRD file not found at <path> — merge the prd/<EPIC-KEY> branch first."; exit 1; }` Then read it.
 3. Identify if an existing Epic has child stories already — do not duplicate
 4. **[invoke `user-story-mapping`]** Map the user journey for this Epic: identify persona, narrative, activities, and steps. Use the output as the structural skeleton for story decomposition.
@@ -110,16 +115,18 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 
     Label rules:
     - Pass the label via `--label "AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels). Multiple labels are comma-separated: `--label "AI-Ready,foo"`.
-    - Decompose-created stories receive **only** `AI-Ready` — **never** `AI-Refine`.
+    - **When `epicAiWorkflowSource=label`** (the Epic's mode came from a label, i.e. the project has no usable AI Workflow field): propagate the mode as a **label at create time** instead of a field stamp — `--label "AI-Ready,AI-Workflow:auto"` or `--label "AI-Ready,AI-Workflow:assisted"` (lowercase mode token matching `epicAiWorkflow`). Step 10a's field stamp is then skipped for these stories.
+    - Decompose-created stories receive **only** these labels — **never** `AI-Refine`.
     **Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
 10a. **Post-create: stamp the AI Workflow field on each created child story; report Story Points for manual entry.** For each key in the created-keys list:
     - **Custom-field stamps go through `jira-set-field.sh`, never `acli jira workitem edit`** — acli has no flag for setting custom-field values (verified through 1.3.22), so the plugin ships a REST helper. It authenticates via the same `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract as the acli skill's headless auth; when those are absent it exits 2 (skip) rather than failing.
     - **Story Points are NOT written.** The plugin does not set the points field — auto-stamping is dropped until acli exposes custom-field values natively (the REST-token env contract proved too fragile to require of every consumer). Instead, surface each story's step-6a estimate in the final return (step 15) as `<CHILD-KEY>: estimated N pts — set Story Points manually in Jira`.
-    - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted`, set the AI Workflow custom field by display name (never `customfield_*`); best-effort, same swallow pattern:
+    - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted` **and `epicAiWorkflowSource=field`**, set the AI Workflow custom field by display name (never `customfield_*`); best-effort, same swallow pattern:
       ```bash
       bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "AI Workflow" "<epicAiWorkflow>" option --if-empty \
         || echo "WARN: AI Workflow stamp failed for <CHILD-KEY> (exit $?) — continuing"
       ```
+      If `epicAiWorkflowSource=label`: **skip this field stamp** — the mode already rode the child's create-time `--label` (step 10); writing the field would fail on a project that has no usable field, which is the very case the label source signals.
       If `epicAiWorkflow` is `unset`: **skip this edit entirely** for that story. Do not write an empty or null value.
     - If an `edit` call fails for a story: surface the failing key in the agent return (non-silent) — the story exists but without that stamp. Do not abort the remaining stories. Example: `"Warning: AI Workflow stamp failed for <KEY>."`
     - **Never add `AI-Refine` to a decompose-created story** in this step or any other.
