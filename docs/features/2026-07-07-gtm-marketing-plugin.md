@@ -64,8 +64,11 @@ marketing by hand.
 8. A report command reads the primary KPI (GitHub stars for nightshift) plus secondary analytics,
    correlates KPI movement with published content, harvests social proof, and outputs a digest with
    calendar adjustments.
-9. Reply sending, Hacker News / Reddit / Product Hunt posting, and demo-video recording are never
-   automated — the engine only ever prepares drafts or queue items for a human on those.
+9. Reply sending, Hacker News / Product Hunt posting, and demo-video recording are never automated —
+   no Postiz integration exists for HN/PH and both demand live human presence; the engine only ever
+   prepares drafts or queue items for a human on those. Reddit (a supported Postiz channel) defaults
+   to `manual` but is config-overridable to `draft` / `auto` by a founder who accepts the
+   subreddit-rules risk.
 10. All engine state (watermark, content log, calendar, social proof, queue) lives in the repo as
     reviewable, committable files — not in hidden config.
 
@@ -122,8 +125,9 @@ draft-only and continues, never blocking on a listening/analytics error.
    batch across channels, directory-submission checklist, and a coordinated launch-day calendar
    (Show HN + Product Hunt + social blast across X / LinkedIn / Bluesky + Reddit + long-form article
    cross-posted to dev.to / Hashnode / Medium with the demo video).
-4. Trust-sensitive channels (Hacker News, Product Hunt, Reddit, founder account) are routed to the
-   human queue — the engine prepares, a human posts.
+4. Trust-sensitive channels (Hacker News, Product Hunt, founder account, and Reddit unless
+   explicitly overridden in config) are routed to the human queue — the engine prepares, a human
+   posts.
 5. Demo-video *recording* is a human/manual step; the engine delivers only the script and storyboard.
 
 ### Flow D — Postiz-unreachable degradation

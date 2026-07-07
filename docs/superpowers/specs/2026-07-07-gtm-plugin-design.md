@@ -144,8 +144,9 @@ Three-state per channel, honest about agent-vs-human channel ownership:
 
 Graduation path draft → auto is a one-word config change per channel.
 
-**Never automated:** reply sending, HN/Reddit posting, Product Hunt launch-day presence, demo
-video recording.
+**Never automated:** reply sending, HN/Product Hunt posting (no Postiz integration; live presence
+required), demo video recording. Reddit is Postiz-supported and defaults to `manual`, but is
+config-overridable to `draft`/`auto` by a founder who accepts the subreddit-rules risk.
 
 ## Companion change (sdlc-side)
 
