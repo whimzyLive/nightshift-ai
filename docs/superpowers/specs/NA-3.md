@@ -8,6 +8,16 @@
 
 Stand up the new `gtm` plugin package and its `/gtm:init` entry command — the marketing counterpart to sdlc's `/init`. `/gtm:init` gates on Postiz reachability, detects the repo's product info (running the product-marketing interview to fill gaps), then writes a version-controlled marketing foundation before any channel or KPI configuration exists.
 
+## Acceptance Criteria
+
+Binary done/not-done statements (from the NA-3 Jira story). Every `AC-n` reference elsewhere in this spec points here:
+
+- **AC-1** — `/gtm:init` verifies Postiz is reachable (backend URL resolved **and** the API-key env var present) and **stops with a clear message, writing no partial config**, when either check fails.
+- **AC-2** — `/gtm:init` detects product info (name, one-liner, repo, landing URL) from the repository; when product-marketing context is missing, it triggers the product-marketing interview to fill the gaps.
+- **AC-3** — `/gtm:init` writes `marketing-context.md`, `.agents/product-marketing.md`, and the `docs/gtm/` scaffold.
+- **AC-4** — Re-running `/gtm:init` when config already exists offers keep / merge / rerun and **never silently overwrites**.
+- **AC-5** — The founder can commit the resulting config as a version-controlled marketing setup.
+
 ## Context & Scope Boundary
 
 `gtm` is nightshift's second plugin, sitting beside `sdlc` (`plugins/sdlc/`). NA-3 is the foundation story for the whole Epic — it **blocks** NA-4, NA-5, NA-6, NA-7, NA-8, and NA-11. Those downstream stories own channel ownership/voice/cadence, KPI metric+source setup, engagement listening, pulse, and launch. This spec delivers only:
@@ -20,20 +30,32 @@ Everything a downstream story owns — Postiz channel config, KPI provider catal
 
 **This is a plugin/tooling repo** (Markdown + Shell). There is no database, HTTP API, web UI, mobile app, or offline-sync layer in scope — those template sections are omitted per the writing-specs skill.
 
+### Deviations from the epic design doc
+
+The epic design doc `docs/superpowers/specs/2026-07-07-gtm-plugin-design.md` sketches the broader gtm architecture. NA-3 deliberately deviates on two points, scoped to init:
+
+- **No `marketingskills` plugin dependency in NA-3.** The bundled `product-marketing` agent (`plugins/gtm/agents/product-marketing.md`) stands in as the interviewer; adopting the `marketingskills` plugin is deferred to a later story. This keeps the foundation self-contained.
+- **The Postiz gate is a raw authenticated HTTP probe, not an MCP-reachability check.** A direct `curl`-style probe against the Postiz backend is simpler and dependency-free for init; an MCP-based integration path is not required to prove reachability.
+
+The `.agents/product-marketing.md` path is nonetheless kept as-is (per AC-3) so that a future `marketingskills` adoption can bind to the same location without moving files.
+
 ## Deliverables — Plugin Machinery (committed under `plugins/gtm/`)
 
-Mirror the `plugins/sdlc/` layout exactly. New files:
+Mirror the `plugins/sdlc/` layout exactly. `gtm` has **no hard dependency on the `sdlc` plugin** — it vendors the shared scripts it needs into its own `scripts/` directory so it is standalone. New files:
 
 | File | Purpose |
 | ---- | ------- |
-| `plugins/gtm/.claude-plugin/plugin.json` | Plugin manifest — `name: "gtm"`, `version`, `description`, `author`, and the `superpowers@claude-plugins-official` cross-marketplace dependency (same as sdlc). No hard dependency on the `sdlc` plugin. |
+| `plugins/gtm/.claude-plugin/plugin.json` | Plugin manifest — `name: "gtm"`, `version: "0.1.0"`, `description`, `author`, and the `superpowers@claude-plugins-official` cross-marketplace dependency (same as sdlc). **No dependency on the `sdlc` plugin.** |
 | `plugins/gtm/commands/init.md` | The `/gtm:init` command (primary deliverable — command namespace derives from plugin name → invoked as `/gtm:init`). |
 | `plugins/gtm/agents/product-marketing.md` | Bundled `product-marketing` agent definition — the interviewer dispatched to fill product-info gaps. |
-| `plugins/gtm/hooks/hooks.json` | SessionStart hook registration (points at the loader below); SessionEnd → reuse `cleanup-tmp.sh` pattern. |
+| `plugins/gtm/hooks/hooks.json` | SessionStart hook registration (points at the loader below); SessionEnd → the **vendored** `plugins/gtm/scripts/cleanup-tmp.sh`. |
 | `plugins/gtm/hooks/load-marketing-context.sh` | SessionStart loader: (a) writes the `.claude/.gtm-plugin-root` marker so subagents/later commands can resolve `${CLAUDE_PLUGIN_ROOT}`; (b) injects `.claude/project/marketing-context.md` as additionalContext when present. Inert-safe (emits nothing, exit 0) in a repo without gtm config. Modeled on `plugins/sdlc/hooks/load-project-context.sh`. |
+| `plugins/gtm/scripts/session-complete.sh` | **Vendored** copy of the session-release script (functional equivalent of `plugins/sdlc/scripts/session-complete.sh`) — so gtm depends on nothing outside its own package. Called by the Release-session step. |
+| `plugins/gtm/scripts/cleanup-tmp.sh` | **Vendored** copy of the SessionEnd temp-cleanup script (functional equivalent of `plugins/sdlc/scripts/cleanup-tmp.sh`). Referenced by `hooks.json`. |
 | `plugins/gtm/refs/postiz-verify.md` | The Postiz reachability + auth probe protocol (see Postiz Verification). |
 | `plugins/gtm/refs/product-detect.md` | The read-only product-info detection procedure (see Product Info Detection). |
 | `plugins/gtm/refs/marketing-context-template.md` | The `marketing-context.md` token template `/gtm:init` fills. |
+| `plugins/gtm/refs/agent-binding-template.md` | The token template `/gtm:init` fills to write `.agents/product-marketing.md` (the per-repo agent binding). |
 | `plugins/gtm/README.md` | Plugin readme (mirror `plugins/sdlc/README.md` structure). |
 
 Modified file:
@@ -64,7 +86,7 @@ The gtm counterpart to `.claude/project/project-context.md`. Written from `refs/
 
 ### `.agents/product-marketing.md` (repo-root agent binding)
 
-Per-repo binding/override for the bundled `product-marketing` agent, written at the **repo root** under `.agents/` (as stated verbatim in AC-3 — a gtm convention distinct from sdlc's `.claude/project/agents/`). Carries the resolved product context and points at the bundled agent definition. No placeholder tokens remain after write.
+Per-repo binding/override for the bundled `product-marketing` agent, written at the **repo root** under `.agents/` (as stated verbatim in AC-3 — a gtm convention distinct from sdlc's `.claude/project/agents/`). Filled from `refs/agent-binding-template.md`. Carries the resolved product context and points at the bundled agent definition. No placeholder tokens remain after write.
 
 ### `docs/gtm/` scaffold
 
@@ -72,7 +94,7 @@ Create the marketing working-directory skeleton:
 
 | Path | Purpose |
 | ---- | ------- |
-| `docs/gtm/README.md` | Explains the gtm working directory and what downstream stories populate |
+| `docs/gtm/README.md` | Explains the gtm working directory. Minimal required sections: **(1) Purpose** (what `docs/gtm/` holds); **(2) Directory map** (`digests/` and the placeholders downstream stories add); **(3) What init writes vs what downstream stories populate**. Sourced from a `refs/docs-gtm-readme-template.md` template or written inline by the command. |
 | `docs/gtm/digests/.gitkeep` | Reserved for committed pulse digests (Epic: digests committed under `docs/gtm/digests/`) |
 
 Only the skeleton — the content log (JSONL), campaigns, and digests themselves are produced by downstream stories, not by init.
@@ -80,6 +102,8 @@ Only the skeleton — the content log (JSONL), campaigns, and digests themselves
 ### `.claude/.gtm-plugin-root` (gitignored marker)
 
 Single-line absolute plugin root, written by the SessionStart hook so later gtm commands/subagents resolve `${CLAUDE_PLUGIN_ROOT}`. `/gtm:init` must ensure `.tmp/` and `.claude/.gtm-plugin-root` are gitignored (idempotent append, mirror sdlc Step 4e).
+
+**Note — deliberate divergence from sdlc:** sdlc's `.claude/.sdlc-plugin-root` marker is committed; the gtm marker `.claude/.gtm-plugin-root` is **gitignored**. This is an intentional improvement — the marker is a per-session, machine-absolute cache and should never be committed.
 
 ## Command Surface — `/gtm:init`
 
@@ -95,9 +119,22 @@ Single-line absolute plugin root, written by the SessionStart hook so later gtm 
 | 1 | Postiz prerequisite gate | Verify env var present **and** reachability/auth probe passes. STOP with a clear message and **write nothing** on failure (AC-1). |
 | 2 | Product info detection | Read-only scan of the repo for name, one-liner, repo, landing URL (AC-2). |
 | 3 | Gap interview | If any product-marketing context is missing, dispatch/run the `product-marketing` interview to fill only the gaps (AC-2). |
-| 4 | Write artifacts | Write `marketing-context.md`, `.agents/product-marketing.md`, the `docs/gtm/` scaffold, the `.gtm-plugin-root` marker, and ensure gitignore entries (AC-3, AC-5). No placeholder tokens remain. |
-| 5 | Post-init checklist | Print what was written, the env var the founder must keep set, and how to commit the foundation; point at the next command (channel/KPI setup). |
-| Final | Release session | Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` as the last action (silent no-op outside the worker). Reuse the sdlc script path or vendor an equivalent — see Open Questions. |
+| 4 | Write artifacts (atomic) | Stage every write to the session temp dir first, then move all staged files into their final paths only after **all** writes succeed (see Atomic-write requirement). Writes `marketing-context.md`, `.agents/product-marketing.md`, the `docs/gtm/` scaffold, the `.gtm-plugin-root` marker, and ensures gitignore entries (AC-3, AC-5). No placeholder tokens remain. |
+| 5 | Post-init checklist | Print what was written, the env var the founder must keep set, and how to commit the foundation; name the follow-up stories/epic that extend this foundation (see Post-init checklist). |
+| Final | Release session | Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` (the vendored gtm copy) as the last action — silent no-op outside the worker. |
+
+### Atomic-write requirement (Step 4)
+
+`/gtm:init` must never leave a half-written config set. Stage **all** artifact writes under the session temp dir (`scripts/tmp-dir.sh` → `./.tmp/<session>`), and only **after every staged write succeeds** move them into their final paths (same-filesystem rename where possible). On **any** failure mid-write: delete the staging area and leave the repo **untouched** — no partial `marketing-context.md`, no orphan `.agents/` or `docs/gtm/` files.
+
+### Post-init checklist (Step 5)
+
+The checklist names the concrete follow-up work that extends this foundation — the stories NA-3 blocks, under Epic **NA-2** — rather than any not-yet-existing command name:
+
+- **NA-4 / NA-5 / NA-6 / NA-7 / NA-8** — channel ownership/voice/cadence, KPI metric+source setup, engagement listening, pulse, launch.
+- **NA-11** — (as linked from NA-3).
+
+It also reminds the founder to keep the Postiz API-key env var set, and shows how to commit the written foundation (AC-5).
 
 ## Postiz Verification (Step 1 detail)
 
@@ -133,16 +170,19 @@ When `.claude/project/marketing-context.md` already exists, **never silently ove
 - **Merge new findings** — re-run detection; backfill only template fields absent from the existing file (prompting for missing user-choice fields), preserving every value already set; then write.
 - **Re-run full setup** — walk all prompts again with existing values offered as defaults, then rewrite.
 
+**Both Merge and Re-run re-enter at Step 1 (the Postiz gate re-runs before any write).** A dead or unreachable backend can therefore never be re-written against — the gate protects the write path on every path through the command, first-run and re-run alike.
+
 ## Implementation Guide — platform-engineer
 
 `platform-engineer` owns `plugins/` and `tools/` and is the **only** active agent needed for this story. `web-engineer` (owns `brand/`) is **not** required — `brand/` is read-only detection input.
 
-1. Create the `plugins/gtm/` package skeleton mirroring `plugins/sdlc/` (manifest, `commands/`, `agents/`, `hooks/`, `refs/`, `README.md`).
-2. Author `plugins/gtm/commands/init.md` implementing Steps 0–5 + Final above. Use `plugins/sdlc/commands/init.md` as the structural reference (re-init guard, prerequisite gate, read-only scan, one-question-at-a-time prompts, no-placeholder write rule, session-complete release).
-3. Author the three refs (`postiz-verify.md`, `product-detect.md`, `marketing-context-template.md`) and the bundled `product-marketing` agent.
-4. Author `hooks/hooks.json` + `hooks/load-marketing-context.sh` mirroring sdlc's SessionStart loader, using a `.claude/.gtm-plugin-root` marker (distinct filename so gtm and sdlc markers never collide).
-5. Register the plugin in `.claude-plugin/marketplace.json`.
-6. Portability: run `tools/portability-lint.sh` — no absolute/user-specific paths hardcoded in bundled files.
+1. Create the `plugins/gtm/` package skeleton mirroring `plugins/sdlc/` (manifest, `commands/`, `agents/`, `hooks/`, `scripts/`, `refs/`, `README.md`).
+2. Author `plugins/gtm/commands/init.md` implementing Steps 0–5 + Final above. Use `plugins/sdlc/commands/init.md` as the structural reference (re-init guard, prerequisite gate, read-only scan, one-question-at-a-time prompts, no-placeholder write rule, atomic staged writes, session-complete release).
+3. Author the four refs (`postiz-verify.md`, `product-detect.md`, `marketing-context-template.md`, `agent-binding-template.md`) and the bundled `product-marketing` agent.
+4. Vendor `scripts/session-complete.sh` and `scripts/cleanup-tmp.sh` into `plugins/gtm/scripts/` (functional equivalents of the sdlc scripts) so gtm is standalone.
+5. Author `hooks/hooks.json` + `hooks/load-marketing-context.sh` mirroring sdlc's SessionStart loader, using a `.claude/.gtm-plugin-root` marker (distinct filename so gtm and sdlc markers never collide).
+6. Register the plugin in `.claude-plugin/marketplace.json`.
+7. Portability: run `tools/portability-lint.sh` — no absolute/user-specific paths hardcoded in bundled files.
 
 ## Error Handling
 
@@ -154,8 +194,8 @@ When `.claude/project/marketing-context.md` already exists, **never silently ove
 | No `git remote origin` | `repo` becomes an interview gap; prompt for it. |
 | No landing URL found | Field left blank (not required); no prompt needed unless founder wants one. |
 | Existing config + "Keep existing" | Print summary, STOP, no writes. |
-| Existing config + "Merge" / "Re-run" | Backfill or rewrite per Re-run Safety; never clobber set values silently. |
-| Any Step failing after Step 1 passes | STOP with actionable message; do not leave a partially-written config set. |
+| Existing config + "Merge" / "Re-run" | Re-enter at Step 1 (Postiz gate re-runs); then backfill or rewrite per Re-run Safety; never clobber set values silently. |
+| Any Step failing after Step 1 passes | STOP with actionable message; **atomic write** guarantees the repo is left untouched — delete the staging area, leave no partially-written config set. |
 
 ## Permissions & Trust Posture
 
@@ -170,11 +210,15 @@ No RBAC model exists in this repo — the only actor is the founder running `/gt
 - The append-only JSONL content log and its dedupe/merge rules.
 - Any change under `brand/` (read-only detection source only).
 - Postiz **channel connection** — init verifies the backend is reachable and authenticated; it does not connect or configure individual channels.
+- Adopting the `marketingskills` plugin — deferred; NA-3 uses the bundled `product-marketing` agent (see Deviations).
 
 ## Open Questions
 
-- [ ] **`marketing-context.md` location** — Suggested default: `.claude/project/marketing-context.md` (mirrors `project-context.md`; auto-loaded by the SessionStart hook). Alternative considered: `docs/gtm/`.
-- [ ] **`.agents/` vs `.claude/project/agents/` for the agent binding** — Suggested default: follow AC-3 literally → repo-root `.agents/product-marketing.md`. Flag if alignment with sdlc's `.claude/project/agents/` is preferred.
 - [ ] **Postiz probe endpoint** — Suggested default: a lightweight authenticated GET against the Postiz public API (e.g. the connected-integrations list) under `<backend URL>`; confirm the exact path against current Postiz API docs during implementation. Only the 2xx-vs-401/403-vs-connection-error distinction is load-bearing for this spec.
-- [ ] **`session-complete.sh` reuse** — Suggested default: call the existing `plugins/sdlc/scripts/session-complete.sh` via the resolved sdlc plugin root; if gtm must be standalone with no sdlc dependency, vendor an equivalent script into `plugins/gtm/scripts/`.
-- [ ] **Plugin version** — Suggested default: start `plugins/gtm/.claude-plugin/plugin.json` at `0.1.0` (independent of sdlc's version line).
+
+## Decided (defaults locked by this spec)
+
+- **`marketing-context.md` location — Decided:** `.claude/project/marketing-context.md` (mirrors `project-context.md`; auto-loaded by the SessionStart hook).
+- **`.agents/product-marketing.md` path — Decided:** repo-root `.agents/product-marketing.md`, per AC-3 (kept for future `marketingskills` compatibility, see Deviations).
+- **`session-complete.sh` — Decided:** gtm has **no** sdlc dependency; vendor `session-complete.sh` (and `cleanup-tmp.sh`) into `plugins/gtm/scripts/` and call via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh`.
+- **Plugin version — Decided:** `plugins/gtm/.claude-plugin/plugin.json` starts at `0.1.0` (independent of sdlc's version line).
