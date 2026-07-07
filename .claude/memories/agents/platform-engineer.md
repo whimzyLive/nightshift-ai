@@ -140,19 +140,32 @@
   invoke `npx skills find/add/check/update` (a public package-manager CLI querying the public
   skills.sh registry) — passes the "no exfiltration / no RCE / no secret access, confined to local
   files + public registry" checklist cleanly.
-- `skill-creator`'s `SKILL.md` (33KB) densely cross-references sibling directories it ships with
-  upstream — `scripts/*.py`, `references/schemas.md`, `assets/eval_review.html`, `agents/grader.md`,
-  `eval-viewer/generate_review.py` — none of which this plan's Phase 1 scope vendors (only
-  `SKILL.md` + `LICENSE.txt` per the plan's explicit file list). The vendored copy in this repo is
-  therefore SKILL.md-only prose guidance; several of its own internal instructions point at files
-  that don't exist under `plugins/sdlc/skills/skill-creator/`. This is a known scope gap from
-  following the plan literally, not an oversight — flag it if a later phase (README provenance,
-  Phase 6) or a user of the skill hits a dead reference.
-- Vetted `skill-creator`'s bundled scripts anyway (spec requires reading bundled scripts before
-  vendoring even though they aren't copied): `subprocess.run(["claude", "-p", ...])` calls in
-  `run_eval.py`/`improve_description.py`/`generate_review.py` are local CLI invocations (not
-  RCE from untrusted input); `eval-viewer/viewer.html` only `fetch()`s a local `/api/feedback`
-  endpoint. No external network exfiltration found.
+- **Follow-up (same day):** initially vendored `skill-creator` as `SKILL.md` + `LICENSE.txt` only
+  per the plan's literal file list, flagging the dangling internal references (`scripts/*.py`,
+  `references/schemas.md`, `assets/eval_review.html`, `agents/*.md`, `eval-viewer/*`) as a known
+  scope gap. Coordinator follow-up confirmed the skill is non-functional without them and asked to
+  vendor the full support tree. Re-cloned the same pinned commit
+  (`9d2f1ae187231d8199c64b5b762e1bdf2244733d`) and copied all five referenced directories —
+  `scripts/`, `references/`, `assets/`, `agents/`, `eval-viewer/` — verbatim (including the
+  executable bits on the `.py` files). Did **not** skip `agents/` or `eval-viewer/`: re-reading
+  SKILL.md's own "Reference files" section and Step 4 of the core loop shows both are core runtime
+  dependencies, not optional/advanced-only — `agents/grader.md` is used every iteration (grading
+  step), `agents/analyzer.md` is used every iteration (analyst pass) and also in the optional blind
+  comparison, and `eval-viewer/generate_review.py` is invoked directly by SKILL.md as the mandatory
+  viewer-launch step (repeated emphasis: "GENERATE THE EVAL VIEWER *BEFORE* evaluating..."). Only
+  `agents/comparator.md` is exclusively used by the explicitly-optional "Advanced: Blind comparison"
+  section — vendored it anyway since it lives in the same small `agents/` directory as the two core
+  files and splitting one file out of a 3-file directory for an "optional but harmless" doc isn't
+  worth the inconsistency.
+- Vetted every bundled script across all five directories, not just the ones read in the first
+  pass (spec requires reading bundled scripts before vendoring): `subprocess.run(["claude", "-p",
+  ...])` calls in `run_eval.py`/`improve_description.py` and `subprocess.run(["lsof", "-ti", ...])`
+  + `os.kill(...)` in `eval-viewer/generate_review.py` are local CLI/process-management invocations
+  (not RCE from untrusted input, not exfiltration); `eval-viewer/viewer.html`'s `fetch()` calls only
+  hit the local `/api/feedback` endpoint served by that same local script (same-origin, no external
+  host). `aggregate_benchmark.py`, `generate_report.py`, `package_skill.py`, `quick_validate.py`,
+  `utils.py` — grepped for network/exec primitives, no matches. No external network exfiltration
+  found anywhere in the vendored tree.
 - `git clone` works fine for vendoring even though this session's `curl`/`wget` are blocked by a
   context-mode hook (only for the http fetch path, not git's own transport) — used `git clone
   --depth 50 <repo>` into the scratchpad, read files with the Read tool, then `rm -rf` the clone
@@ -163,7 +176,11 @@
   full supporting directory tree" as two different, explicitly distinguishable deliverables — do
   not silently expand or contract the plan's stated file list based on what looks more "complete";
   record the resulting internal-reference gap in memory instead so the decision is traceable to
-  the plan, not to an unstated assumption.
+  the plan, not to an unstated assumption. Confirmed in practice: flagging the gap rather than
+  guessing let the coordinator make the call explicitly, and the follow-up instruction ("check
+  which directories are actually runtime needs, not just referenced") was answerable by re-reading
+  the skill's own core-loop steps vs. its "Advanced"/optional sections — a skill's own structure
+  usually tells you which bundled resources are load-bearing.
 
 ## 2026-07-07 — Story NA-3 PR review feedback — Postiz backend URL as config token, not a secret
 **Learnings:**
