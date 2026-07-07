@@ -67,11 +67,12 @@ marketing by hand.
 8. A report command reads the user-defined primary KPI from config (metric + source — GitHub stars
    is nightshift's choice, not a plugin default) plus secondary analytics, correlates KPI movement
    with published content, harvests social proof, and outputs a digest with calendar adjustments.
-9. Reply sending, Hacker News / Product Hunt posting, and demo-video recording are never automated —
-   no Postiz integration exists for HN/PH and both demand live human presence; the engine only ever
-   prepares drafts or queue items for a human on those. Reddit (a supported Postiz channel) defaults
-   to `manual` but is config-overridable to `draft` / `auto` by a founder who accepts the
-   subreddit-rules risk.
+9. Reply sending and Hacker News / Product Hunt posting are never automated — no Postiz integration
+   exists for HN/PH and both demand live human presence; the engine only ever prepares drafts or
+   queue items for a human on those. Reddit (a supported Postiz channel) defaults to `manual` but is
+   config-overridable to `draft` / `auto` by a founder who accepts the subreddit-rules risk. The
+   demo video is machine-rendered (VHS terminal capture + Remotion composition) but always
+   human-reviewed before publishing; voiceover is human/optional.
 10. All engine state (watermark, content log, calendar, social proof, queue) lives in the repo as
     reviewable, committable files — not in hidden config.
 
@@ -133,15 +134,18 @@ draft-only and continues, never blocking on a listening/analytics error.
    (marketplace listing live) before any asset points at it.
 2. Engine locks positioning first, reusing the locked brand (name "Nightshift", tagline "you sleep,
    it ships") and existing brand kit — no name validation pending.
-3. Engine produces the launch asset set: landing-site handoff, ~90s demo script + storyboard (paste
-   a ticket key → agents hand off → a PR opens → it fixes its own review → it merges), launch-post
-   batch across channels, directory-submission checklist, and a coordinated launch-day calendar
-   (Show HN + Product Hunt + social blast across X / LinkedIn / Bluesky + Reddit + long-form article
-   cross-posted to dev.to / Hashnode / Medium with the demo video).
+3. Engine produces the launch asset set: landing-site handoff, ~90s demo (storyline: paste a
+   ticket key → agents hand off → a PR opens → it fixes its own review → it merges) built with the
+   VHS + Remotion pipeline — a VHS tape script renders the terminal capture deterministically and a
+   Remotion composition assembles the final cut — launch-post batch across channels,
+   directory-submission checklist, and a coordinated launch-day calendar (Show HN + Product Hunt +
+   social blast across X / LinkedIn / Bluesky + Reddit + long-form article cross-posted to dev.to /
+   Hashnode / Medium with the demo video).
 4. Trust-sensitive channels (Hacker News, Product Hunt, founder account, and Reddit unless
    explicitly overridden in config) are routed to the human queue — the engine prepares, a human
    posts.
-5. Demo-video *recording* is a human/manual step; the engine delivers only the script and storyboard.
+5. The rendered demo video is always human-reviewed before it is published anywhere; voiceover is a
+   human/optional step.
 
 ### Flow D — Postiz-unreachable degradation
 
@@ -169,42 +173,52 @@ Carried from the Epic's Out of Scope (v1):
 - Off-platform listening APIs for X / Reddit — the GitHub engagement provider is the only listening
   source shipped in v1 (optional, config-enabled).
 - Automated reply sending — never, not just v1; replies are drafted for a human to send.
-- Long-form / terminal-demo video production — scripts and storyboards only.
+- Free-form / long-form video production beyond the VHS + Remotion demo pipeline (e.g. YouTube
+  tutorials, talking-head content).
 - The `sdlc` PR-badge viral-loop change — a related companion improvement tracked as its own ticket,
   not part of this plugin build.
 
-## Open Questions
+## Resolved Decisions
 
-Carried from the Epic (6) plus new ones surfaced during PRD:
+All nine open questions were resolved with the product owner on 2026-07-07:
 
-1. Postiz setup assumption per consumer (self-hosted backend URL + API key env var) — confirm
-   expected deployment before init is specced. — Owner: Solutions Architect
-2. Channel graduation policy — what signals justify promoting a channel from `draft` to `auto`? —
-   Owner: Product
-3. KPI provider catalogue beyond v1 — v1 ships the GitHub managed provider plus the custom
-   command/endpoint source (the universal escape hatch). Which managed providers come next
-   (npm downloads, site analytics, waitlist signups, marketplace installs)? — Owner: Product
-4. Voice / quality-bar ownership — reuse the ECC hard-bans anti-slop rules vs project-specific voice;
-   who approves the final bar? — Owner: Product
-5. Demo-video production path (asciinema / VHS / Remotion / human) — which is the default
-   recommendation for launch? — Owner: Product
-6. marketingskills cross-marketplace dependency — versioning and availability guarantees for the
-   required upstream skills. — Owner: Solutions Architect
-7. (New) Pulse cadence defaults and quiet-day handling — what is the recommended default frequency
-   for a new install, and how are quiet days expressed? — Owner: Product
-8. (New) Content-log / watermark conflict handling — how does dedupe behave when the same repo is run
-   from two machines or branches? — Owner: Solutions Architect
-9. (New) Digest delivery surface — is the pulse digest terminal-only, a committed file, or both? —
-   Owner: Product
+1. **Postiz deployment** — support both: config carries a backend URL (defaulting to the Postiz
+   cloud, `api.postiz.com`) plus an API key env var; self-hosted deployments override the URL. Same
+   auth path either way.
+2. **Channel graduation** — promotion from `draft` to `auto` is always a founder decision (a
+   one-word config change). `/gtm:report` tracks the approve-without-edit streak per channel and
+   recommends promotion after a sustained streak (default 10 consecutive untouched drafts); it
+   never promotes on its own.
+3. **KPI provider catalogue** — v1 ships the GitHub managed provider plus the custom
+   command/endpoint source; further managed providers are deferred and added demand-driven.
+4. **Voice / quality bar** — the plugin ships ECC-derived anti-slop defaults (hard bans) as
+   `refs/voice-rules.md`; each project can extend or override them via its marketing context. The
+   copy-review gate enforces the merged result.
+5. **Demo video** — VHS + Remotion pipeline: the engine generates a VHS `.tape` script that records
+   the terminal demo deterministically (re-recordable every release, CI-able), and a Remotion
+   composition wraps the capture into the final cut (captions, brand frames, pacing). Human
+   voiceover optional.
+6. **marketingskills dependency** — pinned to a known-good release tag; init verifies the required
+   skills are present and warns which features degrade when one is missing. Upstream breakage never
+   blocks a pulse — the copy gate falls back to the plugin's own voice rules.
+7. **Pulse cadence** — default is a daily pulse with the calendar gating what is actually due
+   (target ~3 posts per week per channel; weekends quiet). Cadence and quiet days are config
+   fields with these defaults.
+8. **State conflicts** — the content log is append-only JSONL with dedupe key item+channel and a
+   git union-merge attribute, so concurrent appends merge cleanly; the publish stage only runs on
+   the default branch (elsewhere pulse auto-degrades to dry-run); watermark resolves to the newest
+   SHA on merge.
+9. **Digest delivery** — both: printed in-session and appended under `docs/gtm/digests/`, so
+   unattended loop runs keep a reviewable history that `/gtm:report` can correlate.
 
 ## Dependencies
 
 - **marketingskills plugin** — cross-marketplace skill dependency (copywriting, cro, launch, ai-seo,
   content-strategy, directory-submissions, copy-editing, product-marketing). Must be installed and
   available.
-- **Postiz instance + API key** — reachable backend (self-hosted) and an API key exposed via an env
-  var (never the key itself in config). Provides channel discovery, platform rules, draft/schedule/
-  publish, and AI image / short-video generation.
+- **Postiz instance + API key** — cloud (`api.postiz.com`, the default) or a self-hosted backend
+  URL, plus an API key exposed via an env var (never the key itself in config). Provides channel
+  discovery, platform rules, draft/schedule/publish, and AI image / short-video generation.
 - **GitHub CLI (`gh`)** — required only when the configured KPI or engagement source is GitHub
   (as it is for nightshift); products tracking a different metric skip this dependency.
 - **`sdlc` plugin (optional)** — used for the landing-site and docs build handoff; when absent, the

@@ -37,7 +37,7 @@ so upstream skills work unmodified.
 
 ```
 plugins/gtm/
-├── .claude-plugin/plugin.json   # deps: marketingskills; sdlc optional
+├── .claude-plugin/plugin.json   # deps: marketingskills (pinned tag; init verifies, degrades); sdlc optional
 ├── agents/
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
 │   ├── content-writer.md        # per-channel drafts + media, obeys integrationSchema
@@ -103,8 +103,10 @@ Designed idempotent + resumable → runnable via native `/loop`, scheduled cloud
 ### `/gtm:launch`
 
 Positioning locked first (ECC ordering), then the launch asset list: landing site (delegates to
-`/gtm:site`), ~90s demo **script + storyboard** (production is `manual` — Postiz video tool is
-short-form social, not terminal demos; record with asciinema/VHS/Remotion or human), brand kit
+`/gtm:site`), ~90s demo via the **VHS + Remotion pipeline** — engine generates a VHS `.tape`
+script (deterministic terminal recording, re-recordable each release, CI-able) plus a Remotion
+composition that wraps the capture into the final cut (captions, brand frames, pacing); human
+voiceover optional. Brand kit
 (reuses `brand/` + `nightshift-design`), launch post batch across channels,
 `directory-submissions` checklist, coordinated launch-day calendar (Show HN + Product Hunt +
 social blast + article cross-posts). Human-owned channels (HN, PH, aged-account Reddit) always
@@ -114,7 +116,9 @@ land in `queue/`.
 
 User-defined primary KPI from config — metric + source, no plugin default (nightshift:
 `github_stars` via `gh api`) — + Postiz analytics secondary.
-Correlates KPI deltas with post timing via UTM convention. Harvests testimonials. Outputs digest +
+Correlates KPI deltas with post timing via UTM convention. Harvests testimonials. Tracks per-channel
+approve-without-edit streaks and recommends draft→auto promotion after a sustained streak (default
+10 consecutive untouched drafts) — never promotes on its own. Outputs digest +
 calendar adjustments (feeds next pulse).
 
 ### `/gtm:site`
@@ -131,15 +135,20 @@ marketingskills `ai-seo` + `content-strategy` + `schema` audit docs → doc-impr
 
 - **Product**: name, one-liner, repo, landing URL
 - **KPI**: user-defined primary metric + source (no plugin default; nightshift picks `github_stars`); source is a provider reference — managed (v1: `github`) or `custom` with a command/endpoint that returns the current value; secondary = Postiz analytics. Engagement sources listed separately, optional
-- **Postiz**: backend URL, API key **env var name** (never the key)
+- **Postiz**: backend URL (default: `api.postiz.com` cloud; self-hosted overrides), API key **env var name** (never the key)
 - **Channels**: one row per Postiz integration — ownership `auto|draft|manual`, voice
   `brand|founder`, cadence, content types
-- **Voice**: project voice + hard-bans pointer
-- **Cadence**: pulse frequency, quiet days
+- **Voice**: project voice layered over the plugin's ECC-derived anti-slop defaults
+  (`refs/voice-rules.md`); projects may extend or override — copy gate enforces the merged result
+- **Cadence**: pulse frequency (default: daily pulse; calendar gates output at ~3 posts/week/channel),
+  quiet days (default: weekends)
 - **UTM convention**
 
 State lives in repo (`docs/gtm/`), not `.claude/`: reviewable, committable, PR-able, survives
-machine changes.
+machine changes. Content log is append-only JSONL (dedupe key: item+channel) with a git
+union-merge attribute so concurrent appends merge cleanly; watermark resolves to the newest SHA on
+merge. The publish stage runs only on the default branch — elsewhere pulse auto-degrades to
+dry-run. Pulse digests print in-session AND append under `docs/gtm/digests/` for unattended runs.
 
 ## Autonomy model
 
@@ -154,8 +163,10 @@ Three-state per channel, honest about agent-vs-human channel ownership:
 Graduation path draft → auto is a one-word config change per channel.
 
 **Never automated:** reply sending, HN/Product Hunt posting (no Postiz integration; live presence
-required), demo video recording. Reddit is Postiz-supported and defaults to `manual`, but is
-config-overridable to `draft`/`auto` by a founder who accepts the subreddit-rules risk.
+required), publishing the demo video without human review. Reddit is Postiz-supported and defaults
+to `manual`, but is config-overridable to `draft`/`auto` by a founder who accepts the
+subreddit-rules risk. Demo video is machine-rendered (VHS + Remotion) but human-reviewed before it
+ships; voiceover optional/human.
 
 ## Companion change (sdlc-side)
 
@@ -191,9 +202,9 @@ not part of the gtm plugin build.
 - Email / newsletter sequences (no list yet; Postiz is not email)
 - Paid ads
 - Community ops (Discord/Slack)
-- X/Reddit listening APIs (GitHub-side listening only in v1)
+- X/Reddit listening APIs (GitHub engagement provider is the only listening source in v1 — optional, config-enabled)
 - Automated reply sending (never, not just v1)
-- Long-form video production (scripts/storyboards only)
+- Free-form/long-form video beyond the VHS + Remotion demo pipeline (YouTube tutorials, talking-head)
 
 ## Key references
 
