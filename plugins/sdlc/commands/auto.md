@@ -124,28 +124,41 @@ The mode has two sources, in strict precedence order:
    field doesn't exist on the instance**. Projects that cannot add custom fields opt in via a label
    instead: `AI-Workflow:full-auto`, `AI-Workflow:auto`, or `AI-Workflow:assisted` (lowercase mode
    tokens). When a story carries **multiple** `AI-Workflow:*` labels, the **most conservative** one
-   wins (`assisted` > `auto` > `full-auto`) — so the Full-Auto label check must also confirm no
-   more-conservative label is present.
+   wins (`assisted` > `auto` > `full-auto`) — the label probes below check most-conservative first,
+   so the ladder's order encodes that rule.
+
+`MODE` always resolves to a **real mode string** (`Full Auto` / `Auto` / `Assisted`) or empty for
+unset/unreadable — never a placeholder — because callers interpolate it into operator-facing text
+(e.g. the epic loop's E2b gate prompt via `storyMode(S)`):
 
 ```bash
-# Definitive, format-agnostic Full-Auto check: ask Jira directly whether STORY_KEY matches.
+# Definitive, format-agnostic mode resolution: field first, then label fallback.
 if acli jira workitem search --jql 'key = STORY_KEY AND "AI Workflow" = "Full Auto"' --fields key 2>/dev/null | grep -qw STORY_KEY; then
   MODE="Full Auto"
 elif acli jira workitem search --jql 'key = STORY_KEY AND "AI Workflow" is not EMPTY' --fields key 2>/dev/null | grep -qw STORY_KEY; then
-  MODE="other"   # field set to Auto / Assisted — field wins, labels are NOT consulted
-elif acli jira workitem search --jql 'key = STORY_KEY AND labels = "AI-Workflow:full-auto" AND labels not in ("AI-Workflow:auto", "AI-Workflow:assisted")' --fields key 2>/dev/null | grep -qw STORY_KEY; then
-  MODE="Full Auto"   # label fallback: field unset/absent, full-auto label, no more-conservative label
+  # Field set but not Full Auto — field wins, labels are NOT consulted. Read the real
+  # value (Auto / Assisted / …) so MODE carries a genuine mode string.
+  MODE="$(acli jira workitem view STORY_KEY --fields 'AI Workflow' --json 2>/dev/null \
+            | jq -r '.fields["AI Workflow"].value // .fields["AI Workflow"].name // .fields["AI Workflow"] // empty')"
+  [ -z "$MODE" ] && MODE="Auto"   # set-but-unreadable value ⇒ safe gated default (any non-Full-Auto value gates)
+# Field unset or absent on the instance → AI-Workflow:* label fallback, most conservative first.
+elif acli jira workitem search --jql 'key = STORY_KEY AND labels = "AI-Workflow:assisted"' --fields key 2>/dev/null | grep -qw STORY_KEY; then
+  MODE="Assisted"
+elif acli jira workitem search --jql 'key = STORY_KEY AND labels = "AI-Workflow:auto"' --fields key 2>/dev/null | grep -qw STORY_KEY; then
+  MODE="Auto"
+elif acli jira workitem search --jql 'key = STORY_KEY AND labels = "AI-Workflow:full-auto"' --fields key 2>/dev/null | grep -qw STORY_KEY; then
+  MODE="Full Auto"
 else
-  MODE="other"   # Auto / Assisted (field or label) / unset / unreadable — all take the human-merge path
+  MODE=""   # neither field nor label set, or unreadable — human-merge path
 fi
 ```
 
 `MODE="Full Auto"` is the **only** value that enables auto-merge. Any other outcome (`Auto`,
-`Assisted`, unset, or a JQL/auth error that yields no match) → the **human-merge** path. Defaulting
+`Assisted`, empty, or a JQL/auth error that yields no match) → the **human-merge** path. Defaulting
 to the human path is the safe failure mode: a transient read error must never trigger an unattended
 merge. (The `"AI Workflow"` field name is the consuming repo's single-select; the JQL match is
 case- and format-stable, unlike scraping view output. On an instance where the field doesn't exist
-at all, the two field probes error → no match → the label probe still runs, which is exactly the
+at all, the two field probes error → no match → the label probes still run, which is exactly the
 fallback's target case. The label tokens deliberately mirror the mode values the consuming repo's
 trigger service resolves from the same labels, so webhook-side triggering and `/auto`-side gating
 agree.)
@@ -437,7 +450,7 @@ on the **Epic** explaining that an AI Workflow mode must be set before automatio
 ```bash
 acli jira workitem comment create --key EPIC_KEY --body "Cannot start epic automation: no AI Workflow mode is set on this Epic.
 
-Set the Epic's AI Workflow field to one of Full Auto / Auto / Assisted — or, on a project without the custom field, add an AI-Workflow:full-auto / AI-Workflow:auto / AI-Workflow:assisted label — (it becomes the default mode for every child story that does not set its own), then re-run /auto EPIC_KEY."
+Set the Epic's AI Workflow field to one of Full Auto / Auto / Assisted — or, on a project without the custom field, add an AI-Workflow:full-auto / AI-Workflow:auto / AI-Workflow:assisted label. It becomes the default mode for every child story that does not set its own. Then re-run /auto EPIC_KEY."
 ```
 
 Then run the direct `session-complete.sh` release (see **Final action**) and exit. (An unreadable
