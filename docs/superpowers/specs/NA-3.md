@@ -12,7 +12,7 @@ Stand up the new `gtm` plugin package and its `/gtm:init` entry command — the 
 
 Binary done/not-done statements (from the NA-3 Jira story). Every `AC-n` reference elsewhere in this spec points here:
 
-- **AC-1** — `/gtm:init` verifies Postiz is reachable (the Postiz CLI's required env vars present **and** `postiz auth:status` succeeds) and **stops with a clear message, writing no partial config**, when either check fails.
+- **AC-1** — `/gtm:init` verifies Postiz is reachable (a resolved backend URL, the `POSTIZ_API_KEY` env var present, **and** `postiz auth:status` succeeds against that backend URL) and **stops with a clear message, writing no partial config**, when any check fails.
 - **AC-2** — `/gtm:init` detects product info (name, one-liner, repo, landing URL) from the repository; when product-marketing context is missing, it triggers the `product-marketing` interview (the marketingskills `product-marketing` skill) to fill the gaps.
 - **AC-3** — `/gtm:init` writes `marketing-context.md`, `.agents/product-marketing.md`, and the `docs/gtm/` scaffold.
 - **AC-4** — Re-running `/gtm:init` when config already exists offers keep / merge / rerun and **never silently overwrites**.
@@ -37,7 +37,7 @@ All Postiz operations across the gtm plugin (init's reachability gate, and every
 
 - It is a Claude Code plugin marketplace: marketplace name **`postiz-agent`**, plugin name **`postiz`** — installable reference **`postiz@postiz-agent`**, marketplace source **`gitroomhq/postiz-agent`**.
 - The plugin ships a `postiz` skill (`SKILL.md` at repo root, source `./`) wrapping the `postiz` npm CLI (`npm i -g postiz`): `auth:status` / `auth:login`, `posts:create`, `upload`, `integrations`, `analytics` across 28+ platforms.
-- **CLI contract:** requires env var **`POSTIZ_API_URL`** (backend URL) plus the API-key env var **`POSTIZ_API_KEY`** for authentication. *(The CLI also offers OAuth via `postiz auth:login`, but gtm's init gate requires the `POSTIZ_API_KEY` env var — see Postiz Verification — consistent with the `marketing-context.md` schema and the Decided env-var contract.)*
+- **CLI contract:** requires env var **`POSTIZ_API_URL`** (backend URL) plus the API-key env var **`POSTIZ_API_KEY`** for authentication. gtm treats the backend URL as a **persisted config value** (resolved at init and exported as `POSTIZ_API_URL` before every CLI call) rather than an env-only secret; only the API key stays env-only. *(The CLI also offers OAuth via `postiz auth:login`, but gtm's init gate requires the `POSTIZ_API_KEY` env var — see Postiz Verification — consistent with the `marketing-context.md` schema and the Decided env-var contract.)*
 - **Hard rules (from the skill):** authenticate first (`postiz auth:status` must pass before any other command); all media must be uploaded through `postiz upload`.
 
 gtm therefore **never hand-rolls HTTP against Postiz** — it delegates to the CLI/skill.
@@ -102,11 +102,15 @@ The gtm counterpart to `.claude/project/project-context.md` — it exists to **c
 | Product | `one-liner` | string | Yes | — | Tagline / one-sentence pitch |
 | Product | `repo` | string (URL or `owner/name`) | Yes | — | From `git remote` or interview |
 | Product | `landing URL` | string (URL) | No | empty | Blank allowed if none exists yet |
-| Postiz  | `API URL env var` | string (env var **name**) | Yes | `POSTIZ_API_URL` | Stores the **name only**; the `postiz` CLI reads the backend URL (cloud or self-hosted) from this env var at run time |
+| Postiz  | `Backend URL` | string (URL) | Yes | `https://api.postiz.com` | Stores the **resolved value** — chosen at init via `AskUserQuestion` (cloud default or self-hosted); not a secret. Exported as `POSTIZ_API_URL` by commands invoking the `postiz` CLI. |
 | Postiz  | `API key env var` | string (env var **name**) | Yes | `POSTIZ_API_KEY` | Stores the **name only** — never the key value |
 | Voice   | `voice overrides` | markdown block | No | empty | Placeholder for per-project ECC anti-slop overrides layered on the plugin defaults; populated by a downstream story, empty at init |
 
-**Hard rule — secret hygiene:** only env-var **names** are persisted (`POSTIZ_API_URL`, `POSTIZ_API_KEY`); the actual backend URL and key **values live in the environment and are never written to disk**. The `postiz` CLI reads them at run time.
+**Hard rule — secret hygiene:** the Postiz **backend URL is persisted by design** — it is a
+non-secret config value, chosen at init and written as the `Backend URL` token; commands invoking
+the `postiz` CLI export it as `POSTIZ_API_URL`. Only the **API key** stays env-only: its env-var
+**name** (`POSTIZ_API_KEY`) is persisted, but the key **value lives in the environment and is
+never written to disk**.
 
 ### `.agents/product-marketing.md` (marketingskills canonical product-context doc)
 
@@ -142,7 +146,7 @@ Single-line absolute plugin root, written by the SessionStart hook so later gtm 
 | ---- | ---- | --------- |
 | 0 | Re-init guard | Detect existing `.claude/project/marketing-context.md`; branch to the Re-run Safety flow if present. |
 | 1 | Dependency check | Verify **both** the `postiz@postiz-agent` plugin (+ `postiz` skill) **and** the `marketing-skills@marketingskills` plugin (+ `product-marketing` skill) are installed. If missing, install (`claude plugin marketplace add <src>` → `claude plugin install <plugin>@<marketplace> --scope project`) or instruct the user; STOP with an actionable message if either cannot be installed. Writes no config. |
-| 2 | Postiz prerequisite gate | Verify the CLI's required env vars present (`POSTIZ_API_URL` + the API-key env var) **and** `postiz auth:status` reports authenticated. STOP with a clear message and **write nothing** on failure (AC-1). |
+| 2 | Postiz prerequisite gate | Resolve the backend URL (existing `marketing-context.md` token → `POSTIZ_API_URL` env as seed → `AskUserQuestion` cloud default/self-hosted), verify `POSTIZ_API_KEY` is present, **and** `postiz auth:status` reports authenticated against the resolved backend. STOP with a clear message and **write nothing** on failure (AC-1). |
 | 3 | Product info detection | In-command, read-only scan of the repo for name, one-liner, repo, landing URL (AC-2). |
 | 4 | Product-marketing context | In-command: **invoke the marketingskills `product-marketing` skill** to create/maintain `.agents/product-marketing.md`, seeded with the Step-3 detection (auto-draft → founder-corrects, or from-scratch interview). No agent dispatch (AC-2, AC-3). |
 | 5 | Write gtm config (atomic) | In-command: stage init's own writes to the session temp dir first, then move them into place only after **all** succeed (see Atomic-write requirement). Writes `marketing-context.md`, the `docs/gtm/` scaffold, the `.gtm-plugin-root` marker, and ensures gitignore entries; then **verifies `.agents/product-marketing.md` exists** (produced by Step 4) — STOP if absent (AC-3, AC-5). No placeholder tokens remain. |
@@ -169,16 +173,17 @@ The checklist names the concrete follow-up work that extends this foundation —
 - **NA-4 / NA-5 / NA-6 / NA-7 / NA-8** — channel ownership/voice/cadence, KPI metric+source setup, engagement listening, pulse, launch.
 - **NA-11** — (as linked from NA-3).
 
-It also reminds the founder to keep the `POSTIZ_API_URL` and API-key env vars set, and shows how to commit the written foundation (AC-5).
+It also reminds the founder to keep the `POSTIZ_API_KEY` env var set (the backend URL now lives in `marketing-context.md`, not the environment), and shows how to commit the written foundation (AC-5).
 
 ## Postiz Verification (Step 2 detail)
 
-Spec'd in `refs/postiz-verify.md`. Runs **through the `postiz` skill/CLI** — gtm never hand-rolls HTTP. Two conditions, both required to pass; either failure = STOP, no files written:
+Spec'd in `refs/postiz-verify.md`. Runs **through the `postiz` skill/CLI** — gtm never hand-rolls HTTP. Three conditions, all required to pass; any failure = STOP, no files written:
 
-1. **Env vars present** — `POSTIZ_API_URL` **and** the API-key env var (default `POSTIZ_API_KEY`) are both set and non-empty. (The gate requires the API-key env var — consistent with AC-1, the `marketing-context.md` schema, and the Decided env-var contract; the CLI's OAuth mode is not an accepted init-gate path.)
-2. **Auth probe** — `postiz auth:status` reports authenticated. "Not authenticated" (bad/expired/absent key) and a CLI/connection error (unreachable backend) each map to a distinct STOP message.
+1. **Resolve the backend URL** — first match wins: (a) the existing `marketing-context.md` `Backend URL` token, when this is a Merge/Re-run re-entry; (b) `POSTIZ_API_URL` env var, if set — seeds the default answer only, never skips the question; (c) `AskUserQuestion` — founder picks **cloud default** (`https://api.postiz.com`) or **self-hosted** (supplies a URL). Export the resolved value as `POSTIZ_API_URL` for the rest of the session.
+2. **API key env var present** — `POSTIZ_API_KEY` is set and non-empty. (The gate requires the API-key env var — consistent with AC-1, the `marketing-context.md` schema, and the Decided env-var contract; the CLI's OAuth mode is not an accepted init-gate path.)
+3. **Auth probe** — `postiz auth:status` (with the resolved backend URL exported) reports authenticated. "Not authenticated" (bad/expired/absent key) and a CLI/connection error (unreachable backend) each map to a distinct STOP message; an unresolvable backend URL also maps to its own STOP message.
 
-The CLI owns the endpoint, transport, and auth mechanics; init only interprets `auth:status`. Values are read from the environment at run time and never persisted (only the env-var names are written to `marketing-context.md`).
+The CLI owns the endpoint, transport, and auth mechanics; init only interprets `auth:status`. The backend URL is a **persisted config value** (written to `marketing-context.md`'s `Backend URL` token in Step 5; authoritative for future sessions over a stale env var) — only the API key stays env-only, and only its env-var **name** is ever written to `marketing-context.md`.
 
 ## Product Info Detection (Step 3 detail)
 
@@ -225,9 +230,10 @@ When `.claude/project/marketing-context.md` already exists, **never silently ove
 | Scenario | Behaviour |
 | -------- | --------- |
 | `postiz@postiz-agent` or `marketing-skills@marketingskills` not installed and cannot be installed | STOP; message gives the `claude plugin marketplace add <src>` + `claude plugin install <plugin>@<marketplace>` steps for the missing plugin(s); write nothing. |
-| `POSTIZ_API_URL` (or the API-key env var) missing/empty | STOP; message names the exact env var(s); write nothing (AC-1). |
+| Postiz backend URL cannot be resolved (should not happen — `AskUserQuestion` always yields one) | STOP; message says re-run `/gtm:init` and answer the backend-URL prompt; write nothing (AC-1). |
+| `POSTIZ_API_KEY` missing/empty | STOP; message names the exact env var; write nothing (AC-1). |
 | `postiz auth:status` reports not authenticated | STOP; message says credentials invalid/expired/absent; write nothing. |
-| `postiz auth:status` errors / backend unreachable | STOP; message says the Postiz backend (`POSTIZ_API_URL`) is unreachable; write nothing. |
+| `postiz auth:status` errors / backend unreachable | STOP; message says the resolved Postiz backend URL is unreachable; write nothing. |
 | `product-marketing` skill did not produce `.agents/product-marketing.md` | STOP at Step 5 verification; message says the marketing-context doc is missing; init's own config writes are discarded (atomic). |
 | No `git remote origin` | `repo` becomes an interview gap; prompt for it. |
 | No landing URL found | Field left blank (not required); no prompt needed unless founder wants one. |
@@ -264,7 +270,7 @@ None outstanding — all decisions are locked below.
 - **`deepline-gtm` skill — Decided (rejected):** the `deepline-gtm` skill (skills.sh / code.deepline.com) was evaluated for the GTM-brief role and **rejected** — it is sales-outbound prospecting/enrichment behind a paid vendor API requiring an account, not marketing-brief authoring; and its install instructions rely on sandbox-bypass npm-prefix + custom-registry patterns that fail our supply-chain bar.
 - **Postiz operations — Decided:** all Postiz interaction (init's gate and every downstream action) goes through the `postiz` skill from `postiz@postiz-agent`; gtm never hand-rolls HTTP against Postiz.
 - **Postiz reachability gate — Decided:** `postiz auth:status` via the CLI; the CLI owns endpoint/transport/auth details (this resolves the former "Postiz probe endpoint" open question — no hand-rolled HTTP probe).
-- **Postiz env-var contract — Decided:** `POSTIZ_API_URL` (backend URL) + `POSTIZ_API_KEY` (API key) — both required; the init gate uses the API-key env var (OAuth is not an accepted gate path). `marketing-context.md` persists only the env-var **names**, never the values.
+- **Postiz env-var contract — Decided:** `POSTIZ_API_URL` (backend URL) + `POSTIZ_API_KEY` (API key) — both required by the CLI at run time; the init gate uses the API-key env var (OAuth is not an accepted gate path). The backend URL is a **persisted config token** in `marketing-context.md` (chosen at init via `AskUserQuestion`: cloud default `https://api.postiz.com` or self-hosted — not a secret), which commands export as `POSTIZ_API_URL` before invoking the CLI; an already-set `POSTIZ_API_URL` env var only **seeds** the init-time choice, never persists silently. `marketing-context.md` persists only the API key's env-var **name**, never its value.
 - **`marketing-context.md` location — Decided:** `.claude/project/marketing-context.md` (mirrors `project-context.md`; auto-loaded by the SessionStart hook). It is gtm's plugin config, distinct from `.agents/product-marketing.md` (owned by the marketingskills skill).
 - **`.agents/product-marketing.md` path — Decided:** repo-root `.agents/product-marketing.md`, per AC-3 — the file the marketingskills `product-marketing` skill creates and maintains.
 - **Vendored script set — Decided:** gtm has **no** sdlc dependency; vendor the complete set — `session-complete.sh`, `cleanup-tmp.sh`, `tmp-dir.sh`, and the shared sibling `session-key.sh` — into `plugins/gtm/scripts/`, and resolve every call via `${CLAUDE_PLUGIN_ROOT}/scripts/…`.

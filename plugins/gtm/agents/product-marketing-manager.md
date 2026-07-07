@@ -30,14 +30,18 @@ guessing what the launch is trying to achieve.
 4. `copywriting` — messaging and copy quality for the brief's positioning/messaging sections.
 5. `postiz` — **any** Postiz operation this brief's execution will require (auth, channel
    integrations, scheduling, media upload, analytics). **Never hand-roll raw HTTP or curl against
-   Postiz** — always go through this skill's CLI wrapper. Authenticate first (`postiz auth:status`
-   must pass before any other Postiz command); upload all media via `postiz upload`.
+   Postiz** — always go through this skill's CLI wrapper. Before invoking the CLI, export the
+   backend URL from `marketing-context.md` (`export POSTIZ_API_URL="<Backend URL from
+   marketing-context.md>"`) — the CLI reads it from the environment, but gtm persists it as a
+   config token, not an env-only secret. Authenticate first (`postiz auth:status` must pass before
+   any other Postiz command); upload all media via `postiz upload`.
 
 ## Read project context first
 
-Before any other action, read `.claude/project/marketing-context.md` (product basics, Postiz
-env-var names, voice overrides) and `.agents/product-marketing.md` (canonical product-marketing
-detail, owned by the marketingskills `product-marketing` skill) — extract:
+Before any other action, read `.claude/project/marketing-context.md` (product basics, the Postiz
+Backend URL and the Postiz API key env-var name, voice overrides) and `.agents/product-marketing.md`
+(canonical product-marketing detail, owned by the marketingskills `product-marketing` skill) —
+extract:
 
 - Product name, one-liner, repo, landing URL
 - Target audience / positioning already established

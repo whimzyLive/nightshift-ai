@@ -38,7 +38,8 @@ AskUserQuestion(
 ```
 
 - **Keep existing** → print a summary of the current config (Product name/one-liner/repo/landing
-  URL, Postiz env-var names, whether Voice overrides are set) and **STOP**. Write nothing.
+  URL, Postiz Backend URL, Postiz API key env-var name, whether Voice overrides are set) and
+  **STOP**. Write nothing.
 - **Merge new findings** → **re-enter at Step 1** (dependency check) before touching anything.
   After Steps 1–2 pass: re-run Step 3 detection, backfill only the `marketing-context.md` template
   fields absent from the existing file (prompting for missing user-choice fields), preserving
@@ -85,11 +86,21 @@ This step writes no config. Only continue to Step 2 once both dependencies are c
 
 ## Step 2 — Postiz prerequisite gate
 
-Apply `${CLAUDE_PLUGIN_ROOT}/refs/postiz-verify.md` exactly: verify `POSTIZ_API_URL` and
-`POSTIZ_API_KEY` are both set and non-empty, then confirm `postiz auth:status` reports
-authenticated. **STOP with the matching distinct message and write nothing** (AC-1) on any
-failure — missing env var(s), not-authenticated, or a CLI/connection error each get their own
-message per that ref. Do not proceed to Step 3 until this gate passes.
+Apply `${CLAUDE_PLUGIN_ROOT}/refs/postiz-verify.md` exactly — three conditions, all required:
+
+1. **Resolve the backend URL**, first match wins: (a) the existing `marketing-context.md` Backend
+   URL token, when this is a Merge/Re-run re-entry; (b) `POSTIZ_API_URL` env var, if set — used only
+   to **seed** the default answer below, never to skip the question; (c) `AskUserQuestion` — the
+   founder picks **Cloud default** (`https://api.postiz.com`) or **Self-hosted** (supplies a URL).
+   Export the resolved value (`export POSTIZ_API_URL="<resolved>"`) for the rest of this session.
+2. **`POSTIZ_API_KEY`** is set and non-empty.
+3. **`postiz auth:status`** (with `POSTIZ_API_URL` exported per step 1) reports authenticated.
+
+**STOP with the matching distinct message and write nothing** (AC-1) on any failure — an
+unresolved backend URL, a missing `POSTIZ_API_KEY`, a not-authenticated result, or a CLI/connection
+error each get their own message per that ref. Do not proceed to Step 3 until this gate passes. The
+resolved Backend URL carries forward to Step 5, which persists it as the `marketing-context.md`
+token — after that, the token is authoritative for future sessions (see the ref's precedence note).
 
 ## Step 3 — Product info detection
 
@@ -122,8 +133,8 @@ session temp dir first, and only move them into place after **every** staged wri
 2. Write the following into `$stage`, mirroring the final repo-relative layout:
    - `project/marketing-context.md` — filled from `${CLAUDE_PLUGIN_ROOT}/refs/marketing-context-template.md`
      using the Step 3 detection and Step 3/interview-collected values (product name, one-liner,
-     repo, landing URL, Postiz env-var **names** only, empty Voice section). No placeholder tokens
-     may remain.
+     repo, landing URL, the Step 2-resolved Postiz **Backend URL** value, the Postiz API key env-var
+     **name** only, empty Voice section). No placeholder tokens may remain.
    - `docs-gtm/README.md` — filled from `${CLAUDE_PLUGIN_ROOT}/refs/docs-gtm-readme-template.md`.
    - `docs-gtm/digests/.gitkeep` and `docs-gtm/briefs/.gitkeep` — empty marker files.
    - `gtm-plugin-root` — the resolved `${CLAUDE_PLUGIN_ROOT}` value (this session's), single line.
@@ -192,15 +203,17 @@ session temp dir first, and only move them into place after **every** staged wri
 Print a summary:
 
 > **Files written:**
-> - `.claude/project/marketing-context.md` — gtm's operational config (product basics, Postiz
->   env-var names, empty Voice overrides).
+> - `.claude/project/marketing-context.md` — gtm's operational config (product basics, the Postiz
+>   Backend URL, the Postiz API key env-var name, empty Voice overrides).
 > - `.agents/product-marketing.md` — the marketingskills canonical product-context doc.
 > - `docs/gtm/README.md`, `docs/gtm/digests/.gitkeep`, `docs/gtm/briefs/.gitkeep` — the marketing
 >   working-directory scaffold.
 > - `.claude/.gtm-plugin-root` (gitignored) — per-session plugin-root cache.
 >
-> **Keep these environment variables set** for every future gtm session: `POSTIZ_API_URL`,
-> `POSTIZ_API_KEY`. Only their **names** were persisted to disk — never the values.
+> **Keep this environment variable set** for every future gtm session: `POSTIZ_API_KEY`. Only its
+> **name** was persisted to disk — never the value. The Postiz backend URL now lives in
+> `marketing-context.md` (not a secret) — gtm commands export it as `POSTIZ_API_URL` for the
+> `postiz` CLI automatically; you don't need to keep it set yourself.
 >
 > **To commit the foundation** (AC-5):
 > ```bash

@@ -47,14 +47,14 @@ you).
 
 ## Env-var contract (Postiz)
 
-`/gtm:init`'s reachability gate (and every downstream Postiz action) requires two environment
-variables, read from the environment at run time:
+The `postiz` CLI reads its backend URL from the `POSTIZ_API_URL` environment variable and its API
+key from `POSTIZ_API_KEY`. gtm splits these differently by sensitivity:
 
-| Env var | Purpose |
-| ------- | ------- |
-| `POSTIZ_API_URL` | Postiz backend URL (cloud or self-hosted) |
-| `POSTIZ_API_KEY` | API key for authentication |
+| Value | Where it lives | Persisted? |
+| ----- | --------------- | ---------- |
+| Postiz backend URL | `.claude/project/marketing-context.md` (Postiz → `Backend URL`) | **Yes** — a config token, not a secret. Chosen at `/gtm:init` via `AskUserQuestion`: **cloud default** (`https://api.postiz.com`) or a **self-hosted** URL you supply. Commands that invoke the `postiz` CLI export it as `POSTIZ_API_URL` from this token. |
+| Postiz API key | environment only (`POSTIZ_API_KEY`) | **Never** — only the env-var **name** `POSTIZ_API_KEY` is persisted; the key value must stay in your shell/`.env`, never written to disk. |
 
-**Secret hygiene:** only the env-var **names** (`POSTIZ_API_URL`, `POSTIZ_API_KEY`) are persisted
-to `.claude/project/marketing-context.md` — the actual URL and key **values live in the
-environment and are never written to disk**.
+An already-set `POSTIZ_API_URL` env var, if present at `/gtm:init` time, seeds the default answer
+to the backend-URL question — it does not skip it. After init, the `marketing-context.md` token is
+authoritative; later changes to the env var no longer take effect unless you re-run `/gtm:init`.

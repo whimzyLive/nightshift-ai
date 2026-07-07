@@ -22,7 +22,7 @@ Every task's requirements implicitly include this section. Exact values copied v
 - **Plugin name:** `gtm` — **version:** `0.1.0` (independent of sdlc's version line).
 - **Dependencies (exactly two):** `postiz@postiz-agent` and `marketing-skills@marketingskills`. **NO `superpowers`. NO `sdlc`.**
 - **marketplace.json `allowCrossMarketplaceDependenciesOn` final value:** `["claude-plugins-official", "postiz-agent", "marketingskills"]` (pre-existing `claude-plugins-official` stays for sdlc's superpowers dep; append the other two).
-- **Postiz env-var contract:** `POSTIZ_API_URL` (backend URL) + `POSTIZ_API_KEY` (API key). Both required at the init gate. **Only env-var NAMES are persisted to disk — never the values.**
+- **Postiz env-var contract:** `POSTIZ_API_URL` (backend URL) + `POSTIZ_API_KEY` (API key). Both required at the init gate. **Backend URL is a persisted config token in `marketing-context.md`** (chosen at init: cloud default `https://api.postiz.com` or self-hosted — not a secret; a set `POSTIZ_API_URL` env var only seeds the init-time choice), exported as `POSTIZ_API_URL` by commands invoking the CLI. **Only the API key's env-var NAME is persisted to disk — never its value.**
 - **Postiz reachability gate:** via the `postiz` CLI (`postiz auth:status`) — gtm never hand-rolls HTTP against Postiz.
 - **`.agents/product-marketing.md`** is owned/maintained by the marketingskills `product-marketing` skill — init invokes the skill, does NOT author a template for it. No `refs/agent-binding-template.md`.
 - **Path resolution:** every script/ref invocation resolves via `${CLAUDE_PLUGIN_ROOT}/scripts/…` — NEVER a `plugins/sdlc/` path.
@@ -111,9 +111,10 @@ Single sequential phase — `platform-engineer` only. This story is pure plugin 
 Do **NOT** author `refs/agent-binding-template.md` — the marketingskills `product-marketing` skill owns `.agents/product-marketing.md`.
 
 **`postiz-verify.md`** (Step 2 gate protocol, via the `postiz` CLI — never HTTP):
-1. Env vars present — `POSTIZ_API_URL` AND `POSTIZ_API_KEY` both set and non-empty.
-2. Auth probe — `postiz auth:status` reports authenticated.
-- Distinct STOP messages: (a) missing/empty env var(s) — name the exact var; (b) not authenticated — credentials invalid/expired/absent; (c) CLI/connection error — backend at `POSTIZ_API_URL` unreachable. Every failure = STOP, write nothing. Values read from env at run time, never persisted.
+1. Resolve backend URL — existing `marketing-context.md` `Backend URL` token → `POSTIZ_API_URL` env (seed only) → `AskUserQuestion` (cloud default `https://api.postiz.com` / self-hosted). Export resolved value as `POSTIZ_API_URL`.
+2. API key env var present — `POSTIZ_API_KEY` set and non-empty.
+3. Auth probe — `postiz auth:status` (with `POSTIZ_API_URL` exported) reports authenticated.
+- Distinct STOP messages: (a) backend URL unresolved; (b) missing/empty `POSTIZ_API_KEY`; (c) not authenticated — credentials invalid/expired/absent; (d) CLI/connection error — resolved backend unreachable. Every failure = STOP, write nothing. Backend URL is a persisted config value (not a secret); only the API key stays env-only and only its name is ever persisted.
 
 **`product-detect.md`** (Step 3, read-only; writes nothing) — resolve each field by first matching source, unresolved → interview gap for Step 4:
 | Field | Sources (in order) | Fallback |
@@ -124,7 +125,7 @@ Do **NOT** author `refs/agent-binding-template.md` — the marketingskills `prod
 | landing URL | `package.json` `homepage` → first external link/badge in `README.md` | prompt (blank allowed) |
 `brand/` is read-only here.
 
-**`marketing-context-template.md`** — token template for `.claude/project/marketing-context.md` with the spec schema sections: Product (`name`, `one-liner`, `repo`, `landing URL`), Postiz (`API URL env var` default `POSTIZ_API_URL`, `API key env var` default `POSTIZ_API_KEY` — NAMES only, secret-hygiene rule), Voice (`voice overrides` — empty at init). Points at `.agents/product-marketing.md` as the canonical product-marketing detail.
+**`marketing-context-template.md`** — token template for `.claude/project/marketing-context.md` with the spec schema sections: Product (`name`, `one-liner`, `repo`, `landing URL`), Postiz (`Backend URL` — resolved value, default `https://api.postiz.com`, chosen at init via `AskUserQuestion`, not a secret; `API key env var` default `POSTIZ_API_KEY` — NAME only, secret-hygiene rule), Voice (`voice overrides` — empty at init). Points at `.agents/product-marketing.md` as the canonical product-marketing detail.
 
 **`docs-gtm-readme-template.md`** — template for `docs/gtm/README.md` with the three required sections: (1) Purpose, (2) Directory map (`digests/`, `briefs/`, downstream placeholders), (3) What init writes vs what downstream stories populate.
 
@@ -146,11 +147,11 @@ Do **NOT** author `refs/agent-binding-template.md` — the marketingskills `prod
 **Step ladder (must be implemented exactly):**
 - **Step 0 — Re-init guard:** detect existing `.claude/project/marketing-context.md`; if present, `AskUserQuestion` → Keep existing (print summary, STOP, write nothing) / Merge new findings (re-detect, backfill only absent template fields, preserve set values) / Re-run full setup (re-prompt with existing values as defaults, rewrite). Both Merge and Re-run **re-enter at Steps 1–2** before any write.
 - **Step 1 — Dependency check:** verify both `postiz@postiz-agent` (+`postiz` skill) and `marketing-skills@marketingskills` (+`product-marketing` skill) installed. If missing, install idempotently: `claude plugin marketplace add gitroomhq/postiz-agent` → `claude plugin install postiz@postiz-agent --scope project`; and `claude plugin marketplace add coreyhaines31/marketingskills` → `claude plugin install marketing-skills@marketingskills --scope project`. STOP with actionable message if either cannot be installed. Writes no config.
-- **Step 2 — Postiz prerequisite gate:** apply `${CLAUDE_PLUGIN_ROOT}/refs/postiz-verify.md`. STOP + write nothing on failure (AC-1).
+- **Step 2 — Postiz prerequisite gate:** apply `${CLAUDE_PLUGIN_ROOT}/refs/postiz-verify.md` — resolve the backend URL (existing `marketing-context.md` token → `POSTIZ_API_URL` env as seed → `AskUserQuestion` cloud default/self-hosted), export it as `POSTIZ_API_URL`, verify `POSTIZ_API_KEY` present, and confirm `postiz auth:status` authenticated. STOP + write nothing on any failure (AC-1).
 - **Step 3 — Product info detection:** apply `${CLAUDE_PLUGIN_ROOT}/refs/product-detect.md` (read-only, AC-2).
 - **Step 4 — Product-marketing context:** invoke the marketingskills `product-marketing` **skill** in-command, seeded with the Step-3 detection, to create/maintain `.agents/product-marketing.md` (auto-draft → founder-corrects, or from-scratch interview). No agent dispatch (AC-2, AC-3).
-- **Step 5 — Write gtm config (atomic):** stage init's own writes to the session temp dir via `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` → `./.tmp/<session>`, move into place only after ALL succeed. Writes `.claude/project/marketing-context.md` (from the template, no placeholder tokens remaining), the `docs/gtm/` scaffold (`README.md` from `docs-gtm-readme-template.md`, `digests/.gitkeep`, `briefs/.gitkeep`), the gitignored `.claude/.gtm-plugin-root` marker, and idempotently appends `.tmp/` + `.claude/.gtm-plugin-root` to `.gitignore` (mirror sdlc Step 4e). Then **verify `.agents/product-marketing.md` exists** (Step 4 output) — STOP if absent, discard staging (AC-3, AC-5).
-- **Step 6 — Post-init checklist:** print what was written, remind to keep `POSTIZ_API_URL` + `POSTIZ_API_KEY` set, show how to commit the foundation (AC-5), and name the follow-up stories NA-4 / NA-5 / NA-6 / NA-7 / NA-8 / NA-11 under Epic NA-2.
+- **Step 5 — Write gtm config (atomic):** stage init's own writes to the session temp dir via `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` → `./.tmp/<session>`, move into place only after ALL succeed. Writes `.claude/project/marketing-context.md` (from the template, no placeholder tokens remaining — includes the Step 2-resolved Postiz `Backend URL` value and the `POSTIZ_API_KEY` env-var name), the `docs/gtm/` scaffold (`README.md` from `docs-gtm-readme-template.md`, `digests/.gitkeep`, `briefs/.gitkeep`), the gitignored `.claude/.gtm-plugin-root` marker, and idempotently appends `.tmp/` + `.claude/.gtm-plugin-root` to `.gitignore` (mirror sdlc Step 4e). Then **verify `.agents/product-marketing.md` exists** (Step 4 output) — STOP if absent, discard staging (AC-3, AC-5).
+- **Step 6 — Post-init checklist:** print what was written, remind to keep `POSTIZ_API_KEY` set (the backend URL now lives in `marketing-context.md`, exported automatically by gtm commands), show how to commit the foundation (AC-5), and name the follow-up stories NA-4 / NA-5 / NA-6 / NA-7 / NA-8 / NA-11 under Epic NA-2.
 - **Final — Release session:** run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` (vendored) as the last action — silent no-op outside the worker.
 
 - [ ] **[platform-engineer]** Read `plugins/sdlc/commands/init.md` for structure (guard, gate, scan, prompts, atomic staging, release).
@@ -177,7 +178,7 @@ Do **NOT** author `refs/agent-binding-template.md` — the marketingskills `prod
 
 **Reference:** `plugins/sdlc/README.md` structure.
 
-**Content:** document the plugin, the two dependencies (`postiz@postiz-agent`, `marketing-skills@marketingskills`), and the `POSTIZ_API_URL` / `POSTIZ_API_KEY` env-var contract (names-only persisted, values live in the environment).
+**Content:** document the plugin, the two dependencies (`postiz@postiz-agent`, `marketing-skills@marketingskills`), and the Postiz env-var contract — `Backend URL` as a persisted `marketing-context.md` config token (cloud default `https://api.postiz.com` or self-hosted, chosen at init, exported as `POSTIZ_API_URL` by the CLI-invoking commands) and `POSTIZ_API_KEY` as an env-only secret (name only persisted).
 
 - [ ] **[platform-engineer]** Read `plugins/sdlc/README.md` for the structure.
 - [ ] **[platform-engineer]** Write `plugins/gtm/README.md` (deps + env-var contract documented).

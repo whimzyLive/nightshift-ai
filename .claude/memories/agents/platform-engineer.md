@@ -125,3 +125,46 @@
 - For "make detector X more precise" findings on grep-based lint scripts: after tightening a regex
   to catch more true positives, immediately grep the *whole* scanned tree with the new pattern and
   triage every hit — don't assume the reviewer's one verification snippet is exhaustive.
+
+## 2026-07-07 — Story NA-3 PR review feedback — Postiz backend URL as config token, not a secret
+**Learnings:**
+- Two PR review comments (design-level, not bug-level) asked to reclassify one of two "env-var only"
+  values as a persisted config token: the Postiz **backend URL** isn't a secret — the API **key** is.
+  The fix touched 7 files (2 refs, 1 command, 1 agent, 1 README, 1 spec, 1 plan) because the old
+  design had "only env-var names, never values" as a single blanket rule applied uniformly to both
+  `POSTIZ_API_URL` and `POSTIZ_API_KEY` — splitting the two by sensitivity meant every place that
+  stated the blanket rule, listed the two vars together, or gave a single combined STOP/checklist
+  message needed independent treatment for URL vs key. A single grep for the shared token
+  (`POSTIZ_API_URL`) across the whole plugin + both docs was necessary at the end to catch every
+  place the old uniform framing had leaked in (schema tables, error-handling tables, "Decided"
+  bullets, checklist prose, and even the downstream `product-marketing-manager` agent's "read
+  project context" paragraph) — a per-file review would have missed at least one of these.
+- Introducing a 3-source resolution ladder (existing config token → env var as *seed only* → user
+  prompt) for a value that used to be a flat "must be set in env" check requires explicitly writing
+  a precedence rule, not just the ladder itself — otherwise it's ambiguous whether a later env-var
+  change should silently override the persisted token on every run. Stated it explicitly everywhere
+  the ladder appears: "config token is authoritative after first write; env var only seeds the
+  *first* resolution." Repeating the same precedence sentence at each of the 4 places (ref, command,
+  README, spec) keeps a future reader from having to infer it from just the ladder order.
+- A CLI that reads a value from an environment variable at run time doesn't dictate where that value
+  is *sourced from* upstream — `postiz` only ever sees `POSTIZ_API_URL` in its own process env, but
+  gtm can still treat the value as a first-class persisted config token and `export` it into the
+  session right before every CLI invocation. Don't conflate "the CLI's contract requires an env var"
+  with "the value must be secret / env-only" — those are separate, independently-decidable design
+  choices.
+
+**Pitfalls:**
+- Same isolated-worktree-can't-check-out-the-named-branch situation recurred yet again on this
+  dispatch — `git checkout feat/NA-3` would have failed since the shared main checkout already had
+  it open. Used the `git merge --ff-only origin/feat/NA-3` fix from the first NA-3 dispatch (not the
+  detach-and-checkout variant from the second) since it was the simplest option available without
+  touching the shared checkout at all.
+
+**Patterns:**
+- When a review comment says "let the user choose between two named options at init," model it as
+  an explicit `AskUserQuestion` with exactly those two labeled options (not a free-text prompt with
+  the options merely described in the question text) — this repo's other init flows (unless
+  otherwise specified) use `AskUserQuestion` for every wallet-time either/or decision, so consistency
+  with existing gate patterns (e.g. Step 0's re-init keep/merge/rerun choice for this same command)
+  matters as a matching signal, moving to the AskUserQuestion primitive keeps the interaction model
+  uniform across the plugin.
