@@ -2,3 +2,6 @@
 
 # fork-local org token denylist for portability-lint (keep the public plugin org-neutral)
 tools/portability-denylist.txt
+
+# agent scratch — SDLC plugin temp files (auto-cleaned, never commit)
+.tmp/
