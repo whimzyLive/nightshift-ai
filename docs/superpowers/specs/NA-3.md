@@ -36,7 +36,7 @@ All Postiz operations across the gtm plugin (init's reachability gate, and every
 
 - It is a Claude Code plugin marketplace: marketplace name **`postiz-agent`**, plugin name **`postiz`** — installable reference **`postiz@postiz-agent`**, marketplace source **`gitroomhq/postiz-agent`**.
 - The plugin ships a `postiz` skill (`SKILL.md` at repo root, source `./`) wrapping the `postiz` npm CLI (`npm i -g postiz`): `auth:status` / `auth:login`, `posts:create`, `upload`, `integrations`, `analytics` across 28+ platforms.
-- **CLI contract:** requires env var **`POSTIZ_API_URL`** (backend URL) plus authentication — API-key auth via **`POSTIZ_API_KEY`**, or OAuth via `postiz auth:login`.
+- **CLI contract:** requires env var **`POSTIZ_API_URL`** (backend URL) plus the API-key env var **`POSTIZ_API_KEY`** for authentication. *(The CLI also offers OAuth via `postiz auth:login`, but gtm's init gate requires the `POSTIZ_API_KEY` env var — see Postiz Verification — consistent with the `marketing-context.md` schema and the Decided env-var contract.)*
 - **Hard rules (from the skill):** authenticate first (`postiz auth:status` must pass before any other command); all media must be uploaded through `postiz upload`.
 
 gtm therefore **never hand-rolls HTTP against Postiz** — it delegates to the CLI/skill.
@@ -161,7 +161,7 @@ It also reminds the founder to keep the `POSTIZ_API_URL` and API-key env vars se
 
 Spec'd in `refs/postiz-verify.md`. Runs **through the `postiz` skill/CLI** — gtm never hand-rolls HTTP. Two conditions, both required to pass; either failure = STOP, no files written:
 
-1. **Env vars present** — `POSTIZ_API_URL` is set and non-empty, and credentials are available (the API-key env var, default `POSTIZ_API_KEY`, is set — or an OAuth session exists).
+1. **Env vars present** — `POSTIZ_API_URL` **and** the API-key env var (default `POSTIZ_API_KEY`) are both set and non-empty. (The gate requires the API-key env var — consistent with AC-1, the `marketing-context.md` schema, and the Decided env-var contract; the CLI's OAuth mode is not an accepted init-gate path.)
 2. **Auth probe** — `postiz auth:status` reports authenticated. "Not authenticated" (bad/expired/absent key) and a CLI/connection error (unreachable backend) each map to a distinct STOP message.
 
 The CLI owns the endpoint, transport, and auth mechanics; init only interprets `auth:status`. Values are read from the environment at run time and never persisted (only the env-var names are written to `marketing-context.md`).
@@ -242,7 +242,7 @@ None outstanding — all decisions are locked below.
 
 - **Postiz operations — Decided:** all Postiz interaction (init's gate and every downstream action) goes through the `postiz` skill from `postiz@postiz-agent`; gtm never hand-rolls HTTP against Postiz.
 - **Postiz reachability gate — Decided:** `postiz auth:status` via the CLI; the CLI owns endpoint/transport/auth details (this resolves the former "Postiz probe endpoint" open question — no hand-rolled HTTP probe).
-- **Postiz env-var contract — Decided:** `POSTIZ_API_URL` (backend URL) + `POSTIZ_API_KEY` (API key); `marketing-context.md` persists only the env-var **names**, never the values.
+- **Postiz env-var contract — Decided:** `POSTIZ_API_URL` (backend URL) + `POSTIZ_API_KEY` (API key) — both required; the init gate uses the API-key env var (OAuth is not an accepted gate path). `marketing-context.md` persists only the env-var **names**, never the values.
 - **Dependency wiring — Decided:** `plugins/gtm/.claude-plugin/plugin.json` declares `postiz@postiz-agent` (and `superpowers@claude-plugins-official`); `.claude-plugin/marketplace.json` adds `postiz-agent` to `allowCrossMarketplaceDependenciesOn`.
 - **`marketing-context.md` location — Decided:** `.claude/project/marketing-context.md` (mirrors `project-context.md`; auto-loaded by the SessionStart hook).
 - **`.agents/product-marketing.md` path — Decided:** repo-root `.agents/product-marketing.md`, per AC-3 (kept for future `marketingskills` compatibility, see Deviations).
