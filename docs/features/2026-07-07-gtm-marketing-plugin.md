@@ -224,6 +224,39 @@ All nine open questions were resolved with the product owner on 2026-07-07:
 - **`sdlc` plugin (optional)** — used for the landing-site and docs build handoff; when absent, the
   engine writes a brief instead of dispatching a build.
 
+### Story Dependency Graph (NA-2 stories)
+
+Canonical build order for the stories under `NA-2`. Jira `Blocks` / `is blocked by` links are kept in
+sync with this graph.
+
+**Completion order (dependency layers — same-layer stories are parallel-safe):**
+
+- **L0:** NA-3 — Bootstrap gtm plugin config via /gtm:init
+- **L1:** NA-4 — Configure per-channel ownership via /gtm:init picker · NA-5 — Set up KPI metric and
+  source in init · NA-6 — Produce landing page copy and build handoff · NA-7 — Audit docs and open
+  SEO improvement PRs
+- **L2:** NA-8 — Run pulse pass to draft and publish content
+- **L3:** NA-9 — Generate growth report with KPI and social proof · NA-10 — Produce full nightshift
+  launch asset campaign · NA-11 — Poll engagement sources for proof and replies
+
+**Dependency edges:**
+
+| Blocker | Blocks | Rationale |
+|---|---|---|
+| NA-3 | NA-4 | Channel picker writes into the config scaffold NA-3 creates |
+| NA-3 | NA-5 | KPI setup writes into the config scaffold NA-3 creates |
+| NA-3 | NA-6 | Site command reuses the marketing-context/brand scaffold NA-3 creates |
+| NA-3 | NA-7 | Docs command reuses the docs/gtm scaffold NA-3 creates |
+| NA-3 | NA-8 | Pulse loop reads the config NA-3 writes |
+| NA-3 | NA-11 | Engagement-source config lives in the marketing-context NA-3 writes |
+| NA-4 | NA-8 | Pulse's publish stage routes by the channel ownership NA-4 configures |
+| NA-4 | NA-10 | Launch routes trust-sensitive channels using the ownership NA-4 configures |
+| NA-5 | NA-9 | Report correlates against the KPI metric/source NA-5 sets up |
+| NA-6 | NA-10 | Launch reuses the landing-site handoff produced by NA-6 |
+| NA-8 | NA-9 | Report correlates against the UTM-tagged content log NA-8 produces |
+| NA-8 | NA-10 | Launch reuses the content-writer/copy-gate infrastructure NA-8 builds |
+| NA-8 | NA-11 | Engagement poll is step 3 of the pulse loop NA-8 implements |
+
 ## Product Checks
 
 - **Roles affected:** developer founder (primary operator), founder-as-marketer (configures channels
