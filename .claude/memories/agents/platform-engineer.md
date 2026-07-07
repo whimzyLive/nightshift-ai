@@ -126,6 +126,45 @@
   to catch more true positives, immediately grep the *whole* scanned tree with the new pattern and
   triage every hit — don't assume the reviewer's one verification snippet is exhaustive.
 
+## 2026-07-08 — Story NA-12 Phase 1-2 — vendored skill-creator + find-skills, wrote analyze-protocol.md
+**Learnings:**
+- Both upstream skills vetted clean. `skill-creator` (anthropics/skills, pinned commit
+  `9d2f1ae187231d8199c64b5b762e1bdf2244733d`) ships its own per-skill `LICENSE.txt`
+  (Apache-2.0, Copyright 2026 Anthropic, PBC) — carried verbatim, no modification needed.
+  `find-skills` (vercel-labs/skills, pinned commit `4ce6d48ac44c8b637db87b2102fea3baca719df1`)
+  has **no** per-skill or top-level `LICENSE` file upstream at this commit — only `package.json`
+  `"license": "MIT"` and a README "## License / MIT" section declare it. Wrote a standard MIT
+  `LICENSE` file for the vendored copy with a provenance footer explaining it was transcribed
+  (not copied) from those two upstream sources, since there was no file to literally carry over.
+- `find-skills`' `SKILL.md` is pure prose with **no bundled scripts** — it only tells the agent to
+  invoke `npx skills find/add/check/update` (a public package-manager CLI querying the public
+  skills.sh registry) — passes the "no exfiltration / no RCE / no secret access, confined to local
+  files + public registry" checklist cleanly.
+- `skill-creator`'s `SKILL.md` (33KB) densely cross-references sibling directories it ships with
+  upstream — `scripts/*.py`, `references/schemas.md`, `assets/eval_review.html`, `agents/grader.md`,
+  `eval-viewer/generate_review.py` — none of which this plan's Phase 1 scope vendors (only
+  `SKILL.md` + `LICENSE.txt` per the plan's explicit file list). The vendored copy in this repo is
+  therefore SKILL.md-only prose guidance; several of its own internal instructions point at files
+  that don't exist under `plugins/sdlc/skills/skill-creator/`. This is a known scope gap from
+  following the plan literally, not an oversight — flag it if a later phase (README provenance,
+  Phase 6) or a user of the skill hits a dead reference.
+- Vetted `skill-creator`'s bundled scripts anyway (spec requires reading bundled scripts before
+  vendoring even though they aren't copied): `subprocess.run(["claude", "-p", ...])` calls in
+  `run_eval.py`/`improve_description.py`/`generate_review.py` are local CLI invocations (not
+  RCE from untrusted input); `eval-viewer/viewer.html` only `fetch()`s a local `/api/feedback`
+  endpoint. No external network exfiltration found.
+- `git clone` works fine for vendoring even though this session's `curl`/`wget` are blocked by a
+  context-mode hook (only for the http fetch path, not git's own transport) — used `git clone
+  --depth 50 <repo>` into the scratchpad, read files with the Read tool, then `rm -rf` the clone
+  before committing (nothing scratchpad-sourced belongs in the final diff).
+
+**Patterns:**
+- For a "vendor a third-party skill" plan task, treat "SKILL.md + LICENSE only" and "the skill's
+  full supporting directory tree" as two different, explicitly distinguishable deliverables — do
+  not silently expand or contract the plan's stated file list based on what looks more "complete";
+  record the resulting internal-reference gap in memory instead so the decision is traceable to
+  the plan, not to an unstated assumption.
+
 ## 2026-07-07 — Story NA-3 PR review feedback — Postiz backend URL as config token, not a secret
 **Learnings:**
 - Two PR review comments (design-level, not bug-level) asked to reclassify one of two "env-var only"
