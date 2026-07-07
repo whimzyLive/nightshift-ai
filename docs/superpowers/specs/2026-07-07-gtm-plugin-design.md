@@ -60,13 +60,19 @@ plugins/gtm/
 
 ### `/gtm:init`
 
-1. Prereq gate: `gh` auth OK; Postiz MCP reachable (backend URL + API key env var).
+1. Prereq gate: Postiz MCP reachable (backend URL + API key env var).
 2. Detect product info from README/repo.
 3. If `.agents/product-marketing.md` missing → run marketingskills `product-marketing` interview.
 4. `integrationList` → channel picker: per channel set ownership (`auto|draft|manual`), account
    voice (`brand|founder`), cadence, content types.
-5. Write `marketing-context.md` + `.agents/product-marketing.md` + `docs/gtm/` scaffold.
-6. Re-init guard identical to sdlc `/init` (keep / merge / rerun).
+5. KPI setup orchestration — founder defines the metric, picks its source from the provider
+   catalogue: managed provider (v1: GitHub via `gh`) or **custom source** (founder-supplied shell
+   command or endpoint returning the metric's current value). Init walks through that source's
+   auth/env needs, then runs a verification probe (reads one value) before accepting. Same for
+   optional engagement sources. Nothing hardcoded to GitHub; provider auth (e.g. `gh`) checked
+   only when that provider is selected.
+6. Write `marketing-context.md` + `.agents/product-marketing.md` + `docs/gtm/` scaffold.
+7. Re-init guard identical to sdlc `/init` (keep / merge / rerun).
 
 ### `/gtm:pulse` — core loop pass
 
@@ -124,7 +130,7 @@ marketingskills `ai-seo` + `content-strategy` + `schema` audit docs → doc-impr
 ## Config schema — `.claude/project/marketing-context.md`
 
 - **Product**: name, one-liner, repo, landing URL
-- **KPI**: user-defined primary metric + source (no plugin default; nightshift picks `github_stars`); secondary = Postiz analytics. Engagement sources listed separately, optional
+- **KPI**: user-defined primary metric + source (no plugin default; nightshift picks `github_stars`); source is a provider reference — managed (v1: `github`) or `custom` with a command/endpoint that returns the current value; secondary = Postiz analytics. Engagement sources listed separately, optional
 - **Postiz**: backend URL, API key **env var name** (never the key)
 - **Channels**: one row per Postiz integration — ownership `auto|draft|manual`, voice
   `brand|founder`, cadence, content types

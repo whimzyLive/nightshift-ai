@@ -43,11 +43,12 @@ marketing by hand.
 
 ## Acceptance Criteria
 
-1. A founder can run an init command that verifies prerequisites (Postiz reachability, plus provider
-   auth for whichever KPI/engagement source the founder selects — e.g. GitHub auth when GitHub is
-   chosen), detects product info, presents a channel picker plus a KPI picker (metric + source), and
-   writes the marketing config plus a docs scaffold — with a re-init guard that offers keep / merge /
-   rerun when config already exists.
+1. A founder can run an init command that verifies Postiz reachability, detects product info,
+   presents a channel picker, and orchestrates KPI setup — founder defines the metric and its
+   source (managed provider or custom command/endpoint), init handles that source's auth/env needs
+   and proves it can read a value before writing config. Writes the marketing config plus a docs
+   scaffold — with a re-init guard that offers keep / merge / rerun when config already exists.
+   No KPI source is hardcoded or assumed.
 2. A pulse pass reads config, scans git since the last watermark, drafts per-channel content in the
    configured voice, and passes every item through a copy-review gate before anything is published;
    no item reaches a channel without passing the gate.
@@ -83,11 +84,15 @@ marketing by hand.
 3. Engine detects product info (name, one-liner, repo, landing URL) from the repository.
 4. If the product-marketing context is missing, engine runs the product-marketing interview.
 5. Engine lists available Postiz channels and presents a picker; founder sets per channel: ownership
-   (`auto` / `draft` / `manual`), voice (`brand` / `founder`), cadence, and content types. Founder
-   then picks the primary KPI (metric + source) and optional engagement sources; the engine verifies
-   auth for whichever providers were chosen (e.g. `gh` auth when GitHub is selected).
-6. Engine writes the marketing config, the product-marketing context, and the docs scaffold.
-7. Founder commits the config — marketing setup is now version-controlled.
+   (`auto` / `draft` / `manual`), voice (`brand` / `founder`), cadence, and content types.
+6. Init then orchestrates KPI setup: founder names the metric that matters to them and picks its
+   source from the provider catalogue — a managed provider (GitHub at v1) or a custom source (any
+   founder-supplied command or endpoint that returns the metric's current value). Init walks
+   through whatever that source needs (auth, env vars), runs a verification probe to confirm a
+   value can actually be read, and records the same for any optional engagement sources. Nothing
+   is hardcoded to GitHub or any other platform.
+7. Engine writes the marketing config, the product-marketing context, and the docs scaffold.
+8. Founder commits the config — marketing setup is now version-controlled.
 
 **Edge — config already exists:** engine detects existing config and offers keep / merge / rerun;
 nothing is overwritten without the founder choosing.
@@ -176,10 +181,9 @@ Carried from the Epic (6) plus new ones surfaced during PRD:
    expected deployment before init is specced. — Owner: Solutions Architect
 2. Channel graduation policy — what signals justify promoting a channel from `draft` to `auto`? —
    Owner: Product
-3. KPI provider catalogue at v1 — the KPI is user-defined (metric + source) with no plugin default;
-   GitHub is the only provider shipped at v1. Which additional sources (npm downloads, site
-   analytics, waitlist signups, marketplace installs) come next, and can a founder point at a
-   custom command/endpoint as a source? — Owner: Product
+3. KPI provider catalogue beyond v1 — v1 ships the GitHub managed provider plus the custom
+   command/endpoint source (the universal escape hatch). Which managed providers come next
+   (npm downloads, site analytics, waitlist signups, marketplace installs)? — Owner: Product
 4. Voice / quality-bar ownership — reuse the ECC hard-bans anti-slop rules vs project-specific voice;
    who approves the final bar? — Owner: Product
 5. Demo-video production path (asciinema / VHS / Remotion / human) — which is the default
