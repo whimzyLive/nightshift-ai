@@ -20,8 +20,8 @@ fills.
 ## Step 1 — `name`
 
 ```bash
-[ -f package.json ] && grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' package.json | head -1
-git remote get-url origin 2>/dev/null | sed -E 's#.*/([^/.]+)(\.git)?$#\1#'
+[ -f package.json ] && jq -r '.name // empty' package.json
+url="$(git remote get-url origin 2>/dev/null)" && [ -n "$url" ] && basename "${url%.git}"
 [ -f README.md ] && grep -m1 -E '^# ' README.md | sed -E 's/^# //'
 ```
 
@@ -30,7 +30,7 @@ First non-empty result wins. If none resolve, `name` is an interview gap.
 ## Step 2 — `one-liner`
 
 ```bash
-[ -f package.json ] && grep -o '"description"[[:space:]]*:[[:space:]]*"[^"]*"' package.json | head -1
+[ -f package.json ] && jq -r '.description // empty' package.json
 [ -f README.md ] && sed -n '2,6p' README.md | grep -m1 -E '^[A-Za-z].{10,}'
 [ -f brand/BRAND_KIT.md ] && grep -m1 -iE 'tagline' brand/BRAND_KIT.md
 ```
@@ -49,7 +49,7 @@ URL as-is. If no `origin` remote exists, `repo` is an interview gap — prompt f
 ## Step 4 — `landing URL`
 
 ```bash
-[ -f package.json ] && grep -o '"homepage"[[:space:]]*:[[:space:]]*"[^"]*"' package.json | head -1
+[ -f package.json ] && jq -r '.homepage // empty' package.json
 [ -f README.md ] && grep -m1 -oE 'https?://[^ )\]]+' README.md
 ```
 

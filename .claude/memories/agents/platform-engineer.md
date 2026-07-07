@@ -41,3 +41,48 @@
   scripts subdir — provenance comments belong in the plan/spec docs, not inside the new package
   itself (even doc files under the new plugin's own `refs/`/`README.md` should stay free of the
   literal path).
+
+## 2026-07-07 — Story NA-3 review fixes — /gtm:init atomicity + portability-lint multi-plugin scope
+**Learnings:**
+- "Atomic write, discard on failure" claims must be checked *before* any finalize step starts
+  moving files into their real paths, not after — an existence check placed after the `mv` block
+  runs too late: by the time it fires, the "discarded" files are already live at their final repo
+  paths, so the STOP message is a lie. The fix pattern is: gate-check → (pass) → finalize moves,
+  never finalize moves → gate-check → rollback-message-that-doesn't-actually-rollback.
+- When a multi-file finalize can't be made atomic with plain `mv` (no cross-file transaction),
+  pick one file as the "completion marker" and move it *last*. Whatever file a re-init/guard reads
+  to decide "does config already exist" should be exactly that last-moved file — that way a
+  mid-finalize crash is always detectable and self-healing (guard sees "doesn't exist yet", so
+  Step 0 treats it as a fresh/incomplete init rather than a corrupted one) instead of accidentally
+  looking like a complete, healthy install.
+- The repo's `tools/portability-lint.sh` had `../plugins/sdlc` hardcoded as its only scan root —
+  adding a second plugin (`plugins/gtm`) silently made the lint a no-op for it. Fixed by looping
+  over `plugins/*/` and refactoring the 7 checks into a `lint_plugin()` function taking the plugin
+  root as a param; the shared `marketplace.json` JSON-validity check moved outside the loop (it's
+  repo-level, not per-plugin) so it isn't redundantly re-checked once per plugin.
+- `git remote get-url origin | sed -E 's#.*/([^/.]+)(\.git)?$#\1#'` silently mangles any repo name
+  containing a dot (e.g. `context-mode.dev` → `dev`) because the capture group `[^/.]+` excludes
+  dots entirely — it isn't a "last segment" extractor, it stops at the first dot from the right
+  that isn't part of a literal trailing `.git`. Verified fix (`basename "${url%.git}"` — strip a
+  trailing `.git` via parameter expansion first, then take the path basename) against SSH, HTTPS,
+  and no-`.git`-suffix remote URL forms, and against a plain no-dot repo name, before trusting it.
+- `grep -o '"name"[[:space:]]*:...' package.json` matches the *first* `"name"` key anywhere in the
+  file, including nested ones (e.g. inside `exports`, `bin`, or a nested `peerDependenciesMeta`
+  block) — not necessarily the top-level field. `jq -r '.name // empty' package.json` is the
+  correct top-level-only, JSON-aware extraction; the `// empty` guards against `jq` emitting the
+  literal string `null` when the field is absent (verified against a JSON file lacking `name`).
+
+**Pitfalls:**
+- Same isolated-worktree-can't-check-out-the-named-branch situation as the initial pass (see the
+  entry above) recurred on this review-fix dispatch too — `git checkout feat/NA-3` failed because
+  the shared main checkout already had it. Reused the same fix: stay in the default (non-`cd`'d)
+  Bash cwd of the assigned worktree, and `git merge --ff-only origin/feat/NA-3` to fast-forward
+  the worktree's local branch onto the remote branch's tip before editing anything. This is
+  evidently a recurring characteristic of this project's worktree-per-dispatch setup, not a one-off
+  — expect it on every dispatch for a story whose branch is also open in the main checkout.
+
+**Patterns:**
+- When a review finding says "root hardcoded to X, should scan all Y" for a lint/CI script, check
+  whether any of the script's checks assume a *single* root implicitly beyond the obvious `root=`
+  var (e.g. a shared manifest check that should run once, not once per scanned unit) — collapsing
+  everything into one blind per-unit loop over-scans some checks and duplicates their output.

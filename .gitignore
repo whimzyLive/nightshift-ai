@@ -5,3 +5,6 @@ tools/portability-denylist.txt
 
 # agent scratch — SDLC plugin temp files (auto-cleaned, never commit)
 .tmp/
+
+# gtm plugin-root marker — per-session cache, never commit (nightshift dogfoods gtm too)
+.claude/.gtm-plugin-root

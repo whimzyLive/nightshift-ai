@@ -66,7 +66,7 @@ Single sequential phase — `platform-engineer` only. This story is pure plugin 
 - `version`: `"0.1.0"`
 - `description`: one-line marketing-engine description
 - `author`: mirror the sdlc manifest's author shape
-- `dependencies`: `["postiz@postiz-agent", "marketing-skills@marketingskills"]` — exactly these two. NO `superpowers`, NO `sdlc`.
+- `dependencies`: `[{ "name": "postiz", "marketplace": "postiz-agent" }, { "name": "marketing-skills", "marketplace": "marketingskills" }]` — object form, mirroring sdlc's manifest shape, exactly these two. NO `superpowers`, NO `sdlc`.
 
 **`marketplace.json` two edits (leave the `sdlc` entry untouched):**
 1. `allowCrossMarketplaceDependenciesOn` → `["claude-plugins-official", "postiz-agent", "marketingskills"]`.
@@ -74,7 +74,7 @@ Single sequential phase — `platform-engineer` only. This story is pure plugin 
 
 - [ ] **[platform-engineer]** Read `plugins/sdlc/.claude-plugin/plugin.json` for the author/field shape, then write `plugins/gtm/.claude-plugin/plugin.json` with the fields above.
 - [ ] **[platform-engineer]** Edit `.claude-plugin/marketplace.json`: extend the allowlist to the three-element array and append the `gtm` plugins entry.
-- [ ] **[platform-engineer]** Verify: `jq -e '.dependencies == ["postiz@postiz-agent","marketing-skills@marketingskills"]' plugins/gtm/.claude-plugin/plugin.json` and `jq -e '.name=="gtm" and .version=="0.1.0"' plugins/gtm/.claude-plugin/plugin.json`.
+- [ ] **[platform-engineer]** Verify: `jq -e '[.dependencies[] | "\(.name)@\(.marketplace)"] == ["postiz@postiz-agent","marketing-skills@marketingskills"]' plugins/gtm/.claude-plugin/plugin.json` (object-form dependencies, mirroring sdlc's manifest shape) and `jq -e '.name=="gtm" and .version=="0.1.0"' plugins/gtm/.claude-plugin/plugin.json`.
 - [ ] **[platform-engineer]** Verify: `jq -e '.allowCrossMarketplaceDependenciesOn == ["claude-plugins-official","postiz-agent","marketingskills"]' .claude-plugin/marketplace.json` and `jq -e '[.plugins[].name] | index("gtm") and index("sdlc")' .claude-plugin/marketplace.json` (both gtm and sdlc present).
 
 ### Task Group 3 — SessionStart/SessionEnd hooks

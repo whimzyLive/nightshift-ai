@@ -25,6 +25,10 @@ if [ -n "$plugin_root" ] && [ -d "$proj/.claude" ]; then
   printf '%s\n' "$plugin_root" > "$proj/.claude/.gtm-plugin-root" 2>/dev/null || true
 fi
 
+# NOTE: sdlc's loader has a (1.5) version-drift warning (stale cached plugin version vs. latest
+# installed) that this hook deliberately omits at gtm v0.1.0 — single-version usage so far makes
+# it unneeded; port it over if/when gtm ships multiple installed versions side by side.
+
 # (2) Assemble additionalContext: root mapping (if known) + marketing-context.md.
 intro=""
 if [ -n "$plugin_root" ]; then

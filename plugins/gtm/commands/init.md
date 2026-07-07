@@ -128,24 +128,52 @@ session temp dir first, and only move them into place after **every** staged wri
    - `docs-gtm/digests/.gitkeep` and `docs-gtm/briefs/.gitkeep` — empty marker files.
    - `gtm-plugin-root` — the resolved `${CLAUDE_PLUGIN_ROOT}` value (this session's), single line.
 
-3. Only after **all** of the above are written successfully, move them into their final paths
-   (same-filesystem rename where possible):
+3. **Verify `.agents/product-marketing.md` exists** (Step 4's output) **before finalizing anything**
+   — this gates the move in sub-step 4 below:
+
+   ```bash
+   [ -f ".agents/product-marketing.md" ] && echo "PMM_DOC=yes" || echo "PMM_DOC=no"
+   ```
+
+   If `PMM_DOC=no`, delete the staging area and **STOP** — the marketing-context doc is missing:
+
+   ```bash
+   rm -rf "$stage"
+   ```
+
+   > The marketingskills `product-marketing` skill did not produce `.agents/product-marketing.md`.
+   > init's own config writes have been discarded — nothing was finalized. Re-run `/gtm:init` once
+   > the skill can complete.
+
+   Because this check runs **before** sub-step 4 moves anything into place, the "discarded" claim
+   holds: at this point only `$stage` exists on disk, and deleting it truly leaves the repo
+   untouched. The atomic guarantee covers only init's **own** writes (`marketing-context.md`, the
+   `docs/gtm/` scaffold, the `.gtm-plugin-root` marker) — `.agents/product-marketing.md` is the
+   skill's own interactive output from Step 4, accepted as-is and verified here, not staged by
+   init.
+
+4. Only after **all** of the above are written successfully and PMM_DOC=yes, move them into their
+   final paths (same-filesystem rename where possible). `marketing-context.md` moves **last** — its
+   presence is what Step 0's re-init guard checks, so it is the natural commit point: every other
+   path lands first, and only once they've all succeeded does the guard-visible file appear.
 
    ```bash
    mkdir -p .claude/project docs/gtm/digests docs/gtm/briefs
-   mv "$stage/project/marketing-context.md" .claude/project/marketing-context.md
    mv "$stage/docs-gtm/README.md" docs/gtm/README.md
    mv "$stage/docs-gtm/digests/.gitkeep" docs/gtm/digests/.gitkeep
    mv "$stage/docs-gtm/briefs/.gitkeep" docs/gtm/briefs/.gitkeep
    mv "$stage/gtm-plugin-root" .claude/.gtm-plugin-root
+   mv "$stage/project/marketing-context.md" .claude/project/marketing-context.md
    rm -rf "$stage"
    ```
 
-   On **any** failure during staging or the move (a write errors, a `mv` fails), delete the
-   staging area and leave every one of these paths **untouched** — no partial
-   `marketing-context.md`, no orphan `docs/gtm/` files. Report the failure and STOP.
+   A failure while **staging** (sub-steps 1–2) or at the **PMM_DOC gate** (sub-step 3) leaves every
+   final path untouched — nothing has moved yet. A failure **mid-move** here (a `mv` fails partway)
+   can leave some final paths written and others not; it is not silently rolled back. Report the
+   failure and STOP — re-running `/gtm:init` (Step 0's Merge/Re-run paths) heals a half-finalized
+   state, since only `marketing-context.md` marks completion and it is the last thing written.
 
-4. Ensure gitignore entries (idempotent append, mirror sdlc's Step 4e) — `.tmp/` (agent scratch)
+5. Ensure gitignore entries (idempotent append, mirror sdlc's Step 4e) — `.tmp/` (agent scratch)
    and `.claude/.gtm-plugin-root` (gitignored, unlike sdlc's committed marker — it is a per-session
    machine-absolute cache):
 
@@ -157,22 +185,6 @@ session temp dir first, and only move them into place after **every** staged wri
      printf '\n# gtm plugin-root marker — per-session cache, never commit\n.claude/.gtm-plugin-root\n' >> .gitignore
    fi
    ```
-
-5. **Verify `.agents/product-marketing.md` exists** (Step 4's output):
-
-   ```bash
-   [ -f ".agents/product-marketing.md" ] && echo "PMM_DOC=yes" || echo "PMM_DOC=no"
-   ```
-
-   If `PMM_DOC=no`, **STOP** — the marketing-context doc is missing:
-
-   > The marketingskills `product-marketing` skill did not produce `.agents/product-marketing.md`.
-   > init's own config writes have been discarded. Re-run `/gtm:init` once the skill can complete.
-
-   The atomic guarantee above covers only init's **own** writes (`marketing-context.md`, the
-   `docs/gtm/` scaffold, the `.gtm-plugin-root` marker) — `.agents/product-marketing.md` is the
-   skill's own interactive output from Step 4, accepted as-is and verified here, not staged by
-   init.
 
 ## Step 6 — Post-init checklist
 
