@@ -224,3 +224,45 @@
   with existing gate patterns (e.g. Step 0's re-init keep/merge/rerun choice for this same command)
   matters as a matching signal, moving to the AskUserQuestion primitive keeps the interaction model
   uniform across the plugin.
+
+## 2026-07-08 — Story NA-12 Phases 3-5 — ai-enablement-engineer agent + /sdlc:analyze + init opt-in
+**Learnings:**
+- The GitHub-style anchor-slug rule matters when a spec mandates *exact* anchor headings that two
+  separate files must cross-reference: `## Drift / gap table` → `#drift--gap-table` (the `/` is
+  stripped, leaving the surrounding spaces to collapse into a double hyphen) and
+  `## Memory-conflict analysis & resolution` → `#memory-conflict-analysis--resolution` (the `&` does
+  the same). Got both right by deriving the slug mechanically (lowercase → strip punctuation →
+  spaces to hyphens) rather than guessing, then grepped the ref file itself for its own internal
+  cross-references to confirm the derived slugs matched what was already in use there.
+- When a plan phase says "mirror the shipped agent's shape" but the new agent's First-steps must
+  also encode a hard gate the shipped agent doesn't have (here: STOP entirely if not Active, before
+  even reading task instructions — vs. platform-engineer's softer "confirm with the user if
+  Standby"), don't force the borrowed template's exact wording; keep the structural shape (numbered
+  First steps, same section order) but let the gate's actual severity (STOP vs confirm) come from
+  the spec's Error Handling table, since the two agents' ownership models are genuinely different
+  (opt-in-gated vs always-active-in-repo).
+- For a new domain agent that is *not* a normal multi-select at init (gated by its own single
+  opt-in instead), the cleanest place to wire it into `init.md` without touching the shared
+  templates (`refs/agent-override-template.md`, `refs/project-context-template.md` — out of this
+  phase's scope) is to give it a **self-contained, fixed override body inline in init.md itself**,
+  explicitly called out as bypassing the stack-driven agent-domain-mapping/run-order tables those
+  templates define for the other agents. This keeps the phase's diff scoped to the one deliverable
+  file (`init.md`) while still producing a fully-substituted (`<project name>`/typecheck/test only)
+  no-placeholder override on scaffold.
+- "Mark the agent Active" needed no new boolean field anywhere: this repo's (and the plugin's)
+  existing model treats presence of a workspace→agent row as the sole activity signal for every
+  domain agent (no separate `Active: true` token exists in the template). Re-used that exact
+  mechanism for `ai-enablement-engineer`'s opt-in instead of inventing a parallel activation
+  concept — kept the ownership model's "single fact" claim (spec: "that single fact... is the
+  entire ownership model") literally true instead of adding a second source of truth.
+- Verified "no hard-coded area path in the write-scope resolution logic" (Phase 3 Step 9's own
+  verify instruction) by grepping the finished agent file for the literal string `plugins/` and
+  confirming every hit was either front-matter description prose or an explicit "e.g." illustrative
+  example — never inside the ownership-resolution paragraph as the source of truth.
+
+**Patterns:**
+- Before writing a new agent/command that references anchors in a shared ref doc, `grep -n "^## "`
+  the ref file first to get the literal heading list, then always link via `<ref>#<derived-slug>`
+  using the *same* derivation the ref file's own internal links already use (found by grepping the
+  ref for its own `](#...)` occurrences) — cheaper and more reliable than trusting hand-derived
+  slugs from memory of GitHub's algorithm.
