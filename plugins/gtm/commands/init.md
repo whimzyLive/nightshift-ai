@@ -38,8 +38,10 @@ AskUserQuestion(
 ```
 
 - **Keep existing** → print a summary of the current config (Product name/one-liner/repo/landing
-  URL, Postiz Backend URL, Postiz API key env-var name, whether Voice overrides are set, plus a
-  one-line channel count, e.g. "Channels configured: 4") and **STOP**. Write nothing.
+  URL, Postiz Backend URL, Postiz API key env-var name, whether Voice overrides are set, a
+  one-line channel count, e.g. "Channels configured: 4", plus a **KPI line** — metric name, source
+  type + provider, and `Verified value`, e.g. `KPI configured: "GitHub stars" via managed:github —
+  verified value 128`) and **STOP**. Write nothing.
 - **Merge new findings** → **re-enter at Step 1** (dependency check) before touching anything.
   After Steps 1–2 pass: re-run Step 3 detection, backfill only the `marketing-context.md` template
   fields absent from the existing file (prompting for missing user-choice fields), preserving
@@ -52,11 +54,22 @@ AskUserQuestion(
   settings untouched. This hook is what makes graduating a channel from `draft` to `auto` reachable
   via the Merge path, not only via a full Re-run (see Step 6).
   `.agents/product-marketing.md` is re-maintained idempotently by the marketingskills skill
-  (Step 4) regardless. Then continue to Step 5 (write) and Step 6.
+  (Step 4) regardless. Also re-enter Step 4c: backfill the `## KPI` section only if absent from the
+  existing file; preserve an already-set KPI block. When present but incomplete, backfill only
+  missing tokens (prompting for any missing user-choice field). **Malformed enum values on Merge
+  (Minor 5d):** treat an existing KPI token holding an **invalid/out-of-enum value** (e.g. a
+  `Source type` that is neither `managed` nor `custom`, or a `GitHub metric` outside the four-value
+  enum) as **missing** — re-prompt for it rather than preserving the malformed value. Re-run the
+  probe to refresh `Verified value`. Then continue to Step 5 (write) and Step 6.
 - **Re-run full setup** → **re-enter at Step 1** (dependency check) before touching anything.
   After Steps 1–2 pass: walk all prompts again with existing values offered as defaults, then
   rewrite via Steps 3–6. Also capture the existing Channels rows from the file and run Step 4b for
-  every channel with existing values offered as defaults — the founder may change any.
+  every channel with existing values offered as defaults — the founder may change any. Also
+  re-prompt all KPI fields (Step 4c) with existing values offered as defaults, then re-run the
+  probe.
+
+Both Merge and Re-run **re-enter the KPI probe before writing** (Step 4c) — a broken KPI source can
+never be re-written against, mirroring the Postiz gate's re-entry posture.
 
 **Both Merge and Re-run re-enter at Steps 1–2** — the dependency check and Postiz gate always run
 before any write, first-run and re-run alike, so a dead or unreachable backend can never be
@@ -171,6 +184,32 @@ Defer to the ref for error handling (transport error → STOP, write nothing; em
 malformed-entry skip; the drop-confirmation guard for a previously configured channel that
 `integrations:list` no longer returns) rather than re-specifying it here.
 
+## Step 4c — KPI metric and source
+
+Apply `${CLAUDE_PLUGIN_ROOT}/refs/kpi-config.md` exactly. Like Steps 4 and 4b, this step **gathers
+into an in-memory KPI model and writes nothing to final paths** — Step 5 renders it.
+
+1. **Metric name (AC-1)** — prompt free-text for the metric that matters; no default, no pre-fill;
+   required (blank → re-prompt).
+2. **Source selection (AC-2)** — `AskUserQuestion`, single-select: Managed: GitHub / Custom command
+   / Custom endpoint.
+3. **Auth/env walk-through (AC-3)** — branch: GitHub → verify `gh` installed + `gh auth status`
+   authenticated, resolve `<owner>/<name>` from the Product `Repo` token, prompt `GitHub metric`
+   (default `stars`, noting the `open-issues`-includes-PRs caveat), no env-var prompt. Custom →
+   prompt command/URL (+ `Value path` for endpoint), then ask whether an env var is needed and, if
+   so, capture its **name** and verify it is set/non-empty; `gh` is **not** checked.
+4. **Verification probe (AC-4)** — read exactly one live numeric value per the ref's per-source
+   probe. On any failure (missing/unauthenticated `gh`, unresolvable repo, missing named env var,
+   missing `jq` when a non-`.` `Value path` is used, non-zero exit, unreachable endpoint, empty or
+   non-numeric result) — **STOP with the matching clear error and write nothing.**
+5. **Collect** `Metric name`, `Source type`, `Provider`, source-specific fields, `Auth env var`
+   name, and the probe's `Verified value` into the in-memory KPI model for Step 5.
+
+**Ordering invariant:** Steps 4, 4b, and 4c all write only in-memory; the sole config write is the
+atomic Step 5, so a probe STOP anywhere in 4c leaves every final path untouched — identical posture
+to the Step 2 Postiz gate. Defer to the ref for the STOP messages rather than re-specifying them
+here.
+
 ## Step 5 — Write gtm config (atomic)
 
 `/gtm:init` must never leave a half-written **gtm config** set. Stage init's own writes under the
@@ -188,7 +227,11 @@ session temp dir first, and only move them into place after **every** staged wri
      repo, landing URL, the Step 2-resolved Postiz **Backend URL** value, the Postiz API key env-var
      **name** only, empty Voice section), plus the Step 4b Channels model rendered into the
      `## Channels` table (every row fully materialized — no `<...>` placeholder token remains — or
-     the empty-table form when no channels exist). No placeholder tokens may remain.
+     the empty-table form when no channels exist), plus the Step 4c KPI model rendered into the
+     `## KPI` section — fully materialized (all nine rows present; no `<...>` placeholder remains;
+     source-irrelevant cells blank; `Value path` blank for non-endpoint sources per the Minor 5g
+     fill rule). This KPI section is part of init's own atomic write; `marketing-context.md` still
+     moves **last** as the completion marker. No placeholder tokens may remain.
    - `docs-gtm/README.md` — filled from `${CLAUDE_PLUGIN_ROOT}/refs/docs-gtm-readme-template.md`.
    - `docs-gtm/digests/.gitkeep` and `docs-gtm/briefs/.gitkeep` — empty marker files.
    - `gtm-plugin-root` — the resolved `${CLAUDE_PLUGIN_ROOT}` value (this session's), single line.
@@ -263,7 +306,7 @@ Print a summary:
 > **Files written:**
 > - `.claude/project/marketing-context.md` — gtm's operational config (product basics, the Postiz
 >   Backend URL, the Postiz API key env-var name, empty Voice overrides, the per-channel Channels
->   table).
+>   table, the KPI metric/source/`Verified value`).
 > - `.agents/product-marketing.md` — the marketingskills canonical product-context doc.
 > - `docs/gtm/README.md`, `docs/gtm/digests/.gitkeep`, `docs/gtm/briefs/.gitkeep` — the marketing
 >   working-directory scaffold.
@@ -271,6 +314,10 @@ Print a summary:
 >
 > **Channels configured:** N (ownership/voice/cadence/content-types per channel) — graduate a
 > channel from `draft` to `auto` by re-running `/gtm:init` and changing its ownership.
+>
+> **KPI configured:** metric name, source type + provider, and the `Verified value` read at init,
+> e.g. `KPI configured: "GitHub stars" via managed:github — verified value 128`. Change the KPI by
+> re-running `/gtm:init` (Merge/Re-run).
 >
 > **Keep this environment variable set** for every future gtm session: `POSTIZ_API_KEY`. Only its
 > **name** was persisted to disk — never the value. The Postiz backend URL now lives in
@@ -284,9 +331,10 @@ Print a summary:
 > ```
 >
 > **Next, under Epic [NA-2](https://whimzylive.atlassian.net/browse/NA-2):** this foundation
-> unblocks **NA-5, NA-6, NA-7, NA-8** (KPI metric+source setup, engagement listening, pulse,
-> launch) and **NA-11**. Those remain unblocked-not-yet-configured; channel ownership/voice/cadence
-> config (NA-4) is now written by this run — see **Channels configured** above.
+> unblocks **NA-6, NA-7, NA-8** (engagement listening, pulse, launch) and **NA-11**. Those remain
+> unblocked-not-yet-configured; channel ownership/voice/cadence config (NA-4) and KPI metric+source
+> config (NA-5) are now written by this run — see **Channels configured** / **KPI configured**
+> above.
 
 ## Final — Release session
 
