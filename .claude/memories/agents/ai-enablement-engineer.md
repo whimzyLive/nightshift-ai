@@ -58,3 +58,48 @@
   items), add a short forward-pointing clause at the unconditional step rather than assuming the
   reader will infer the exception from the other step alone — cross-step conditionals need an explicit
   breadcrumb at both ends.
+
+## NA-4 review-fix follow-up (round 3)
+
+- Never assume a CLI's documented/skill-modeled output shape (e.g. "returns a JSON array, pipe
+  straight to `jq`") is what actually comes out on stdout — a human-readable preamble line before
+  the JSON is a common real-world CLI pattern. When a ref delegates enumeration to a CLI, make the
+  parse defensive (extract from the first line starting with the expected structural character,
+  e.g. `sed -n '/^\[/,$p'`) and give the "zero exit but nothing parseable" case its own distinct
+  STOP message — folding it into the transport/connection-error message misdiagnoses a CLI-version
+  or output-format problem as a backend-reachability problem, sending the founder down the wrong
+  troubleshooting path.
+- A "refresh only the stable-identity field on re-run match" rule is incomplete if a *display*
+  field (e.g. `Name`) also participates in the fallback match key — display data still needs
+  refreshing every run, or a later rename silently breaks the fallback the *next* time the primary
+  key goes stale. When a rule like this changes, update it in every place it's stated (ref
+  re-run-matching bullet, template schema column note, template fill rule, command step if it
+  restates) — don't leave one copy saying "only field X" after another now says "X and Y".
+  Explicitly note in the ref when a later fix deliberately supersedes wording carried over from an
+  earlier merged spec, so a future reader doesn't think it's a transcription slip.
+- A step that only *gathers into an in-memory model* (writes nothing to a final path) must never
+  use the verb "write" for what it does with the empty-list case either — "record ... into the
+  in-memory model; a later step renders it" keeps the step's own no-write contract intact even for
+  its edge cases.
+- An "atomic staging guarantee leaves X untouched" claim is only true for the paths *that step's
+  own atomic write* covers. On a Merge/Re-run path, an earlier step (e.g. a marketingskills skill
+  invocation) may have already mutated a file *outside* that atomic write (e.g.
+  `.agents/product-marketing.md`) before this step's error occurs — state the STOP's write-nothing
+  scope precisely (which file(s) truly weren't touched) and point at how to reconcile the file that
+  might already have moved (re-run the command to resync).
+- Prefer per-item three-way outcomes (drop / retain-and-flag-stale / abort) over an all-or-nothing
+  decline gate whenever one declined item shouldn't cost the founder every other answer already
+  gathered in the same run — model the "decline" outcome as an *explicit, distinct* abort action,
+  not the default branch of a single yes/no per affected item.
+- `grep -v '<pattern>'` on whole lines silently hides any other match that happens to share a line
+  with the excluded pattern. For a "no stray placeholder" style check, scan token-by-token with
+  `-o` (`grep -onE '<[^>]+>' files | grep -v ':<line-anchored-exact-token>$'`) so the file:line
+  survives and only the exact excluded token is dropped, not the whole line it lives on.
+- When the same AC-n label is reused by two different stories in one file (NA-3's Step 0/2/3/4/6
+  gates vs NA-4's Step 0-Merge/Step 4b additions), only the *newly added* citations need the
+  disambiguating story prefix (`NA-4 AC-n`) — leave every pre-existing citation as bare `AC-n`.
+  Grep `AC-[0-9]` across the file first and sort hits by which story's section they sit in before
+  touching any of them; qualifying a pre-existing NA-3 tag by mistake is itself a new inconsistency.
+- A boundary condition stated only implicitly (e.g. "pre-selected to X" vs "skipped -> Y") should
+  get one explicit sentence distinguishing "prompted and the default was accepted" from "never
+  prompted/answered at all" — reviewers read these as the same case unless the text says otherwise.

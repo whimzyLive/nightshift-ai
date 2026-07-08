@@ -149,11 +149,16 @@ Values copied verbatim from the spec — every task's requirements implicitly in
 
 - [ ] **Step 1: No stray placeholder tokens** — confirm no unintended `<...>` token remains in the three files. Permitted `<...>` tokens: the illustrative `<id>` cells in example rows, **the template's own intentional fill placeholders** (`marketing-context-template.md` is a template — tokens like `<product-name>`, `<one-liner>` inside its fence and fill rules are its purpose, as are init.md's pre-existing message placeholders like `<plugin>`/`<resolved>`). The check targets tokens **newly added by NA-4 outside those categories**.
 
-Run:
+Run a token-level scan rather than a whole-line filter — `grep -v '<id>'` on whole lines would hide
+any co-located stray token sharing a line with a legitimate `<id>` cell:
 ```bash
-grep -nE '<[^>]+>' plugins/gtm/refs/channel-config.md plugins/gtm/refs/marketing-context-template.md plugins/gtm/commands/init.md | grep -v '<id>'
+grep -onE '<[^>]+>' plugins/gtm/refs/channel-config.md plugins/gtm/refs/marketing-context-template.md plugins/gtm/commands/init.md | grep -v ':<id>$'
 ```
-Expected: hits are only the pre-existing/intentional categories above (`${CLAUDE_PLUGIN_ROOT}` is `${...}`, not `<...>`, and is fine). Investigate any hit introduced by NA-4 that is not an example `<id>` cell or an intentional template fill placeholder.
+This keeps the `file:line:<token>` form and drops only exact `<id>` tokens, so a stray token on the
+same line as a legitimate `<id>` cell still surfaces. Expected: hits are only the pre-existing/
+intentional categories above (`${CLAUDE_PLUGIN_ROOT}` is `${...}`, not `<...>`, and is fine).
+Investigate any hit introduced by NA-4 that is not an example `<id>` cell or an intentional template
+fill placeholder.
 
 - [ ] **Step 2: Cross-references resolve** — confirm `commands/init.md` cites `refs/channel-config.md` and `refs/marketing-context-template.md`, and both ref files exist.
 

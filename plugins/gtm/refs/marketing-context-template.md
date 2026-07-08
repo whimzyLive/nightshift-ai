@@ -70,7 +70,7 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
 | Postiz  | `Backend URL` | string (URL) | Yes | `https://api.postiz.com` | Postiz backend URL — cloud default or self-hosted, chosen at init via AskUserQuestion (seeded from `POSTIZ_API_URL` env if already set). Not a secret — persisted by design; exported as `POSTIZ_API_URL` by any command invoking the `postiz` CLI. |
 | Postiz  | `API key env var` | string (env var name) | Yes | `POSTIZ_API_KEY` | Name only — never the value |
 | Channels | `Channel` | string | Yes | — | Postiz `identifier` — platform key from `integrations:list`. |
-| Channels | `Name` | string | Yes | — | Postiz `name` — account display name; disambiguates multiple accounts on one platform. |
+| Channels | `Name` | string | Yes | — | Postiz `name` — account display name; disambiguates multiple accounts on one platform. Refreshed every run alongside `Integration ID` (display data, not a founder setting) — keeps the `(Channel, Name)` fallback match key current across account renames. |
 | Channels | `Integration ID` | string | Yes | — | Postiz `id`, refreshed every run; downstream publish handle; primary re-run match key but not stable identity (reconnect can go stale — `(Channel, Name)` fallback applies). |
 | Channels | `Ownership` | enum `auto` \| `draft` \| `manual` | Yes | `draft` | AC-4: any channel not explicitly set is `draft`. |
 | Channels | `Voice` | enum `brand` \| `founder` | Yes | `brand` | `brand` = product/brand account voice; `founder` = founder's personal voice; distinct from the global Voice overrides section below. |
@@ -101,5 +101,5 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
 8. Per-channel `Voice` column is distinct from the global `## Voice` overrides section — the latter
    stays empty at init.
 9. On the Merge/Re-run path, preserve every existing channel setting; only backfill
-   channels/settings absent from the file; refresh `Integration ID` every run (per
+   channels/settings absent from the file; refresh `Integration ID` and `Name` every run (per
    `${CLAUDE_PLUGIN_ROOT}/refs/channel-config.md` re-run matching).

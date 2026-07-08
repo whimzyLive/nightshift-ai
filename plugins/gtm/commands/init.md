@@ -45,7 +45,12 @@ AskUserQuestion(
   fields absent from the existing file (prompting for missing user-choice fields), preserving
   every value already set. Also capture the existing Channels rows from the file and run Step 4b,
   preserving every existing per-channel setting and only backfilling channels/settings absent from
-  the file (new channels → schema defaults, AC-4); re-prompt only for genuinely new channels.
+  the file (new channels → schema defaults, NA-4 AC-4); re-prompt only for genuinely new channels
+  — then ask one lightweight follow-up per the ref's Merge-path adjustment hook: "Adjust settings
+  for any existing channel? (default: no)". If yes, the founder names which matched channel(s) to
+  re-prompt (existing values pre-selected as defaults); every other matched row keeps its preserved
+  settings untouched. This hook is what makes graduating a channel from `draft` to `auto` reachable
+  via the Merge path, not only via a full Re-run (see Step 6).
   `.agents/product-marketing.md` is re-maintained idempotently by the marketingskills skill
   (Step 4) regardless. Then continue to Step 5 (write) and Step 6.
 - **Re-run full setup** → **re-enter at Step 1** (dependency check) before touching anything.
@@ -150,12 +155,15 @@ steps: Step 2 confirmed Postiz auth and exported `POSTIZ_API_URL`; on a fresh ru
 Channels table is empty; on a Merge/Re-run re-entry, Step 0 has already captured the current
 Channels rows.
 
-1. Enumerate via `postiz integrations:list` (AC-1); parse `id`, `name`, `identifier` per channel.
+1. Enumerate via `postiz integrations:list` (NA-4 AC-1); parse `id`, `name`, `identifier` per
+   channel.
 2. For each channel, prompt the founder — one channel at a time — for the four settings
-   (Ownership / Voice / Cadence / Content types, AC-2), each pre-seeded with the existing value
-   (re-run) or the schema default (fresh run) per the ref. (Merge path: only genuinely new channels
-   are prompted — see Step 0.) The `reddit` identifier is recommended-defaulted to `manual`; any
-   channel the founder skips falls back to the AC-4 default `draft`.
+   (Ownership / Voice / Cadence / Content types, NA-4 AC-2), each pre-seeded with the existing
+   value (re-run) or the schema default (fresh run) per the ref. (Merge path: only genuinely new
+   channels — plus any the founder asks to adjust via Step 0's Merge-path adjustment hook — are
+   prompted; other matched channels keep their preserved settings.) The `reddit` identifier is
+   recommended-defaulted to `manual`; any channel the founder skips falls back to the NA-4 AC-4
+   default `draft`.
 3. Collect the answers into the in-memory Channels model that Step 5 renders. This step **writes
    nothing** to final paths — it only gathers values.
 
@@ -246,8 +254,9 @@ session temp dir first, and only move them into place after **every** staged wri
 
 ## Step 6 — Post-init checklist
 
-Note any channel dropped on a re-run via the drop-confirmation guard as an addition to the
-**Channels configured** line below before printing the summary.
+Per the drop-confirmation guard's per-channel outcome, note any channel dropped on a re-run, and
+list any channel the founder chose to retain flagged "stale (not returned by Postiz)", as an
+addition to the **Channels configured** line below before printing the summary.
 
 Print a summary:
 
