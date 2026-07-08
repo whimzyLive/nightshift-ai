@@ -273,9 +273,9 @@ Print a summary:
 > ```
 >
 > **Next, under Epic [NA-2](https://whimzylive.atlassian.net/browse/NA-2):** this foundation
-> unblocks **NA-4, NA-5, NA-6, NA-7, NA-8** (channel ownership/voice/cadence, KPI metric+source
-> setup, engagement listening, pulse, launch) and **NA-11**. Those stories extend this foundation
-> — none of their config exists yet.
+> unblocks **NA-5, NA-6, NA-7, NA-8** (KPI metric+source setup, engagement listening, pulse,
+> launch) and **NA-11**. Those remain unblocked-not-yet-configured; channel ownership/voice/cadence
+> config (NA-4) is now written by this run — see **Channels configured** above.
 
 ## Final — Release session
 

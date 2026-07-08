@@ -43,24 +43,17 @@ environment and is never written to this file or any other file `/gtm:init` writ
 | linkedin | Rishi Patel       | <id>           | draft     | founder | weekly  | release-note, article-link |
 | reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link               |
 
-When `postiz integrations:list` returns zero channels, this section is still written with an
-**empty table** (header + separator rows only) plus a one-line note that channels can be connected
-in Postiz and picked up on the next `/gtm:init` run. Exception: on a re-entry that already has
-configured rows, an empty enumeration triggers the drop-confirmation guard (see
-`${CLAUDE_PLUGIN_ROOT}/refs/channel-config.md` Re-run matching) rather than an automatic
-empty-table write.
-
-**Content-type catalogue (locked, six values):** `release-note` (shipped feature / merged PR /
-changelog highlight) · `tip` (usage tip / how-to) · `thread` (long-form multi-part narrative) ·
-`article-link` (link to a cross-posted long-form article) · `demo-clip` (the VHS + Remotion demo
-video) · `milestone` (KPI / community milestone, e.g. star count).
-
 ## Voice
 
 <voice overrides — markdown block, empty at init; populated by a downstream story>
 ```
 
 ## Schema
+
+**Content-type catalogue (locked, six values):** `release-note` (shipped feature / merged PR /
+changelog highlight) · `tip` (usage tip / how-to) · `thread` (long-form multi-part narrative) ·
+`article-link` (link to a cross-posted long-form article) · `demo-clip` (the VHS + Remotion demo
+video) · `milestone` (KPI / community milestone, e.g. star count).
 
 | Section | Field | Type | Required | Default | Notes |
 | ------- | ----- | ---- | -------- | ------- | ----- |
@@ -95,7 +88,10 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
 6. Materialise every Channels row fully — no `<...>` placeholder token may remain (`Integration ID`
    filled from the live `integrations:list` `id`).
 7. When `integrations:list` returns zero channels, write the empty-table form (header + separator
-   rows only) plus the one-line "connect channels in Postiz and re-run" note.
+   rows only) plus the one-line "connect channels in Postiz and re-run" note. Exception: on a
+   re-entry that already has configured rows, an empty enumeration triggers the drop-confirmation
+   guard (see `${CLAUDE_PLUGIN_ROOT}/refs/channel-config.md` Re-run matching) rather than an
+   automatic empty-table write.
 8. Per-channel `Voice` column is distinct from the global `## Voice` overrides section — the latter
    stays empty at init.
 9. On the Merge/Re-run path, preserve every existing channel setting; only backfill
