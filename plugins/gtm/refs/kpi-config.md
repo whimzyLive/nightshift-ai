@@ -78,16 +78,28 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
    > re-run, or supply a raw-numeric endpoint with `Value path` `.`.
 
    A `Value path` of `.` needs no `jq` gate — the raw body is validated numeric directly.
-3. **Probe (AC-4):** `curl -fsS "<url>"` (fail on HTTP error), then apply `Value path` — **use
-   `jq -r` (Minor 5e)** so the extracted value is raw text, not a JSON-quoted string, before numeric
-   validation:
+3. **Probe (AC-4):** `curl -fsS "<url>"` (fail on HTTP error), then apply `Value path`. Which of the
+   two forms below applies is exactly the same condition as the jq availability gate in step 2 —
+   `jq` is only invoked when `Value path` is non-`.`:
 
-   ```bash
-   curl -fsS "<url>" | jq -r '<Value path>'
-   ```
+   - **`Value path` = `.`** (raw-numeric body, the common case for a from-scratch metric endpoint):
+     validate the response body numeric directly — no `jq` involved, so this form works even when
+     `jq` isn't installed:
 
-   For `Value path` `.` with a plain-numeric body, the body itself is the value (still validated
-   numeric). Connection error, HTTP error, empty, or non-numeric result → STOP.
+     ```bash
+     curl -fsS "<url>"
+     ```
+
+   - **`Value path` is non-`.`** (extracting a numeric field from a JSON response): pipe through
+     `jq -r` — **use `jq -r` (Minor 5e)**, not plain `jq`, so the extracted value is raw text, not a
+     JSON-quoted string, before numeric validation. `jq`'s presence was already confirmed by step
+     2's gate:
+
+     ```bash
+     curl -fsS "<url>" | jq -r '<Value path>'
+     ```
+
+   Connection error, HTTP error, empty, or non-numeric result (either form) → STOP.
 4. **Auth injection:** when `Auth env var` is set, add `-H "Authorization: Bearer $<name>"` (value
    read from the environment at run time, never persisted). The stored `<url>` is itself
    shell-expanded at probe time, so an embedded `$VAR` (e.g.
