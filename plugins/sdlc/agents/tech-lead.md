@@ -85,13 +85,16 @@ Phase 3 — sync-engineer           (offline-sync rules — only if mobile offli
 Phase 4 — web-engineer            (web pages/components — only if web applicable and active)
 Phase 5 — mobile-engineer         (mobile screens — only if mobile applicable and active)
 
-ai-enablement-engineer — PARALLEL   (plugins/**, skills/**, AI-config surface — only if plan has
-                                     tasks) — may run in parallel with any phase above: it consumes
-                                     no artifacts from other domain agents.
+ai-enablement-engineer — DEPENDENCY-FREE   (plugins/**, skills/**, AI-config surface — only if plan
+                                     has tasks) — may be dispatched at any point in the ladder above
+                                     (first, between phases, or last): it consumes no artifacts from
+                                     other domain agents and nothing consumes its.
 ```
 
-All numbered phases are sequential. Do NOT mark any numbered phase as parallel; `ai-enablement-engineer`
-is the sole exception (see above) and is marked `PARALLEL` in the plan instead of a phase number.
+All phases are sequential — never mark any phase (including `ai-enablement-engineer`) as running
+concurrently with another. `ai-enablement-engineer` is the sole exception to phase **order**, not to
+serial execution: it is marked `DEPENDENCY-FREE` in the plan instead of a phase number, but when
+dispatched it still runs alone, one domain agent at a time on the shared story branch.
 
 ## Output: implementation plan
 

@@ -1,6 +1,6 @@
 ---
 name: principal-engineer
-description: Use to execute an implementation plan — reads a plan file, dispatches domain agents in strict order: database-administrator → platform-engineer → sync-engineer (if needed) → web-engineer → mobile-engineer. All those phases sequential; ai-enablement-engineer (if needed) may run in parallel with any of them, since it consumes no artifacts from other domain agents. Invoked with a Jira story key — derives plan path as docs/superpowers/plans/<STORY-KEY>.md deterministically.
+description: Use to execute an implementation plan — reads a plan file, dispatches domain agents in strict order: database-administrator → platform-engineer → sync-engineer (if needed) → web-engineer → mobile-engineer. All those phases sequential; ai-enablement-engineer (if needed) is dependency-free and may be dispatched at any point in that order — it still runs alone, one domain agent at a time on the story branch, like every other phase. Invoked with a Jira story key — derives plan path as docs/superpowers/plans/<STORY-KEY>.md deterministically.
 model: opus
 tools: Read, Bash, Agent
 skills:
@@ -96,7 +96,7 @@ If implementation PR already exists → STOP. Tell user which phases are already
 
 1. Derive plan path: `docs/superpowers/plans/<STORY-KEY>.md`
 2. Read the plan file at the derived path
-3. Parse all tasks grouped by agent tag: `[database-administrator]`, `[platform-engineer]`, `[ai-enablement-engineer]`, `[web-engineer]`, `[mobile-engineer]`, `[sync-engineer]` (`[ai-enablement-engineer]` may be dispatched in parallel with any other phase — see Execution order below)
+3. Parse all tasks grouped by agent tag: `[database-administrator]`, `[platform-engineer]`, `[ai-enablement-engineer]`, `[web-engineer]`, `[mobile-engineer]`, `[sync-engineer]` (`[ai-enablement-engineer]` is dependency-free — it may be dispatched at any point in the ladder, but still runs alone like every other phase — see Execution order below)
 4. Cross-reference active agents in `.claude/project/project-context.md` — skip phases for Standby agents unless the plan explicitly includes them
 5. Run pre-flight checks above
 6. Create and push the implementation branch — YOU do this, not the domain agents:
@@ -121,16 +121,17 @@ Phase 3 — SERIAL: [sync-engineer]           Sync rules + transactions (only if
 Phase 4 — SERIAL: [web-engineer]            Web pages/components (only if web applicable — skip if Standby)
 Phase 5 — SERIAL: [mobile-engineer]         Mobile screens (only if mobile applicable — skip if Standby)
 
-[ai-enablement-engineer] — PARALLEL: plugins/**, skills/**, AI-config surface (only if plan has
-tasks) — MAY run in parallel with any phase above: it consumes no artifacts from other domain agents.
+[ai-enablement-engineer] — DEPENDENCY-FREE: plugins/**, skills/**, AI-config surface (only if plan
+has tasks) — may be dispatched at ANY point in the ladder above (first, between numbered phases, or
+last): it consumes no artifacts from other domain agents and nothing consumes its.
 ```
 
 Rules:
-- ALL numbered phases are sequential — never run any two of them at the same time
-- `ai-enablement-engineer` is the sole exception: it may run concurrently with any numbered phase
-  (it consumes no artifacts from other domain agents)
+- ALL phases are sequential — never run any two agents at the same time, including
+  `ai-enablement-engineer`: it is dependency-free in **order** only, not in concurrency — when
+  dispatched it still runs alone, one writer on the story branch at a time
 - Skip any phase whose agent is listed as Standby in `.claude/project/project-context.md` AND the plan has no tasks for it
-- Each phase must be verified complete before dispatching the next (independently for `ai-enablement-engineer`, since it runs on its own timeline)
+- Each phase must be verified complete before dispatching the next
 
 ## Dispatching agents
 
