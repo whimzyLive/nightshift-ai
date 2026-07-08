@@ -34,7 +34,7 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
 2. **Resolve the repo:** derive `<owner>/<name>` from the Product `Repo` token (normalise to
    `owner/name`). If the token is a non-GitHub URL or otherwise unresolvable to `owner/name`, STOP.
 3. **Prompt `GitHub metric`** — single-select `stars` \| `forks` \| `watchers` \| `open-issues`,
-   default `stars`. **Caveat (Minor 5c):** state that `open-issues` maps to `.open_issues_count`,
+   default `stars`. **Caveat:** state that `open-issues` maps to `.open_issues_count`,
    which includes open **pull requests** as well as issues — a founder who wants an issues-only
    count should know `open-issues` is really an issues+PRs count. No env-var prompt for GitHub.
 4. **Probe (AC-4):** read one value via a single `gh api` call, mapped by `GitHub metric`:
@@ -70,7 +70,7 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
 1. **Env (AC-3):** ask whether the source needs an env var (bearer token / PAT); if yes, capture
    its **name** and verify it is set and non-empty — STOP if missing/empty. `gh` is **not** checked.
    Also prompt for `Value path` (jq filter; default `.` = the raw body is already numeric).
-2. **jq availability gate (Minor 5b):** when the founder supplies a non-`.` `Value path` (i.e. jq
+2. **jq availability gate:** when the founder supplies a non-`.` `Value path` (i.e. jq
    extraction is actually required), verify `jq` is installed **before** probing. If `jq` is
    missing, STOP:
 
@@ -78,9 +78,20 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
    > re-run, or supply a raw-numeric endpoint with `Value path` `.`.
 
    A `Value path` of `.` needs no `jq` gate — the raw body is validated numeric directly.
-3. **Probe (AC-4):** `curl -fsS "<url>"` (fail on HTTP error), then apply `Value path`. Which of the
-   two forms below applies is exactly the same condition as the jq availability gate in step 2 —
-   `jq` is only invoked when `Value path` is non-`.`:
+3. **Probe (AC-4), with auth injection applied inline:** the `Authorization` header (when needed)
+   must be attached to the **same** `curl` call that reads the value — never added after the fact,
+   or an authed endpoint 401s and STOPs before any later step is reached. When `Auth env var` is
+   set, every `curl` invocation below adds `-H "Authorization: Bearer $<name>"` (the value read
+   from the environment at run time, never persisted). The stored `<url>` is itself shell-expanded
+   at probe time too, so an embedded `$VAR` (e.g. `https://api.example.com/metric?token=$VAR`)
+   resolves from the environment — covering query-param-token APIs that don't use a bearer header;
+   when a URL uses that pattern, no `-H` flag is needed. Any future reader of this config (e.g.
+   NA-9's KPI reader) MUST apply the same injection convention. Curl against a founder-supplied
+   metric endpoint is legitimate here — the "never hand-roll HTTP" rule applies to **Postiz**, not
+   to the founder's own escape-hatch source.
+
+   Which of the two forms below applies is exactly the same condition as the jq availability gate
+   in step 2 — `jq` is only invoked when `Value path` is non-`.`:
 
    - **`Value path` = `.`** (raw-numeric body, the common case for a from-scratch metric endpoint):
      validate the response body numeric directly — no `jq` involved, so this form works even when
@@ -88,26 +99,21 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
 
      ```bash
      curl -fsS "<url>"
+     # with an Auth env var set:
+     curl -fsS -H "Authorization: Bearer $<name>" "<url>"
      ```
 
    - **`Value path` is non-`.`** (extracting a numeric field from a JSON response): pipe through
-     `jq -r` — **use `jq -r` (Minor 5e)**, not plain `jq`, so the extracted value is raw text, not a
-     JSON-quoted string, before numeric validation. `jq`'s presence was already confirmed by step
-     2's gate:
+     `jq -r` — use `jq -r`, not plain `jq`, so the extracted value is raw text, not a JSON-quoted
+     string, before numeric validation. `jq`'s presence was already confirmed by step 2's gate:
 
      ```bash
      curl -fsS "<url>" | jq -r '<Value path>'
+     # with an Auth env var set:
+     curl -fsS -H "Authorization: Bearer $<name>" "<url>" | jq -r '<Value path>'
      ```
 
    Connection error, HTTP error, empty, or non-numeric result (either form) → STOP.
-4. **Auth injection:** when `Auth env var` is set, add `-H "Authorization: Bearer $<name>"` (value
-   read from the environment at run time, never persisted). The stored `<url>` is itself
-   shell-expanded at probe time, so an embedded `$VAR` (e.g.
-   `https://api.example.com/metric?token=$VAR`) resolves from the environment too — covering
-   query-param-token APIs that do not use a bearer header. Any future reader of this config (e.g.
-   NA-9's KPI reader) MUST apply the same injection convention. Curl against a founder-supplied
-   metric endpoint is legitimate here — the "never hand-roll HTTP" rule applies to **Postiz**, not
-   to the founder's own escape-hatch source.
 
 ## Numeric validation
 
@@ -147,5 +153,6 @@ Every STOP below occurs in the gather phase (Step 4c), **before** the atomic Ste
 | Endpoint response not numeric after `Value path` | STOP: the endpoint response did not yield a numeric value at `<Value path>`. Write nothing. | AC-4 |
 | `Metric name` left blank | Re-prompt — required (AC-1); never write a default. | AC-1 |
 
-This table mirrors the spec's Error Handling section verbatim — `/gtm:init` Step 4c cites this ref
-rather than re-specifying the messages.
+This table mirrors the spec's Error Handling section, plus the jq-availability gate row (a
+hardening addition not present in the spec) — `/gtm:init` Step 4c cites this ref rather than
+re-specifying the messages.

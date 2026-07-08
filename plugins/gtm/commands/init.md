@@ -39,9 +39,12 @@ AskUserQuestion(
 
 - **Keep existing** → print a summary of the current config (Product name/one-liner/repo/landing
   URL, Postiz Backend URL, Postiz API key env-var name, whether Voice overrides are set, a
-  one-line channel count, e.g. "Channels configured: 4", plus a **KPI line** — metric name, source
-  type + provider, and `Verified value`, e.g. `KPI configured: "GitHub stars" via managed:github —
-  verified value 128`) and **STOP**. Write nothing.
+  one-line channel count, e.g. "Channels configured: 4") and **STOP**. Write nothing. Add a **KPI
+  line** to the summary, conditional on whether `## KPI` exists in the file — a config written
+  before NA-5 has no such section:
+  - **`## KPI` present:** metric name, source type + provider, and `Verified value`, e.g.
+    `KPI configured: "GitHub stars" via managed:github — verified value 128`.
+  - **`## KPI` absent:** `KPI: not configured — re-run /gtm:init and choose Merge to add one`.
 - **Merge new findings** → **re-enter at Step 1** (dependency check) before touching anything.
   After Steps 1–2 pass: re-run Step 3 detection, backfill only the `marketing-context.md` template
   fields absent from the existing file (prompting for missing user-choice fields), preserving
@@ -56,8 +59,8 @@ AskUserQuestion(
   `.agents/product-marketing.md` is re-maintained idempotently by the marketingskills skill
   (Step 4) regardless. Also re-enter Step 4c: backfill the `## KPI` section only if absent from the
   existing file; preserve an already-set KPI block. When present but incomplete, backfill only
-  missing tokens (prompting for any missing user-choice field). **Malformed enum values on Merge
-  (Minor 5d):** treat an existing KPI token holding an **invalid/out-of-enum value** (e.g. a
+  missing tokens (prompting for any missing user-choice field). **Malformed enum values on Merge:**
+  treat an existing KPI token holding an **invalid/out-of-enum value** (e.g. a
   `Source type` that is neither `managed` nor `custom`, or a `GitHub metric` outside the four-value
   enum) as **missing** — re-prompt for it rather than preserving the malformed value. Re-run the
   probe to refresh `Verified value`. Then continue to Step 5 (write) and Step 6.
@@ -229,7 +232,7 @@ session temp dir first, and only move them into place after **every** staged wri
      `## Channels` table (every row fully materialized — no `<...>` placeholder token remains — or
      the empty-table form when no channels exist), plus the Step 4c KPI model rendered into the
      `## KPI` section — fully materialized (all nine rows present; no `<...>` placeholder remains;
-     source-irrelevant cells blank; `Value path` blank for non-endpoint sources per the Minor 5g
+     source-irrelevant cells blank; `Value path` blank for non-endpoint sources per the Value path
      fill rule). This KPI section is part of init's own atomic write; `marketing-context.md` still
      moves **last** as the completion marker. No placeholder tokens may remain.
    - `docs-gtm/README.md` — filled from `${CLAUDE_PLUGIN_ROOT}/refs/docs-gtm-readme-template.md`.

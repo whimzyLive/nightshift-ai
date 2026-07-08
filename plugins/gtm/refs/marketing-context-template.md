@@ -42,10 +42,6 @@ environment and is never written to this file or any other file `/gtm:init` writ
 
 ## KPI
 
-<!-- Row set is fixed (all nine rows always present); values below are illustrative only — the
-     written file materialises the founder's real answers and the probe's real Verified value;
-     source-irrelevant cells render blank, never omitted and never `<...>`. -->
-
 | Token             | Value |
 | ----------------- | ----- |
 | Metric name       | GitHub stars |
@@ -68,6 +64,11 @@ never written to this file.
 
 <voice overrides — markdown block, empty at init; populated by a downstream story>
 ```
+
+**KPI row values above are illustrative only (never render these into a generated file):** the row
+set is fixed — all nine rows are always present — and the written file materialises the founder's
+real answers and the probe's real `Verified value`; source-irrelevant cells render blank, never
+omitted and never `<...>`.
 
 **Example rows (illustrative only — never render these into a generated file):** a materialised
 `## Channels` table looks like this once real channels are configured:
@@ -111,11 +112,10 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
 | KPI | `Verified value` | string (numeric) | Yes | none | The one live value read by the Step-4c probe (AC-4). Refreshed on every Re-run/Merge re-probe. |
 | Voice   | `voice overrides` | markdown block | No | empty | ECC anti-slop overrides, populated by a downstream story |
 
-> **Minor 5c (open-issues + PRs)** is captured in the `GitHub metric` row above.
-> **Minor 5f (scope Bearer-header note to endpoint):** the `Auth env var` row scopes the
-> `Authorization: Bearer` injection specifically to the **endpoint** source; the
-> `command`/`$VAR`-in-URL shell-expansion path is stated separately, so the bearer-header claim is
-> not over-generalised to the command source.
+> The `open-issues`-includes-PRs caveat is captured in the `GitHub metric` row above. The
+> `Auth env var` row scopes the `Authorization: Bearer` injection specifically to the **endpoint**
+> source; the `command`/`$VAR`-in-URL shell-expansion path is stated separately, so the
+> bearer-header claim is not over-generalised to the command source.
 
 ## Fill rules
 
@@ -146,12 +146,15 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
     **source-irrelevant cells are written blank** (empty table cell), never omitted and never
     `<...>`.
 11. `Metric name` is always the founder's real answer — never a default, never pre-filled (AC-1).
-12. **Value path fill rule (Minor 5g):** `Value path` is written **blank** for the `github` and
-    `command` sources (jq extraction does not apply); for the `endpoint` source it holds the
-    founder's jq filter, and the literal `.` is written **only** when the endpoint body is already
-    raw-numeric (`.` selects the whole body). Do not write `.` for non-endpoint sources — those
-    cells are blank.
+12. **Value path fill rule:** `Value path` is written **blank** for the `github` and `command`
+    sources (jq extraction does not apply); for the `endpoint` source it holds the founder's jq
+    filter, and the literal `.` is written **only** when the endpoint body is already raw-numeric
+    (`.` selects the whole body). Do not write `.` for non-endpoint sources — those cells are blank.
 13. `Verified value` is always the probe's real trimmed numeric result — never invented, refreshed
     on every re-probe.
 14. On the "Merge new findings" re-init path, preserve an already-set `## KPI` block; only backfill
-    missing tokens.
+    missing tokens. Values failing their enum/format (a `Source type` outside `managed`/`custom`, a
+    `Provider` outside its enum, a `GitHub metric` outside its four-value enum, or a non-numeric
+    `Verified value`) are treated as **missing** and re-prompted — matching
+    `${CLAUDE_PLUGIN_ROOT}/commands/init.md`'s Merge-path malformed-enum-as-missing rule, not
+    silently preserved as-is.
