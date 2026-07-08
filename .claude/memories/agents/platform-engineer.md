@@ -404,3 +404,67 @@ fork).
   http...>`) as a *separate* pass from checking script logic (`fetch`/`subprocess`/`exec` calls) —
   the two are different vetting axes and a script-logic-only pass will miss a static tag pointing at
   a CDN.
+
+## 2026-07-08 — Story NA-12 high-effort workflow review — 10 confirmed defects, owner "dependency-free" clarification
+**Learnings:**
+- "Parallel" as a review-round shorthand can itself be the bug: round 3's fix made
+  ai-enablement-engineer a genuine concurrency exception ("MAY run in parallel," "sequential only
+  ... except..."), but the owner's actual intent was narrower — no *dependency ordering* (it may be
+  slotted anywhere in the ladder), not no *serialization* (exactly one domain agent still writes the
+  story branch at a time — the git single-branch/worktree constraint and Step-5 HEAD-advance check
+  don't go away). Reworded every spot from "MAY run in parallel with any phase" to "dependency-free:
+  may be dispatched at any point in the ladder ... but still runs alone, one domain agent at a time"
+  and made "sequential only — never two domain agents at once" universal again (no exception
+  clause) — the exception is about *order*, not *concurrency*. A one-word review shorthand
+  ("parallel") that seemed unambiguous in isolation turned out to conflate two genuinely different
+  properties (freedom from ordering vs. freedom from mutual exclusion); worth re-deriving the
+  precise claim from the owner's own justification sentence ("consumes no artifacts... nothing
+  consumes its") rather than trusting the shorthand label alone, even on a second pass.
+- A "defined exactly once" charter (analyze-protocol.md's own stated purpose) is violated not just
+  by copy-pasted prose blocks but by *independently drifting restatements of the same fact* — the
+  clearest tell was commands/analyze.md's Default-mode step 1 and agents/ai-enablement-engineer.md's
+  First-steps step 1 each hard-coding their own version of the "not Active" report message
+  ("AI-config management not enabled; run /sdlc:init to opt in."), which had already silently
+  diverged from the corrected canonical message written into the new Error-handling table
+  ("repo not opted in or project-context unreadable — run /sdlc:init."). Fixed by grepping the
+  literal old message string tree-wide after adding the canonical table, not just checking the
+  table itself was correct — a dedup pass isn't done until every duplicate copy is gone, including
+  ones embedded as inline strings inside otherwise-unrelated operational steps (not just the
+  obviously-duplicated table/list blocks the review named).
+- "Move X to a canonical location and reference it by anchor" needs a same-file check too:
+  `refs/analyze-protocol.md`'s own Scan-protocol step 2 restated the old (now-wrong) "not Active"
+  message inline, in the *same file* as the new canonical Error-handling table three headings below
+  it — proximity to the canonical source doesn't prevent drift; every restatement needs the same
+  grep-and-replace treatment regardless of which file it lives in.
+- A branch-before-commit reorder for a *standalone* apply path must explicitly say what *dispatched*
+  mode does instead (nothing — it commits on the already-checked-out impl branch), otherwise a
+  reader might assume the new "branch first" step applies universally and try to branch mid-dispatch
+  (which would violate the domain-agent-handoff.md contract of never creating a branch). Every
+  reorder edit paired the standalone step with an explicit "dispatched mode does not branch here"
+  sentence.
+- Init.md's row-writes for a newly-opted-in agent needed a "does the target directory exist"
+  precondition that the original design silently lacked — same failure shape as writing a
+  workspace→agent row for a path that doesn't exist yet, which the plugin's own drift/gap table
+  already flags as a check ("Workspace→agent table vs disk: Table lists a path that no longer
+  exists"). The fix (write conditionally, keep ≥1 row for the Active signal, document a root-level
+  fallback) had to reference that pre-existing drift check by name to make clear *why* an
+  unconditional write was wrong, not just assert the new conditional behavior.
+- A python HTML-report generator (`generate_report.py`) embeds its whole template in one
+  triple-double-quoted string built via `"""..." + var + """..."""` concatenation — safe to strip
+  `<link>` tags and swap `'Poppins'`/`'Lora'` font-family values (they're just text inside the
+  string, single-quoted, no nesting conflict with the outer `"""`), but must re-run `python3 -m
+  py_compile` afterward rather than assume "it's just editing text inside a string" is risk-free —
+  a stray literal `"""` or unbalanced quote inside the edited text would silently break the module
+  at import time, not at template-render time.
+
+**Patterns:**
+- When a review defines a domain-agent property with a precise causal justification ("it consumes
+  no artifacts from other domain agents and nothing consumes its"), treat that justification
+  sentence — not the one-word label the previous round used — as the actual spec to reword every
+  occurrence against; a label alone (parallel/dependency-free/concurrent) is lossy compared to the
+  underlying claim and different rounds can legitimately mean different things by the same word.
+- After finishing a "canonicalize X, replace duplicates with anchor refs" pass, grep the *exact old
+  literal string* (not just the structural pattern) across the whole plugin tree as a final check —
+  this catches both cross-file copies and same-file restatements a structural/anchor-based search
+  would miss (an anchor reference makes copy #1 correct without touching copy #2 that used the same
+  words but not the same anchor).
