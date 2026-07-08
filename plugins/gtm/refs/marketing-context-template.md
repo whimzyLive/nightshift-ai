@@ -35,6 +35,26 @@ invoking the CLI must `export POSTIZ_API_URL="<Backend URL>"` from this token fi
 env-var **name** for the API key is persisted above; the actual key **value** lives in the
 environment and is never written to this file or any other file `/gtm:init` writes.
 
+## Channels
+
+| Channel  | Name              | Integration ID | Ownership | Voice   | Cadence | Content types              |
+| -------- | ----------------- | -------------- | --------- | ------- | ------- | -------------------------- |
+| x        | Nightshift        | <id>           | draft     | brand   | default | release-note, milestone    |
+| linkedin | Rishi Patel       | <id>           | draft     | founder | weekly  | release-note, article-link |
+| reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link               |
+
+When `postiz integrations:list` returns zero channels, this section is still written with an
+**empty table** (header + separator rows only) plus a one-line note that channels can be connected
+in Postiz and picked up on the next `/gtm:init` run. Exception: on a re-entry that already has
+configured rows, an empty enumeration triggers the drop-confirmation guard (see
+`${CLAUDE_PLUGIN_ROOT}/refs/channel-config.md` Re-run matching) rather than an automatic
+empty-table write.
+
+**Content-type catalogue (locked, six values):** `release-note` (shipped feature / merged PR /
+changelog highlight) · `tip` (usage tip / how-to) · `thread` (long-form multi-part narrative) ·
+`article-link` (link to a cross-posted long-form article) · `demo-clip` (the VHS + Remotion demo
+video) · `milestone` (KPI / community milestone, e.g. star count).
+
 ## Voice
 
 <voice overrides — markdown block, empty at init; populated by a downstream story>
@@ -50,6 +70,13 @@ environment and is never written to this file or any other file `/gtm:init` writ
 | Product | `landing URL` | string (URL) | No | empty | Blank allowed if none exists yet |
 | Postiz  | `Backend URL` | string (URL) | Yes | `https://api.postiz.com` | Postiz backend URL — cloud default or self-hosted, chosen at init via AskUserQuestion (seeded from `POSTIZ_API_URL` env if already set). Not a secret — persisted by design; exported as `POSTIZ_API_URL` by any command invoking the `postiz` CLI. |
 | Postiz  | `API key env var` | string (env var name) | Yes | `POSTIZ_API_KEY` | Name only — never the value |
+| Channels | `Channel` | string | Yes | — | Postiz `identifier` — platform key from `integrations:list`. |
+| Channels | `Name` | string | Yes | — | Postiz `name` — account display name; disambiguates multiple accounts on one platform. |
+| Channels | `Integration ID` | string | Yes | — | Postiz `id`, refreshed every run; downstream publish handle; primary re-run match key but not stable identity (reconnect can go stale — `(Channel, Name)` fallback applies). |
+| Channels | `Ownership` | enum `auto` \| `draft` \| `manual` | Yes | `draft` | AC-4: any channel not explicitly set is `draft`. |
+| Channels | `Voice` | enum `brand` \| `founder` | Yes | `brand` | `brand` = product/brand account voice; `founder` = founder's personal voice; distinct from the global Voice overrides section below. |
+| Channels | `Cadence` | enum `default` \| `daily` \| `weekly` \| `paused` | Yes | `default` | `default` = inherit global pulse cadence; `paused` = prepared but never scheduled. |
+| Channels | `Content types` | comma-separated subset of the six-value catalogue | Yes | `release-note, milestone` | Multi-select. |
 | Voice   | `voice overrides` | markdown block | No | empty | ECC anti-slop overrides, populated by a downstream story |
 
 ## Fill rules
@@ -65,3 +92,12 @@ environment and is never written to this file or any other file `/gtm:init` writ
    invent voice guidance at init time.
 5. On the "Merge new findings" re-init path, preserve every value already set; only backfill
    template fields that are absent from the existing file.
+6. Materialise every Channels row fully — no `<...>` placeholder token may remain (`Integration ID`
+   filled from the live `integrations:list` `id`).
+7. When `integrations:list` returns zero channels, write the empty-table form (header + separator
+   rows only) plus the one-line "connect channels in Postiz and re-run" note.
+8. Per-channel `Voice` column is distinct from the global `## Voice` overrides section — the latter
+   stays empty at init.
+9. On the Merge/Re-run path, preserve every existing channel setting; only backfill
+   channels/settings absent from the file; refresh `Integration ID` every run (per
+   `${CLAUDE_PLUGIN_ROOT}/refs/channel-config.md` re-run matching).
