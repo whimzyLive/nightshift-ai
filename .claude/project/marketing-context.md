@@ -23,4 +23,11 @@ invoking the CLI must `export POSTIZ_API_URL="<Backend URL>"` from this token fi
 env-var **name** for the API key is persisted above; the actual key **value** lives in the
 environment and is never written to this file or any other file `/gtm:init` writes.
 
+## Channels
+
+| Channel | Name        | Integration ID            | Ownership | Voice   | Cadence | Content types                              |
+| ------- | ----------- | ------------------------- | --------- | ------- | ------- | ------------------------------------------ |
+| devto   | Rushi Patel | cmrc8fc340003o57rwrbk9mb4 | auto      | brand   | default | release-note, article-link, tip            |
+| x       | Rushi Patel | cmrc60gmz0001o57reda64cvn | draft     | founder | default | release-note, milestone, thread, demo-clip |
+
 ## Voice
