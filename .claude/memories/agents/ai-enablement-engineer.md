@@ -103,3 +103,24 @@
 - A boundary condition stated only implicitly (e.g. "pre-selected to X" vs "skipped -> Y") should
   get one explicit sentence distinguishing "prompted and the default was accepted" from "never
   prompted/answered at all" — reviewers read these as the same case unless the text says otherwise.
+
+## NA-5 — KPI metric and source setup (`plugins/gtm`)
+
+- When a plan/spec's Task-4-style verification grep expects a multi-word token (e.g. `Custom
+  command`) to appear verbatim on a single line across three files, watch for prose line-wrap:
+  Markdown source can hard-wrap a phrase like "Custom command" across two source lines (`Custom` at
+  EOL, `command` starting the next), which is invisible when reading rendered Markdown but makes
+  `grep -onE 'Custom command'` silently miss it in exactly one of the three files. Run the Task-4
+  greps for real (not just by eyeballing the prose) and re-wrap any option/enum list so each locked
+  token phrase sits fully on one physical line.
+- When a spec gives an exact illustrative table (e.g. the `## KPI` nine-row example with concrete
+  values like "GitHub stars" / "managed" / "128" rather than `<...>` placeholders) and says "add
+  this exact shape to the fenced template block," follow that literally even though sibling
+  sections (Product/Postiz) use `<...>` placeholders in the same fence — the two styles can coexist
+  in one template file; add a short inline comment above the table clarifying it's illustrative
+  ("row set fixed, values illustrative, source-irrelevant cells blank") so a reader doesn't mistake
+  the concrete-looking values for what a fresh run would literally emit.
+- A `$<field name>` illustration token (e.g. `$<Auth env var>`, showing how a stored string
+  shell-expands a referenced env var by name at probe time) is a legitimate spec-inherited
+  convention, not stray placeholder drift — when it appears verbatim in the spec's own locked
+  wording, carry it into the ref as-is rather than "fixing" it to a bracket-free form.
