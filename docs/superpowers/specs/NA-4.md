@@ -60,7 +60,7 @@ NA-4 adds one new section to the `marketing-context.md` template and its schema.
 | reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link             |
 ```
 
-When `integrations:list` returns zero channels, the section is still written with an **empty table** (header + separator rows only) plus a one-line note that channels can be connected in Postiz and picked up on the next `/gtm:init` run.
+When `integrations:list` returns zero channels, the section is still written with an **empty table** (header + separator rows only) plus a one-line note that channels can be connected in Postiz and picked up on the next `/gtm:init` run. Exception: on a re-entry that already has configured rows, an empty enumeration triggers the drop-confirmation guard (see Re-run matching / Error Handling) rather than an automatic empty-table write.
 
 ### Column schema
 
@@ -80,7 +80,7 @@ When `integrations:list` returns zero channels, the section is still written wit
 
 ### Re-run matching (AC-5)
 
-On a Merge or Re-run re-entry, existing Channels rows are matched to freshly enumerated channels by **`Integration ID` first**, falling back to the **(`Channel` identifier, `Name`)** pair when the id is absent (channel reconnected). A matched row's `Ownership` / `Voice` / `Cadence` / `Content types` are **preserved as-is** and offered as the pre-selected defaults if re-prompting; only the `Integration ID` is refreshed. A newly discovered channel with no matching row gets the schema defaults — `Ownership = draft` (AC-4). A previously configured channel that is no longer returned by `integrations:list` is **dropped** from the rewritten table (it is no longer connected). No setting is ever silently overwritten (AC-5).
+On a Merge or Re-run re-entry, existing Channels rows are matched to freshly enumerated channels by **`Integration ID` first**, falling back to the **(`Channel` identifier, `Name`)** pair when no `Integration ID` match is found in the freshly enumerated list (e.g. a reconnected channel — its stored id is present but stale, so it matches nothing). A matched row's `Ownership` / `Voice` / `Cadence` / `Content types` are **preserved as-is** and offered as the pre-selected defaults if re-prompting; only the `Integration ID` is refreshed. A newly discovered channel with no matching row gets the schema defaults — `Ownership = draft` (AC-4). A previously configured channel that is no longer returned by `integrations:list` is **dropped** from the rewritten table (it is no longer connected) — but never silently: any re-run that would drop one or more previously configured rows must list the affected channels and get explicit founder confirmation before writing; if the founder declines, STOP with the existing rows intact (nothing written). In particular, an **empty** enumeration on a re-entry that has existing configured rows (API key pointed at a different Postiz org, backend reset — `auth:status` can still pass) must never auto-write an empty table over them. No setting is ever silently overwritten or dropped (AC-5).
 
 ## Command Surface — `/gtm:init` changes
 
@@ -132,11 +132,12 @@ Use the existing `plugins/gtm/refs/postiz-verify.md` and `plugins/gtm/commands/i
 
 | Scenario | Behaviour |
 | -------- | --------- |
-| `postiz integrations:list` returns an **empty** array | Not an error. Write the empty Channels table + the "connect channels in Postiz and re-run" note; continue to Step 5. |
+| `postiz integrations:list` returns an **empty** array (fresh run, or re-entry with no previously configured rows) | Not an error. Write the empty Channels table + the "connect channels in Postiz and re-run" note; continue to Step 5. |
+| `postiz integrations:list` returns an **empty** array on a Merge/Re-run re-entry with previously configured rows | Guard against a silent wipe (AC-5): list the rows that would be dropped and require explicit founder confirmation before writing the empty table; on decline, STOP with the existing rows intact (nothing written). |
 | `postiz integrations:list` **errors** (transport / non-zero exit) after Step 2 auth passed | STOP with an actionable message ("could not enumerate Postiz channels via `postiz integrations:list`; confirm the backend is reachable and re-run `/gtm:init`"); write nothing — the atomic staging guarantee leaves config untouched. |
 | An enumerated channel is missing `id`, `name`, or `identifier` | Skip that malformed entry, warn which channel was skipped, continue with the rest. |
 | Founder skips / declines to set a channel's ownership | Apply AC-4 default `draft` (never left blank). |
-| Re-run: an existing configured channel no longer returned by `integrations:list` | Drop it from the rewritten table (no longer connected); note the drop in the Step 6 summary. |
+| Re-run: an existing configured channel no longer returned by `integrations:list` | Confirm the drop with the founder (see Re-run matching — never silent), then drop it from the rewritten table and note the drop in the Step 6 summary; on decline, STOP with nothing written. |
 | Re-run: two accounts share a platform `identifier` | Disambiguate rows by `Name`; match/preserve per (identifier, Name). |
 
 ## Permissions & Trust Posture
@@ -153,14 +154,14 @@ No RBAC model exists in this repo — the only actor is the founder running `/gt
 - **Connecting / authenticating new Postiz channels** — the founder connects channels in Postiz itself; the picker only reads what `integrations:list` already returns.
 - Any change under `tools/` or `brand/`.
 
-## Open Questions
+## Open Questions (all resolved — defaults adopted)
 
-- [ ] Reddit default ownership vs AC-4. — **Suggested default (adopted above):** the picker pre-selects `manual` for the `reddit` identifier as a *recommended* answer (Epic's subreddit-automation caution), while the universal AC-4 fallback for any un-touched channel remains `draft`. Both rules hold: a founder who runs the picker sees `manual` pre-selected for Reddit and can override; a founder who never touches a channel gets `draft`.
-- [ ] Content-type catalogue extensibility. — **Suggested default (adopted above):** ship the six-value catalogue locked in Config Schema; per-repo extension of the catalogue is deferred to a downstream voice/content-strategy story.
+- [x] Reddit default ownership vs AC-4. — **Resolved (adopted above):** the picker pre-selects `manual` for the `reddit` identifier as a *recommended* answer (Epic's subreddit-automation caution), while the universal AC-4 fallback for any un-touched channel remains `draft`. Both rules hold: a founder who runs the picker sees `manual` pre-selected for Reddit and can override; a founder who never touches a channel gets `draft`.
+- [x] Content-type catalogue extensibility. — **Resolved (adopted above):** ship the six-value catalogue locked in Config Schema; per-repo extension of the catalogue is deferred to a downstream voice/content-strategy story.
 
 ## Decided (defaults locked by this spec)
 
 - Picker lives **inside `/gtm:init`** as Step 4b (after the product-marketing interview, before the atomic write) — not a standalone command.
 - Ownership enum `auto|draft|manual`; Voice enum `brand|founder`; Cadence enum `default|daily|weekly|paused`; content-type catalogue of six values — all fixed here.
 - Persisted as a `## Channels` markdown table in `marketing-context.md`; `Integration ID` refreshed every run; re-run match key = `Integration ID` then (`Channel`, `Name`).
-- Empty `integrations:list` → empty table + note, never a hard stop; a transport **error** → STOP with nothing written (atomic).
+- Empty `integrations:list` → empty table + note, never a hard stop — except on a re-entry with previously configured rows, where the drop-confirmation guard applies (AC-5); a transport **error** → STOP with nothing written (atomic).
