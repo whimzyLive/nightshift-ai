@@ -8,3 +8,6 @@ tools/portability-denylist.txt
 
 # gtm plugin-root marker — per-session cache, never commit (nightshift dogfoods gtm too)
 .claude/.gtm-plugin-root
+
+# Ignore env files for local development (never commit)
+.env
