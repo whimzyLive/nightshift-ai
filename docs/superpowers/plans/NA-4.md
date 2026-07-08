@@ -147,13 +147,13 @@ Values copied verbatim from the spec — every task's requirements implicitly in
 - Consumes: all three edited files (Tasks 1–3).
 - Produces: pass/fail signal — this repo has no typecheck/lint gate (Markdown + Shell), so verification is a Markdown cross-reference + enum-consistency check.
 
-- [ ] **Step 1: No stray placeholder tokens** — confirm no unintended `<...>` token remains in the three files (the only permitted `<...>` are the illustrative `<id>` cells inside example template rows).
+- [ ] **Step 1: No stray placeholder tokens** — confirm no unintended `<...>` token remains in the three files. Permitted `<...>` tokens: the illustrative `<id>` cells in example rows, **the template's own intentional fill placeholders** (`marketing-context-template.md` is a template — tokens like `<product-name>`, `<one-liner>` inside its fence and fill rules are its purpose, as are init.md's pre-existing message placeholders like `<plugin>`/`<resolved>`). The check targets tokens **newly added by NA-4 outside those categories**.
 
 Run:
 ```bash
 grep -nE '<[^>]+>' plugins/gtm/refs/channel-config.md plugins/gtm/refs/marketing-context-template.md plugins/gtm/commands/init.md | grep -v '<id>'
 ```
-Expected: no output other than known intentional tokens (`${CLAUDE_PLUGIN_ROOT}` is `${...}`, not `<...>`, and is fine). Investigate any `<...>` hit that is not an example `<id>` cell.
+Expected: hits are only the pre-existing/intentional categories above (`${CLAUDE_PLUGIN_ROOT}` is `${...}`, not `<...>`, and is fine). Investigate any hit introduced by NA-4 that is not an example `<id>` cell or an intentional template fill placeholder.
 
 - [ ] **Step 2: Cross-references resolve** — confirm `commands/init.md` cites `refs/channel-config.md` and `refs/marketing-context-template.md`, and both ref files exist.
 
