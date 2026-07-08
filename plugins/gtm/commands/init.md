@@ -73,8 +73,28 @@ claude plugin marketplace add coreyhaines31/marketingskills
 claude plugin install marketing-skills@marketingskills --scope project
 ```
 
-Project scope records both in `.claude/settings.json` `enabledPlugins` (committed), so teammates
-get them on checkout too. If either install fails (network, marketplace unreachable, permission
+Whether or not an install was needed, ensure the repo's committed `.claude/settings.json` declares
+both dependency marketplaces under `extraKnownMarketplaces`. Without this, a teammate's client has
+no source for `postiz-agent` / `marketingskills`, gtm's `plugin.json` dependencies are left
+unresolved on checkout, and gtm is disabled with a `dependency-unsatisfied` error. Merge these keys
+with the native Edit/Write tools (idempotent — preserve existing keys, skip any already present):
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "postiz-agent": {
+      "source": { "source": "github", "repo": "gitroomhq/postiz-agent" }
+    },
+    "marketingskills": {
+      "source": { "source": "github", "repo": "coreyhaines31/marketingskills" }
+    }
+  }
+}
+```
+
+Project scope records both plugins in `.claude/settings.json` `enabledPlugins` (committed);
+together with `extraKnownMarketplaces` above, teammates get the marketplaces registered and both
+dependencies auto-resolved on checkout. If either install fails (network, marketplace unreachable, permission
 denied), **STOP** with an actionable message naming which plugin failed and the exact commands to
 run manually:
 

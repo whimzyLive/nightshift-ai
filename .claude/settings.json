@@ -1,6 +1,23 @@
 {
   "enabledPlugins": {
     "sdlc@nightshift": true,
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "gtm@nightshift": true,
+    "postiz@postiz-agent": true,
+    "marketing-skills@marketingskills": true
+  },
+  "extraKnownMarketplaces": {
+    "postiz-agent": {
+      "source": {
+        "source": "github",
+        "repo": "gitroomhq/postiz-agent"
+      }
+    },
+    "marketingskills": {
+      "source": {
+        "source": "github",
+        "repo": "coreyhaines31/marketingskills"
+      }
+    }
   }
 }
