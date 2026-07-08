@@ -131,7 +131,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
 
 1. Read `docs/superpowers/plans/<STORY-KEY>.md`.
 2. Group tasks by agent tag: `[database-administrator]`, `[platform-engineer]`,
-   `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`.
+   `[ai-enablement-engineer]`, `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`
+   (`[ai-enablement-engineer]` is dependency-free — it may be dispatched at any point in the ladder,
+   but still runs alone, one domain agent at a time, like every other phase — see Step 4).
 3. Cross-reference Active agents in project-context — drop Standby phases with no tasks.
 4. Note any "grounding corrections" / "open items" the plan flagged — pass them verbatim into
    the relevant domain-agent prompt so the implementer honors them.
@@ -144,8 +146,11 @@ task list **inline from the Jira story**:
 2. Turn it into an ordered, agent-tagged task list the same way `tech-lead` would: map each piece of
    work to the **Active** domain agent that owns its files (per project-context), in the standard
    dependency order (database-administrator → platform-engineer → sync-engineer → web-engineer →
-   mobile-engineer). Keep it proportional — a lightweight story is small, usually one or two domain
-   agents and a handful of tasks.
+   mobile-engineer); `ai-enablement-engineer` (if applicable) is dependency-free and may be
+   dispatched at any point in that order — it consumes no artifacts from other domain agents and
+   nothing consumes its, though it still runs alone, one domain agent at a time, like every other
+   phase. Keep it proportional — a lightweight story is small, usually one or two domain agents and
+   a handful of tasks.
 3. Treat the **acceptance criteria as the completion contract** — pass them verbatim into each
    domain-agent prompt (there is no plan doc to carry them).
 
@@ -211,7 +216,9 @@ multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contra
    test now **PASSES**, then run the project quality gate (`typecheck` + `test`). Multiple affected
    domains run **sequentially in the normal dependency order** (database-administrator →
    platform-engineer → sync-engineer → web-engineer → mobile-engineer), one agent at a time, each on
-   the single `fix/<STORY-KEY>` branch.
+   the single `fix/<STORY-KEY>` branch; `ai-enablement-engineer` (if affected) is dependency-free and
+   may be dispatched at any point in that order — it still runs alone, like any other phase, when
+   dispatched.
 
 Per-phase **Step-5 push/verify** runs after each domain-agent commit, exactly as on the feature path.
 The phase-3 commit (test added, fix not yet applied) and HEAD (fix applied) are the QA Step-7
@@ -243,9 +250,17 @@ Phase 2 — [platform-engineer]       backend infra + handlers + config
 Phase 3 — [sync-engineer]           offline-sync rules + transactions (only if plan has tasks)
 Phase 4 — [web-engineer]            web pages/components (only if plan has tasks)
 Phase 5 — [mobile-engineer]         mobile screens (only if plan has tasks)
+
+[ai-enablement-engineer]            plugins/**, skills/**, AI-config surface (only if plan has tasks)
+                                     — dependency-free: may be dispatched at ANY point in the ladder
+                                     above (first, between numbered phases, or last) — it consumes
+                                     no artifacts from other domain agents and nothing consumes its.
 ```
 
-- Sequential only — never two domain agents at once.
+- Sequential only — never two domain agents at once. This applies to `ai-enablement-engineer` too:
+  it is dependency-free in **order** only, not in concurrency — when dispatched it still runs alone,
+  like any other phase, preserving one-writer-at-a-time on the single story branch (git
+  single-branch/worktree constraint, Step-5 HEAD-advance check).
 - Each phase verified complete before the next is dispatched.
 
 ### Sub-task commit sequencing (only when `subtaskCount > 0`, from Step 2.5)

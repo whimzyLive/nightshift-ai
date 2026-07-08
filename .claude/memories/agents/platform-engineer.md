@@ -126,6 +126,62 @@
   to catch more true positives, immediately grep the *whole* scanned tree with the new pattern and
   triage every hit — don't assume the reviewer's one verification snippet is exhaustive.
 
+## 2026-07-08 — Story NA-12 Phase 1-2 — vendored skill-creator + find-skills, wrote analyze-protocol.md
+**Learnings:**
+- Both upstream skills vetted clean. `skill-creator` (anthropics/skills, pinned commit
+  `9d2f1ae187231d8199c64b5b762e1bdf2244733d`) ships its own per-skill `LICENSE.txt`
+  (Apache-2.0, Copyright 2026 Anthropic, PBC) — carried verbatim, no modification needed.
+  `find-skills` (vercel-labs/skills, pinned commit `4ce6d48ac44c8b637db87b2102fea3baca719df1`)
+  has **no** per-skill or top-level `LICENSE` file upstream at this commit — only `package.json`
+  `"license": "MIT"` and a README "## License / MIT" section declare it. Wrote a standard MIT
+  `LICENSE` file for the vendored copy with a provenance footer explaining it was transcribed
+  (not copied) from those two upstream sources, since there was no file to literally carry over.
+- `find-skills`' `SKILL.md` is pure prose with **no bundled scripts** — it only tells the agent to
+  invoke `npx skills find/add/check/update` (a public package-manager CLI querying the public
+  skills.sh registry) — passes the "no exfiltration / no RCE / no secret access, confined to local
+  files + public registry" checklist cleanly.
+- **Follow-up (same day):** initially vendored `skill-creator` as `SKILL.md` + `LICENSE.txt` only
+  per the plan's literal file list, flagging the dangling internal references (`scripts/*.py`,
+  `references/schemas.md`, `assets/eval_review.html`, `agents/*.md`, `eval-viewer/*`) as a known
+  scope gap. Coordinator follow-up confirmed the skill is non-functional without them and asked to
+  vendor the full support tree. Re-cloned the same pinned commit
+  (`9d2f1ae187231d8199c64b5b762e1bdf2244733d`) and copied all five referenced directories —
+  `scripts/`, `references/`, `assets/`, `agents/`, `eval-viewer/` — verbatim (including the
+  executable bits on the `.py` files). Did **not** skip `agents/` or `eval-viewer/`: re-reading
+  SKILL.md's own "Reference files" section and Step 4 of the core loop shows both are core runtime
+  dependencies, not optional/advanced-only — `agents/grader.md` is used every iteration (grading
+  step), `agents/analyzer.md` is used every iteration (analyst pass) and also in the optional blind
+  comparison, and `eval-viewer/generate_review.py` is invoked directly by SKILL.md as the mandatory
+  viewer-launch step (repeated emphasis: "GENERATE THE EVAL VIEWER *BEFORE* evaluating..."). Only
+  `agents/comparator.md` is exclusively used by the explicitly-optional "Advanced: Blind comparison"
+  section — vendored it anyway since it lives in the same small `agents/` directory as the two core
+  files and splitting one file out of a 3-file directory for an "optional but harmless" doc isn't
+  worth the inconsistency.
+- Vetted every bundled script across all five directories, not just the ones read in the first
+  pass (spec requires reading bundled scripts before vendoring): `subprocess.run(["claude", "-p",
+  ...])` calls in `run_eval.py`/`improve_description.py` and `subprocess.run(["lsof", "-ti", ...])`
+  + `os.kill(...)` in `eval-viewer/generate_review.py` are local CLI/process-management invocations
+  (not RCE from untrusted input, not exfiltration); `eval-viewer/viewer.html`'s `fetch()` calls only
+  hit the local `/api/feedback` endpoint served by that same local script (same-origin, no external
+  host). `aggregate_benchmark.py`, `generate_report.py`, `package_skill.py`, `quick_validate.py`,
+  `utils.py` — grepped for network/exec primitives, no matches. No external network exfiltration
+  found anywhere in the vendored tree.
+- `git clone` works fine for vendoring even though this session's `curl`/`wget` are blocked by a
+  context-mode hook (only for the http fetch path, not git's own transport) — used `git clone
+  --depth 50 <repo>` into the scratchpad, read files with the Read tool, then `rm -rf` the clone
+  before committing (nothing scratchpad-sourced belongs in the final diff).
+
+**Patterns:**
+- For a "vendor a third-party skill" plan task, treat "SKILL.md + LICENSE only" and "the skill's
+  full supporting directory tree" as two different, explicitly distinguishable deliverables — do
+  not silently expand or contract the plan's stated file list based on what looks more "complete";
+  record the resulting internal-reference gap in memory instead so the decision is traceable to
+  the plan, not to an unstated assumption. Confirmed in practice: flagging the gap rather than
+  guessing let the coordinator make the call explicitly, and the follow-up instruction ("check
+  which directories are actually runtime needs, not just referenced") was answerable by re-reading
+  the skill's own core-loop steps vs. its "Advanced"/optional sections — a skill's own structure
+  usually tells you which bundled resources are load-bearing.
+
 ## 2026-07-07 — Story NA-3 PR review feedback — Postiz backend URL as config token, not a secret
 **Learnings:**
 - Two PR review comments (design-level, not bug-level) asked to reclassify one of two "env-var only"
@@ -168,3 +224,247 @@
   with existing gate patterns (e.g. Step 0's re-init keep/merge/rerun choice for this same command)
   matters as a matching signal, moving to the AskUserQuestion primitive keeps the interaction model
   uniform across the plugin.
+
+## 2026-07-08 — Story NA-12 Phases 3-5 — ai-enablement-engineer agent + /sdlc:analyze + init opt-in
+**Learnings:**
+- The GitHub-style anchor-slug rule matters when a spec mandates *exact* anchor headings that two
+  separate files must cross-reference: `## Drift / gap table` → `#drift--gap-table` (the `/` is
+  stripped, leaving the surrounding spaces to collapse into a double hyphen) and
+  `## Memory-conflict analysis & resolution` → `#memory-conflict-analysis--resolution` (the `&` does
+  the same). Got both right by deriving the slug mechanically (lowercase → strip punctuation →
+  spaces to hyphens) rather than guessing, then grepped the ref file itself for its own internal
+  cross-references to confirm the derived slugs matched what was already in use there.
+- When a plan phase says "mirror the shipped agent's shape" but the new agent's First-steps must
+  also encode a hard gate the shipped agent doesn't have (here: STOP entirely if not Active, before
+  even reading task instructions — vs. platform-engineer's softer "confirm with the user if
+  Standby"), don't force the borrowed template's exact wording; keep the structural shape (numbered
+  First steps, same section order) but let the gate's actual severity (STOP vs confirm) come from
+  the spec's Error Handling table, since the two agents' ownership models are genuinely different
+  (opt-in-gated vs always-active-in-repo).
+- For a new domain agent that is *not* a normal multi-select at init (gated by its own single
+  opt-in instead), the cleanest place to wire it into `init.md` without touching the shared
+  templates (`refs/agent-override-template.md`, `refs/project-context-template.md` — out of this
+  phase's scope) is to give it a **self-contained, fixed override body inline in init.md itself**,
+  explicitly called out as bypassing the stack-driven agent-domain-mapping/run-order tables those
+  templates define for the other agents. This keeps the phase's diff scoped to the one deliverable
+  file (`init.md`) while still producing a fully-substituted (`<project name>`/typecheck/test only)
+  no-placeholder override on scaffold.
+- "Mark the agent Active" needed no new boolean field anywhere: this repo's (and the plugin's)
+  existing model treats presence of a workspace→agent row as the sole activity signal for every
+  domain agent (no separate `Active: true` token exists in the template). Re-used that exact
+  mechanism for `ai-enablement-engineer`'s opt-in instead of inventing a parallel activation
+  concept — kept the ownership model's "single fact" claim (spec: "that single fact... is the
+  entire ownership model") literally true instead of adding a second source of truth.
+- Verified "no hard-coded area path in the write-scope resolution logic" (Phase 3 Step 9's own
+  verify instruction) by grepping the finished agent file for the literal string `plugins/` and
+  confirming every hit was either front-matter description prose or an explicit "e.g." illustrative
+  example — never inside the ownership-resolution paragraph as the source of truth.
+
+**Patterns:**
+- Before writing a new agent/command that references anchors in a shared ref doc, `grep -n "^## "`
+  the ref file first to get the literal heading list, then always link via `<ref>#<derived-slug>`
+  using the *same* derivation the ref file's own internal links already use (found by grepping the
+  ref for its own `](#...)` occurrences) — cheaper and more reliable than trusting hand-derived
+  slugs from memory of GitHub's algorithm.
+
+## 2026-07-08 — Story NA-12 review fixes — dispatch-ladder slot, Active-definition centralization
+**Learnings:**
+- "Add the new agent to the classic 5-agent dependency order" review findings named only 2 of the
+  3 occurrences in `principal-engineer-playbook.md` (~L133, ~L146) plus the Step-4 ladder — grepping
+  the whole file for the repeated arrow-chain (`database-administrator.*platform-engineer.*sync-
+  engineer`) surfaced a third, unlisted instance inside the defect-path Phase-4 prose (~L212-213).
+  Fixed all three for internal consistency rather than only the two literally named — a finding's
+  line numbers are illustrative of the *pattern*, not necessarily an exhaustive location list; a
+  repo-wide grep for the exact stale string is the cheap way to confirm nothing else matching the
+  same defect was left behind.
+- Renumbering a "Phase N — [agent] ..." ladder when inserting a new phase in the middle (after
+  platform-engineer, before sync-engineer) requires renumbering every phase after the insertion
+  point (3→4, 4→5, 5→6) — checked no other part of the same doc referenced those old phase numbers
+  by number (the defect-path's own "Phase 1-4" debugging cycle is a separate, differently-scoped
+  numbering scheme in the same file and must NOT be touched/renumbered).
+- Centralizing a repeated informal definition ("Active") at its one canonical anchor
+  (`analyze-protocol.md#ownership-resolution-rules`) only needs a same-file pointer-free fix for
+  occurrences *below* the definition in the same doc (scan-protocol's own "if not Active, STOP" step
+  already reads correctly in-file without an extra cross-reference) — but occurrences in *other*
+  files (`agents/ai-enablement-engineer.md`, `commands/analyze.md`) still need an explicit anchor
+  link, since a reader of those files has no reason to already know where the definition lives.
+- Two nearly-identical "Project skills (invoke via the Skill tool)" headings existed for
+  `ai-enablement-engineer` (the live `.claude/project/agents/` override and the `init.md` scaffold
+  template that generates it) listing skills that are actually preloaded via the agent's own
+  front-matter `skills:` key, not runtime Skill-tool invocations like other agents' overrides. Fixed
+  both to the same corrected heading/wording rather than picking one canonical file and drifting
+  from it — a scaffold template and its generated artifact must stay textually identical or the next
+  `/sdlc:init` regenerates the stale wording.
+
+**Patterns:**
+- When a review finding gives approximate line numbers (`~L###`) for "this pattern repeats", treat
+  them as a starting point and grep the exact stale substring across the whole file before declaring
+  the fix complete — under-fixing a few of N repeated occurrences reintroduces the same
+  inconsistency the finding was raised to close.
+
+## 2026-07-08 — Story NA-12 re-review — dispatch-ladder slot missed in sibling files
+**Learnings:**
+- A single grep scoped to one file (`principal-engineer-playbook.md`) is not a "grep the whole
+  tree" pass — the same stale 5-agent enumeration existed independently in `tech-lead.md` (the plan
+  agent's own "Execution order" ladder), `principal-engineer.md` (front-matter description, tag list,
+  and its own execution-order ladder — 3 separate spots in one file), and `commands/plan.md` (the
+  plan-doc phase list `tech-lead` is instructed to emit) — four files the playbook ref doesn't
+  `grep -r` catch since each has its own independently-authored copy of the same ladder rather than
+  including the ref. Fixed by repo-wide `grep -rn` across `plugins/sdlc/` for the exact arrow-chain
+  and `Phase 1 —`/`[database-administrator]` substrings, not just the one ref file the original
+  finding named.
+- Not every hit on the "5 agent names co-occurring" grep is a dispatch-ladder enumeration needing
+  the same fix: `refs/agent-override-template.md`'s run-order table and `refs/solutions-architect.md`'s
+  "if X applicable" spec-section headers are structurally different (the override-template run-order
+  table is explicitly out of scope for `ai-enablement-engineer` per its earlier phase's design — it
+  uses a fixed, non-table-derived override — and the architect's conditional headers aren't an
+  ordering/dispatch list at all). `refs/domain-agent-handoff.md`'s "Referenced from ..." sentence
+  *did* need the addition since `ai-enablement-engineer.md` genuinely references that ref (branch/
+  memory/commit/return + pre-work checkout). Triage each hit against "is this actually a dispatch
+  order, and does ai-enablement-engineer actually participate in/reference it" before editing —
+  blind find-and-add-to-every-hit would have wrongly touched the override-template table.
+- Auto.md's own "Phase 1 (Spec) / Phase 2 (Plan+Impl)" and the defect path's "Phase 1-4 (reproduce/
+  root-cause/test/fix)" numbering schemes share the word "Phase" with the domain-dispatch ladder but
+  are unrelated axes (workflow stage vs. debugging step vs. domain-agent order) — grepping bare
+  `Phase 1` across the tree surfaces all three; only the domain-agent-order ones needed the edit.
+
+**Patterns:**
+- "Grep the whole plugin tree" instructions after a review finding should search for the *exact
+  repeated substrings* (the arrow chain, the bracketed tag list, the `Phase N — [agent]` line shape)
+  across every file in the plugin, not just the one ref file a finding happened to cite — independent
+  same-content copies (not `${CLAUDE_PLUGIN_ROOT}` includes) are exactly what make partial fixes
+  drift out of sync with each other.
+
+## 2026-07-08 — Story NA-12 PR #45 review round 3 — owner ruling reverses serial→parallel, contradiction fix, eval-viewer CDN hardening
+**Learnings:**
+- An owner ruling that reverses a design decision already landed in two prior commits
+  (6086c34/c2b9477: ai-enablement-engineer as a numbered *serial* Phase-3 slot) means "undo the
+  numbering, don't just relabel it" — every file that had been renumbered up (Phase 3→4, 4→5, 5→6)
+  needed renumbering *back down* to the original 1-5, with ai-enablement-engineer pulled out of the
+  numbered sequence entirely into its own unnumbered "MAY run in parallel" line placed after the
+  ladder. Verified no dangling `Phase 6` references remained anywhere in `plugins/sdlc/` after the
+  revert (grepped the literal string tree-wide) — a partial renumber-back would have been worse than
+  the original bug (a still-wrong number instead of a consistently-wrong one).
+- A "sequential only" rule needs its exception spelled out at the rule itself, not just implied by
+  moving the parallel agent out of the numbered list — added "except ai-enablement-engineer, which
+  may run concurrently... it consumes no artifacts from other domain agents" as a second bullet next
+  to every "sequential only"/"ALL phases are sequential" rule statement (4 files), since a reader
+  hitting the rule text alone (without noticing the separate unnumbered ladder line above it) would
+  otherwise still conclude parallel dispatch is forbidden.
+- Two consecutive review rounds gave literally opposite instructions for the same override heading
+  (round 2: "annotate as plugin-bundled/front-matter-preloaded... no Skill-tool invocation needed";
+  round 3: that phrasing now flagged as contradicting the agent's own First-steps, which *does* say
+  "invoke via the Skill tool" — fix to "plugin-bundled — invoke via the Skill tool", matching the
+  platform-engineer override's convention wording). Resolution: front-matter preload and explicit
+  Skill-tool invocation are not mutually exclusive (a skill can be both preloaded *and* still
+  explicitly invoked by convention) — added one sentence in the agent's First-steps making that
+  explicit instead of re-litigating which claim is "more true"; the two rounds weren't actually
+  contradicting each other, round 2 just used the wrong word ("no ... invocation needed") to express
+  a scope claim ("also plugin-bundled") that round 3's own wording expresses cleanly.
+- Vendoring-at-a-pinned-ref does not mean zero local modifications are ever allowed — the repo's own
+  "no local forks for non-security issues, they belong upstream" policy (see this round's REJECTED
+  Copilot findings on `skill-creator`'s Python scripts) has a security carve-out: `eval-viewer/
+  viewer.html`'s Google Fonts `<link>`s and `cdn.sheetjs.com` SheetJS `<script>` are a genuine
+  supply-chain/no-network-exfiltration gap in the earlier NA-12 Phase-1-2 vet (which checked
+  `subprocess`/`fetch()` in the `.py`/`.html` *script* bodies but missed the static `<head>`
+  `<link>`/`<script src>` tags loading third-party JS/CSS at render time — a vetting blind spot:
+  "no exfiltration in the code" checks don't cover "loads third-party code via a static tag"). Fixed
+  by removing the tags (system font-stack fallback; XLSX rendering degrades to a
+  "preview unavailable offline" message via a `typeof XLSX === "undefined"` guard rather than
+  crash), and recorded as a **documented local deviation** (not a silent fork) in a new "Local
+  deviations" column on `plugins/sdlc/README.md`'s provenance table — the distinguishing factor
+  from the rejected findings is CWE-driven (remote-code-loading risk) vs. style/robustness nits in
+  vendored Python that belong upstream.
+- Stray `</content>`/`</invoke>` tags at the tail of `docs/superpowers/plans/NA-12.md` were leftover
+  tool-call artifact text from whatever process generated the plan doc (visible only by `tail`-ing
+  the file — they don't show up in a normal Read unless you look at the very end) — a good reminder
+  to `tail -5` any doc a review flags as having "stray content at end of file" rather than assuming
+  a mid-file diff review would have caught it.
+
+**Vet record update — `skill-creator` (pinned `9d2f1ae187231d8199c64b5b762e1bdf2244733d`):**
+Re-vetted `eval-viewer/viewer.html` specifically for static `<head>` resource loads (not just script
+`subprocess`/`fetch` calls, per the NA-12 Phase-1-2 vet's original scope). Found two remote loads:
+`fonts.googleapis.com`/`fonts.gstatic.com` (Google Fonts CSS) and `cdn.sheetjs.com` (SheetJS
+`xlsx.full.min.js`, SRI-pinned but still a remote JS load). Both removed as a documented local
+deviation (see README provenance table); no other bundled file in the `skill-creator` tree loads
+remote resources (re-confirmed via `grep -rn "https://" eval-viewer/` → zero hits post-fix). The 4
+Copilot findings on `run_loop.py`/`quick_validate.py`/`package_skill.py` remain correctly rejected
+(non-security robustness/dependency nits in vendored-verbatim Python — belong upstream, not a local
+fork).
+
+**Patterns:**
+- When a review finding says "X may run in parallel because it consumes no artifacts from other
+  agents," treat that as a structural claim about the *data-flow dependency graph*, not just a
+  labeling change — an agent with no upstream artifact dependency shouldn't be slotted into any
+  numbered serial position at all (not even a placeholder "Phase N (parallel)"), because a numbered
+  slot visually implies "waits for N-1" to a future reader; pull it out of the list entirely into
+  its own annotated line.
+- When vetting a bundled third-party asset for "no exfiltration/no remote code," explicitly check
+  static resource-loading tags (`<link href=... rel=stylesheet>`, `<script src=...>`, `<img src=...
+  http...>`) as a *separate* pass from checking script logic (`fetch`/`subprocess`/`exec` calls) —
+  the two are different vetting axes and a script-logic-only pass will miss a static tag pointing at
+  a CDN.
+
+## 2026-07-08 — Story NA-12 high-effort workflow review — 10 confirmed defects, owner "dependency-free" clarification
+**Learnings:**
+- "Parallel" as a review-round shorthand can itself be the bug: round 3's fix made
+  ai-enablement-engineer a genuine concurrency exception ("MAY run in parallel," "sequential only
+  ... except..."), but the owner's actual intent was narrower — no *dependency ordering* (it may be
+  slotted anywhere in the ladder), not no *serialization* (exactly one domain agent still writes the
+  story branch at a time — the git single-branch/worktree constraint and Step-5 HEAD-advance check
+  don't go away). Reworded every spot from "MAY run in parallel with any phase" to "dependency-free:
+  may be dispatched at any point in the ladder ... but still runs alone, one domain agent at a time"
+  and made "sequential only — never two domain agents at once" universal again (no exception
+  clause) — the exception is about *order*, not *concurrency*. A one-word review shorthand
+  ("parallel") that seemed unambiguous in isolation turned out to conflate two genuinely different
+  properties (freedom from ordering vs. freedom from mutual exclusion); worth re-deriving the
+  precise claim from the owner's own justification sentence ("consumes no artifacts... nothing
+  consumes its") rather than trusting the shorthand label alone, even on a second pass.
+- A "defined exactly once" charter (analyze-protocol.md's own stated purpose) is violated not just
+  by copy-pasted prose blocks but by *independently drifting restatements of the same fact* — the
+  clearest tell was commands/analyze.md's Default-mode step 1 and agents/ai-enablement-engineer.md's
+  First-steps step 1 each hard-coding their own version of the "not Active" report message
+  ("AI-config management not enabled; run /sdlc:init to opt in."), which had already silently
+  diverged from the corrected canonical message written into the new Error-handling table
+  ("repo not opted in or project-context unreadable — run /sdlc:init."). Fixed by grepping the
+  literal old message string tree-wide after adding the canonical table, not just checking the
+  table itself was correct — a dedup pass isn't done until every duplicate copy is gone, including
+  ones embedded as inline strings inside otherwise-unrelated operational steps (not just the
+  obviously-duplicated table/list blocks the review named).
+- "Move X to a canonical location and reference it by anchor" needs a same-file check too:
+  `refs/analyze-protocol.md`'s own Scan-protocol step 2 restated the old (now-wrong) "not Active"
+  message inline, in the *same file* as the new canonical Error-handling table three headings below
+  it — proximity to the canonical source doesn't prevent drift; every restatement needs the same
+  grep-and-replace treatment regardless of which file it lives in.
+- A branch-before-commit reorder for a *standalone* apply path must explicitly say what *dispatched*
+  mode does instead (nothing — it commits on the already-checked-out impl branch), otherwise a
+  reader might assume the new "branch first" step applies universally and try to branch mid-dispatch
+  (which would violate the domain-agent-handoff.md contract of never creating a branch). Every
+  reorder edit paired the standalone step with an explicit "dispatched mode does not branch here"
+  sentence.
+- Init.md's row-writes for a newly-opted-in agent needed a "does the target directory exist"
+  precondition that the original design silently lacked — same failure shape as writing a
+  workspace→agent row for a path that doesn't exist yet, which the plugin's own drift/gap table
+  already flags as a check ("Workspace→agent table vs disk: Table lists a path that no longer
+  exists"). The fix (write conditionally, keep ≥1 row for the Active signal, document a root-level
+  fallback) had to reference that pre-existing drift check by name to make clear *why* an
+  unconditional write was wrong, not just assert the new conditional behavior.
+- A python HTML-report generator (`generate_report.py`) embeds its whole template in one
+  triple-double-quoted string built via `"""..." + var + """..."""` concatenation — safe to strip
+  `<link>` tags and swap `'Poppins'`/`'Lora'` font-family values (they're just text inside the
+  string, single-quoted, no nesting conflict with the outer `"""`), but must re-run `python3 -m
+  py_compile` afterward rather than assume "it's just editing text inside a string" is risk-free —
+  a stray literal `"""` or unbalanced quote inside the edited text would silently break the module
+  at import time, not at template-render time.
+
+**Patterns:**
+- When a review defines a domain-agent property with a precise causal justification ("it consumes
+  no artifacts from other domain agents and nothing consumes its"), treat that justification
+  sentence — not the one-word label the previous round used — as the actual spec to reword every
+  occurrence against; a label alone (parallel/dependency-free/concurrent) is lossy compared to the
+  underlying claim and different rounds can legitimately mean different things by the same word.
+- After finishing a "canonicalize X, replace duplicates with anchor refs" pass, grep the *exact old
+  literal string* (not just the structural pattern) across the whole plugin tree as a final check —
+  this catches both cross-file copies and same-file restatements a structural/anchor-based search
+  would miss (an anchor reference makes copy #1 correct without touching copy #2 that used the same
+  words but not the same anchor).

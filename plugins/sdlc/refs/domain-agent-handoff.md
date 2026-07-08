@@ -1,6 +1,6 @@
 # Domain-agent handoff protocol
 
-Shared completion protocol for domain engineers dispatched by `principal-engineer`. Referenced from `database-administrator`, `platform-engineer`, `sync-engineer`, `web-engineer`, `mobile-engineer`. Replaces the duplicated "Branch & PR" + "Completion checklist" + "Write memory" block previously inlined in each.
+Shared completion protocol for domain engineers dispatched by `principal-engineer`. Referenced from `database-administrator`, `platform-engineer`, `ai-enablement-engineer`, `sync-engineer`, `web-engineer`, `mobile-engineer`. Replaces the duplicated "Branch & PR" + "Completion checklist" + "Write memory" block previously inlined in each.
 
 ## Pre-work: verify and checkout branch — BEFORE reading or writing any file
 

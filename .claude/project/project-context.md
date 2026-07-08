@@ -14,11 +14,12 @@
 | Primary language | Markdown, Shell        |
 
 ## Workspace → agent
-| Path            | Owner             |
-| --------------- | ----------------- |
-| plugins/        | platform-engineer |
-| tools/          | platform-engineer |
-| brand/          | web-engineer      |
+| Path            | Owner                  |
+| --------------- | ---------------------- |
+| plugins/        | ai-enablement-engineer |
+| skills/         | ai-enablement-engineer |
+| tools/          | platform-engineer      |
+| brand/          | web-engineer           |
 
 ## Triage
 

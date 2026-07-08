@@ -253,13 +253,17 @@ Test command (suggest `DETECTED_TEST` as the default), and each active agent's o
 accept open string values, so a picker would be wrong.
 
 **Active agents** are the workspace-owning **domain** agents — the ones that touch this repo's code.
-Two tiers exist; only the domain tier is selectable:
+Three categories exist; only the domain tier is a multi-select pick:
 
 - **Pipeline agents** — `product-manager`, `scrum-master`, `solutions-architect`, `tech-lead`,
   `principal-engineer`, `qa-engineer`. Always active, own no code, need **no** override file. Do
   **not** prompt for them.
 - **Domain agents** — own paths and write code. Selectable below; each selected one gets a
   workspace→agent row and an override file.
+- **`ai-enablement-engineer`** — a special case: gated by its own single opt-in confirm (see
+  **AI-context opt-in** below), not by this multi-select. It owns the repo's AI-configuration
+  surface plus `plugins/`/`skills/` once opted in, and is never offered as an option in the
+  multi-select picker below.
 
 **Selection guide — which domain agents does this repo need?** Present the options with this decision
 aid (multi-select), so the user picks by what the repo actually contains, not by guessing:
@@ -288,6 +292,95 @@ Guidance to apply while prompting:
 For **each** selected agent, ask for its **owned path(s)** (suggest the typical paths above as
 defaults, confirm against the repo) so the workspace→agent table and the override's Ownership line
 carry real values.
+
+**AI-config paths are never `platform-engineer`'s default.** `platform-engineer`'s typical owned
+paths above intentionally exclude AI-config paths (`plugins/`, `skills/`, `.claude/**`,
+`CLAUDE.md`/`AGENT(S).md`, etc.) — those belong to `ai-enablement-engineer`, gated by its own
+opt-in immediately below, not to any backend/infra selection here. If a user free-types
+`plugins/` or `skills/` as a `platform-engineer` owned path, confirm they instead mean the
+AI-context opt-in below and steer them there instead of recording the path under
+`platform-engineer`.
+
+### AI-context opt-in (`ai-enablement-engineer`)
+
+`ai-enablement-engineer` is gated by a single opt-in confirm, separate from the domain-agent
+multi-select above — it is Active only when this repo opts in, never by default. Ask:
+
+```
+AskUserQuestion(
+  header: "AI-config mgmt",
+  question: "Opt this repo into AI-config management? ai-enablement-engineer would own plugins/, skills/, and the repo's AI-config surface (CLAUDE.md, .claude/**, AGENT(S).md, etc.), and expose /sdlc:analyze for drift/gap/memory-conflict scanning.",
+  multiSelect: false,
+  options: [
+    { label: "Opt in", description: "Grant ai-enablement-engineer ownership of plugins/, skills/, and the AI-config surface; scaffold its override; mark it Active." },
+    { label: "Skip", description: "Leave ai-enablement-engineer inactive — no rows written, no override created. Re-run /init later to opt in." }
+  ]
+)
+```
+
+- **Opt in** → carry two effects into Step 4:
+
+  (a) **Workspace→agent rows** — for each of `plugins/`, `skills/`: write a `<dir>/` →
+      `ai-enablement-engineer` row to the Step 4b table **only if that directory exists in this
+      repo**. Writing a row for a directory that doesn't exist yet is guaranteed false drift on the
+      very first `/sdlc:analyze` scan (the "Workspace→agent table vs disk" check in
+      `analyze-protocol.md#drift--gap-table` flags exactly this: "Table lists a path that no longer
+      exists"). At least one row must land to mark the agent **Active** — row presence is the sole
+      Active signal, no separate flag exists (`analyze-protocol.md#ownership-resolution-rules`):
+      `plugins/` exists in essentially every consumer repo (this plugin's own install lives there),
+      so in practice it is almost always the row that survives. If genuinely **neither** `plugins/`
+      nor `skills/` exists yet, still scaffold the override (below) and write one row for the
+      AI-config surface root (`.claude/` — a judgment call, note the rationale in the row) so the
+      Active signal holds regardless. When a skipped directory appears later, add its row on the
+      next `/init` "Merge new findings" pass or by hand — the agent's write-scope already covers it
+      via the config-driven AI-config surface baseline even before a table row names it explicitly.
+
+      **Migration (the sole documented exception to Step 0's "never touch values already
+      present"):** if `plugins/` or `skills/` already has a workspace→agent row under a
+      **different** owner (e.g. a legacy `platform-engineer` row predating this agent), the opt-in
+      confirmation **reassigns** that row to `ai-enablement-engineer` rather than leaving both a
+      stale row and a new one — one path, one owner is the ownership model's core invariant. This
+      reassignment fires only when the user explicitly confirms this AI-context opt-in prompt; it
+      never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
+
+  (b) scaffold `.claude/project/agents/ai-enablement-engineer.md` in Step 4c using
+  the **fixed** override shape below (its skill list and owned paths are fixed by the agent
+  definition, not derived from the Step 3.5 stack-suggestion flow the other overrides use):
+
+  ```markdown
+  # AI Workflow Manager — <project name> bindings
+
+  ## Skills (plugin-bundled — invoke via the Skill tool)
+  1. skill-creator
+  2. find-skills
+  3. conventional-commit
+
+  ## Directory guides (read before coding)
+  # No directory guides yet — add CLAUDE.md files to owned paths.
+
+  ## Ownership
+  - owns: plugins/, skills/, .claude/, CLAUDE.md, AGENT.md/AGENTS.md and the AI-config surface (baseline globs ship in the agent definition; this override may add more)
+  - never: .claude/project/project-context.md, .claude/.*-plugin-root pointers, other agents' memory files
+  - runs after: — · before: —
+
+  ## Tech rules
+  - Markdown/Shell; kebab-case file naming; any shell script touched must pass `bash tools/portability-lint.sh` if the repo has that gate.
+
+  ## Local dev (tokens from project-context Tooling)
+  - Typecheck: `<confirmed typecheck cmd, or "none configured">` · Test: `<confirmed test cmd, or "none configured">`
+  - Never run cloud deploys — those are manual ops actions outside agent scope.
+  ```
+
+  Substitute `<project name>` and the typecheck/test tokens from the values already collected
+  above (Step 3) — no `<...>` placeholder may remain.
+- **Skip** → add no workspace→agent row for `ai-enablement-engineer` and scaffold no override.
+  The agent stays inactive with no effect on the repo — its definition is repo-agnostic, so
+  there is nothing to undo later; opting in is always available on a future `/init` run.
+- **Re-init semantics** — this prompt is a normal Step 3 field, so it participates in the Step 0
+  "Merge new findings" schema-backfill exactly like any other: a repo that has not opted in yet
+  (no `ai-enablement-engineer` rows present) is prompted once when merging; a repo that already
+  opted in (its rows already present) is never re-prompted — the existing rows and override are
+  kept verbatim, matching Step 0's "never touch values already present" rule.
 
 ## Step 3.5 — Suggest skills and refs based on detected stack
 
@@ -376,7 +469,7 @@ are documented in that template file. Token slots to substitute:
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
-| workspace→agent rows | one row per active agent with its confirmed owned path(s) |
+| workspace→agent rows | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
 
 > **On the Merge-new-findings path** (Step 0): do **not** regenerate the file from scratch — preserve
 > the existing `.claude/project/project-context.md` verbatim and only **inject the tokens/sections
@@ -399,6 +492,13 @@ and `## Local dev` from detected values (not placeholders). Every token slot in 
 replaced with an actual value — no `<...>` placeholders may remain.
 
 Do not write override files for agents the user did not select.
+
+**`ai-enablement-engineer` is scaffolded separately, not through this stack-driven flow.** Only
+write `.claude/project/agents/ai-enablement-engineer.md` when the AI-context opt-in (Step 3) was
+accepted, and use the **fixed** override content given there — it does not use the agent domain
+mapping / run-order tables above, since its skill list (`skill-creator`, `find-skills`,
+`conventional-commit`) and owned paths are fixed by the agent definition, not derived from the
+Step 3.5 stack suggestions.
 
 **4d. `.claude/project/skills.json`** — write or merge the project skills manifest per
 `refs/skills-manifest.md`. Build the array from the confirmed install list (Step 3.5):
@@ -569,7 +669,8 @@ Rules:
 Creating or modifying Jira custom fields is **out of scope** — but the pipeline needs them, so tell
 the user exactly what to set up and how to verify. Print this checklist:
 
-> Files written: `.claude/project/project-context.md`, agent overrides for `<active agents>`,
+> Files written: `.claude/project/project-context.md`, agent overrides for `<active agents>`
+> (plus `ai-enablement-engineer`'s override if the AI-context opt-in was accepted),
 > `.claude/.sdlc-plugin-root`, and `.claude/project/skills.json`. Confirmed skills are installed
 > (Step 4f): from their declared `source` into `.claude/skills/<name>/`, or via `claude plugin install
 > … --scope project` for plugin-backed ones, the rest as

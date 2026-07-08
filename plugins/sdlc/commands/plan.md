@@ -34,7 +34,13 @@ The agent should:
    - Phase 3 — `sync-engineer` (only if spec has an offline-sync section)
    - Phase 4 — `web-engineer` (only if spec has Web UI section)
    - Phase 5 — `mobile-engineer` (only if spec has Mobile UI section)
-   - All phases sequential — principal-engineer dispatches one agent at a time
+   - `ai-enablement-engineer` — DEPENDENCY-FREE (plugins/**, skills/**, AI-config surface — only if
+     plan has tasks) — may be dispatched at any point in the ladder above (first, between phases, or
+     last): it consumes no artifacts from other domain agents and nothing consumes its; not part of
+     the numbered serial sequence
+   - All phases sequential — principal-engineer dispatches one agent at a time, never two at once;
+     `ai-enablement-engineer` is the sole exception to phase **order** (may be dispatched anywhere in
+     the sequence), not to serial execution — it still runs alone when dispatched
 8. Each task must be completable without questions — include entity names, field names, route paths from spec
 9. End each phase with a verification step (typecheck + lint + validate)
 10. Commit the plan file, push the branch to remote, then raise PR:

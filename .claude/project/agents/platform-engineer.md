@@ -7,8 +7,8 @@
 # No directory guides yet — add CLAUDE.md files to owned paths.
 
 ## Ownership
-- owns: plugins/, tools/
-- never: brand/
+- owns: tools/
+- never: brand/, plugins/, skills/
 - runs after: — · before: web-engineer
 
 ## Tech rules
