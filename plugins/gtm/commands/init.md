@@ -1,5 +1,5 @@
 ---
-description: Bootstrap the gtm marketing foundation for this repo — installs the Postiz and marketing-skills dependencies, gates on Postiz reachability, detects product info, invokes the marketingskills product-marketing skill, and atomically writes marketing-context.md plus the docs/gtm/ scaffold. Safe to re-run (keep/merge/rerun, never silently overwrites).
+description: Bootstrap the gtm marketing foundation for this repo — installs the Postiz and marketing-skills dependencies, gates on Postiz reachability, detects product info, invokes the marketingskills product-marketing skill, configures per-channel Postiz ownership/voice/cadence/content-types, and atomically writes marketing-context.md plus the docs/gtm/ scaffold. Safe to re-run (keep/merge/rerun, never silently overwrites).
 ---
 
 Bootstrap **this repository's** GTM marketing foundation — the marketing counterpart to sdlc's
@@ -38,16 +38,25 @@ AskUserQuestion(
 ```
 
 - **Keep existing** → print a summary of the current config (Product name/one-liner/repo/landing
-  URL, Postiz Backend URL, Postiz API key env-var name, whether Voice overrides are set) and
-  **STOP**. Write nothing.
+  URL, Postiz Backend URL, Postiz API key env-var name, whether Voice overrides are set, plus a
+  one-line channel count, e.g. "Channels configured: 4") and **STOP**. Write nothing.
 - **Merge new findings** → **re-enter at Step 1** (dependency check) before touching anything.
   After Steps 1–2 pass: re-run Step 3 detection, backfill only the `marketing-context.md` template
   fields absent from the existing file (prompting for missing user-choice fields), preserving
-  every value already set. `.agents/product-marketing.md` is re-maintained idempotently by the
-  marketingskills skill (Step 4) regardless. Then continue to Step 5 (write) and Step 6.
+  every value already set. Also capture the existing Channels rows from the file and run Step 4b,
+  preserving every existing per-channel setting and only backfilling channels/settings absent from
+  the file (new channels → schema defaults, NA-4 AC-4); re-prompt only for genuinely new channels
+  — then ask one lightweight follow-up per the ref's Merge-path adjustment hook: "Adjust settings
+  for any existing channel? (default: no)". If yes, the founder names which matched channel(s) to
+  re-prompt (existing values pre-selected as defaults); every other matched row keeps its preserved
+  settings untouched. This hook is what makes graduating a channel from `draft` to `auto` reachable
+  via the Merge path, not only via a full Re-run (see Step 6).
+  `.agents/product-marketing.md` is re-maintained idempotently by the marketingskills skill
+  (Step 4) regardless. Then continue to Step 5 (write) and Step 6.
 - **Re-run full setup** → **re-enter at Step 1** (dependency check) before touching anything.
   After Steps 1–2 pass: walk all prompts again with existing values offered as defaults, then
-  rewrite via Steps 3–6.
+  rewrite via Steps 3–6. Also capture the existing Channels rows from the file and run Step 4b for
+  every channel with existing values offered as defaults — the founder may change any.
 
 **Both Merge and Re-run re-enter at Steps 1–2** — the dependency check and Postiz gate always run
 before any write, first-run and re-run alike, so a dead or unreachable backend can never be
@@ -137,7 +146,30 @@ invocation with the Step 3 detection results (including any gaps). The skill own
 `.agents/product-marketing.md`: it checks legacy locations, then either auto-drafts the doc from
 README / landing page / `package.json` for the founder to correct, or runs a from-scratch
 conversational interview when nothing is detected (AC-2, AC-3). This interview needs no Postiz
-calls. On completion, proceed to Step 5.
+calls. On completion, proceed to Step 4b.
+
+## Step 4b — Channel configuration
+
+Apply `${CLAUDE_PLUGIN_ROOT}/refs/channel-config.md` exactly. Preconditions already met by earlier
+steps: Step 2 confirmed Postiz auth and exported `POSTIZ_API_URL`; on a fresh run the existing
+Channels table is empty; on a Merge/Re-run re-entry, Step 0 has already captured the current
+Channels rows.
+
+1. Enumerate via `postiz integrations:list` (NA-4 AC-1); parse `id`, `name`, `identifier` per
+   channel.
+2. For each channel, prompt the founder — one channel at a time — for the four settings
+   (Ownership / Voice / Cadence / Content types, NA-4 AC-2), each pre-seeded with the existing
+   value (re-run) or the schema default (fresh run) per the ref. (Merge path: only genuinely new
+   channels — plus any the founder asks to adjust via Step 0's Merge-path adjustment hook — are
+   prompted; other matched channels keep their preserved settings.) The `reddit` identifier is
+   recommended-defaulted to `manual`; any channel the founder skips falls back to the NA-4 AC-4
+   default `draft`.
+3. Collect the answers into the in-memory Channels model that Step 5 renders. This step **writes
+   nothing** to final paths — it only gathers values.
+
+Defer to the ref for error handling (transport error → STOP, write nothing; empty-list handling;
+malformed-entry skip; the drop-confirmation guard for a previously configured channel that
+`integrations:list` no longer returns) rather than re-specifying it here.
 
 ## Step 5 — Write gtm config (atomic)
 
@@ -154,7 +186,9 @@ session temp dir first, and only move them into place after **every** staged wri
    - `project/marketing-context.md` — filled from `${CLAUDE_PLUGIN_ROOT}/refs/marketing-context-template.md`
      using the Step 3 detection and Step 3/interview-collected values (product name, one-liner,
      repo, landing URL, the Step 2-resolved Postiz **Backend URL** value, the Postiz API key env-var
-     **name** only, empty Voice section). No placeholder tokens may remain.
+     **name** only, empty Voice section), plus the Step 4b Channels model rendered into the
+     `## Channels` table (every row fully materialized — no `<...>` placeholder token remains — or
+     the empty-table form when no channels exist). No placeholder tokens may remain.
    - `docs-gtm/README.md` — filled from `${CLAUDE_PLUGIN_ROOT}/refs/docs-gtm-readme-template.md`.
    - `docs-gtm/digests/.gitkeep` and `docs-gtm/briefs/.gitkeep` — empty marker files.
    - `gtm-plugin-root` — the resolved `${CLAUDE_PLUGIN_ROOT}` value (this session's), single line.
@@ -220,15 +254,23 @@ session temp dir first, and only move them into place after **every** staged wri
 
 ## Step 6 — Post-init checklist
 
+Per the drop-confirmation guard's per-channel outcome, note any channel dropped on a re-run, and
+list any channel the founder chose to retain flagged "stale (not returned by Postiz)", as an
+addition to the **Channels configured** line below before printing the summary.
+
 Print a summary:
 
 > **Files written:**
 > - `.claude/project/marketing-context.md` — gtm's operational config (product basics, the Postiz
->   Backend URL, the Postiz API key env-var name, empty Voice overrides).
+>   Backend URL, the Postiz API key env-var name, empty Voice overrides, the per-channel Channels
+>   table).
 > - `.agents/product-marketing.md` — the marketingskills canonical product-context doc.
 > - `docs/gtm/README.md`, `docs/gtm/digests/.gitkeep`, `docs/gtm/briefs/.gitkeep` — the marketing
 >   working-directory scaffold.
 > - `.claude/.gtm-plugin-root` (gitignored) — per-session plugin-root cache.
+>
+> **Channels configured:** N (ownership/voice/cadence/content-types per channel) — graduate a
+> channel from `draft` to `auto` by re-running `/gtm:init` and changing its ownership.
 >
 > **Keep this environment variable set** for every future gtm session: `POSTIZ_API_KEY`. Only its
 > **name** was persisted to disk — never the value. The Postiz backend URL now lives in
@@ -242,9 +284,9 @@ Print a summary:
 > ```
 >
 > **Next, under Epic [NA-2](https://whimzylive.atlassian.net/browse/NA-2):** this foundation
-> unblocks **NA-4, NA-5, NA-6, NA-7, NA-8** (channel ownership/voice/cadence, KPI metric+source
-> setup, engagement listening, pulse, launch) and **NA-11**. Those stories extend this foundation
-> — none of their config exists yet.
+> unblocks **NA-5, NA-6, NA-7, NA-8** (KPI metric+source setup, engagement listening, pulse,
+> launch) and **NA-11**. Those remain unblocked-not-yet-configured; channel ownership/voice/cadence
+> config (NA-4) is now written by this run — see **Channels configured** above.
 
 ## Final — Release session
 
