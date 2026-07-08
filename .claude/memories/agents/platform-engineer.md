@@ -334,3 +334,73 @@
   across every file in the plugin, not just the one ref file a finding happened to cite — independent
   same-content copies (not `${CLAUDE_PLUGIN_ROOT}` includes) are exactly what make partial fixes
   drift out of sync with each other.
+
+## 2026-07-08 — Story NA-12 PR #45 review round 3 — owner ruling reverses serial→parallel, contradiction fix, eval-viewer CDN hardening
+**Learnings:**
+- An owner ruling that reverses a design decision already landed in two prior commits
+  (6086c34/c2b9477: ai-enablement-engineer as a numbered *serial* Phase-3 slot) means "undo the
+  numbering, don't just relabel it" — every file that had been renumbered up (Phase 3→4, 4→5, 5→6)
+  needed renumbering *back down* to the original 1-5, with ai-enablement-engineer pulled out of the
+  numbered sequence entirely into its own unnumbered "MAY run in parallel" line placed after the
+  ladder. Verified no dangling `Phase 6` references remained anywhere in `plugins/sdlc/` after the
+  revert (grepped the literal string tree-wide) — a partial renumber-back would have been worse than
+  the original bug (a still-wrong number instead of a consistently-wrong one).
+- A "sequential only" rule needs its exception spelled out at the rule itself, not just implied by
+  moving the parallel agent out of the numbered list — added "except ai-enablement-engineer, which
+  may run concurrently... it consumes no artifacts from other domain agents" as a second bullet next
+  to every "sequential only"/"ALL phases are sequential" rule statement (4 files), since a reader
+  hitting the rule text alone (without noticing the separate unnumbered ladder line above it) would
+  otherwise still conclude parallel dispatch is forbidden.
+- Two consecutive review rounds gave literally opposite instructions for the same override heading
+  (round 2: "annotate as plugin-bundled/front-matter-preloaded... no Skill-tool invocation needed";
+  round 3: that phrasing now flagged as contradicting the agent's own First-steps, which *does* say
+  "invoke via the Skill tool" — fix to "plugin-bundled — invoke via the Skill tool", matching the
+  platform-engineer override's convention wording). Resolution: front-matter preload and explicit
+  Skill-tool invocation are not mutually exclusive (a skill can be both preloaded *and* still
+  explicitly invoked by convention) — added one sentence in the agent's First-steps making that
+  explicit instead of re-litigating which claim is "more true"; the two rounds weren't actually
+  contradicting each other, round 2 just used the wrong word ("no ... invocation needed") to express
+  a scope claim ("also plugin-bundled") that round 3's own wording expresses cleanly.
+- Vendoring-at-a-pinned-ref does not mean zero local modifications are ever allowed — the repo's own
+  "no local forks for non-security issues, they belong upstream" policy (see this round's REJECTED
+  Copilot findings on `skill-creator`'s Python scripts) has a security carve-out: `eval-viewer/
+  viewer.html`'s Google Fonts `<link>`s and `cdn.sheetjs.com` SheetJS `<script>` are a genuine
+  supply-chain/no-network-exfiltration gap in the earlier NA-12 Phase-1-2 vet (which checked
+  `subprocess`/`fetch()` in the `.py`/`.html` *script* bodies but missed the static `<head>`
+  `<link>`/`<script src>` tags loading third-party JS/CSS at render time — a vetting blind spot:
+  "no exfiltration in the code" checks don't cover "loads third-party code via a static tag"). Fixed
+  by removing the tags (system font-stack fallback; XLSX rendering degrades to a
+  "preview unavailable offline" message via a `typeof XLSX === "undefined"` guard rather than
+  crash), and recorded as a **documented local deviation** (not a silent fork) in a new "Local
+  deviations" column on `plugins/sdlc/README.md`'s provenance table — the distinguishing factor
+  from the rejected findings is CWE-driven (remote-code-loading risk) vs. style/robustness nits in
+  vendored Python that belong upstream.
+- Stray `</content>`/`</invoke>` tags at the tail of `docs/superpowers/plans/NA-12.md` were leftover
+  tool-call artifact text from whatever process generated the plan doc (visible only by `tail`-ing
+  the file — they don't show up in a normal Read unless you look at the very end) — a good reminder
+  to `tail -5` any doc a review flags as having "stray content at end of file" rather than assuming
+  a mid-file diff review would have caught it.
+
+**Vet record update — `skill-creator` (pinned `9d2f1ae187231d8199c64b5b762e1bdf2244733d`):**
+Re-vetted `eval-viewer/viewer.html` specifically for static `<head>` resource loads (not just script
+`subprocess`/`fetch` calls, per the NA-12 Phase-1-2 vet's original scope). Found two remote loads:
+`fonts.googleapis.com`/`fonts.gstatic.com` (Google Fonts CSS) and `cdn.sheetjs.com` (SheetJS
+`xlsx.full.min.js`, SRI-pinned but still a remote JS load). Both removed as a documented local
+deviation (see README provenance table); no other bundled file in the `skill-creator` tree loads
+remote resources (re-confirmed via `grep -rn "https://" eval-viewer/` → zero hits post-fix). The 4
+Copilot findings on `run_loop.py`/`quick_validate.py`/`package_skill.py` remain correctly rejected
+(non-security robustness/dependency nits in vendored-verbatim Python — belong upstream, not a local
+fork).
+
+**Patterns:**
+- When a review finding says "X may run in parallel because it consumes no artifacts from other
+  agents," treat that as a structural claim about the *data-flow dependency graph*, not just a
+  labeling change — an agent with no upstream artifact dependency shouldn't be slotted into any
+  numbered serial position at all (not even a placeholder "Phase N (parallel)"), because a numbered
+  slot visually implies "waits for N-1" to a future reader; pull it out of the list entirely into
+  its own annotated line.
+- When vetting a bundled third-party asset for "no exfiltration/no remote code," explicitly check
+  static resource-loading tags (`<link href=... rel=stylesheet>`, `<script src=...>`, `<img src=...
+  http...>`) as a *separate* pass from checking script logic (`fetch`/`subprocess`/`exec` calls) —
+  the two are different vetting axes and a script-logic-only pass will miss a static tag pointing at
+  a CDN.

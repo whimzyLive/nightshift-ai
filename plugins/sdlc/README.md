@@ -77,10 +77,10 @@ skills for detected gaps, and `skill-creator` to scaffold a new skill when a gap
 Both degrade gracefully if unavailable or offline (the scan still emits structural drift and notes
 the skip).
 
-| Skill | Upstream | Pinned ref | License |
-| ----- | -------- | ---------- | ------- |
-| `skill-creator` | [`anthropics/skills`](https://www.skills.sh/anthropics/skills/skill-creator) (Anthropic official) | `9d2f1ae187231d8199c64b5b762e1bdf2244733d` | Apache-2.0 (upstream `LICENSE.txt` carried verbatim) |
-| `find-skills` | [`vercel-labs/skills`](https://www.skills.sh/vercel-labs/skills/find-skills) (Vercel Labs) | `4ce6d48ac44c8b637db87b2102fea3baca719df1` | MIT (no upstream `LICENSE` file at this commit — MIT text transcribed from `package.json`/README with a provenance footer, not copied verbatim) |
+| Skill | Upstream | Pinned ref | License | Local deviations |
+| ----- | -------- | ---------- | ------- | ----------------- |
+| `skill-creator` | [`anthropics/skills`](https://www.skills.sh/anthropics/skills/skill-creator) (Anthropic official) | `9d2f1ae187231d8199c64b5b762e1bdf2244733d` | Apache-2.0 (upstream `LICENSE.txt` carried verbatim) | Local modification: removed remote CDN loads (Google Fonts `<link>`s, `cdn.sheetjs.com` SheetJS `<script>`) from `eval-viewer/viewer.html` — security/offline (no remote network loads at render time; fonts fall back to the system stack, XLSX preview degrades to a "preview unavailable offline" message). |
+| `find-skills` | [`vercel-labs/skills`](https://www.skills.sh/vercel-labs/skills/find-skills) (Vercel Labs) | `4ce6d48ac44c8b637db87b2102fea3baca719df1` | MIT (no upstream `LICENSE` file at this commit — MIT text transcribed from `package.json`/README with a provenance footer, not copied verbatim) | — |
 
 **Refresh strategy:** manual only. The optional vendored-skill-staleness drift check (advisory) may
 surface a newer reachable upstream ref, but never auto-updates; a refresh is a normal reviewed PR that

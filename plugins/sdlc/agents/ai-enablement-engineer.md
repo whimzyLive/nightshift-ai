@@ -35,8 +35,11 @@ AI-configuration surface and (once opted in) `plugins/**` / `skills/**`.
    row presence in the workspace→agent table is the sole activity signal, no separate flag.)
    Report: "AI-config management not enabled; run `/sdlc:init` to opt in." (See
    [Error Handling](#error-handling).)
-2. **Read your override `.claude/project/agents/ai-enablement-engineer.md`** — invoke each project
-   skill it lists, in order, via the Skill tool; then read each directory guide it lists.
+2. **Read your override `.claude/project/agents/ai-enablement-engineer.md`** — invoke each listed
+   skill, in order, via the Skill tool (per repo override convention); then read each directory
+   guide it lists. Note: these three skills (`skill-creator`, `find-skills`, `conventional-commit`)
+   are also plugin-bundled and preloaded via this agent's own front-matter `skills:` key — the
+   front-matter preload and the explicit Skill-tool invocation are not in conflict, both apply.
 3. Read your memory archives if they exist: `.claude/memories/agents/ai-enablement-engineer.md`,
    `.claude/memories/agents/shared.md`.
 4. Read the specific task instructions provided.

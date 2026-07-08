@@ -81,13 +81,17 @@ Only include phases for agents listed as Active in `.claude/project/project-cont
 ```
 Phase 1 — database-administrator  (schema + entities + migrations — ALWAYS FIRST, if active)
 Phase 2 — platform-engineer       (backend infra + handlers)
-Phase 3 — ai-enablement-engineer  (plugins/**, skills/**, AI-config surface — only if plan has tasks)
-Phase 4 — sync-engineer           (offline-sync rules — only if mobile offline required and active)
-Phase 5 — web-engineer            (web pages/components — only if web applicable and active)
-Phase 6 — mobile-engineer         (mobile screens — only if mobile applicable and active)
+Phase 3 — sync-engineer           (offline-sync rules — only if mobile offline required and active)
+Phase 4 — web-engineer            (web pages/components — only if web applicable and active)
+Phase 5 — mobile-engineer         (mobile screens — only if mobile applicable and active)
+
+ai-enablement-engineer — PARALLEL   (plugins/**, skills/**, AI-config surface — only if plan has
+                                     tasks) — may run in parallel with any phase above: it consumes
+                                     no artifacts from other domain agents.
 ```
 
-All phases are sequential. Do NOT mark any phases as parallel.
+All numbered phases are sequential. Do NOT mark any numbered phase as parallel; `ai-enablement-engineer`
+is the sole exception (see above) and is marked `PARALLEL` in the plan instead of a phase number.
 
 ## Output: implementation plan
 
