@@ -92,7 +92,7 @@ illustrative — the written file materialises the founder's real answers and th
 | KPI | `Custom command` | string (shell command) | When `Provider=command` | none | Command that prints the metric's current value to stdout. Blank otherwise. |
 | KPI | `Custom endpoint` | string (URL) | When `Provider=endpoint` | none | URL whose response contains the metric's current value. Blank otherwise. |
 | KPI | `Value path` | string (jq filter) | No | `.` | For `endpoint` JSON responses — jq filter that extracts the numeric value (`.` = the raw body is already numeric). Blank for `command`/`github`. |
-| KPI | `Auth env var` | string (env var **name**) | No | blank | Name of an env var the custom source needs (bearer token, PAT, etc.). **Name only — never the value.** Blank for `github` (which uses `gh`'s own auth) and for custom sources needing no auth. |
+| KPI | `Auth env var` | string (env var **name**) | No | blank | Name of an env var the custom source needs (bearer token, PAT, etc.). **Name only — never the value.** **Injection convention:** when set, the probe (and any future reader, e.g. NA-9) sends `Authorization: Bearer $<name>` with the value read from the environment at run time; the stored `Custom command`/`Custom endpoint` strings are also shell-expanded at run time, so any `$VAR` reference embedded in them (e.g. `?token=$VAR`) resolves from the environment. Blank for `github` (which uses `gh`'s own auth) and for custom sources needing no auth. |
 | KPI | `Verified value` | string (numeric) | Yes | none | The one live value read by the Step-4c probe (AC-4) — a provenance breadcrumb proving the source worked at init. Refreshed on every Re-run/Merge re-probe. |
 
 ### Secret hygiene
@@ -198,7 +198,9 @@ free-text, with no default (AC-1).
    missing.
 2. Probe (AC-4): execute the command, capture stdout, trim; must be a single numeric value. Non-zero
    exit, empty, or non-numeric → STOP. (The command is founder-authored and runs locally with the
-   founder's consent — see Permissions & Trust Posture.)
+   founder's consent — see Permissions & Trust Posture.) The stored command string is shell-expanded
+   at probe time, so any `$VAR` reference in it (including `$<Auth env var>`) resolves from the
+   environment at run time — the value is never persisted.
 
 **Custom: endpoint**
 
@@ -208,6 +210,12 @@ free-text, with no default (AC-1).
    `.` = raw numeric body). Result must be numeric. Connection error, HTTP error, empty, or
    non-numeric → STOP. (Curl against a founder-supplied metric endpoint is legitimate — the "never
    hand-roll HTTP" rule applies to **Postiz**, not to the founder's own escape-hatch source.)
+   **Auth injection:** when `Auth env var` is set, the probe adds
+   `-H "Authorization: Bearer $<name>"`, the value read from the environment at run time and never
+   persisted. The stored `<url>` string is itself shell-expanded at probe time, so any `$VAR`
+   reference embedded in it (e.g. `https://api.example.com/metric?token=$VAR`) resolves from the
+   environment — covering query-param-token APIs that do not use a bearer header. Any future reader
+   of this config (e.g. NA-9's KPI reader) MUST apply the same injection convention.
 
 ### Numeric validation
 
@@ -252,7 +260,9 @@ config and is not rolled back — re-running `/gtm:init` heals a half-run.
 
 - **No secrets persisted** — only env-var **names** (`Auth env var`) reach disk; the GitHub source
   persists no secret (uses ambient `gh` auth). Custom command/endpoint strings must reference env
-  vars rather than embed literal secrets; the rendered section states this.
+  vars rather than embed literal secrets; the rendered section states this. At probe time the named
+  env var is injected as `Authorization: Bearer $<name>` (endpoint) or shell-expanded from the
+  stored string (command / `$VAR` in URL), always read live from the environment.
 - **Custom-command execution** — the probe executes a **founder-supplied shell command** locally,
   during an interactive `/gtm:init` the founder explicitly initiated and to which they typed the
   command. This is the intended escape-hatch behaviour; init does not sandbox or sanitise it. No new
@@ -280,7 +290,9 @@ config and is not rolled back — re-running `/gtm:init` heals a half-run.
 - [x] **Custom-endpoint value extraction** — Locked: a `Value path` jq filter (default `.` = raw
   numeric body); JSON responses use a jq path, plain-numeric bodies use `.`.
 - [x] **Custom-source auth** — Locked: a single optional `Auth env var` **name** (bearer token /
-  PAT), value read from the environment at run time, never persisted.
+  PAT), value read from the environment at run time, never persisted; injected as
+  `Authorization: Bearer $<name>` (or via `$VAR` shell-expansion in the stored URL/command for
+  query-param-token APIs).
 - [x] **Persist the probe's value?** — Locked: yes, as `Verified value` (provenance breadcrumb;
   refreshed on every re-probe).
 - [x] **Step placement** — Locked: Step 4c, after channel config, before the atomic Step 5. All 4x
