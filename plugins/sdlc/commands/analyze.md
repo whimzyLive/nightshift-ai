@@ -11,9 +11,10 @@ opted in — for drift, gaps, and config-vs-memory conflicts, and report the fin
 
 The agent should:
 
-1. Read `.claude/project/project-context.md`. **If `ai-enablement-engineer` is not Active there,
-   stop** and report: "AI-config management not enabled; run `/sdlc:init` to opt in." Write nothing.
-   ("Active" is defined at
+1. Read `.claude/project/project-context.md`. **If `ai-enablement-engineer` is not Active there
+   (including a missing/malformed table — see
+   [Error handling](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling)), STOP**, report
+   per that row. ("Active" is defined at
    [`analyze-protocol.md#ownership-resolution-rules`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#ownership-resolution-rules):
    row presence in the workspace→agent table is the sole activity signal, no separate flag.)
 2. Resolve effective write-scope per
@@ -42,24 +43,19 @@ conflict and the candidate sources of truth; the human picks which side is corre
 memory, or a specific file) or defers. A deferred conflict is report-only — reset nothing.
 
 For each fix the human confirms, run the
-[Apply flow](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#apply-flow):
+[Apply flow](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#apply-flow) exactly as written there —
+scope guard, then (standalone mode) **branch `chore/ai-config-<slug>` off `<BASE-BRANCH>` BEFORE any
+edit** (per project-context's Base branch token — never assume `main`), apply, commit, then push +
+raise the PR:
 
-1. **Scope guard** — resolve effective write-scope again; if any target path falls outside it,
-   **refuse and abort**, listing the offending path (AC-5). No writes happen.
-2. Apply the scoped edit (Edit/Write) only within resolved write-scope; drive "create a missing
-   skill" through `skill-creator`.
-3. Commit via the `conventional-commit` skill.
-4. **Reviewable diff** — `/sdlc:analyze` runs standalone (not dispatched by `principal-engineer` on
-   a story), so branch `chore/ai-config-<slug>` off `main` and raise the PR yourself:
-   ```bash
-   dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
-   # write "$dir/pr-body.md" describing the fix and the finding it resolves
-   PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
-     "chore/ai-config-<slug>" main "chore(ai-config): <fix summary>" "$dir/pr-body.md")
-   ```
-   If `raise-pr.sh` fails, surface the failure and leave the branch + local commit for manual
-   recovery — do not retry silently.
-5. Report the diff/PR URL back to the user. Do **not** merge.
+```bash
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+# write "$dir/pr-body.md" describing the fix and the finding it resolves
+PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
+  "chore/ai-config-<slug>" "<BASE-BRANCH>" "chore(ai-config): <fix summary>" "$dir/pr-body.md")
+```
+
+Report the diff/PR URL back to the user. Do **not** merge.
 
 ## Output
 
@@ -71,17 +67,12 @@ per-finding fields (`area` · `kind` · `detail` · `proposed fix` · `target pa
 
 ## Error handling
 
-| Scenario | Behavior |
-| -------- | -------- |
-| Repo not opted in (agent not Active in project-context) | No-op — report "AI-config management not enabled; run `/sdlc:init` to opt in." Write nothing. |
-| Scan finds no drift/gaps/conflicts | Report "no drift detected" and exit cleanly. |
-| Apply attempted without human confirmation | Refuse — confirmation is mandatory (never auto-apply). |
-| Apply target outside resolved write-scope | Refuse and abort; print the offending path(s); make no writes (AC-5). |
-| Memory conflict with no human decision (deferred) | Report only; reset nothing. |
-| Reset targets another agent's memory but not human-arbitrated | Refuse — the cross-agent memory exception applies only to a human-confirmed, reviewable reset. |
-| `project-context.md` missing or malformed table | Scan proceeds on the AI-config surface; report the table problem as drift; do not edit project-context (read-only authority). |
-| `find-skills` / `skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
-| `raise-pr.sh` fails during standalone apply | Surface the failure; leave branch + local commit for manual recovery; do not retry silently. |
+Canonical table (defined exactly once):
+[`analyze-protocol.md#error-handling`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling).
+Gist: not-Active/unreadable project-context → STOP, report-only; no drift found → report and exit
+clean; apply without confirmation or outside write-scope → refuse; `find-skills`/`skill-creator`
+offline → degrade gracefully; `find-skills` install/update commands → refuse (surfacing/suggesting
+only, see [Skill usage guardrails](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#skill-usage-guardrails)).
 
 Optional area/glob to narrow the scan (default: full resolved write-scope):
 $ARGUMENTS

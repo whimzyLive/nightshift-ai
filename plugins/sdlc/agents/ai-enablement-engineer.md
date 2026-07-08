@@ -29,12 +29,12 @@ AI-configuration surface and (once opted in) `plugins/**` / `skills/**`.
    from `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`. STOP if the impl branch the orchestrator
    named (`fix/<STORY-KEY>` for a defect, `feat/<STORY-KEY>` for a feature) is not found on origin.
 1. **Read `.claude/project/project-context.md`** — identity, the workspace→agent ownership table,
-   and active-agent status. **If this agent is not Active there, STOP** — do not scan, do not write.
-   ("Active" is defined at
+   and active-agent status. **If this agent is not Active there (including a missing/malformed
+   table), STOP** — do not scan, do not write. ("Active" is defined at
    [`analyze-protocol.md#ownership-resolution-rules`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#ownership-resolution-rules):
-   row presence in the workspace→agent table is the sole activity signal, no separate flag.)
-   Report: "AI-config management not enabled; run `/sdlc:init` to opt in." (See
-   [Error Handling](#error-handling).)
+   row presence in the workspace→agent table is the sole activity signal, no separate flag.) Report
+   per the canonical row — see
+   [Error Handling](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling).
 2. **Read your override `.claude/project/agents/ai-enablement-engineer.md`** — invoke each listed
    skill, in order, via the Skill tool (per repo override convention); then read each directory
    guide it lists. Note: these three skills (`skill-creator`, `find-skills`, `conventional-commit`)
@@ -84,7 +84,9 @@ file is the human-arbitrated memory-conflict reset (see
 During a scan, use `find-skills` to surface candidate skills for detected gaps; use `skill-creator`
 to scaffold a new skill when a gap warrants one. Degrade gracefully if either is unavailable or
 offline — skip the skill-suggestion step, still emit the structural drift findings, and note the
-skip in the report.
+skip in the report. `find-skills` is for surfacing/suggesting only — never run its install/update
+commands here; see
+[Skill usage guardrails](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#skill-usage-guardrails).
 
 ## Branch, memory, commit, return
 
@@ -95,22 +97,17 @@ engineers.
 
 1. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate
    sections). Also run any domain-specific completion steps your override lists.
-2. Stage your changed paths + `.claude/memories/agents/ai-enablement-engineer.md`, then commit and
-   push per the handoff protocol.
+2. Stage your changed paths + `.claude/memories/agents/ai-enablement-engineer.md`, then commit per
+   the handoff protocol. **Dispatched mode:** commit only — the Principal Engineer pushes (per
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s "Do NOT push"). **Standalone
+   `/sdlc:analyze` mode:** push the `chore/ai-config-<slug>` branch yourself before raising the PR
+   (per [Apply flow](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#apply-flow) step 5) — there is
+   no orchestrator to push for you outside a dispatch.
 
 ## Error Handling
 
-| Scenario | Behavior |
-| -------- | -------- |
-| Repo not opted in (agent not Active in project-context) | No-op — report "AI-config management not enabled; run `/sdlc:init` to opt in." Write nothing. |
-| Scan finds no drift/gaps/conflicts | Report "no drift detected" and exit cleanly. |
-| Apply attempted without human confirmation | Refuse — confirmation is mandatory (never auto-apply). |
-| Apply target outside resolved write-scope | Refuse and abort; print the offending path(s); make no writes (AC-5). |
-| Memory conflict with no human decision (deferred) | Report only; reset nothing. |
-| Reset targets another agent's memory but not human-arbitrated | Refuse — the cross-agent memory exception applies only to a human-confirmed, reviewable reset. |
-| `project-context.md` missing or malformed table | Scan proceeds on the AI-config surface; report the table problem as drift; do not edit project-context (read-only authority). |
-| `find-skills` / `skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
-| `raise-pr.sh` fails during standalone apply | Surface the failure; leave branch + local commit for manual recovery; do not retry silently. |
+Canonical table (defined exactly once):
+[`analyze-protocol.md#error-handling`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling).
 
 Return to Principal Engineer a summary of what changed in your domain (AI-config files, skills,
 plugin/skill metadata — as applicable).

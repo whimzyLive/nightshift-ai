@@ -318,10 +318,32 @@ AskUserQuestion(
 )
 ```
 
-- **Opt in** → carry two effects into Step 4: (a) add `plugins/` → `ai-enablement-engineer` and
-  `skills/` → `ai-enablement-engineer` to the Step 4b workspace→agent rows — this **is** what
-  marks the agent Active (the same row-presence mechanism every domain agent uses; no separate
-  flag exists); (b) scaffold `.claude/project/agents/ai-enablement-engineer.md` in Step 4c using
+- **Opt in** → carry two effects into Step 4:
+
+  (a) **Workspace→agent rows** — for each of `plugins/`, `skills/`: write a `<dir>/` →
+      `ai-enablement-engineer` row to the Step 4b table **only if that directory exists in this
+      repo**. Writing a row for a directory that doesn't exist yet is guaranteed false drift on the
+      very first `/sdlc:analyze` scan (the "Workspace→agent table vs disk" check in
+      `analyze-protocol.md#drift--gap-table` flags exactly this: "Table lists a path that no longer
+      exists"). At least one row must land to mark the agent **Active** — row presence is the sole
+      Active signal, no separate flag exists (`analyze-protocol.md#ownership-resolution-rules`):
+      `plugins/` exists in essentially every consumer repo (this plugin's own install lives there),
+      so in practice it is almost always the row that survives. If genuinely **neither** `plugins/`
+      nor `skills/` exists yet, still scaffold the override (below) and write one row for the
+      AI-config surface root (`.claude/` — a judgment call, note the rationale in the row) so the
+      Active signal holds regardless. When a skipped directory appears later, add its row on the
+      next `/init` "Merge new findings" pass or by hand — the agent's write-scope already covers it
+      via the config-driven AI-config surface baseline even before a table row names it explicitly.
+
+      **Migration (the sole documented exception to Step 0's "never touch values already
+      present"):** if `plugins/` or `skills/` already has a workspace→agent row under a
+      **different** owner (e.g. a legacy `platform-engineer` row predating this agent), the opt-in
+      confirmation **reassigns** that row to `ai-enablement-engineer` rather than leaving both a
+      stale row and a new one — one path, one owner is the ownership model's core invariant. This
+      reassignment fires only when the user explicitly confirms this AI-context opt-in prompt; it
+      never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
+
+  (b) scaffold `.claude/project/agents/ai-enablement-engineer.md` in Step 4c using
   the **fixed** override shape below (its skill list and owned paths are fixed by the agent
   definition, not derived from the Step 3.5 stack-suggestion flow the other overrides use):
 

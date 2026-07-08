@@ -45,14 +45,22 @@ scan protocol, `/sdlc:analyze`) resolves against this one definition.
 At the start of any run, print the resolved write-scope. Before any write, refuse and abort on a
 path outside that scope (AC-5).
 
+## Base branch
+
+`<BASE-BRANCH>` is read from `.claude/project/project-context.md`'s Base branch token — never
+assume the repo default (e.g. `main`), consistent with every other SDLC agent/command that branches
+off a base. Used when creating the standalone `chore/ai-config-<slug>` branch in
+[Apply flow](#apply-flow) step 2.
+
 ## Scan protocol
 
 Read-only. Repo-wide read is always permitted; writes are scope-limited to the resolved
 write-scope above.
 
 1. Resolve write-scope per [Ownership-resolution rules](#ownership-resolution-rules) and print it.
-2. If the agent is not Active in `.claude/project/project-context.md`, stop here and report:
-   "AI-config management not enabled; run `/sdlc:init` to opt in." Write nothing.
+2. If the agent is not Active in `.claude/project/project-context.md` — including a missing or
+   malformed table, per [Active (definition)](#ownership-resolution-rules) — stop here and report
+   per the [Error handling](#error-handling) row. Write nothing.
 3. Run every check in the [Drift / gap table](#drift--gap-table) against the resolved scope
    (reads may range repo-wide; only writes are scope-limited).
 4. Run [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution) as its own
@@ -73,7 +81,19 @@ write-scope above.
 | Plugin/skill metadata | `SKILL.md` missing required front-matter; `plugin.json`/`marketplace.json` referencing a missing plugin path |
 | **Config-vs-memory semantic conflict** | An owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/etc.) asserts one semantic while agent-learning memory (`.claude/memories/agents/*.md`, project shared memory) records a contradictory one — see [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution) |
 | Vendored-skill staleness (advisory) | Recorded pinned ref (README) older than reachable upstream — advisory only; refresh is manual |
-| **Skill gaps (AC-6)** | For gaps, run `find-skills` to surface candidates; if none fit, note `skill-creator` can scaffold one |
+| **Skill gaps (AC-6)** | For gaps, run `find-skills` to surface candidates (see [Skill usage guardrails](#skill-usage-guardrails)); if none fit, note `skill-creator` can scaffold one |
+
+## Skill usage guardrails
+
+`find-skills` is sanctioned for **surfacing/suggesting** skill-gap candidates only. **Never** run
+its `npx skills add`/`npx skills update` (or any other install/update) commands during a scan or
+apply — those run unpinned, unvetted third-party code at install time, a supply-chain risk this
+plugin does not accept implicitly. Any skill that should actually be installed goes through the
+normal human-confirmed vet-and-pin vendoring flow (clone at a pinned ref, vet bundled
+scripts/network calls, carry the license, record provenance in `plugins/sdlc/README.md`) — the same
+process `skill-creator` and `find-skills` themselves were vendored through. `find-skills`'s own
+`SKILL.md` (vendored verbatim from upstream) is not edited to add this constraint — it is enforced
+here, in the agent's own usage of the skill, not in the vendored skill's instructions.
 
 ## Memory-conflict analysis & resolution
 
@@ -113,17 +133,23 @@ never without human confirmation.
    [Ownership-resolution rules](#ownership-resolution-rules)); if the fix's target paths are not
    all within scope (respecting the read-only carve-outs, and the memory-conflict exception only
    when human-arbitrated), **refuse and abort** with the offending path listed (AC-5).
-2. Apply the scoped edits (Edit/Write) only within resolved write-scope; for "create a missing
+2. **Branch (standalone mode only, BEFORE any edit):** running standalone via `/sdlc:analyze`,
+   create and check out `chore/ai-config-<slug>` off `<BASE-BRANCH>` (per [Base branch](#base-branch)
+   — never assume `main`), so the coming edits land on the fix branch, not whatever branch happened
+   to be checked out. **Dispatched mode does not branch here** — commits land on the
+   already-checked-out impl branch per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`.
+3. Apply the scoped edits (Edit/Write) only within resolved write-scope; for "create a missing
    skill", drive it through `skill-creator`.
-3. Commit via the `conventional-commit` skill.
-4. **Reviewable diff:**
+4. Commit via the `conventional-commit` skill.
+5. **Reviewable diff:**
    - **Dispatched by `principal-engineer`:** commit on the impl branch per
      `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`; `principal-engineer` opens the PR — do
      not self-raise.
-   - **Standalone via `/sdlc:analyze`:** branch `chore/ai-config-<slug>` off `main`; raise a PR via
-     `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh <head> main "<title>" <body-file>`. The PR **is**
-     the reviewable diff.
-5. Report the diff/PR back to the user. Do not merge.
+   - **Standalone via `/sdlc:analyze`:** push the `chore/ai-config-<slug>` branch created in step 2,
+     then raise a PR via
+     `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh <head> <BASE-BRANCH> "<title>" <body-file>`. The PR
+     **is** the reviewable diff.
+6. Report the diff/PR back to the user. Do not merge.
 
 ## Output shape
 
@@ -139,3 +165,20 @@ Per finding, report exactly these fields:
 
 No writes happen in scan mode — every listed target path is informational until a human confirms
 an apply via the [Apply flow](#apply-flow).
+
+## Error handling
+
+Canonical error-handling table for both the `ai-enablement-engineer` agent and the `/sdlc:analyze`
+command — defined exactly once here; each references this anchor instead of restating the rows.
+
+| Scenario | Behavior |
+| -------- | -------- |
+| Repo not opted in / `project-context.md` missing or malformed table (agent not Active — see [Active (definition)](#ownership-resolution-rules)) | **STOP** — report-only: "repo not opted in or project-context unreadable — run `/sdlc:init`." Write nothing. Do not scan. |
+| Scan finds no drift/gaps/conflicts | Report "no drift detected" and exit cleanly. |
+| Apply attempted without human confirmation | Refuse — confirmation is mandatory (never auto-apply). |
+| Apply target outside resolved write-scope | Refuse and abort; print the offending path(s); make no writes (AC-5). |
+| Memory conflict with no human decision (deferred) | Report only; reset nothing. |
+| Reset targets another agent's memory but not human-arbitrated | Refuse — the cross-agent memory exception applies only to a human-confirmed, reviewable reset. |
+| `find-skills` / `skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
+| `find-skills` install/update commands would run | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only. |
+| `raise-pr.sh` fails during standalone apply | Surface the failure; leave branch + local commit for manual recovery; do not retry silently. |
