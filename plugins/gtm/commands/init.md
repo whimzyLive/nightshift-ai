@@ -153,9 +153,9 @@ Channels rows.
 1. Enumerate via `postiz integrations:list` (AC-1); parse `id`, `name`, `identifier` per channel.
 2. For each channel, prompt the founder — one channel at a time — for the four settings
    (Ownership / Voice / Cadence / Content types, AC-2), each pre-seeded with the existing value
-   (re-run) or the schema default (fresh run) per the ref. The `reddit` identifier is
-   recommended-defaulted to `manual`; any channel the founder skips falls back to the AC-4 default
-   `draft`.
+   (re-run) or the schema default (fresh run) per the ref. (Merge path: only genuinely new channels
+   are prompted — see Step 0.) The `reddit` identifier is recommended-defaulted to `manual`; any
+   channel the founder skips falls back to the AC-4 default `draft`.
 3. Collect the answers into the in-memory Channels model that Step 5 renders. This step **writes
    nothing** to final paths — it only gathers values.
 
@@ -246,6 +246,9 @@ session temp dir first, and only move them into place after **every** staged wri
 
 ## Step 6 — Post-init checklist
 
+Note any channel dropped on a re-run via the drop-confirmation guard as an addition to the
+**Channels configured** line below before printing the summary.
+
 Print a summary:
 
 > **Files written:**
@@ -259,7 +262,6 @@ Print a summary:
 >
 > **Channels configured:** N (ownership/voice/cadence/content-types per channel) — graduate a
 > channel from `draft` to `auto` by re-running `/gtm:init` and changing its ownership.
-> (Note any channel dropped on a re-run via the drop-confirmation guard here.)
 >
 > **Keep this environment variable set** for every future gtm session: `POSTIZ_API_KEY`. Only its
 > **name** was persisted to disk — never the value. The Postiz backend URL now lives in

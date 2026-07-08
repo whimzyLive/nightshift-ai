@@ -37,16 +37,22 @@ environment and is never written to this file or any other file `/gtm:init` writ
 
 ## Channels
 
-| Channel  | Name              | Integration ID | Ownership | Voice   | Cadence | Content types              |
-| -------- | ----------------- | -------------- | --------- | ------- | ------- | -------------------------- |
-| x        | Nightshift        | <id>           | draft     | brand   | default | release-note, milestone    |
-| linkedin | Rishi Patel       | <id>           | draft     | founder | weekly  | release-note, article-link |
-| reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link               |
+| Channel | Name | Integration ID | Ownership | Voice | Cadence | Content types |
+| ------- | ---- | --------------- | --------- | ----- | ------- | ------------- |
 
 ## Voice
 
 <voice overrides — markdown block, empty at init; populated by a downstream story>
 ```
+
+**Example rows (illustrative only — never render these into a generated file):** a materialised
+`## Channels` table looks like this once real channels are configured:
+
+| Channel  | Name              | Integration ID | Ownership | Voice   | Cadence | Content types              |
+| -------- | ----------------- | -------------- | --------- | ------- | ------- | -------------------------- |
+| x        | Nightshift        | <id>           | draft     | brand   | default | release-note, milestone    |
+| linkedin | Rishi Patel       | <id>           | draft     | founder | weekly  | release-note, article-link |
+| reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link               |
 
 ## Schema
 
@@ -81,8 +87,8 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
 3. `Backend URL` is chosen at init: cloud default (`https://api.postiz.com`) or a self-hosted URL
    the founder supplies — never left blank. `API key env var` defaults to `POSTIZ_API_KEY`; only
    override the name if the founder explicitly names a different variable for their setup.
-4. `Voice` starts empty — a downstream story (channel ownership/voice/cadence) populates it. Never
-   invent voice guidance at init time.
+4. `Voice` starts empty — a downstream story (voice overrides / content strategy) populates it.
+   Never invent voice guidance at init time.
 5. On the "Merge new findings" re-init path, preserve every value already set; only backfill
    template fields that are absent from the existing file.
 6. Materialise every Channels row fully — no `<...>` placeholder token may remain (`Integration ID`
