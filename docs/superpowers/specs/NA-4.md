@@ -68,7 +68,7 @@ When `integrations:list` returns zero channels, the section is still written wit
 | ------ | --------------------- | -------- | ------- | ----- |
 | `Channel` | string — Postiz `identifier` | Yes | — | Platform key from `integrations:list`. |
 | `Name` | string — Postiz `name` | Yes | — | Account display name; disambiguates multiple accounts on one platform. |
-| `Integration ID` | string — Postiz `id` | Yes | — | Refreshed from `integrations:list` on **every** run; downstream publish handle. Never a match key on re-run (see Re-run matching). |
+| `Integration ID` | string — Postiz `id` | Yes | — | Refreshed from `integrations:list` on **every** run; downstream publish handle. Primary match key on re-run, but not a stable identity key — it can go stale on reconnect, in which case the (`Channel`, `Name`) fallback applies (see Re-run matching). |
 | `Ownership` | enum: `auto` \| `draft` \| `manual` | Yes | `draft` | AC-4: any channel not explicitly set is `draft`. |
 | `Voice` | enum: `brand` \| `founder` | Yes | `brand` | `brand` = product/brand account voice; `founder` = founder's personal voice. Distinct from the global **Voice** overrides section (which stays empty at init). |
 | `Cadence` | enum: `default` \| `daily` \| `weekly` \| `paused` | Yes | `default` | `default` = inherit the global pulse cadence (~3 posts/week, weekends quiet); `paused` = prepared but never scheduled. |
