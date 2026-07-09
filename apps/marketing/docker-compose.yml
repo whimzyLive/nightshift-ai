@@ -16,13 +16,13 @@ services:
       timeout: 3s
       retries: 15
     command:
-      - "postgres"
-      - "-c"
-      - "wal_level=logical"
-      - "-c"
-      - "max_wal_senders=10"
-      - "-c"
-      - "max_replication_slots=10"
+      - 'postgres'
+      - '-c'
+      - 'wal_level=logical'
+      - '-c'
+      - 'max_wal_senders=10'
+      - '-c'
+      - 'max_replication_slots=10'
     volumes:
       # postgres:18+ expects the mount at /var/lib/postgresql (data lives in a
       # versioned subdirectory, enabling pg_upgrade --link across majors).
@@ -31,7 +31,7 @@ services:
     image: bytebase/dbhub:latest
     init: true
     ports:
-      - "9080:8080"
+      - '9080:8080'
     environment:
       DB_TYPE: postgres
       DB_HOST: ${DATABASE_HOST:-db}
@@ -41,7 +41,8 @@ services:
       DB_NAME: ${DATABASE_NAME:-nightshift}
     volumes:
       - ./dbhub.toml:/app/dbhub.toml:ro
-    command: ["--transport", "http", "--port", "8080", "--config", "/app/dbhub.toml"]
+    command:
+      ['--transport', 'http', '--port', '8080', '--config', '/app/dbhub.toml']
 volumes:
   db:
     driver: local

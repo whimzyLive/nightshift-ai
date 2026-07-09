@@ -3,13 +3,13 @@ name: motion-dev-animations
 description: Creates 120fps GPU-accelerated animations with Motion.dev (Framer Motion successor) for React, Next.js, Svelte, and Astro projects. Use when user requests animation, motion, scroll effects, parallax, hero animations, gestures, drag interactions, spring physics, whileHover effects, whileInView animations, animated UI, micro-interactions, page transitions, or layout animations. Generates production TypeScript/JSX code with accessibility (prefers-reduced-motion) and performance validation (≥60fps). Supports entrance animations, gesture interactions (hover/tap/drag), scroll-based reveals, and layout transitions using spring physics and natural timing. Do NOT use for CSS-only transitions (use native CSS), static sites without JavaScript, Vue animations (use motion-v variant instead), or SVG/Canvas complex animations (GSAP better suited).
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 metadata:
-  version: "3.0.0"
-  author: "Motion Dev Standards"
-  tags: ["motion", "framer-motion", "animation", "react", "nextjs", "svelte", "astro", "gestures", "scroll", "parallax", "microinteractions", "spring-physics", "layout-animations"]
-  min_claude_version: "3.5"
-  created: "2025-11-07"
-  updated: "2025-11-08"
-  optimization: "Research-backed: imperative language, few-shot (3 examples), layered complexity, progressive loading"
+  version: '3.0.0'
+  author: 'Motion Dev Standards'
+  tags: ['motion', 'framer-motion', 'animation', 'react', 'nextjs', 'svelte', 'astro', 'gestures', 'scroll', 'parallax', 'microinteractions', 'spring-physics', 'layout-animations']
+  min_claude_version: '3.5'
+  created: '2025-11-07'
+  updated: '2025-11-08'
+  optimization: 'Research-backed: imperative language, few-shot (3 examples), layered complexity, progressive loading'
 ---
 
 # Motion Dev Animations
@@ -25,12 +25,14 @@ Generate production-grade animations using Motion.dev following Apple/Jon Ive pr
 ## When to Use
 
 ✅ **Use for**:
+
 - React 19+/Next.js 15+/Svelte 5+/Astro 4+ animation implementation
 - Scroll effects (parallax, reveal), gestures (hover, drag, tap), layout animations
 - Hero sections, cards, micro-interactions requiring 60fps+ performance
 - Projects needing spring physics, natural motion, accessibility
 
 ❌ **Don't use for**:
+
 - CSS-only transitions (use native `transition` property)
 - Static sites without JavaScript frameworks
 - Vue projects (use `motion-v` package - different API)
@@ -40,7 +42,9 @@ Generate production-grade animations using Motion.dev following Apple/Jon Ive pr
 ## Workflow: Clarify → Plan → Implement → Verify
 
 ### Step 1: Clarify Requirements
+
 Determine project context and animation goals:
+
 - Framework (React 19+, Next.js 15+, Svelte 5+, Astro 4+)
 - Animation type (entrance, gesture, scroll, layout)
 - Design goal (subtle, prominent, playful, professional)
@@ -48,7 +52,9 @@ Determine project context and animation goals:
 - Trigger mechanism (mount, viewport, user interaction)
 
 ### Step 2: Plan Animation Strategy
+
 Define implementation approach:
+
 - Components to animate (headers, cards, buttons, sections)
 - Motion patterns (fade, slide, scale, spring, parallax)
 - Timing specifications (duration, delay, stagger intervals)
@@ -56,7 +62,9 @@ Define implementation approach:
 - Accessibility fallbacks (prefers-reduced-motion alternatives)
 
 ### Step 3: Implement in Phases
+
 Build animations incrementally:
+
 - **Setup**: Install Motion.dev, configure imports, prepare component structure
 - **Core Animation**: Apply motion properties (initial, animate, transition)
 - **Refinement**: Tune timing, easing curves, spring physics for natural feel
@@ -64,7 +72,9 @@ Build animations incrementally:
 - **Optimization**: Verify GPU-acceleration, minimize bundle size, test performance
 
 ### Step 4: Verify Quality Standards
+
 Check against requirements:
+
 - **Performance**: ≥60fps (Chrome DevTools → Performance tab)
 - **Layout Stability**: CLS = 0 (Lighthouse audit)
 - **Accessibility**: Honors prefers-reduced-motion (system settings test)
@@ -102,61 +112,65 @@ INPUT: What should animate?
 
 ## API Quick Reference
 
-| Component/Hook | Usage | When |
-|----------------|-------|------|
-| **motion.div** | `<motion.div animate={{x: 100}}>` | Basic animations |
-| **whileHover** | `whileHover={{scale: 1.05}}` | Hover states (0.2-0.3s) |
-| **whileTap** | `whileTap={{scale: 0.95}}` | Click feedback |
-| **whileInView** | `whileInView={{opacity: 1}}` | Scroll reveal |
-| **drag** | `drag="x"` dragConstraints | Draggable elements |
-| **layout** | `<motion.div layout />` | Auto FLIP animation |
-| **useScroll** | Track scroll progress | Parallax, progress bars |
-| **useTransform** | Map values | Scroll-linked effects |
-| **useSpring** | Spring physics | Smooth value changes |
-| **useInView** | Viewport detection | Trigger animations |
+| Component/Hook   | Usage                             | When                    |
+| ---------------- | --------------------------------- | ----------------------- |
+| **motion.div**   | `<motion.div animate={{x: 100}}>` | Basic animations        |
+| **whileHover**   | `whileHover={{scale: 1.05}}`      | Hover states (0.2-0.3s) |
+| **whileTap**     | `whileTap={{scale: 0.95}}`        | Click feedback          |
+| **whileInView**  | `whileInView={{opacity: 1}}`      | Scroll reveal           |
+| **drag**         | `drag="x"` dragConstraints        | Draggable elements      |
+| **layout**       | `<motion.div layout />`           | Auto FLIP animation     |
+| **useScroll**    | Track scroll progress             | Parallax, progress bars |
+| **useTransform** | Map values                        | Scroll-linked effects   |
+| **useSpring**    | Spring physics                    | Smooth value changes    |
+| **useInView**    | Viewport detection                | Trigger animations      |
 
 **Full API**: See [Complete API Reference](./reference/api-reference.md)
 
 ## Framework Integration
 
-| Framework | Import | Components | Exit Animations |
-|-----------|--------|------------|-----------------|
+| Framework         | Import           | Components     | Exit Animations     |
+| ----------------- | ---------------- | -------------- | ------------------- |
 | **React/Next.js** | `"motion/react"` | `<motion.div>` | `<AnimatePresence>` |
-| **Svelte** | `"motion"` | Vanilla API | N/A |
-| **Astro** | `"motion"` | Client scripts | N/A |
-| **Vue** | `"motion-v"` | `<motion.div>` | Similar to React |
+| **Svelte**        | `"motion"`       | Vanilla API    | N/A                 |
+| **Astro**         | `"motion"`       | Client scripts | N/A                 |
+| **Vue**           | `"motion-v"`     | `<motion.div>` | Similar to React    |
 
 ## Quality Standards
 
-| Category | Requirement | How to Verify |
-|----------|-------------|---------------|
-| **Performance** | ≥60fps | Chrome DevTools → Performance |
-| **GPU-accel** | transform/opacity only | No width/height/left/top |
-| **Bundle** | <50KB | webpack-bundle-analyzer |
-| **Accessibility** | prefers-reduced-motion | System settings test |
-| **Mobile** | Touch-friendly | iOS/Android testing |
-| **Layout shift** | CLS = 0 | Lighthouse audit |
+| Category          | Requirement            | How to Verify                 |
+| ----------------- | ---------------------- | ----------------------------- |
+| **Performance**   | ≥60fps                 | Chrome DevTools → Performance |
+| **GPU-accel**     | transform/opacity only | No width/height/left/top      |
+| **Bundle**        | <50KB                  | webpack-bundle-analyzer       |
+| **Accessibility** | prefers-reduced-motion | System settings test          |
+| **Mobile**        | Touch-friendly         | iOS/Android testing           |
+| **Layout shift**  | CLS = 0                | Lighthouse audit              |
 
 ## Examples Library (Progressive Loading)
 
 Load on-demand based on animation type:
 
 ### Hero Sections
+
 - [Hero Fade Up](./examples/hero-fade-up.md) - Classic Apple-style entrance
 - Hero Stagger - Orchestrated elements
 - Hero Split Text - Character reveal
 
 ### Scroll Effects
+
 - [Scroll Reveal](./examples/scroll-reveal.md) - Intersection Observer fade-in
 - [Parallax Layers](./examples/parallax-layers.md) - Multi-speed depth
 - Scroll Progress - Reading indicator
 
 ### Gestures & Interactions
+
 - [Card Hover](./examples/card-hover.md) - Elegant lift + shadow
 - [Magnetic Button](./examples/magnetic-button.md) - Cursor-following
 - Drag Carousel - Touch slider
 
 ### Layout Animations
+
 - List Reorder - Drag-to-reorder FLIP
 - Accordion - Expand/collapse
 - Tab Switch - Shared layout
@@ -192,41 +206,33 @@ npm install motion-v
 ## Common Patterns (Copy-Paste Ready)
 
 ### Pattern 1: Fade Up Entrance
+
 ```tsx
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-/>
+<motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} />
 ```
 
 ### Pattern 2: Hover Card
+
 ```tsx
-<motion.div
-  whileHover={{ y: -8, boxShadow: "0 20px 40px rgba(0,0,0,0.12)" }}
-  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-/>
+<motion.div whileHover={{ y: -8, boxShadow: '0 20px 40px rgba(0,0,0,0.12)' }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} />
 ```
 
 ### Pattern 3: Scroll Reveal
+
 ```tsx
-<motion.div
-  initial={{ opacity: 0, y: 50 }}
-  whileInView={{ opacity: 1, y: 0 }}
-  viewport={{ once: true, amount: 0.3 }}
-/>
+<motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} />
 ```
 
 **More patterns**: Staggered lists, exit animations, layout transitions → `./examples/` directory
 
 ## Error Handling
 
-| Issue | Solution |
-|-------|----------|
-| Animation doesn't trigger | Check initial ≠ animate values |
-| Poor performance | Use transform/opacity only + will-change CSS |
-| Layout shift | Set explicit dimensions, use layout prop |
-| Exit not working | Wrap with `<AnimatePresence>`, add key prop |
+| Issue                     | Solution                                     |
+| ------------------------- | -------------------------------------------- |
+| Animation doesn't trigger | Check initial ≠ animate values               |
+| Poor performance          | Use transform/opacity only + will-change CSS |
+| Layout shift              | Set explicit dimensions, use layout prop     |
+| Exit not working          | Wrap with `<AnimatePresence>`, add key prop  |
 
 ## Implementation Best Practices
 
@@ -250,6 +256,7 @@ Apply these design principles to all animations:
 ## Validation
 
 For structured output validation, see:
+
 - [Motion Config Schema](./schema/motion-config.schema.json) - JSON schema
 - [Validation Script](./scripts/validate_motion_config.py) - Automated checks
 

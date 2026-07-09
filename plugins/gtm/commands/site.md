@@ -156,16 +156,16 @@ building is always a separate, founder-initiated step (see the next-steps guidan
 
 ## Step 6 — Report
 
-Return (fields marked *(completed runs)* apply only when the run produced or retained a brief. On a
+Return (fields marked _(completed runs)_ apply only when the run produced or retained a brief. On a
 **step-3** gate-FAIL state explicitly that **no brief was written and no guard action ran**, with
 the violation list. On a **refine-merge** gate-FAIL (step 5a): the guard action was refine, the
 existing brief is untouched, and the fresh artifact was preserved at `docs/gtm/site-brief.new.md`
 — report that path with the violation list):
 
-1. *(completed runs)* The brief path (`docs/gtm/site-brief.md`) and the `GUARD` action applied
+1. _(completed runs)_ The brief path (`docs/gtm/site-brief.md`) and the `GUARD` action applied
    (fresh / refine / regenerate / skip / `--overwrite`); on a refine-FAIL, the preserved
    `docs/gtm/site-brief.new.md` path.
-2. *(completed runs)* **Next steps**: the brief is the standalone deliverable — suggest the
+2. _(completed runs)_ **Next steps**: the brief is the standalone deliverable — suggest the
    founder installs the sdlc plugin (if not already installed) and uses its flow to build the site
    from the brief separately, once the repo is set up with the frameworks and skills the build
    needs. Never dispatch that build from this command. On a `GUARD=skip` run: also state that the
@@ -179,14 +179,14 @@ existing brief is untouched, and the fresh artifact was preserved at `docs/gtm/s
 
 ## Error handling
 
-| Scenario | Behaviour |
-|----------|-----------|
-| `.agents/product-marketing.md` missing/empty | Command STOPs at step 1 with the "run `/gtm:init`" guidance; `content-writer` also enforces this specific STOP independently. |
-| `marketing-context.md` missing/empty | Command STOPs at step 1 (precondition — this is the ONLY guard for this file; the agent does not re-check it). |
-| `.claude/.gtm-plugin-root` missing | Not an error — step 1 writes it from the command's native `${CLAUDE_PLUGIN_ROOT}` before dispatch (it is a gitignored per-machine cache). |
-| Copy-review gate FAIL | Command STOPs after step 3; reports each violation + offending span in the step-6 FAIL format; nothing branded or written. |
-| Refine-merge gate FAIL | Existing brief left untouched; fresh artifact preserved at `docs/gtm/site-brief.new.md`; run ends with the FAIL report. |
-| `task=channel-draft` requested | `content-writer` STOPs: "task=channel-draft is not available until NA-8." |
-| `docs/gtm/site-brief.md` already exists | Re-run guard (step 1b, before the copy run): prompt refine / regenerate / skip; `--overwrite` bypasses the prompt. Never silently overwritten. |
-| `brand/BRAND_KIT.md` missing | Degrade: proceed with an unbranded copy deck, note the missing brand kit in the report (step 6). Do not hard-fail — brand is additive. |
+| Scenario                                                     | Behaviour                                                                                                                                                                 |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.agents/product-marketing.md` missing/empty                 | Command STOPs at step 1 with the "run `/gtm:init`" guidance; `content-writer` also enforces this specific STOP independently.                                             |
+| `marketing-context.md` missing/empty                         | Command STOPs at step 1 (precondition — this is the ONLY guard for this file; the agent does not re-check it).                                                            |
+| `.claude/.gtm-plugin-root` missing                           | Not an error — step 1 writes it from the command's native `${CLAUDE_PLUGIN_ROOT}` before dispatch (it is a gitignored per-machine cache).                                 |
+| Copy-review gate FAIL                                        | Command STOPs after step 3; reports each violation + offending span in the step-6 FAIL format; nothing branded or written.                                                |
+| Refine-merge gate FAIL                                       | Existing brief left untouched; fresh artifact preserved at `docs/gtm/site-brief.new.md`; run ends with the FAIL report.                                                   |
+| `task=channel-draft` requested                               | `content-writer` STOPs: "task=channel-draft is not available until NA-8."                                                                                                 |
+| `docs/gtm/site-brief.md` already exists                      | Re-run guard (step 1b, before the copy run): prompt refine / regenerate / skip; `--overwrite` bypasses the prompt. Never silently overwritten.                            |
+| `brand/BRAND_KIT.md` missing                                 | Degrade: proceed with an unbranded copy deck, note the missing brand kit in the report (step 6). Do not hard-fail — brand is additive.                                    |
 | `--council` passed but `marketing-council` skill unavailable | `content-writer` skips the pass and flags the skip in its return (its documented fallback); the command surfaces it in the step-6 report. Non-fatal; the gate still runs. |

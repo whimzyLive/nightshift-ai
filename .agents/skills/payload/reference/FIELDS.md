@@ -5,7 +5,7 @@ Complete reference for all Payload field types with examples.
 ## Text Field
 
 ```ts
-import type { TextField } from 'payload'
+import type { TextField } from 'payload';
 
 const textField: TextField = {
   name: 'title',
@@ -23,7 +23,7 @@ const textField: TextField = {
     position: 'sidebar',
     condition: (data) => data.showTitle === true,
   },
-}
+};
 ```
 
 > **When to use `position: 'sidebar'`:** Reserve the sidebar for short fields that
@@ -41,8 +41,8 @@ uniqueness and indexing. Call it with no args when the collection has a `title`
 field — the slug is generated from `title` by default:
 
 ```ts
-import { slugField } from 'payload'
-import type { CollectionConfig } from 'payload'
+import { slugField } from 'payload';
+import type { CollectionConfig } from 'payload';
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
@@ -50,7 +50,7 @@ export const Pages: CollectionConfig = {
     { name: 'title', type: 'text', required: true },
     slugField(), // name: 'slug', useAsSlug: 'title', required, unique, position: 'sidebar'
   ],
-}
+};
 ```
 
 `useAsSlug` defaults to `'title'`, so if the collection has **no `title` field**,
@@ -59,7 +59,7 @@ field that doesn't exist:
 
 ```ts
 // Collection keyed on `name` instead of `title`
-fields: [{ name: 'name', type: 'text', required: true }, slugField({ useAsSlug: 'name' })]
+fields: [{ name: 'name', type: 'text', required: true }, slugField({ useAsSlug: 'name' })];
 ```
 
 Override defaults when needed (`overrides` receives the generated `RowField`):
@@ -73,18 +73,18 @@ slugField({
   required: true, // defaults to true
   position: 'sidebar', // default; the slug is a short field well-suited to the sidebar
   overrides: (field) => {
-    field.fields[1].label = 'Custom Slug Label'
-    return field
+    field.fields[1].label = 'Custom Slug Label';
+    return field;
   },
-})
+});
 ```
 
 ## Rich Text (Lexical)
 
 ```ts
-import type { RichTextField } from 'payload'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { HeadingFeature, LinkFeature } from '@payloadcms/richtext-lexical'
+import type { RichTextField } from 'payload';
+import { lexicalEditor } from '@payloadcms/richtext-lexical';
+import { HeadingFeature, LinkFeature } from '@payloadcms/richtext-lexical';
 
 const richTextField: RichTextField = {
   name: 'content',
@@ -102,26 +102,13 @@ const richTextField: RichTextField = {
       }),
     ],
   }),
-}
+};
 ```
 
 ### Advanced Lexical Configuration
 
 ```ts
-import {
-  BoldFeature,
-  EXPERIMENTAL_TableFeature,
-  FixedToolbarFeature,
-  HeadingFeature,
-  IndentFeature,
-  InlineToolbarFeature,
-  ItalicFeature,
-  LinkFeature,
-  OrderedListFeature,
-  UnderlineFeature,
-  UnorderedListFeature,
-  lexicalEditor,
-} from '@payloadcms/richtext-lexical'
+import { BoldFeature, EXPERIMENTAL_TableFeature, FixedToolbarFeature, HeadingFeature, IndentFeature, InlineToolbarFeature, ItalicFeature, LinkFeature, OrderedListFeature, UnderlineFeature, UnorderedListFeature, lexicalEditor } from '@payloadcms/richtext-lexical';
 
 // Global editor config with full features
 export default buildConfig({
@@ -137,9 +124,9 @@ export default buildConfig({
           enabledCollections: ['pages'],
           fields: ({ defaultFields }) => {
             const defaultFieldsWithoutUrl = defaultFields.filter((field) => {
-              if ('name' in field && field.name === 'url') return false
-              return true
-            })
+              if ('name' in field && field.name === 'url') return false;
+              return true;
+            });
 
             return [
               ...defaultFieldsWithoutUrl,
@@ -152,15 +139,15 @@ export default buildConfig({
                 label: ({ t }) => t('fields:enterURL'),
                 required: true,
               },
-            ]
+            ];
           },
         }),
         IndentFeature(),
         EXPERIMENTAL_TableFeature(),
-      ]
+      ];
     },
   }),
-})
+});
 
 // Field-specific editor with custom toolbar
 const richTextWithToolbars: RichTextField = {
@@ -168,22 +155,17 @@ const richTextWithToolbars: RichTextField = {
   type: 'richText',
   editor: lexicalEditor({
     features: ({ rootFeatures }) => {
-      return [
-        ...rootFeatures,
-        HeadingFeature({ enabledHeadingSizes: ['h2', 'h3', 'h4'] }),
-        FixedToolbarFeature(),
-        InlineToolbarFeature(),
-      ]
+      return [...rootFeatures, HeadingFeature({ enabledHeadingSizes: ['h2', 'h3', 'h4'] }), FixedToolbarFeature(), InlineToolbarFeature()];
     },
   }),
   label: false,
-}
+};
 ```
 
 ## Relationship
 
 ```ts
-import type { RelationshipField } from 'payload'
+import type { RelationshipField } from 'payload';
 
 // Single relationship
 const singleRelationship: RelationshipField = {
@@ -192,7 +174,7 @@ const singleRelationship: RelationshipField = {
   relationTo: 'users',
   required: true,
   maxDepth: 2,
-}
+};
 
 // Multiple relationships (hasMany)
 const multipleRelationship: RelationshipField = {
@@ -203,7 +185,7 @@ const multipleRelationship: RelationshipField = {
   filterOptions: {
     active: { equals: true },
   },
-}
+};
 
 // Polymorphic relationship
 const polymorphicRelationship: PolymorphicRelationshipField = {
@@ -211,13 +193,13 @@ const polymorphicRelationship: PolymorphicRelationshipField = {
   type: 'relationship',
   relationTo: ['posts', 'pages'],
   hasMany: true,
-}
+};
 ```
 
 ## Array
 
 ```ts
-import type { ArrayField } from 'payload'
+import type { ArrayField } from 'payload';
 
 const arrayField: ArrayField = {
   name: 'slides',
@@ -243,13 +225,13 @@ const arrayField: ArrayField = {
   admin: {
     initCollapsed: true,
   },
-}
+};
 ```
 
 ## Blocks
 
 ```ts
-import type { BlocksField, Block } from 'payload'
+import type { BlocksField, Block } from 'payload';
 
 const HeroBlock: Block = {
   slug: 'hero',
@@ -266,7 +248,7 @@ const HeroBlock: Block = {
       relationTo: 'media',
     },
   ],
-}
+};
 
 const ContentBlock: Block = {
   slug: 'content',
@@ -276,19 +258,19 @@ const ContentBlock: Block = {
       type: 'richText',
     },
   ],
-}
+};
 
 const blocksField: BlocksField = {
   name: 'layout',
   type: 'blocks',
   blocks: [HeroBlock, ContentBlock],
-}
+};
 ```
 
 ## Select
 
 ```ts
-import type { SelectField } from 'payload'
+import type { SelectField } from 'payload';
 
 // Use select for genuine taxonomy. For publish state, enable versions.drafts
 // and rely on the auto-injected _status field instead of a custom select.
@@ -302,7 +284,7 @@ const selectField: SelectField = {
   ],
   defaultValue: 'medium',
   required: true,
-}
+};
 
 // Multiple select
 const multiSelectField: SelectField = {
@@ -310,13 +292,13 @@ const multiSelectField: SelectField = {
   type: 'select',
   hasMany: true,
   options: ['tech', 'news', 'sports'],
-}
+};
 ```
 
 ## Upload
 
 ```ts
-import type { UploadField } from 'payload'
+import type { UploadField } from 'payload';
 
 const uploadField: UploadField = {
   name: 'featuredImage',
@@ -326,7 +308,7 @@ const uploadField: UploadField = {
   filterOptions: {
     mimeType: { contains: 'image' },
   },
-}
+};
 ```
 
 ## Point (Geolocation)
@@ -334,14 +316,14 @@ const uploadField: UploadField = {
 Point fields store geographic coordinates with automatic 2dsphere indexing for geospatial queries.
 
 ```ts
-import type { PointField } from 'payload'
+import type { PointField } from 'payload';
 
 const locationField: PointField = {
   name: 'location',
   type: 'point',
   label: 'Location',
   required: true,
-}
+};
 
 // Returns [longitude, latitude]
 // Example: [-122.4194, 37.7749] for San Francisco
@@ -360,7 +342,7 @@ const nearbyLocations = await payload.find({
       minDistance: 1000,
     },
   },
-})
+});
 
 // Query within polygon area
 const polygon: Point[] = [
@@ -369,7 +351,7 @@ const polygon: Point[] = [
   [11.0, 21.0], // top-right
   [11.0, 19.0], // bottom-right
   [9.0, 19.0], // closing point
-]
+];
 
 const withinArea = await payload.find({
   collection: 'stores',
@@ -381,7 +363,7 @@ const withinArea = await payload.find({
       },
     },
   },
-})
+});
 
 // Query intersecting area
 const intersecting = await payload.find({
@@ -394,7 +376,7 @@ const intersecting = await payload.find({
       },
     },
   },
-})
+});
 ```
 
 **Note**: Point fields are not supported in SQLite.
@@ -404,7 +386,7 @@ const intersecting = await payload.find({
 Join fields create reverse relationships, allowing you to access related documents from the "other side" of a relationship.
 
 ```ts
-import type { JoinField } from 'payload'
+import type { JoinField } from 'payload';
 
 // From Users collection - show user's orders
 const ordersJoinField: JoinField = {
@@ -416,7 +398,7 @@ const ordersJoinField: JoinField = {
     allowCreate: false,
     defaultColumns: ['id', 'createdAt', 'total', 'currency', 'items'],
   },
-}
+};
 
 // From Users collection - show user's cart
 const cartJoinField: JoinField = {
@@ -428,13 +410,13 @@ const cartJoinField: JoinField = {
     allowCreate: false,
     defaultColumns: ['id', 'createdAt', 'total', 'currency'],
   },
-}
+};
 ```
 
 ## Virtual Fields
 
 ```ts
-import type { TextField } from 'payload'
+import type { TextField } from 'payload';
 
 // Computed from siblings
 const computedVirtualField: TextField = {
@@ -444,26 +426,26 @@ const computedVirtualField: TextField = {
   hooks: {
     afterRead: [({ siblingData }) => `${siblingData.firstName} ${siblingData.lastName}`],
   },
-}
+};
 
 // From relationship path
 const pathVirtualField: TextField = {
   name: 'authorName',
   type: 'text',
   virtual: 'author.name',
-}
+};
 ```
 
 ## Conditional Fields
 
 ```ts
-import type { UploadField, CheckboxField } from 'payload'
+import type { UploadField, CheckboxField } from 'payload';
 
 // Simple boolean condition
 const enableFeatureField: CheckboxField = {
   name: 'enableFeature',
   type: 'checkbox',
-}
+};
 
 const conditionalField: TextField = {
   name: 'featureText',
@@ -471,7 +453,7 @@ const conditionalField: TextField = {
   admin: {
     condition: (data) => data.enableFeature === true,
   },
-}
+};
 
 // Sibling data condition (from hero field pattern)
 const typeField: SelectField = {
@@ -479,7 +461,7 @@ const typeField: SelectField = {
   type: 'select',
   options: ['none', 'highImpact', 'mediumImpact', 'lowImpact'],
   defaultValue: 'lowImpact',
-}
+};
 
 const mediaField: UploadField = {
   name: 'media',
@@ -489,7 +471,7 @@ const mediaField: UploadField = {
     condition: (_, { type } = {}) => ['highImpact', 'mediumImpact'].includes(type),
   },
   required: true,
-}
+};
 ```
 
 ## Radio
@@ -497,7 +479,7 @@ const mediaField: UploadField = {
 Radio fields present options as radio buttons for single selection.
 
 ```ts
-import type { RadioField } from 'payload'
+import type { RadioField } from 'payload';
 
 const radioField: RadioField = {
   name: 'priority',
@@ -511,7 +493,7 @@ const radioField: RadioField = {
   admin: {
     layout: 'horizontal', // or 'vertical'
   },
-}
+};
 ```
 
 ## Row (Layout)
@@ -519,7 +501,7 @@ const radioField: RadioField = {
 Row fields arrange fields horizontally in the admin panel (presentational only).
 
 ```ts
-import type { RowField } from 'payload'
+import type { RowField } from 'payload';
 
 const rowField: RowField = {
   type: 'row',
@@ -535,7 +517,7 @@ const rowField: RowField = {
       admin: { width: '50%' },
     },
   ],
-}
+};
 ```
 
 ## Collapsible (Layout)
@@ -543,7 +525,7 @@ const rowField: RowField = {
 Collapsible fields group fields in an expandable/collapsible section.
 
 ```ts
-import type { CollapsibleField } from 'payload'
+import type { CollapsibleField } from 'payload';
 
 const collapsibleField: CollapsibleField = {
   label: ({ data }) => data?.title || 'Advanced Options',
@@ -555,7 +537,7 @@ const collapsibleField: CollapsibleField = {
     { name: 'customCSS', type: 'textarea' },
     { name: 'customJS', type: 'code' },
   ],
-}
+};
 ```
 
 ## UI (Custom Components)
@@ -563,7 +545,7 @@ const collapsibleField: CollapsibleField = {
 UI fields allow fully custom React components in the admin (no data stored).
 
 ```ts
-import type { UIField } from 'payload'
+import type { UIField } from 'payload';
 
 const uiField: UIField = {
   name: 'customMessage',
@@ -574,13 +556,13 @@ const uiField: UIField = {
       Cell: '/path/to/CustomCellComponent', // For list view
     },
   },
-}
+};
 ```
 
 ## Tabs & Groups
 
 ```ts
-import type { TabsField, GroupField } from 'payload'
+import type { TabsField, GroupField } from 'payload';
 
 // Tabs
 const tabsField: TabsField = {
@@ -601,7 +583,7 @@ const tabsField: TabsField = {
       ],
     },
   ],
-}
+};
 
 // Group (named)
 const groupField: GroupField = {
@@ -611,7 +593,7 @@ const groupField: GroupField = {
     { name: 'title', type: 'text' },
     { name: 'description', type: 'textarea' },
   ],
-}
+};
 ```
 
 ## Reusable Field Factories
@@ -619,20 +601,16 @@ const groupField: GroupField = {
 Create composable field patterns that can be customized with overrides.
 
 ```ts
-import type { Field, GroupField } from 'payload'
+import type { Field, GroupField } from 'payload';
 
 // Utility for deep merging
 const deepMerge = <T>(target: T, source: Partial<T>): T => {
   // Implementation would deeply merge objects
-  return { ...target, ...source }
-}
+  return { ...target, ...source };
+};
 
 // Reusable link field factory
-type LinkType = (options?: {
-  appearances?: ('default' | 'outline')[] | false
-  disableLabel?: boolean
-  overrides?: Record<string, unknown>
-}) => GroupField
+type LinkType = (options?: { appearances?: ('default' | 'outline')[] | false; disableLabel?: boolean; overrides?: Record<string, unknown> }) => GroupField;
 
 export const link: LinkType = ({ appearances, disableLabel = false, overrides = {} } = {}) => {
   const linkField: GroupField = {
@@ -691,14 +669,14 @@ export const link: LinkType = ({ appearances, disableLabel = false, overrides = 
         },
       },
     ],
-  }
+  };
 
   if (!disableLabel) {
     linkField.fields.push({
       name: 'label',
       type: 'text',
       required: true,
-    })
+    });
   }
 
   if (appearances !== false) {
@@ -710,14 +688,14 @@ export const link: LinkType = ({ appearances, disableLabel = false, overrides = 
         { label: 'Default', value: 'default' },
         { label: 'Outline', value: 'outline' },
       ],
-    })
+    });
   }
 
-  return deepMerge(linkField, overrides) as GroupField
-}
+  return deepMerge(linkField, overrides) as GroupField;
+};
 
 // Usage
-const navItem = link({ appearances: false })
+const navItem = link({ appearances: false });
 const ctaButton = link({
   overrides: {
     name: 'cta',
@@ -725,7 +703,7 @@ const ctaButton = link({
       description: 'Call to action button',
     },
   },
-})
+});
 ```
 
 ## Field Type Guards
@@ -755,17 +733,17 @@ Type guards for runtime field type checking and safe type narrowing.
 | `valueIsValueWithRelation`  | Value is polymorphic relationship                           | Handle polymorphic relationships         |
 
 ```ts
-import { fieldAffectsData, fieldHasSubFields, fieldIsArrayType } from 'payload'
+import { fieldAffectsData, fieldHasSubFields, fieldIsArrayType } from 'payload';
 
 function processField(field: Field) {
   if (fieldAffectsData(field)) {
     // Safe to access field.name
-    console.log(field.name)
+    console.log(field.name);
   }
 
   if (fieldHasSubFields(field)) {
     // Safe to access field.fields
-    field.fields.forEach(processField)
+    field.fields.forEach(processField);
   }
 }
 ```

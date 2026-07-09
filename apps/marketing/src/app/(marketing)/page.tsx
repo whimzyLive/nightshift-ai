@@ -51,7 +51,11 @@ export default function Page() {
       <header className={styles.header}>
         <span className={styles.logo}>NX</span>
         <nav className={styles.nav}>
-          <a href="https://nx.dev/docs/getting-started/intro" target="_blank" rel="noreferrer">
+          <a
+            href="https://nx.dev/docs/getting-started/intro"
+            target="_blank"
+            rel="noreferrer"
+          >
             Docs
           </a>
           <a href="https://nx.dev/blog" target="_blank" rel="noreferrer">
@@ -82,7 +86,8 @@ export default function Page() {
             <div>
               <strong>Speed up CI with Nx Cloud</strong>
               <p>
-                Remote caching, distributed task execution (DTE), and self-healing CI.{' '}
+                Remote caching, distributed task execution (DTE), and
+                self-healing CI.{' '}
                 <a
                   href="https://cloud.nx.app/get-started"
                   target="_blank"
@@ -109,19 +114,27 @@ export default function Page() {
           <div className={styles.commandsGrid}>
             <div className={styles.commandBlock}>
               <h3>Develop</h3>
-              <pre><code>npx nx serve web</code></pre>
+              <pre>
+                <code>npx nx serve web</code>
+              </pre>
             </div>
             <div className={styles.commandBlock}>
               <h3>Build all</h3>
-              <pre><code>npx nx run-many -t build</code></pre>
+              <pre>
+                <code>npx nx run-many -t build</code>
+              </pre>
             </div>
             <div className={styles.commandBlock}>
               <h3>Test affected</h3>
-              <pre><code>npx nx affected -t test</code></pre>
+              <pre>
+                <code>npx nx affected -t test</code>
+              </pre>
             </div>
             <div className={styles.commandBlock}>
               <h3>Visualize graph</h3>
-              <pre><code>npx nx graph</code></pre>
+              <pre>
+                <code>npx nx graph</code>
+              </pre>
             </div>
           </div>
         </section>

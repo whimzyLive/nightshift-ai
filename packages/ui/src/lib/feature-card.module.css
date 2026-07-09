@@ -9,7 +9,9 @@
   border: 1px solid #1e3a55;
   border-radius: 12px;
   padding: 1.5rem;
-  transition: border-color 0.2s, transform 0.2s;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
   height: 100%;
 }
 

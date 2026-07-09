@@ -50,14 +50,14 @@ pnpm dev
 ### Minimal Config
 
 ```ts
-import { buildConfig } from 'payload'
-import { mongooseAdapter } from '@payloadcms/db-mongodb'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { buildConfig } from 'payload';
+import { mongooseAdapter } from '@payloadcms/db-mongodb';
+import { lexicalEditor } from '@payloadcms/richtext-lexical';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const filename = fileURLToPath(import.meta.url)
-const dirname = path.dirname(filename)
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
 
 export default buildConfig({
   admin: {
@@ -75,7 +75,7 @@ export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL,
   }),
-})
+});
 ```
 
 ## Essential Patterns
@@ -102,8 +102,8 @@ Apply these defaults when modeling content unless there's a clear reason not to:
 ### Basic Collection
 
 ```ts
-import type { CollectionConfig } from 'payload'
-import { slugField } from 'payload'
+import type { CollectionConfig } from 'payload';
+import { slugField } from 'payload';
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
@@ -123,7 +123,7 @@ export const Posts: CollectionConfig = {
     { name: 'author', type: 'relationship', relationTo: 'users', admin: { position: 'sidebar' } },
   ],
   timestamps: true,
-}
+};
 ```
 
 For more collection patterns (auth, upload, drafts, live preview), see [COLLECTIONS.md](reference/COLLECTIONS.md).
@@ -164,14 +164,14 @@ export const Posts: CollectionConfig = {
     beforeChange: [
       async ({ data, operation }) => {
         if (operation === 'create') {
-          data.slug = slugify(data.title)
+          data.slug = slugify(data.title);
         }
-        return data
+        return data;
       },
     ],
   },
   fields: [{ name: 'title', type: 'text' }],
-}
+};
 
 // Field-level: compute / format a single field's value (virtual fields use this)
 export const Users: CollectionConfig = {
@@ -188,7 +188,7 @@ export const Users: CollectionConfig = {
       },
     },
   ],
-}
+};
 ```
 
 When asked to "compute a field" or "populate a field's value in a hook", use a **field-level** hook on that field — never a collection-level `afterRead` that mutates `doc`.
@@ -198,25 +198,25 @@ For all hook patterns, see [HOOKS.md](reference/HOOKS.md). For access control, s
 ### Access Control with Type Safety
 
 ```ts
-import type { Access } from 'payload'
-import type { User } from '@/payload-types'
+import type { Access } from 'payload';
+import type { User } from '@/payload-types';
 
 // Type-safe access control
 export const adminOnly: Access = ({ req }) => {
-  const user = req.user as User
-  return user?.roles?.includes('admin') || false
-}
+  const user = req.user as User;
+  return user?.roles?.includes('admin') || false;
+};
 
 // Row-level access control
 export const ownPostsOnly: Access = ({ req }) => {
-  const user = req.user as User
-  if (!user) return false
-  if (user.roles?.includes('admin')) return true
+  const user = req.user as User;
+  if (!user) return false;
+  if (user.roles?.includes('admin')) return true;
 
   return {
     author: { equals: user.id },
-  }
-}
+  };
+};
 ```
 
 ### Query Example
@@ -232,14 +232,14 @@ const posts = await payload.find({
   depth: 2,
   limit: 10,
   sort: '-createdAt',
-})
+});
 
 // Query with populated relationships
 const post = await payload.findByID({
   collection: 'posts',
   id: '123',
   depth: 2, // Populates relationships (default is 2)
-})
+});
 // Returns: { author: { id: "user123", name: "John" } }
 
 // Without depth, relationships return IDs only
@@ -247,7 +247,7 @@ const post = await payload.findByID({
   collection: 'posts',
   id: '123',
   depth: 0,
-})
+});
 // Returns: { author: "user123" }
 ```
 
@@ -293,14 +293,14 @@ export default async function Page() {
 await payload.find({
   collection: 'posts',
   user: someUser, // Access control is BYPASSED!
-})
+});
 
 // ✅ SECURE: Actually enforces the user's permissions
 await payload.find({
   collection: 'posts',
   user: someUser,
   overrideAccess: false, // REQUIRED for access control
-})
+});
 ```
 
 **When to use each:**
@@ -323,9 +323,9 @@ hooks: {
         collection: 'audit-log',
         data: { docId: doc.id },
         // Missing req - runs in separate transaction!
-      })
+      });
     },
-  ]
+  ];
 }
 
 // ✅ ATOMIC: Same transaction
@@ -336,9 +336,9 @@ hooks: {
         collection: 'audit-log',
         data: { docId: doc.id },
         req, // Maintains atomicity
-      })
+      });
     },
-  ]
+  ];
 }
 ```
 
@@ -358,16 +358,16 @@ hooks: {
         id: doc.id,
         data: { views: doc.views + 1 },
         req,
-      }) // Triggers afterChange again!
+      }); // Triggers afterChange again!
     },
-  ]
+  ];
 }
 
 // ✅ SAFE: Use context flag
 hooks: {
   afterChange: [
     async ({ doc, req, context }) => {
-      if (context.skipHooks) return
+      if (context.skipHooks) return;
 
       await req.payload.update({
         collection: 'posts',
@@ -375,9 +375,9 @@ hooks: {
         data: { views: doc.views + 1 },
         context: { skipHooks: true },
         req,
-      })
+      });
     },
-  ]
+  ];
 }
 ```
 
@@ -426,10 +426,10 @@ export default buildConfig({
     outputFile: path.resolve(dirname, 'payload-types.ts'),
     // autoGenerate defaults to true — types regenerate in dev automatically
   },
-})
+});
 
 // Usage
-import type { Post, User } from '@/payload-types'
+import type { Post, User } from '@/payload-types';
 ```
 
 ## Common Gotchas

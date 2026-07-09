@@ -7,7 +7,12 @@ export interface FeatureCardProps {
   href?: string;
 }
 
-export function FeatureCard({ icon, title, description, href }: FeatureCardProps) {
+export function FeatureCard({
+  icon,
+  title,
+  description,
+  href,
+}: FeatureCardProps) {
   const content = (
     <div className={styles.card}>
       <span className={styles.icon}>{icon}</span>

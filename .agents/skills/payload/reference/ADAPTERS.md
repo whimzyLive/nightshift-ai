@@ -7,19 +7,19 @@ Complete reference for database, storage, and email adapters.
 ### MongoDB
 
 ```ts
-import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { mongooseAdapter } from '@payloadcms/db-mongodb';
 
 export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL,
   }),
-})
+});
 ```
 
 ### Postgres
 
 ```ts
-import { postgresAdapter } from '@payloadcms/db-postgres'
+import { postgresAdapter } from '@payloadcms/db-postgres';
 
 export default buildConfig({
   db: postgresAdapter({
@@ -29,13 +29,13 @@ export default buildConfig({
     push: false, // Don't auto-push schema changes
     migrationDir: './migrations',
   }),
-})
+});
 ```
 
 ### SQLite
 
 ```ts
-import { sqliteAdapter } from '@payloadcms/db-sqlite'
+import { sqliteAdapter } from '@payloadcms/db-sqlite';
 
 export default buildConfig({
   db: sqliteAdapter({
@@ -44,7 +44,7 @@ export default buildConfig({
     },
     transactionOptions: {}, // Enable transactions (disabled by default)
   }),
-})
+});
 ```
 
 ## Transactions
@@ -52,7 +52,7 @@ export default buildConfig({
 Payload automatically uses transactions for all-or-nothing database operations. Pass `req` to include operations in the same transaction.
 
 ```ts
-import type { CollectionAfterChangeHook } from 'payload'
+import type { CollectionAfterChangeHook } from 'payload';
 
 const afterChange: CollectionAfterChangeHook = async ({ req, doc }) => {
   // This will be part of the same transaction
@@ -60,27 +60,27 @@ const afterChange: CollectionAfterChangeHook = async ({ req, doc }) => {
     req, // Pass req to use same transaction
     collection: 'audit-log',
     data: { action: 'created', docId: doc.id },
-  })
-}
+  });
+};
 
 // Manual transaction control
-const transactionID = await payload.db.beginTransaction()
+const transactionID = await payload.db.beginTransaction();
 try {
   await payload.create({
     collection: 'orders',
     data: orderData,
     req: { transactionID },
-  })
+  });
   await payload.update({
     collection: 'inventory',
     id: itemId,
     data: { stock: newStock },
     req: { transactionID },
-  })
-  await payload.db.commitTransaction(transactionID)
+  });
+  await payload.db.commitTransaction(transactionID);
 } catch (error) {
-  await payload.db.rollbackTransaction(transactionID)
-  throw error
+  await payload.db.rollbackTransaction(transactionID);
+  throw error;
 }
 ```
 
@@ -91,7 +91,7 @@ try {
 **Critical**: When performing nested operations in hooks, always pass `req` to maintain transaction context. Failing to do so breaks atomicity and can cause partial updates.
 
 ```ts
-import type { CollectionAfterChangeHook } from 'payload'
+import type { CollectionAfterChangeHook } from 'payload';
 
 // ✅ CORRECT: Thread req through nested operations
 const resaveChildren: CollectionAfterChangeHook = async ({ collection, doc, req }) => {
@@ -100,7 +100,7 @@ const resaveChildren: CollectionAfterChangeHook = async ({ collection, doc, req 
     collection: 'children',
     where: { parent: { equals: doc.id } },
     req, // Maintains transaction context
-  })
+  });
 
   // Update each child - pass req
   for (const child of children.docs) {
@@ -109,9 +109,9 @@ const resaveChildren: CollectionAfterChangeHook = async ({ collection, doc, req 
       collection: 'children',
       data: { updatedField: 'value' },
       req, // Same transaction as parent operation
-    })
+    });
   }
-}
+};
 
 // ❌ WRONG: Missing req breaks transaction
 const brokenHook: CollectionAfterChangeHook = async ({ collection, doc, req }) => {
@@ -119,7 +119,7 @@ const brokenHook: CollectionAfterChangeHook = async ({ collection, doc, req }) =
     collection: 'children',
     where: { parent: { equals: doc.id } },
     // Missing req - separate transaction or no transaction
-  })
+  });
 
   for (const child of children.docs) {
     await req.payload.update({
@@ -127,9 +127,9 @@ const brokenHook: CollectionAfterChangeHook = async ({ collection, doc, req }) =
       collection: 'children',
       data: { updatedField: 'value' },
       // Missing req - if parent operation fails, these updates persist
-    })
+    });
   }
-}
+};
 ```
 
 **Why This Matters:**
@@ -166,7 +166,7 @@ Available storage adapters:
 ### AWS S3
 
 ```ts
-import { s3Storage } from '@payloadcms/storage-s3'
+import { s3Storage } from '@payloadcms/storage-s3';
 
 export default buildConfig({
   plugins: [
@@ -184,13 +184,13 @@ export default buildConfig({
       },
     }),
   ],
-})
+});
 ```
 
 ### Azure Blob Storage
 
 ```ts
-import { azureStorage } from '@payloadcms/storage-azure'
+import { azureStorage } from '@payloadcms/storage-azure';
 
 export default buildConfig({
   plugins: [
@@ -202,13 +202,13 @@ export default buildConfig({
       containerName: process.env.AZURE_STORAGE_CONTAINER_NAME,
     }),
   ],
-})
+});
 ```
 
 ### Google Cloud Storage
 
 ```ts
-import { gcsStorage } from '@payloadcms/storage-gcs'
+import { gcsStorage } from '@payloadcms/storage-gcs';
 
 export default buildConfig({
   plugins: [
@@ -223,13 +223,13 @@ export default buildConfig({
       },
     }),
   ],
-})
+});
 ```
 
 ### Cloudflare R2
 
 ```ts
-import { r2Storage } from '@payloadcms/storage-r2'
+import { r2Storage } from '@payloadcms/storage-r2';
 
 export default buildConfig({
   plugins: [
@@ -248,13 +248,13 @@ export default buildConfig({
       },
     }),
   ],
-})
+});
 ```
 
 ### Vercel Blob
 
 ```ts
-import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob'
+import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob';
 
 export default buildConfig({
   plugins: [
@@ -265,13 +265,13 @@ export default buildConfig({
       token: process.env.BLOB_READ_WRITE_TOKEN,
     }),
   ],
-})
+});
 ```
 
 ### Uploadthing
 
 ```ts
-import { uploadthingStorage } from '@payloadcms/storage-uploadthing'
+import { uploadthingStorage } from '@payloadcms/storage-uploadthing';
 
 export default buildConfig({
   plugins: [
@@ -285,7 +285,7 @@ export default buildConfig({
       },
     }),
   ],
-})
+});
 ```
 
 ## Email Adapters
@@ -293,7 +293,7 @@ export default buildConfig({
 ### Nodemailer (SMTP)
 
 ```ts
-import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
+import { nodemailerAdapter } from '@payloadcms/email-nodemailer';
 
 export default buildConfig({
   email: nodemailerAdapter({
@@ -308,13 +308,13 @@ export default buildConfig({
       },
     },
   }),
-})
+});
 ```
 
 ### Resend
 
 ```ts
-import { resendAdapter } from '@payloadcms/email-resend'
+import { resendAdapter } from '@payloadcms/email-resend';
 
 export default buildConfig({
   email: resendAdapter({
@@ -322,5 +322,5 @@ export default buildConfig({
     defaultFromName: 'My App',
     apiKey: process.env.RESEND_API_KEY,
   }),
-})
+});
 ```

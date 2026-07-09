@@ -30,8 +30,8 @@ purpose. Molecules give atoms context and start to become genuinely useful piece
 reusable across different contexts — the same molecule can be dropped into many organisms
 unchanged.
 
-**Abstract example:** a *search-field* molecule composed of a *label* atom, a *text-input* atom,
-and a *button* atom, all working together to accept and submit a search query.
+**Abstract example:** a _search-field_ molecule composed of a _label_ atom, a _text-input_ atom,
+and a _button_ atom, all working together to accept and submit a search query.
 
 **Boundary rule:** a grouping becomes a molecule once at least two atoms combine for one clear,
 reusable purpose. If the grouping only makes sense in one specific place and isn't reused, it may

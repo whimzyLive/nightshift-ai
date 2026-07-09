@@ -20,17 +20,17 @@
 
 ## Workspace → agent
 
-| Path                | Owner                  |
-| ------------------- | ---------------------- |
-| plugins/            | ai-enablement-engineer |
-| skills/             | ai-enablement-engineer |
-| .agents/            | ai-enablement-engineer |
+| Path                                                  | Owner                                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------------ |
+| plugins/                                              | ai-enablement-engineer                                             |
+| skills/                                               | ai-enablement-engineer                                             |
+| .agents/                                              | ai-enablement-engineer                                             |
 | agents/, .codex/, .opencode/, .gemini/, opencode.json | ai-enablement-engineer (nx-generated mirrors — machine-maintained) |
-| tools/              | platform-engineer      |
-| brand/              | web-engineer           |
-| apps/marketing/     | web-engineer           |
-| apps/marketing-e2e/ | web-engineer           |
-| packages/ui/        | web-engineer           |
+| tools/                                                | platform-engineer                                                  |
+| brand/                                                | web-engineer                                                       |
+| apps/marketing/                                       | web-engineer                                                       |
+| apps/marketing-e2e/                                   | web-engineer                                                       |
+| packages/ui/                                          | web-engineer                                                       |
 
 ## Tooling
 

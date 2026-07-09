@@ -38,20 +38,20 @@ Custom REST API endpoints extend Payload's auto-generated CRUD operations with c
 Custom endpoints are **not authenticated by default**. Check `req.user` to enforce authentication.
 
 ```ts
-import { APIError } from 'payload'
+import { APIError } from 'payload';
 
 export const authenticatedEndpoint = {
   path: '/protected',
   method: 'get',
   handler: async (req) => {
     if (!req.user) {
-      throw new APIError('Unauthorized', 401)
+      throw new APIError('Unauthorized', 401);
     }
 
     // User is authenticated
-    return Response.json({ message: 'Access granted' })
+    return Response.json({ message: 'Access granted' });
   },
-}
+};
 ```
 
 ### Using Payload Operations
@@ -63,7 +63,7 @@ export const getRelatedPosts = {
   path: '/:id/related',
   method: 'get',
   handler: async (req) => {
-    const { id } = req.routeParams
+    const { id } = req.routeParams;
 
     // Find related posts
     const posts = await req.payload.find({
@@ -75,11 +75,11 @@ export const getRelatedPosts = {
       },
       limit: 5,
       sort: '-createdAt',
-    })
+    });
 
-    return Response.json(posts)
+    return Response.json(posts);
   },
-}
+};
 ```
 
 ### Route Parameters
@@ -91,17 +91,17 @@ export const getTrackingEndpoint = {
   path: '/:id/tracking',
   method: 'get',
   handler: async (req) => {
-    const orderId = req.routeParams.id
+    const orderId = req.routeParams.id;
 
-    const tracking = await getTrackingInfo(orderId)
+    const tracking = await getTrackingInfo(orderId);
 
     if (!tracking) {
-      return Response.json({ error: 'not found' }, { status: 404 })
+      return Response.json({ error: 'not found' }, { status: 404 });
     }
 
-    return Response.json(tracking)
+    return Response.json(tracking);
   },
-}
+};
 ```
 
 ### Request Body Handling
@@ -113,28 +113,28 @@ export const createEndpoint = {
   path: '/create',
   method: 'post',
   handler: async (req) => {
-    const data = await req.json()
+    const data = await req.json();
 
     const result = await req.payload.create({
       collection: 'posts',
       data,
-    })
+    });
 
-    return Response.json(result)
+    return Response.json(result);
   },
-}
+};
 ```
 
 **Option 2: Using helper (handles JSON + files)**
 
 ```ts
-import { addDataAndFileToRequest } from 'payload'
+import { addDataAndFileToRequest } from 'payload';
 
 export const uploadEndpoint = {
   path: '/upload',
   method: 'post',
   handler: async (req) => {
-    await addDataAndFileToRequest(req)
+    await addDataAndFileToRequest(req);
 
     // req.data now contains parsed body
     // req.file contains uploaded file (if multipart)
@@ -143,11 +143,11 @@ export const uploadEndpoint = {
       collection: 'media',
       data: req.data,
       file: req.file,
-    })
+    });
 
-    return Response.json(result)
+    return Response.json(result);
   },
-}
+};
 ```
 
 ### CORS Headers
@@ -155,22 +155,22 @@ export const uploadEndpoint = {
 Use `headersWithCors` helper to apply config CORS settings.
 
 ```ts
-import { headersWithCors } from 'payload'
+import { headersWithCors } from 'payload';
 
 export const corsEndpoint = {
   path: '/public-data',
   method: 'get',
   handler: async (req) => {
-    const data = await fetchPublicData()
+    const data = await fetchPublicData();
 
     return Response.json(data, {
       headers: headersWithCors({
         headers: new Headers(),
         req,
       }),
-    })
+    });
   },
-}
+};
 ```
 
 ### Error Handling
@@ -178,22 +178,22 @@ export const corsEndpoint = {
 Throw `APIError` with status codes for proper error responses.
 
 ```ts
-import { APIError } from 'payload'
+import { APIError } from 'payload';
 
 export const validateEndpoint = {
   path: '/validate',
   method: 'post',
   handler: async (req) => {
-    const data = await req.json()
+    const data = await req.json();
 
     if (!data.email) {
-      throw new APIError('Email is required', 400)
+      throw new APIError('Email is required', 400);
     }
 
     // Validation passed
-    return Response.json({ valid: true })
+    return Response.json({ valid: true });
   },
-}
+};
 ```
 
 ### Query Parameters
@@ -205,9 +205,9 @@ export const searchEndpoint = {
   path: '/search',
   method: 'get',
   handler: async (req) => {
-    const url = new URL(req.url)
-    const query = url.searchParams.get('q')
-    const limit = parseInt(url.searchParams.get('limit') || '10')
+    const url = new URL(req.url);
+    const query = url.searchParams.get('q');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
 
     const results = await req.payload.find({
       collection: 'posts',
@@ -217,11 +217,11 @@ export const searchEndpoint = {
         },
       },
       limit,
-    })
+    });
 
-    return Response.json(results)
+    return Response.json(results);
   },
-}
+};
 ```
 
 ## Helper Functions
@@ -231,21 +231,21 @@ export const searchEndpoint = {
 Parses request body and attaches to `req.data` and `req.file`.
 
 ```ts
-import { addDataAndFileToRequest } from 'payload'
+import { addDataAndFileToRequest } from 'payload';
 
 export const endpoint = {
   path: '/process',
   method: 'post',
   handler: async (req) => {
-    await addDataAndFileToRequest(req)
+    await addDataAndFileToRequest(req);
 
     // req.data: parsed JSON or form data
     // req.file: uploaded file (if multipart)
 
-    console.log(req.data) // { title: 'My Post' }
-    console.log(req.file) // File object or undefined
+    console.log(req.data); // { title: 'My Post' }
+    console.log(req.file); // File object or undefined
   },
-}
+};
 ```
 
 **Handles:**
@@ -259,13 +259,13 @@ export const endpoint = {
 Extracts locale from request data and validates against config.
 
 ```ts
-import { addLocalesToRequestFromData } from 'payload'
+import { addLocalesToRequestFromData } from 'payload';
 
 export const endpoint = {
   path: '/translate',
   method: 'post',
   handler: async (req) => {
-    await addLocalesToRequestFromData(req)
+    await addLocalesToRequestFromData(req);
 
     // req.locale: validated locale string
     // req.fallbackLocale: fallback locale string
@@ -273,11 +273,11 @@ export const endpoint = {
     const result = await req.payload.find({
       collection: 'posts',
       locale: req.locale,
-    })
+    });
 
-    return Response.json(result)
+    return Response.json(result);
   },
-}
+};
 ```
 
 ### headersWithCors
@@ -285,13 +285,13 @@ export const endpoint = {
 Applies CORS headers from Payload config.
 
 ```ts
-import { headersWithCors } from 'payload'
+import { headersWithCors } from 'payload';
 
 export const endpoint = {
   path: '/data',
   method: 'get',
   handler: async (req) => {
-    const data = { message: 'Hello' }
+    const data = { message: 'Hello' };
 
     return Response.json(data, {
       headers: headersWithCors({
@@ -300,9 +300,9 @@ export const endpoint = {
         }),
         req,
       }),
-    })
+    });
   },
-}
+};
 ```
 
 ## Real-World Examples
@@ -312,16 +312,16 @@ export const endpoint = {
 From `examples/multi-tenant`:
 
 ```ts
-import { APIError, generatePayloadCookie, headersWithCors } from 'payload'
+import { APIError, generatePayloadCookie, headersWithCors } from 'payload';
 
 export const externalUsersLogin = {
   path: '/login-external',
   method: 'post',
   handler: async (req) => {
-    const { email, password, tenant } = await req.json()
+    const { email, password, tenant } = await req.json();
 
     if (!email || !password || !tenant) {
-      throw new APIError('Missing credentials', 400)
+      throw new APIError('Missing credentials', 400);
     }
 
     // Find user with tenant constraint
@@ -335,33 +335,32 @@ export const externalUsersLogin = {
           },
         ],
       },
-    })
+    });
 
     if (!userQuery.docs.length) {
-      throw new APIError('Invalid credentials', 401)
+      throw new APIError('Invalid credentials', 401);
     }
 
     // Authenticate user
     const result = await req.payload.login({
       collection: 'users',
       data: { email, password },
-    })
+    });
 
     return Response.json(result, {
       headers: headersWithCors({
         headers: new Headers({
           'Set-Cookie': generatePayloadCookie({
-            collectionAuthConfig: req.payload.config.collections.find((c) => c.slug === 'users')
-              .auth,
+            collectionAuthConfig: req.payload.config.collections.find((c) => c.slug === 'users').auth,
             cookiePrefix: req.payload.config.cookiePrefix,
             token: result.token,
           }),
         }),
         req,
       }),
-    })
+    });
   },
-}
+};
 ```
 
 ### Webhook Handler (Stripe)
@@ -373,29 +372,29 @@ export const webhookEndpoint = {
   path: '/webhooks',
   method: 'post',
   handler: async (req) => {
-    const body = await req.text()
-    const signature = req.headers.get('stripe-signature')
+    const body = await req.text();
+    const signature = req.headers.get('stripe-signature');
 
     try {
-      const event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+      const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
 
       // Process event
       switch (event.type) {
         case 'payment_intent.succeeded':
-          await handlePaymentSuccess(req.payload, event.data.object)
-          break
+          await handlePaymentSuccess(req.payload, event.data.object);
+          break;
         case 'payment_intent.failed':
-          await handlePaymentFailure(req.payload, event.data.object)
-          break
+          await handlePaymentFailure(req.payload, event.data.object);
+          break;
       }
 
-      return Response.json({ received: true })
+      return Response.json({ received: true });
     } catch (err) {
-      req.payload.logger.error(`Webhook error: ${err.message}`)
-      return Response.json({ error: err.message }, { status: 400 })
+      req.payload.logger.error(`Webhook error: ${err.message}`);
+      return Response.json({ error: err.message }, { status: 400 });
     }
   },
-}
+};
 ```
 
 ### Data Preview Endpoint
@@ -403,24 +402,24 @@ export const webhookEndpoint = {
 From `packages/plugin-import-export`:
 
 ```ts
-import { addDataAndFileToRequest } from 'payload'
+import { addDataAndFileToRequest } from 'payload';
 
 export const previewEndpoint = {
   path: '/preview',
   method: 'post',
   handler: async (req) => {
     if (!req.user) {
-      throw new APIError('Unauthorized', 401)
+      throw new APIError('Unauthorized', 401);
     }
 
-    await addDataAndFileToRequest(req)
+    await addDataAndFileToRequest(req);
 
-    const { collection, where, limit = 10 } = req.data
+    const { collection, where, limit = 10 } = req.data;
 
     // Validate collection exists
-    const collectionConfig = req.payload.config.collections.find((c) => c.slug === collection)
+    const collectionConfig = req.payload.config.collections.find((c) => c.slug === collection);
     if (!collectionConfig) {
-      throw new APIError('Collection not found', 404)
+      throw new APIError('Collection not found', 404);
     }
 
     // Preview data
@@ -429,15 +428,15 @@ export const previewEndpoint = {
       where,
       limit,
       depth: 0,
-    })
+    });
 
     return Response.json({
       docs: results.docs,
       totalDocs: results.totalDocs,
       fields: collectionConfig.fields,
-    })
+    });
   },
-}
+};
 ```
 
 ### Reindex Action Endpoint
@@ -450,20 +449,20 @@ export const reindexEndpoint = (pluginConfig) => ({
   method: 'post',
   handler: async (req) => {
     if (!req.user) {
-      throw new APIError('Unauthorized', 401)
+      throw new APIError('Unauthorized', 401);
     }
 
-    const { collection } = req.routeParams
+    const { collection } = req.routeParams;
 
     // Reindex collection
-    const result = await reindexCollection(req.payload, collection, pluginConfig)
+    const result = await reindexCollection(req.payload, collection, pluginConfig);
 
     return Response.json({
       message: `Reindexed ${result.count} documents`,
       count: result.count,
-    })
+    });
   },
-})
+});
 ```
 
 ## Endpoint Placement
@@ -473,7 +472,7 @@ export const reindexEndpoint = (pluginConfig) => ({
 Mounted at `/api/{collection-slug}/{path}`.
 
 ```ts
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig } from 'payload';
 
 export const Orders: CollectionConfig = {
   slug: 'orders',
@@ -486,12 +485,12 @@ export const Orders: CollectionConfig = {
       method: 'get',
       handler: async (req) => {
         // Available at: /api/orders/:id/tracking
-        const orderId = req.routeParams.id
-        return Response.json({ orderId })
+        const orderId = req.routeParams.id;
+        return Response.json({ orderId });
       },
     },
   ],
-}
+};
 ```
 
 ### Global Endpoints
@@ -499,7 +498,7 @@ export const Orders: CollectionConfig = {
 Mounted at `/api/globals/{global-slug}/{path}`.
 
 ```ts
-import type { GlobalConfig } from 'payload'
+import type { GlobalConfig } from 'payload';
 
 export const Settings: GlobalConfig = {
   slug: 'settings',
@@ -512,12 +511,12 @@ export const Settings: GlobalConfig = {
       method: 'post',
       handler: async (req) => {
         // Available at: /api/globals/settings/clear-cache
-        await clearCache()
-        return Response.json({ message: 'Cache cleared' })
+        await clearCache();
+        return Response.json({ message: 'Cache cleared' });
       },
     },
   ],
-}
+};
 ```
 
 ## Advanced Patterns
@@ -531,18 +530,18 @@ export const createWebhookEndpoint = (config) => ({
   path: '/webhook',
   method: 'post',
   handler: async (req) => {
-    const signature = req.headers.get('x-webhook-signature')
+    const signature = req.headers.get('x-webhook-signature');
 
     if (!verifySignature(signature, config.secret)) {
-      throw new APIError('Invalid signature', 401)
+      throw new APIError('Invalid signature', 401);
     }
 
-    const data = await req.json()
-    await processWebhook(req.payload, data, config)
+    const data = await req.json();
+    await processWebhook(req.payload, data, config);
 
-    return Response.json({ received: true })
+    return Response.json({ received: true });
   },
-})
+});
 ```
 
 ### Conditional Endpoints
@@ -573,7 +572,7 @@ export const MyCollection: CollectionConfig = {
         ]
       : []),
   ],
-}
+};
 ```
 
 ### OpenAPI Documentation
@@ -610,7 +609,7 @@ export const endpoint = {
       },
     },
   },
-}
+};
 ```
 
 ## Best Practices
