@@ -90,9 +90,11 @@ The gate produces exactly one of two outcomes, applied identically by `/gtm:site
   - **lists each violation with its offending span** — the exact banned phrase, hedge word,
     unsupported superlative, invented claim/metric/quote, or title-case header text, and which
     section of the copy deck it appears in;
-  - **blocks handoff** — nothing is branded, nothing is written to `docs/gtm/site-brief.md`, and no
-    web-engineer dispatch happens on a FAIL. There is no automatic revision loop; the founder (or a
-    re-run of `/gtm:site`) must address the violations.
+  - **blocks the dispatching command's handoff** — nothing is branded, persisted, or routed
+    downstream on a FAIL (for `/gtm:site`: no `docs/gtm/site-brief.md` write, no web-engineer
+    dispatch; future consumers like `/gtm:pulse` block their own publish/queue step the same way).
+    There is no automatic revision loop; the founder (or a re-run of the dispatching command) must
+    address the violations.
 
 A gate run that produces neither a clean PASS nor a FAIL with itemized violations is not a valid
 gate run — always report which outcome occurred and, on FAIL, the complete violation list.
