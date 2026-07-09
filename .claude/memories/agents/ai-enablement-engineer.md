@@ -151,3 +151,25 @@
   shell-expands a referenced env var by name at probe time) is a legitimate spec-inherited
   convention, not stray placeholder drift — when it appears verbatim in the spec's own locked
   wording, carry it into the ref as-is rather than "fixing" it to a bracket-free form.
+
+## NA-15 — atomic-design skill (published-for-others, `skills/` + `plugins/sdlc/refs/skills-map.yml`)
+
+- This repo's runner has no `pyyaml` preinstalled; a plan/spec YAML-parse verification gate
+  (`python3 -c "import yaml..."`) fails with `ModuleNotFoundError` on a clean shell. Fix:
+  `python3 -m pip install --quiet --user pyyaml` before running the gate — cheap, one-time, don't
+  substitute a regex/grep check instead since the gate specifically wants a real YAML parse.
+- Framework-agnostic content scans (AC-4-style, banning `react|vue|expo|...` tokens) must be scoped
+  to skill *content* only (`SKILL.md` + `references/*`), explicitly excluding the sibling
+  `skills-map.yml` registration entry — that file legitimately carries the same framework names as
+  `when:` detection triggers. Keep the grep's file list narrow rather than grepping the whole skill
+  directory, or the registration metadata will produce false-positive "FAIL" hits.
+- For a "published-for-others" skill (same class as `hono-api`/`typeorm`/`electrodb`), the negative
+  checks that matter are: absent from `.claude/project/skills.json`, no `.claude/skills/<name>/`
+  copy, and no agent-override binding — confirmed once per skill; don't add any of the three even if
+  a later task seems to imply local consumption. Registration is `plugins/sdlc/refs/skills-map.yml`
+  `source`+`path` only.
+- When a plan gives an exact YAML block to append to `skills-map.yml` "after the `electrodb` entry,
+  before the trailing comment block," insert it verbatim at that exact anchor — the file's trailing
+  `# Frameworks / ORMs with no built-in skill suggestion` and `# Agent-to-skill domain mapping`
+  comment blocks are documentation-only and don't require updating for a new entry unless the plan
+  explicitly asks (it didn't here — left the per-agent summary comment untouched).
