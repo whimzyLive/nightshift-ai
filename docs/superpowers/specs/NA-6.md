@@ -13,6 +13,24 @@
 > The spec below defines the three prompt artifacts to author and the exact contracts each must
 > encode.
 
+## Story acceptance criteria (traceability)
+
+The Jira story's six ACs, numbered here so in-spec references (`AC-<n>`) are self-contained:
+
+- **AC-1** — `content-writer` agent definition exists with the context contract: reads
+  `.agents/product-marketing.md` + voice rules before drafting; stops with a clear error when the
+  product-marketing context is missing.
+- **AC-2** — the agent encodes the landing-page skill ladder: `site-architecture` → `copywriting` →
+  `cro` → `ai-seo` + `schema` (`offers` conditional; `marketing-council` behind `--council`).
+- **AC-3** — `/gtm:site` contains no copy logic; it dispatches `content-writer` with
+  `task=landing-page`.
+- **AC-4** — generated copy uses the project's brand tokens and voice rules and passes the shared
+  copy-review gate (`copy-editing` + voice rules — same gate as pulse) before handoff.
+- **AC-5** — the build handoff artifact carries the full SEO layer: page map/IA, copy deck, JSON-LD
+  blocks, meta/OG tags, llms.txt recommendation.
+- **AC-6** — when sdlc is installed the build handoff dispatches its `web-engineer` agent; when
+  absent, `docs/gtm/site-brief.md` is written instead.
+
 ## Overview
 
 Ships the gtm plugin's single copy-production role — the `content-writer` agent — with its context
@@ -23,11 +41,12 @@ landing-page copy carrying a full SEO layer and hands the build off to sdlc's we
 
 ## Artifacts
 
-Three files to author, all under `plugins/gtm/` (owner: `ai-enablement-engineer`). All plugin-root
-path resolution uses the established gtm convention: agents/commands do **not** receive
-`${CLAUDE_PLUGIN_ROOT}`; they read `.claude/.gtm-plugin-root` (a single line: the absolute plugin
-root) and substitute its contents wherever `${CLAUDE_PLUGIN_ROOT}` appears — identical to the header
-block already in `plugins/gtm/agents/product-marketing-manager.md`.
+Three files to author, all under `plugins/gtm/` (owner: `ai-enablement-engineer`). Plugin-root
+path resolution follows the established gtm convention, which differs by artifact type: **commands**
+receive `${CLAUDE_PLUGIN_ROOT}` natively from the harness and use it directly (see
+`plugins/gtm/commands/init.md`); **agents** do not — they read `.claude/.gtm-plugin-root` (a single
+line: the absolute plugin root) and substitute its contents wherever `${CLAUDE_PLUGIN_ROOT}`
+appears, identical to the header block already in `plugins/gtm/agents/product-marketing-manager.md`.
 
 | # | Path | Status | Owner |
 |---|------|--------|-------|
@@ -63,13 +82,14 @@ skills:
   - schema
   - offers
   - marketing-council
-  - copy-editing
 ---
 ```
 
 All listed skills exist in the pinned `marketing-skills@marketingskills` v2.6.0 cache (verified:
-`site-architecture`, `copywriting`, `cro`, `ai-seo`, `schema`, `offers`, `marketing-council`,
-`copy-editing`). `offers` and `marketing-council` are declared but conditionally loaded (see ladder).
+`site-architecture`, `copywriting`, `cro`, `ai-seo`, `schema`, `offers`, `marketing-council`).
+`offers` and `marketing-council` are declared but conditionally loaded (see ladder). `copy-editing`
+is deliberately **not** on the agent — it is the copy-review gate's skill, run by `/gtm:site`
+(command step 3), preserving the shared-gate boundary NA-8's pulse reuses.
 
 **Plugin-root resolver header** — include the same `.claude/.gtm-plugin-root` substitution block
 verbatim from `product-marketing-manager.md`.
@@ -104,7 +124,7 @@ discoverability; run in this exact order):**
 | 2 | `copywriting` | Copy deck written to the IA from step 1 | Required |
 | 3 | `cro` | Conversion pass over the copy deck (CTA placement, friction, hierarchy) | Required |
 | 4 | `ai-seo` + `schema` | Meta/OG tags, JSON-LD blocks, llms.txt recommendation | Required |
-| — | `offers` | Sharpen CTA/offer framing | **Conditional** — only when CTA framing is weak; not pinned |
+| — | `offers` | Sharpen CTA/offer framing | **Conditional** — loaded only when CTA framing is weak (available in the pinned catalogue) |
 | — | `marketing-council` | Multi-perspective critique pass | **Conditional** — only when the dispatch carries `--council`; launch-critical pages only; off by default; never in pulse |
 
 **Deliberately excluded from the ladder** (documented in the agent as intentional, not an omission):
@@ -150,9 +170,11 @@ This ref is prose guidance for the gate, not executable config — no schema.
 
 ### Artifact 3 — `plugins/gtm/commands/site.md` (new command)
 
-Thin orchestrator — **no copy logic in the command** (AC3). It dispatches, gates, brands, and routes.
+Thin orchestrator — **no copy logic in the command** (AC-3). It dispatches, gates, brands, and routes.
 
-**Plugin-root resolver header** — same `.claude/.gtm-plugin-root` block as the agents.
+**Plugin-root resolution** — commands receive `${CLAUDE_PLUGIN_ROOT}` natively; use it directly,
+per the `commands/init.md` convention. No `.claude/.gtm-plugin-root` resolver block (that is the
+agents' mechanism).
 
 **Flags:** `--council` (optional) — forwarded to the content-writer dispatch to enable the
 `marketing-council` critique pass; off by default; intended for launch-critical pages only.
@@ -175,13 +197,14 @@ Thin orchestrator — **no copy logic in the command** (AC3). It dispatches, gat
    typography, colour, and voice tokens. (Brand-token application is styling metadata on the copy
    deck, not a visual build.)
 5. **Handoff routing (conditional on sdlc presence):**
-   - **sdlc installed** — dispatch sdlc's `web-engineer` agent (`plugins/sdlc/agents/web-engineer.md`)
-     with the handoff artifact as its build input. Detection: check for the sdlc plugin marker
-     (`.claude/.sdlc-plugin-root` present) — the established sdlc plugin-root marker. Suggested
-     default detection = that marker file exists.
+   - **sdlc installed** — dispatch sdlc's web-engineer agent **by agent name** (`sdlc:web-engineer`
+     via the Agent tool) with the handoff artifact as its build input — never by a hardcoded file
+     path (in a consumer repo the sdlc plugin lives under the `.claude/.sdlc-plugin-root` marker's
+     root, not at `plugins/sdlc/…`). Detection: the `.claude/.sdlc-plugin-root` marker file exists
+     (suggested default).
    - **sdlc absent** — write the handoff artifact to `docs/gtm/site-brief.md` instead. The build is
      not performed; the founder wires it up or installs sdlc later.
-   - **Either path carries the full SEO layer** (AC5) — the page map/IA, copy deck, JSON-LD blocks,
+   - **Either path carries the full SEO layer** (AC-5) — the page map/IA, copy deck, JSON-LD blocks,
      meta/OG tags, and llms.txt recommendation survive the handoff boundary in both branches.
 6. **Report** — return: handoff target taken (web-engineer dispatch vs `site-brief.md`), artifact
    location, gate result, and any open copy decisions for the founder.
@@ -214,7 +237,7 @@ multi-tenant service. The only access boundaries are structural:
 
 | Actor | Can | Cannot |
 |-------|-----|--------|
-| `/gtm:site` (command) | Orchestrate: dispatch writer, run gate, apply brand, route handoff | Contain copy logic (AC3) |
+| `/gtm:site` (command) | Orchestrate: dispatch writer, run gate, apply brand, route handoff | Contain copy logic (AC-3) |
 | `content-writer` (agent) | Produce copy deck + SEO layer via the ladder | Apply brand tokens, run the gate, route the build, or draft without product-marketing context |
 | Founder | Run `/gtm:site`, review gate output, approve/edit copy, wire the build | — |
 
