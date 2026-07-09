@@ -2,6 +2,7 @@
   "name": "@nightshift-ai/source",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {},
   "private": true,
   "dependencies": {
