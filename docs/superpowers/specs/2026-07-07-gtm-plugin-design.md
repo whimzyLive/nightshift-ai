@@ -99,10 +99,29 @@ drafting anything, the agent MUST read `.agents/product-marketing.md` (positioni
 and `refs/voice-rules.md`, and MUST STOP with a clear error if the product-marketing context is
 missing — copy is never produced without locked positioning.
 
+**Task-scoped skill ladders (one agent, per-task loadout — skills load on demand, so the unused
+ladder costs nothing; this is deliberate instead of splitting a separate site-copywriter agent,
+which would duplicate the context contract and drift):**
+
+- **`task=landing-page`** (NA-6) — consultancy ordering, structure → copy → conversion →
+  discoverability: `site-architecture` (page map/IA: section order, URL, nav stubs, future-page
+  slots) → `copywriting` (copy deck per the IA) → `cro` (conversion pass) → `ai-seo` + `schema`
+  (meta/OG, JSON-LD, llms.txt recommendation). `offers` allowed when CTA framing is weak (not
+  pinned). Optional `marketing-council` critique pass, off by default — reserved for
+  launch-critical pages via a `--council` flag on `/gtm:site`; never used in pulse.
+- **`task=channel-draft`** (NA-8) — `copywriting` + `social` + `image` per channel, obeying the
+  postiz integration schema and platform media rules.
+
+Deliberately excluded from the ladders (input-starved or duplicative, revisit post-launch):
+`customer-research` (no real customer voice pre-launch — synthesizing VOC would *lower* accuracy;
+revisit when NA-11's engagement poll harvests real quotes), `competitor-profiling`/`competitors`
+(differentiation accuracy belongs in `.agents/product-marketing.md` at init/PMM-brief time, not
+per run), `marketing-psychology` (copywriting already embeds the useful parts).
+
 **Delivery is split across stories:** **NA-6 ships the agent definition** (context contract +
-landing-page capability, using marketingskills `copywriting` + `cro`); **NA-8 extends it** with
-per-channel drafts, media generation, and postiz integration-schema compliance. Hence the
-`NA-6 Blocks NA-8` dependency edge.
+the landing-page ladder); **NA-8 extends it** with the channel-draft ladder (per-channel drafts,
+media generation, postiz integration-schema compliance). Hence the `NA-6 Blocks NA-8` dependency
+edge.
 
 ## Commands
 
@@ -187,10 +206,17 @@ calendar adjustments (feeds next pulse).
 
 ### `/gtm:site`
 
-Thin orchestrator — no copy logic in the command. Dispatch the `content-writer` agent
-(task = landing page; skills `copywriting` + `cro`; the agent's context contract enforces
-`.agents/product-marketing.md` + voice rules) → apply `nightshift-design` brand tokens → build
-handoff: sdlc installed → dispatch its web-engineer; else write `docs/gtm/site-brief.md`.
+Thin orchestrator — no copy logic in the command. Dispatch the `content-writer` agent with
+`task=landing-page` (runs its landing-page ladder: `site-architecture` → `copywriting` → `cro` →
+`ai-seo` + `schema`; context contract enforces `.agents/product-marketing.md` + voice rules) →
+copy-review gate (`copy-editing` + voice rules, same gate as pulse) → apply `nightshift-design`
+brand tokens → build handoff: sdlc installed → dispatch its web-engineer; else write
+`docs/gtm/site-brief.md`. Optional `--council` flag adds a `marketing-council` critique pass
+before the gate (launch-critical pages only).
+
+**The handoff artifact carries the full SEO layer** (either target — web-engineer dispatch or
+`site-brief.md`): page map/IA, copy deck, JSON-LD schema blocks, meta/OG tags, and the llms.txt
+recommendation. SEO must survive the handoff boundary, not stop at the copy.
 
 ### `/gtm:docs`
 
