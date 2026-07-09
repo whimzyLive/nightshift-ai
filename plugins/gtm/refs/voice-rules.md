@@ -80,8 +80,11 @@ identically:
 
 ## 4. Gate outcome contract
 
-The gate produces exactly one of two outcomes, applied identically by `/gtm:site` and the
-`copy-editing` skill:
+The gate produces exactly one of two outcomes. The **dispatching command** (today `/gtm:site`;
+`/gtm:pulse` at NA-8) applies the gate and owns the verdict — the marketingskills `copy-editing`
+skill is loaded as **review criteria only**, never as an editor: the gate must not rewrite,
+revise, or "improve" the artifact (no-automatic-revision is a product-owner decision). Verdict,
+not edit:
 
 - **PASS** — no hard-ban violations, no positioning-discipline violations, and the merged (plugin +
   project) rule set is satisfied throughout the copy artifact. The artifact may proceed to brand

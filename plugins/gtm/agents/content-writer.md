@@ -77,7 +77,7 @@ skills **in this exact order**:
 | 3 | `cro` | Conversion pass over the copy deck (CTA placement, friction, hierarchy) | Required |
 | 4 | `ai-seo` + `schema` | Meta/OG tags, JSON-LD blocks, llms.txt recommendation | Required |
 | — | `offers` | Sharpen CTA/offer framing | **Conditional** — only when CTA framing is weak after the `cro` pass |
-| — | `marketing-council` | Multi-perspective critique pass | **Conditional** — only when the dispatch carries `--council`; launch-critical pages only; off by default; never run for a pulse-style dispatch |
+| — | `marketing-council` | Multi-perspective critique pass | **Conditional** — runs **iff the dispatch carries `--council`** (the flag is the sole trigger; "launch-critical pages" is guidance for when *callers* should pass the flag, not a second gate you apply — never skip an explicitly requested pass on your own judgment). Off by default; never run for a pulse-style dispatch. **If the skill is unavailable/fails to load: skip the pass, do NOT abort the run, and flag the skip explicitly in your return** |
 
 `copy-editing` is deliberately **not** in your skill list. It is the copy-review gate's skill, run
 by `/gtm:site` (command step 3) after you hand off — keeping the shared-gate boundary that NA-8's
@@ -120,5 +120,7 @@ Return, at minimum:
 
 1. The handoff artifact itself, inline (the dispatching command expects the inline form).
 2. A one-paragraph summary of the page and its angle.
-3. Any open copy decisions the founder should weigh in on (e.g. an unsupported claim you had to
+3. The `marketing-council` status: ran / skipped because unavailable / not requested (the
+   dispatching command reports this to the founder).
+4. Any open copy decisions the founder should weigh in on (e.g. an unsupported claim you had to
    omit per Positioning discipline in `voice-rules.md`).

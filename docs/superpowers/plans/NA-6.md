@@ -129,7 +129,7 @@ Prose guidance for the gate — **not** executable config, **no schema**. Adapte
   | 3 | `cro` | Conversion pass over the copy deck (CTA placement, friction, hierarchy) | Required |
   | 4 | `ai-seo` + `schema` | Meta/OG tags, JSON-LD blocks, llms.txt recommendation | Required |
   | — | `offers` | Sharpen CTA/offer framing | **Conditional** — only when CTA framing is weak |
-  | — | `marketing-council` | Multi-perspective critique pass | **Conditional** — only when dispatch carries `--council`; launch-critical pages only; off by default; never in pulse |
+  | — | `marketing-council` | Multi-perspective critique pass | **Conditional** — runs iff dispatch carries `--council` (flag is the sole trigger; "launch-critical" guides callers, not a second agent-side gate); skip + flag in return if the skill is unavailable; off by default; never in pulse |
 
 - [ ] **Step 6: Document the deliberately-excluded skills (as intentional, not omissions)**
 
@@ -137,7 +137,7 @@ Prose guidance for the gate — **not** executable config, **no schema**. Adapte
 
 - [ ] **Step 7: Write the handoff-artifact output section**
 
-  The agent produces the copy deck plus the full SEO layer as a single structured Markdown artifact and returns its location + a summary. The six required sections (the artifact shape the command persists to `docs/gtm/site-brief.md`):
+  The agent produces the copy deck plus the full SEO layer as a single structured Markdown artifact and returns it **inline** + a summary (a session-temp scratch path is acceptable for very large artifacts — never the brief path). The output section MUST state the persistence boundary: the agent never writes `docs/gtm/site-brief.md` itself — persisting the brief is `/gtm:site`'s step, after the copy-review gate and re-run guard. The six required sections (the artifact shape the command persists to `docs/gtm/site-brief.md`):
 
   | Section | Contents |
   |---------|----------|
