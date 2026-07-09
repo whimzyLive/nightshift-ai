@@ -1,12 +1,19 @@
 {
   "enabledPlugins": {
     "sdlc@nightshift": true,
-    "superpowers@claude-plugins-official": true,
     "gtm@nightshift": true,
+    "superpowers@claude-plugins-official": true,
     "postiz@postiz-agent": true,
-    "marketing-skills@marketingskills": true
+    "marketing-skills@marketingskills": true,
+    "nx@nx-claude-plugins": true
   },
   "extraKnownMarketplaces": {
+    "nx-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "nrwl/nx-ai-agents-config"
+      }
+    },
     "postiz-agent": {
       "source": {
         "source": "github",
@@ -18,6 +25,11 @@
         "source": "github",
         "repo": "coreyhaines31/marketingskills"
       }
+    }
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": ["www.google-analytics.com"]
     }
   }
 }

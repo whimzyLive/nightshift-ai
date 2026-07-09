@@ -24,7 +24,7 @@
 
 ## The problem
 
-You don't lose time *writing* code. You lose it in the **connective tissue** around it: turning a vague ticket into a real spec, breaking that spec into a plan, keeping the plan honest while you implement, then reviewing it without rubber-stamping your own work.
+You don't lose time _writing_ code. You lose it in the **connective tissue** around it: turning a vague ticket into a real spec, breaking that spec into a plan, keeping the plan honest while you implement, then reviewing it without rubber-stamping your own work.
 
 AI coding assistants are great at the middle 20%. nightshift automates the other 80% — the **process** — by giving Claude Code a team of specialized agents that each own one stage of the lifecycle and hand off cleanly to the next.
 
@@ -37,7 +37,7 @@ AI coding assistants are great at the middle 20%. nightshift automates the other
 - **Issue-tracker native** — reads a ticket, derives the branch, the plan path, the PR. Closes the loop back to Jira/GitHub.
 - **Zero hardcoding** — every project-specific fact (stack, paths, Jira key, base branch) lives in one config file per repo. The agents are 100% generic. Install once, use everywhere.
 
-It is **not** a wrapper that "writes code for you." It's a process engine that makes a senior team's *discipline* the default — spec before plan, plan before code, review before merge, tests as the gate.
+It is **not** a wrapper that "writes code for you." It's a process engine that makes a senior team's _discipline_ the default — spec before plan, plan before code, review before merge, tests as the gate.
 
 ## ⚡ Install in 60 seconds
 
@@ -84,7 +84,7 @@ Three ideas do all the heavy lifting:
 
 **2. Generic agents, per-repo config.** The agents carry **zero** project specifics. Everything that changes between repos — tech stack, owned paths, Jira project key, base branch, quality-gate commands — lives in a single `.claude/project/project-context.md` the plugin auto-loads every session. Write that one file and the entire team adapts to your codebase.
 
-**3. The lifecycle is the product.** Spec → plan → implement → review isn't a suggestion; it's enforced by the commands and the handoff protocol. Tests are the merge gate. Reviews are done by a *different* agent than the one who wrote the code.
+**3. The lifecycle is the product.** Spec → plan → implement → review isn't a suggestion; it's enforced by the commands and the handoff protocol. Tests are the merge gate. Reviews are done by a _different_ agent than the one who wrote the code.
 
 ```text
         ┌──────────────── reads .claude/project/project-context.md every session ───────────────┐
@@ -100,34 +100,34 @@ Three ideas do all the heavy lifting:
 
 ## 👥 Meet your team
 
-| Agent | Owns |
-| ----- | ---- |
-| **product-manager** | Vague idea → PRD with binary acceptance criteria |
-| **solutions-architect** | PRD → technical design / spec |
-| **scrum-master** | Story slicing, mapping, splitting |
-| **tech-lead** | Spec → ordered, verifiable implementation plan |
-| **principal-engineer** | Orchestrates the build, dispatches domain agents in dependency order |
-| **platform-engineer** | Backend / infrastructure / serverless |
-| **web-engineer** | Web UI |
-| **mobile-engineer** | Mobile apps |
-| **database-administrator** | Schema, migrations, data |
-| **sync-engineer** | Offline / sync layer |
-| **qa-engineer** | Always-on review → quality gate → AC verification → PR |
+| Agent                      | Owns                                                                 |
+| -------------------------- | -------------------------------------------------------------------- |
+| **product-manager**        | Vague idea → PRD with binary acceptance criteria                     |
+| **solutions-architect**    | PRD → technical design / spec                                        |
+| **scrum-master**           | Story slicing, mapping, splitting                                    |
+| **tech-lead**              | Spec → ordered, verifiable implementation plan                       |
+| **principal-engineer**     | Orchestrates the build, dispatches domain agents in dependency order |
+| **platform-engineer**      | Backend / infrastructure / serverless                                |
+| **web-engineer**           | Web UI                                                               |
+| **mobile-engineer**        | Mobile apps                                                          |
+| **database-administrator** | Schema, migrations, data                                             |
+| **sync-engineer**          | Offline / sync layer                                                 |
+| **qa-engineer**            | Always-on review → quality gate → AC verification → PR               |
 
 Standby roles activate only when your `project-context.md` says your project has them — a backend-only repo never spins up the mobile engineer.
 
 ## 🎛️ The commands
 
-| Command | Does |
-| ------- | ---- |
-| `/init` | Onboard a repo — scaffold `project-context.md` + agent overrides interactively |
-| `/auto <TICKET>` | The whole pipeline, end to end |
-| `/refine-feature`, `/refine-issue` | Sharpen a raw idea or ticket before work starts |
-| `/prd`, `/stories` | Product definition + story breakdown |
-| `/spec` | Produce the technical spec |
-| `/plan` | Break the spec into an ordered plan |
-| `/impl` | Execute the plan with domain agents |
-| `/review`, `/review-fix` | Review against the spec, then fix what review found |
+| Command                            | Does                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `/init`                            | Onboard a repo — scaffold `project-context.md` + agent overrides interactively |
+| `/auto <TICKET>`                   | The whole pipeline, end to end                                                 |
+| `/refine-feature`, `/refine-issue` | Sharpen a raw idea or ticket before work starts                                |
+| `/prd`, `/stories`                 | Product definition + story breakdown                                           |
+| `/spec`                            | Produce the technical spec                                                     |
+| `/plan`                            | Break the spec into an ordered plan                                            |
+| `/impl`                            | Execute the plan with domain agents                                            |
+| `/review`, `/review-fix`           | Review against the spec, then fix what review found                            |
 
 ## 🔧 Configure your repo
 
@@ -138,19 +138,20 @@ Each consuming repo supplies **one file** — `.claude/project/project-context.m
 ```markdown
 # Project Context
 
-| Token            | Value                          |
-| ---------------- | ------------------------------ |
-| Project name     | acme-api                       |
-| Jira project key | ACME                           |
-| Base branch      | develop                        |
-| Package manager  | pnpm                           |
-| Typecheck / Test | pnpm typecheck / pnpm test     |
+| Token            | Value                      |
+| ---------------- | -------------------------- |
+| Project name     | acme-api                   |
+| Jira project key | ACME                       |
+| Base branch      | develop                    |
+| Package manager  | pnpm                       |
+| Typecheck / Test | pnpm typecheck / pnpm test |
 
 ## Workspace → agent
-| Path              | Owner             |
-| ----------------- | ----------------- |
-| services/api/     | platform-engineer |
-| apps/web/         | web-engineer      |
+
+| Path            | Owner             |
+| --------------- | ----------------- |
+| services/api/   | platform-engineer |
+| apps/marketing/ | web-engineer      |
 ```
 
 That's the whole integration. The agents read this, resolve their owned paths and quality gates from it, and adapt. Repo-agnostic by design — the same plugin runs your Node monorepo, your Python service, and your mobile app.

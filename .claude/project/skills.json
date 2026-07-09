@@ -1,4 +1,53 @@
 {
   "version": 1,
-  "skills": []
+  "skills": [
+    {
+      "name": "payload",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "managed by the skills CLI (npx skills add payloadcms/skills) — content at .agents/skills/payload/, pinned in skills-lock.json; .claude/skills/payload is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "managed by the skills CLI (npx skills add nextlevelbuilder/ui-ux-pro-max-skill) — content at .agents/skills/ui-ux-pro-max/, pinned in skills-lock.json; .claude/skills/ui-ux-pro-max is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
+    },
+    {
+      "name": "vercel-react-best-practices",
+      "source": "suggested",
+      "addedBy": "analyze",
+      "note": "managed by the skills CLI (npx skills add vercel-labs/agent-skills -s vercel-react-best-practices) — content at .agents/skills/, pinned in skills-lock.json; .claude/skills/ symlink for discovery. Update via the skills CLI, not by hand."
+    },
+    {
+      "name": "vercel-composition-patterns",
+      "source": "suggested",
+      "addedBy": "analyze",
+      "note": "managed by the skills CLI (npx skills add vercel-labs/agent-skills -s vercel-composition-patterns) — content at .agents/skills/, pinned in skills-lock.json; .claude/skills/ symlink for discovery. Update via the skills CLI, not by hand."
+    },
+    {
+      "name": "nightshift-design",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "hand-authored local skill at .claude/skills/nightshift-design/ (real directory, not CLI-managed) — brand design system + adherence gate; also invoked by gtm:site."
+    },
+    {
+      "name": "atomic-design",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "locally built workspace skill at skills/atomic-design/ (repo-authored, published for others; not CLI-managed) — .claude/skills/atomic-design is a symlink for Claude Code discovery."
+    },
+    {
+      "name": "gsap-core",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "managed by the skills CLI (npx skills add greensock/gsap-skills -s gsap-core) — content at .agents/skills/gsap-core/, pinned in skills-lock.json; .claude/skills/gsap-core is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
+    },
+    {
+      "name": "motion-dev-animations",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "managed by the skills CLI (npx skills add 199-biotechnologies/motion-dev-animations-skill) — content at .agents/skills/motion-dev-animations/, pinned in skills-lock.json; .claude/skills/motion-dev-animations is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
+    }
+  ]
 }

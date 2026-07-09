@@ -1,0 +1,41 @@
+{
+  "name": "@nightshift-ai/marketing",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@nightshift-ai/ui": "workspace:^",
+    "@payloadcms/db-postgres": "3.85.2",
+    "@payloadcms/next": "3.85.2",
+    "@payloadcms/richtext-lexical": "3.85.2",
+    "graphql": "^16.14.2",
+    "next": "~16.2.10",
+    "payload": "3.85.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.35.3"
+  },
+  "nx": {
+    "tags": [
+      "scope:web"
+    ],
+    "targets": {
+      "local-start": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "docker compose up -d --wait",
+          "cwd": "apps/marketing"
+        },
+        "cache": false
+      },
+      "local-stop": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "docker compose down",
+          "cwd": "apps/marketing"
+        },
+        "cache": false
+      }
+    }
+  }
+}

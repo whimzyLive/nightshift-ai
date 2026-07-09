@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/marketing-e2e"
+    },
+    {
+      "path": "./apps/marketing"
+    },
+    {
+      "path": "./packages/ui"
+    }
+  ]
+}

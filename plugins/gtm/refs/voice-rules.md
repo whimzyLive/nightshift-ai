@@ -96,7 +96,7 @@ not edit:
   - **blocks the dispatching command's handoff** — nothing is persisted or routed downstream on a
     FAIL, and at the gate's primary (pre-brand) position nothing is branded either (a re-gate of an
     already-branded merged artifact still blocks persistence and routing). For `/gtm:site`: no
-    `docs/gtm/site-brief.md` write, no web-engineer dispatch; future consumers like `/gtm:pulse`
+    `docs/gtm/site-brief.md` write; future consumers like `/gtm:pulse`
     block their own publish/queue step the same way.
     There is no automatic revision loop; the founder (or a re-run of the dispatching command) must
     address the violations.

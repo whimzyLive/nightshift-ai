@@ -144,6 +144,6 @@ skills:
 # Monorepo detection used for the vercel-composition-patterns / pnpm condition above.
 monorepo_detection:
   command: 'find . -maxdepth 2 -name "package.json" -not -path "*/node_modules/*" | wc -l'
-  rule: "count > 1 => monorepo"
+  rule: 'count > 1 => monorepo'
   # When package_manager = pnpm AND this count > 1, add vercel-composition-patterns
   # to the candidate list (if not already present from the framework conditions).
