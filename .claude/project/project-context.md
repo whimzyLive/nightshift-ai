@@ -25,6 +25,7 @@
 | plugins/            | ai-enablement-engineer |
 | skills/             | ai-enablement-engineer |
 | .agents/            | ai-enablement-engineer |
+| agents/, .codex/, .opencode/, .gemini/, opencode.json | ai-enablement-engineer (nx-generated mirrors — machine-maintained) |
 | tools/              | platform-engineer      |
 | brand/              | web-engineer           |
 | apps/marketing/     | web-engineer           |
