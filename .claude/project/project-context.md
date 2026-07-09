@@ -24,6 +24,7 @@
 | ------------------- | ---------------------- |
 | plugins/            | ai-enablement-engineer |
 | skills/             | ai-enablement-engineer |
+| .agents/            | ai-enablement-engineer |
 | tools/              | platform-engineer      |
 | brand/              | web-engineer           |
 | apps/marketing/     | web-engineer           |
