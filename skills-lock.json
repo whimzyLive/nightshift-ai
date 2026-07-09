@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "payload": {
+      "source": "payloadcms/skills",
+      "sourceType": "github",
+      "skillPath": "skills/payload/SKILL.md",
+      "computedHash": "4abfcc828ca2cc0d9142b2fee2456f257f73dd7a37bd1cce2d354231b08b8767"
+    }
+  }
+}
