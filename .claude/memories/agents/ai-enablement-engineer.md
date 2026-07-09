@@ -1,5 +1,31 @@
 # ai-enablement-engineer — memory
 
+## NA-6 — content-writer agent + voice-rules ref + /gtm:site command (`plugins/gtm`)
+
+- A plan's structural verification grep can accidentally match its own explanatory prose. The
+  NA-6 plan's Task 3 check `grep -c '.gtm-plugin-root' commands/site.md` expects `0` to prove "no
+  accidental agent resolver block" — but the unescaped `.` in that pattern matches any char, so a
+  sentence merely *explaining* "there is no `.claude/.gtm-plugin-root` resolver block here" still
+  trips the count to 1. When a verification grep is meant to detect a structural artifact (a
+  resolver header block), don't describe the artifact's literal marker filename in prose nearby —
+  reword to name the *mechanism* generically ("no plugin-root resolver block") so the check and the
+  prose don't collide. Always run the check for real rather than eyeballing the regex.
+- The gtm plugin's shared-gate boundary (`copy-editing` lives only on the command's gate step, never
+  on the content-producing agent's `skills:` list) is easy to verify precisely: grep the file for
+  the skill name and manually confirm the hit sits in prose ("deliberately not on this list") rather
+  than inside the `skills:` YAML block — a bare occurrence count doesn't distinguish the two.
+- When a spec's plugin-root convention differs by artifact type (commands get
+  `${CLAUDE_PLUGIN_ROOT}` natively; agents resolve it via a `.claude/.<plugin>-plugin-root` marker
+  file), copy the agent-side resolver header block **verbatim** from the established pattern file
+  (here, `product-marketing-manager.md`) rather than re-deriving it — a byte-diff against the
+  source is the cheapest verification and the plan expects verbatim reuse, not a rephrase.
+- This story's worktree started on a synthetic `worktree-agent-<hash>` local branch one commit
+  behind `origin/feat/NA-6` (the plan-writer's commit hadn't been merged into this worktree's local
+  ref yet). `git checkout feat/NA-6` failed because that branch was already checked out in a
+  sibling worktree (`git worktree list` showed it). Fix: `git merge --ff-only origin/feat/NA-6` on
+  the current branch — safe since the local ref was a strict ancestor — rather than trying to force
+  a branch switch that git's one-worktree-per-branch rule disallows.
+
 ## NA-4 — per-channel ownership picker (`plugins/gtm`)
 
 - `plugins/gtm/refs/*.md` protocol refs are thin and delegate fully to the `postiz` CLI — never
