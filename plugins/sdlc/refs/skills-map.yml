@@ -106,7 +106,7 @@ skills:
 
   - name: atomic-design
     description: Framework-agnostic atomic design methodology — decompose any UI into atoms, molecules, organisms, templates, and pages
-    domains: [web-engineer]
+    domains: [web-engineer, mobile-engineer]
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/atomic-design
     when:
@@ -136,8 +136,8 @@ skills:
 # this summary lists the built-in skills per agent for quick reference.
 #
 # platform-engineer  : hono-api, api-routes, typeorm, electrodb
-# web-engineer       : react-components, vercel-react-best-practices, vercel-composition-patterns
-# mobile-engineer    : (no built-in suggestions; add custom mobile skills via "Other")
+# web-engineer       : react-components, vercel-react-best-practices, vercel-composition-patterns, atomic-design
+# mobile-engineer    : atomic-design
 # database-administrator : typeorm, electrodb
 # sync-engineer      : (no built-in suggestions; add custom sync skills via "Other")
 
