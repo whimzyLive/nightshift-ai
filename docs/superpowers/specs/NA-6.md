@@ -237,10 +237,11 @@ agents' mechanism).
    - **Both branches carry the full SEO layer** (AC-5) — the page map/IA, copy deck, JSON-LD
      blocks, meta/OG tags, and llms.txt recommendation live in the brief.
 6. **Report** — completed-run fields (brief path, guard action, web-engineer dispatched or not)
-   apply only when the run reached step 5; a gate-FAIL run instead states explicitly that no brief
-   was written and no guard ran, with the violation list. Always include: gate result (PASS / FAIL
-   / not-run-on-skip), the agent's `marketing-council` status, and any open copy decisions for the
-   founder.
+   apply only when the run reached step 5 and routed; a **step-3** gate-FAIL run instead states
+   explicitly that no brief was written and no guard ran, with the violation list, and a
+   **refine-merge** FAIL reports the untouched existing brief plus the preserved
+   `site-brief.new.md` path. Always include: gate result (PASS / FAIL / not-run-on-skip), the
+   agent's `marketing-council` status, and any open copy decisions for the founder.
 
 ---
 

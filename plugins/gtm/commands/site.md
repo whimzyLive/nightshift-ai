@@ -172,9 +172,11 @@ build up manually or installs sdlc later.
 
 ## Step 6 — Report
 
-Return (fields marked *(completed runs)* apply only when the run reached step 5; on a gate-FAIL
-run state explicitly that **no brief was written and no guard action ran**, and include the
-violation list instead):
+Return (fields marked *(completed runs)* apply only when the run reached step 5 and routed. On a
+**step-3** gate-FAIL state explicitly that **no brief was written and no guard action ran**, with
+the violation list. On a **refine-merge** gate-FAIL (step 5a): the guard action was refine, the
+existing brief is untouched, and the fresh artifact was preserved at `docs/gtm/site-brief.new.md`
+— report that path with the violation list):
 
 1. *(completed runs)* The brief path (`docs/gtm/site-brief.md`) and the `GUARD` action applied
    (fresh / refine / regenerate / skip / `--overwrite`); on a refine-FAIL, the preserved
@@ -182,8 +184,8 @@ violation list instead):
 2. *(completed runs)* Whether `sdlc:web-engineer` was dispatched (and, if not, that the brief is
    the standalone deliverable). On a `GUARD=skip` run: that the existing brief was routed
    **without re-gating**, per the founder's choice.
-3. The copy-review gate result — PASS, FAIL (with the violation list; steps 4–5 never ran), or
-   **not run** (`GUARD=skip`).
+3. The copy-review gate result — PASS, FAIL (with the violation list; on a step-3 FAIL steps 4–5
+   never ran, on a refine-merge FAIL routing never ran), or **not run** (`GUARD=skip`).
 4. The `marketing-council` status from the agent's return (ran / skipped-unavailable / not
    requested).
 5. Any open copy decisions flagged by `content-writer` or the gate that need a founder call.
