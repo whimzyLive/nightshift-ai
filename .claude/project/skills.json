@@ -30,6 +30,12 @@
       "source": "custom",
       "addedBy": "user",
       "note": "hand-authored local skill at .claude/skills/nightshift-design/ (real directory, not CLI-managed) — brand design system + adherence gate; also invoked by gtm:site."
+    },
+    {
+      "name": "atomic-design",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "locally built workspace skill at skills/atomic-design/ (repo-authored, published for others; not CLI-managed) — .claude/skills/atomic-design is a symlink for Claude Code discovery."
     }
   ]
 }

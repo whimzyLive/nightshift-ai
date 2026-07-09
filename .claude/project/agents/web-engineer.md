@@ -7,6 +7,7 @@
 3. `nightshift-design` — nightshift brand design system (night-sky dark theme, terracotta accent, tokens, UI-kit components, brand voice, adherence gate). Invoke for any nightshift-branded interface, marketing page, or brand asset work.
 4. `vercel-react-best-practices` — React/Next.js performance patterns from Vercel Engineering. Invoke when writing, reviewing, or refactoring React/Next.js code.
 5. `vercel-composition-patterns` — React composition patterns (compound components, render props, context providers, React 19 APIs). Invoke when designing reusable component APIs or refactoring boolean-prop proliferation.
+6. `atomic-design` — repo-authored atomic design methodology (atoms → molecules → organisms → templates → pages; hierarchy, naming, composition decisions). Invoke when structuring or decomposing UI into reusable components in apps/marketing or packages/ui.
 
 ## Directory guides (read before coding)
 
