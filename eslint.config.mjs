@@ -8,7 +8,8 @@ export default [
       "ignores": [
         "**/dist",
         "**/out-tsc",
-        "**/test-output"
+        "**/test-output",
+        "**/_ds_bundle.js"
       ]
     },
     {

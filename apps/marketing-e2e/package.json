@@ -1,10 +1,10 @@
 {
-  "name": "@nextjs-template/web-e2e",
+  "name": "@nightshift-ai/marketing-e2e",
   "version": "0.0.1",
   "private": true,
   "nx": {
     "implicitDependencies": [
-      "@nextjs-template/web"
+      "@nightshift-ai/marketing"
     ]
   }
 }

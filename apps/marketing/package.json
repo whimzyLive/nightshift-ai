@@ -1,8 +1,9 @@
 {
-  "name": "@nextjs-template/web",
+  "name": "@nightshift-ai/marketing",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@nightshift-ai/ui": "workspace:^",
     "next": "~16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

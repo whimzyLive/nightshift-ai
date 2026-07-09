@@ -150,7 +150,7 @@ Each consuming repo supplies **one file** — `.claude/project/project-context.m
 | Path              | Owner             |
 | ----------------- | ----------------- |
 | services/api/     | platform-engineer |
-| apps/web/         | web-engineer      |
+| apps/marketing/         | web-engineer      |
 ```
 
 That's the whole integration. The agents read this, resolve their owned paths and quality gates from it, and adapt. Repo-agnostic by design — the same plugin runs your Node monorepo, your Python service, and your mobile app.

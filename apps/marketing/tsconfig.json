@@ -29,8 +29,8 @@
     "src/**/*.tsx",
     "src/**/*.js",
     "src/**/*.jsx",
-    "../../apps/web/.next/types/**/*.ts",
-    "../../dist/apps/web/.next/types/**/*.ts",
+    "../../apps/marketing/.next/types/**/*.ts",
+    "../../dist/apps/marketing/.next/types/**/*.ts",
     "next-env.d.ts"
   ],
   "exclude": [

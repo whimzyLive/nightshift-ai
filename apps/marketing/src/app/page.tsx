@@ -1,4 +1,4 @@
-import { HeroBanner, FeatureCard } from '@nextjs-template/ui';
+import { HeroBanner, FeatureCard } from '@nightshift-ai/ui';
 import styles from './page.module.css';
 
 const features = [
