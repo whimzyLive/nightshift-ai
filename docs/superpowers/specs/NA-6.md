@@ -37,8 +37,9 @@ The Jira story's six ACs, numbered here so in-spec references (`AC-<n>`) are sel
 Ships the gtm plugin's single copy-production role — the `content-writer` agent — with its context
 contract and the `task=landing-page` skill ladder, plus the thin `/gtm:site` orchestrator and the
 `refs/voice-rules.md` anti-slop quality bar it depends on. Result: `/gtm:site` produces reviewed
-landing-page copy carrying a full SEO layer and hands the build off to sdlc's web-engineer (or a
-`site-brief.md` when sdlc is absent) without the founder writing copy or wiring the build.
+landing-page copy carrying a full SEO layer, always writes `docs/gtm/site-brief.md` as the durable
+handoff artifact, and additionally dispatches sdlc's web-engineer when sdlc is installed — without
+the founder writing copy or wiring the build.
 
 ## Artifacts
 
@@ -209,7 +210,8 @@ agents' mechanism).
      (keep the existing brief untouched; continue to routing with it). Each written brief carries a
      one-line provenance header (date + source command).
    - **5b. Always write `docs/gtm/site-brief.md`** (AC-6) — the brief is the durable handoff
-     artifact in **both** branches, regardless of sdlc presence.
+     artifact in **both** branches, regardless of sdlc presence (on a 5a **skip**, the existing
+     brief is retained as that artifact; nothing new is written this run).
    - **5c. sdlc installed** — additionally dispatch sdlc's web-engineer agent **by agent name**
      (`sdlc:web-engineer` via the Agent tool) with the brief as its build input — never by a
      hardcoded file path (in a consumer repo the sdlc plugin lives under the
@@ -219,8 +221,9 @@ agents' mechanism).
      the build up or installs sdlc later.
    - **Both branches carry the full SEO layer** (AC-5) — the page map/IA, copy deck, JSON-LD
      blocks, meta/OG tags, and llms.txt recommendation live in the brief, which is always written.
-6. **Report** — return: brief path + guard action taken (refine/regenerate/skip), whether
-   web-engineer was dispatched, gate result, and any open copy decisions for the founder.
+6. **Report** — return: brief path + guard action taken, if any (fresh write / refine /
+   regenerate / skip / `--overwrite`), whether web-engineer was dispatched, gate result, and any
+   open copy decisions for the founder.
 
 ---
 
@@ -273,8 +276,8 @@ multi-tenant service. The only access boundaries are structural:
 - **`task=channel-draft` ladder** — per-channel drafts, media/image generation, postiz
   integration-schema compliance. Owned by **NA-8** (which extends this same agent file).
 - **`/gtm:pulse`, `/gtm:launch`, `/gtm:report`, `/gtm:docs`** commands — other stories.
-- **Actual page deployment / hosting** — the handoff ends at the build spec or the web-engineer
-  dispatch; no deploy.
+- **Actual page deployment / hosting** — the handoff ends at the brief (always) and the
+  web-engineer dispatch (when sdlc is present); no deploy.
 - **`customer-research`** in the ladder — no real customer voice pre-launch; revisit at NA-11.
 - **`competitor-profiling` per run** — differentiation belongs in `.agents/product-marketing.md` at
   init / PMM-brief time.
