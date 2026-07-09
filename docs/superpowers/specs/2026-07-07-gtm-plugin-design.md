@@ -52,7 +52,7 @@ plugins/gtm/
 ├── agents/
 │   ├── product-marketing-manager.md # PMM — marketing mirror of sdlc's product-manager: vague request → GTM brief
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
-│   ├── content-writer.md        # per-channel drafts + media, obeys postiz integration schema
+│   ├── content-writer.md        # all copy production — NA-6 ships landing-page ladder; NA-8 adds per-channel drafts + media; hard-requires product-marketing context
 │   └── growth-analyst.md        # KPI + analytics pull, digest, calendar tuning, social-proof harvest
 ├── commands/
 │   ├── init.md      # scaffold config, verify Postiz via postiz CLI, product-marketing context
@@ -87,6 +87,42 @@ marketingskills skills (`product-marketing` for context; `launch` / `content-str
 `copywriting` as needed) and the `postiz` skill for any Postiz operation (**never raw HTTP**). NA-3
 ships the agent definition; the brief-producing workflows belong to downstream stories
 (NA-4..NA-8, NA-11).
+
+### `content-writer` agent
+
+The single copy-production role (the consultancy's copywriter / conversion copywriter): **all**
+customer-facing copy is drafted by this agent, never inline in a command. Commands stay thin glue —
+they dispatch the writer and handle orchestration/handoff.
+
+**Context contract (enforced in the agent definition, inherited by every consumer):** before
+drafting anything, the agent MUST read `.agents/product-marketing.md` (repo root,
+positioning/ICP/audience) and `plugins/gtm/refs/voice-rules.md` (the plugin's `refs/voice-rules.md`,
+resolved via `${CLAUDE_PLUGIN_ROOT}` at run time), and MUST STOP with a clear error if the
+product-marketing context is missing — copy is never produced without locked positioning.
+
+**Task-scoped skill ladders (one agent, per-task loadout — skills load on demand, so the unused
+ladder costs nothing; this is deliberate instead of splitting a separate site-copywriter agent,
+which would duplicate the context contract and drift):**
+
+- **`task=landing-page`** (NA-6) — consultancy ordering, structure → copy → conversion →
+  discoverability: `site-architecture` (page map/IA: section order, URL, nav stubs, future-page
+  slots) → `copywriting` (copy deck per the IA) → `cro` (conversion pass) → `ai-seo` + `schema`
+  (meta/OG, JSON-LD, llms.txt recommendation). `offers` allowed when CTA framing is weak (not
+  pinned). Optional `marketing-council` critique pass, off by default — reserved for
+  launch-critical pages via a `--council` flag on `/gtm:site`; never used in pulse.
+- **`task=channel-draft`** (NA-8) — `copywriting` + `social` + `image` per channel, obeying the
+  postiz integration schema and platform media rules.
+
+Deliberately excluded from the ladders (input-starved or duplicative, revisit post-launch):
+`customer-research` (no real customer voice pre-launch — synthesizing VOC would *lower* accuracy;
+revisit when NA-11's engagement poll harvests real quotes), `competitor-profiling`/`competitors`
+(differentiation accuracy belongs in `.agents/product-marketing.md` at init/PMM-brief time, not
+per run), `marketing-psychology` (copywriting already embeds the useful parts).
+
+**Delivery is split across stories:** **NA-6 ships the agent definition** (context contract +
+the landing-page ladder); **NA-8 extends it** with the channel-draft ladder (per-channel drafts,
+media generation, postiz integration-schema compliance). Hence the `NA-6 Blocks NA-8` dependency
+edge.
 
 ## Commands
 
@@ -171,8 +207,17 @@ calendar adjustments (feeds next pulse).
 
 ### `/gtm:site`
 
-marketingskills `copywriting` + `cro` produce copy → `nightshift-design` brand tokens → build
-handoff: sdlc installed → dispatch its web-engineer; else write `docs/gtm/site-brief.md`.
+Thin orchestrator — no copy logic in the command. Dispatch the `content-writer` agent with
+`task=landing-page` (runs its landing-page ladder: `site-architecture` → `copywriting` → `cro` →
+`ai-seo` + `schema`; context contract enforces `.agents/product-marketing.md` + voice rules) →
+copy-review gate (`copy-editing` + voice rules, same gate as pulse) → apply `nightshift-design`
+brand tokens → build handoff: sdlc installed → dispatch its web-engineer; else write
+`docs/gtm/site-brief.md`. Optional `--council` flag adds a `marketing-council` critique pass
+before the gate (launch-critical pages only).
+
+**The handoff artifact carries the full SEO layer** (either target — web-engineer dispatch or
+`site-brief.md`): page map/IA, copy deck, JSON-LD schema blocks, meta/OG tags, and the llms.txt
+recommendation. SEO must survive the handoff boundary, not stop at the copy.
 
 ### `/gtm:docs`
 
