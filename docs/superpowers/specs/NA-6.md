@@ -28,8 +28,9 @@ The Jira story's six ACs, numbered here so in-spec references (`AC-<n>`) are sel
   copy-review gate (`copy-editing` + voice rules — same gate as pulse) before handoff.
 - **AC-5** — the build handoff artifact carries the full SEO layer: page map/IA, copy deck, JSON-LD
   blocks, meta/OG tags, llms.txt recommendation.
-- **AC-6** — when sdlc is installed the build handoff dispatches its `web-engineer` agent; when
-  absent, `docs/gtm/site-brief.md` is written instead.
+- **AC-6** — `docs/gtm/site-brief.md` is always written as the durable handoff artifact; when sdlc
+  is installed the build handoff additionally dispatches its `web-engineer` agent with that brief
+  as build input.
 
 ## Overview
 
@@ -176,8 +177,12 @@ Thin orchestrator — **no copy logic in the command** (AC-3). It dispatches, ga
 per the `commands/init.md` convention. No `.claude/.gtm-plugin-root` resolver block (that is the
 agents' mechanism).
 
-**Flags:** `--council` (optional) — forwarded to the content-writer dispatch to enable the
-`marketing-council` critique pass; off by default; intended for launch-critical pages only.
+**Flags:**
+
+- `--council` (optional) — forwarded to the content-writer dispatch to enable the
+  `marketing-council` critique pass; off by default; intended for launch-critical pages only.
+- `--overwrite` (optional) — non-interactive override of the re-run guard: regenerate
+  `docs/gtm/site-brief.md` without prompting (see step 5a).
 
 **Step ladder:**
 
@@ -190,31 +195,40 @@ agents' mechanism).
    the handoff artifact (copy deck + SEO layer).
 3. **Copy-review gate** — run the shared gate: the marketingskills `copy-editing` skill **plus**
    `refs/voice-rules.md` (Artifact 2), the merged project+plugin rules. Same gate as pulse. On FAIL:
-   report violations and STOP — nothing is branded or handed off. Optionally loop back to the writer
-   for a revision pass (implementer's discretion; default: STOP and surface for founder review).
+   report each violation with its offending span and **STOP** — nothing is branded or handed off,
+   no automatic revision loop (decided — see Resolved decisions).
 4. **Apply brand tokens** — apply `nightshift-design` brand tokens sourced from `brand/BRAND_KIT.md`
    (the project brand kit) to the copy/section artifact so the handoff carries brand-correct
    typography, colour, and voice tokens. (Brand-token application is styling metadata on the copy
    deck, not a visual build.)
-5. **Handoff routing (conditional on sdlc presence):**
-   - **sdlc installed** — dispatch sdlc's web-engineer agent **by agent name** (`sdlc:web-engineer`
-     via the Agent tool) with the handoff artifact as its build input — never by a hardcoded file
-     path (in a consumer repo the sdlc plugin lives under the `.claude/.sdlc-plugin-root` marker's
-     root, not at `plugins/sdlc/…`). Detection: the `.claude/.sdlc-plugin-root` marker file exists
-     (suggested default).
-   - **sdlc absent** — write the handoff artifact to `docs/gtm/site-brief.md` instead. The build is
-     not performed; the founder wires it up or installs sdlc later.
-   - **Either path carries the full SEO layer** (AC-5) — the page map/IA, copy deck, JSON-LD blocks,
-     meta/OG tags, and llms.txt recommendation survive the handoff boundary in both branches.
-6. **Report** — return: handoff target taken (web-engineer dispatch vs `site-brief.md`), artifact
-   location, gate result, and any open copy decisions for the founder.
+5. **Write the brief, then route the build:**
+   - **5a. Re-run guard (before writing)** — if `docs/gtm/site-brief.md` already exists, do NOT
+     silently overwrite (mirrors the `/gtm:init` re-init guard). With `--overwrite`: regenerate
+     without prompting. Otherwise prompt the founder with three options: **refine** (update the
+     existing brief with the newly generated changes), **regenerate** (fresh copy), or **skip**
+     (keep the existing brief untouched; continue to routing with it). Each written brief carries a
+     one-line provenance header (date + source command).
+   - **5b. Always write `docs/gtm/site-brief.md`** (AC-6) — the brief is the durable handoff
+     artifact in **both** branches, regardless of sdlc presence.
+   - **5c. sdlc installed** — additionally dispatch sdlc's web-engineer agent **by agent name**
+     (`sdlc:web-engineer` via the Agent tool) with the brief as its build input — never by a
+     hardcoded file path (in a consumer repo the sdlc plugin lives under the
+     `.claude/.sdlc-plugin-root` marker's root, not at `plugins/sdlc/…`). Detection: the
+     `.claude/.sdlc-plugin-root` marker file exists (decided).
+   - **5d. sdlc absent** — no dispatch; the brief alone is the deliverable and the founder wires
+     the build up or installs sdlc later.
+   - **Both branches carry the full SEO layer** (AC-5) — the page map/IA, copy deck, JSON-LD
+     blocks, meta/OG tags, and llms.txt recommendation live in the brief, which is always written.
+6. **Report** — return: brief path + guard action taken (refine/regenerate/skip), whether
+   web-engineer was dispatched, gate result, and any open copy decisions for the founder.
 
 ---
 
 ## Handoff artifact shape
 
-The single structure the content-writer produces and `/gtm:site` routes. It MUST carry the full SEO
-layer in both handoff branches (web-engineer dispatch and `site-brief.md`). Defined as a document
+The single structure the content-writer produces and `/gtm:site` routes. It is always persisted as
+`docs/gtm/site-brief.md` and MUST carry the full SEO layer; when sdlc is present the same brief is
+also passed to the web-engineer dispatch. Defined as a document
 structure (the artifact is Markdown with embedded code blocks — this is a docs/prompt story, not a
 typed API); the required sections:
 
@@ -227,8 +241,8 @@ typed API); the required sections:
 | llms.txt recommendation | Recommended `llms.txt` content/placement for AI-crawler discoverability |
 | Brand tokens | `nightshift-design` tokens applied to the deck (populated at command step 4) |
 
-When routed to `docs/gtm/site-brief.md`, the same six sections are written as one Markdown brief.
-When dispatched to web-engineer, they are passed as the agent's build spec input.
+The six sections are written as one Markdown brief at `docs/gtm/site-brief.md` (always). When
+web-engineer is dispatched, the brief is passed as the agent's build spec input.
 
 ## Permissions Detail
 
@@ -249,7 +263,8 @@ multi-tenant service. The only access boundaries are structural:
 | `marketing-context.md` missing | Command STOPs at step 1 (precondition). |
 | Copy-review gate FAIL | Command STOPs after step 3; reports each violation + offending span; nothing branded or handed off. |
 | `task=channel-draft` requested (NA-6) | Agent STOPs: "task=channel-draft is not available until NA-8." |
-| sdlc absent at handoff | Non-error — command writes `docs/gtm/site-brief.md` and reports the brief path instead of a web-engineer dispatch. |
+| sdlc absent at handoff | Non-error — the brief (always written) is the deliverable; the report notes no web-engineer dispatch occurred. |
+| `docs/gtm/site-brief.md` already exists on re-run | Re-run guard (step 5a): prompt refine / regenerate / skip; `--overwrite` bypasses the prompt. Never silently overwritten. |
 | `brand/BRAND_KIT.md` missing | Degrade: proceed with unbranded copy deck and note the missing brand kit in the report (suggested default — do not hard-fail; brand is additive to copy). |
 | `--council` passed but `marketing-council` skill unavailable | Warn that the critique pass is skipped; continue (gate still runs). Suggested default — non-fatal. |
 
@@ -266,14 +281,16 @@ multi-tenant service. The only access boundaries are structural:
 - **The full launch asset set** (demo, launch posts, directory checklist) — NA-10.
 - **KPI / channel config** — NA-4 / NA-5.
 
-## Open Questions
+## Resolved decisions
 
-- [ ] **sdlc-presence detection method** — Suggested default: presence of the
-      `.claude/.sdlc-plugin-root` marker file (the established sdlc plugin-root marker). Alternative
-      (`claude plugin list` parse) is heavier and env-dependent; prefer the marker.
-- [ ] **Gate FAIL — auto-revise vs stop** — Suggested default: STOP and surface violations for
-      founder review (deterministic, no silent rewrite loop). A bounded single revision pass is an
-      acceptable implementer choice if it re-runs the gate afterward.
-- [ ] **`site-brief.md` overwrite behaviour on re-run** — Suggested default: overwrite with a
-      one-line provenance header (date + source command); the file is a regenerable handoff artifact,
-      not hand-authored state.
+All former open questions were decided by the product owner in PR #53 review (2026-07-09):
+
+- **sdlc-presence detection** — the `.claude/.sdlc-plugin-root` marker file is sufficient; no
+  `claude plugin list` parsing.
+- **Gate FAIL behaviour** — STOP on errors. Violations are reported and the command stops; no
+  automatic revision loop.
+- **`site-brief.md` re-run behaviour** — never overwrite silently. Re-run guard (step 5a) prompts
+  refine / regenerate / skip, mirroring the `/gtm:init` re-init guard; `--overwrite` is the explicit
+  non-interactive bypass. Every written brief carries a provenance header (date + source command).
+- **Brief always written** — `docs/gtm/site-brief.md` is produced in both handoff branches; the
+  web-engineer dispatch (when sdlc is present) consumes it rather than replacing it (AC-6).
