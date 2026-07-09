@@ -1,0 +1,56 @@
+.problem {
+  padding: var(--space-24) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.intro {
+  max-width: var(--container-prose);
+  margin: 0 auto var(--space-12);
+  text-align: center;
+}
+
+.header {
+  font-size: clamp(1.75rem, 3.6vw, var(--text-3xl));
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.body {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-4);
+}
+.body:last-child {
+  margin-bottom: 0;
+}
+
+.strong {
+  color: var(--accent);
+  font-weight: var(--fw-semibold);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.lead {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-base);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-2);
+}
+
+.subBody {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+  margin: 0;
+}

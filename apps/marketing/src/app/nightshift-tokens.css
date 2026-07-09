@@ -1,0 +1,209 @@
+/* nightshift — design tokens, mirrored verbatim from
+ * .claude/skills/nightshift-design/tokens/{colors,typography,spacing}.css.
+ * Do not hand-edit values here — update the design-system source first,
+ * then re-sync. Font families are aliased to the self-hosted next/font
+ * variables set on <html> in (marketing)/layout.tsx.
+ */
+:root {
+  /* ---- Base values: night-sky background layers (deepest → raised) ---- */
+  --night-900: #08080f;
+  --night-800: #0d0d18;
+  --night-700: #12121f;
+  --night-600: #1a1a2e;
+  --night-500: #22223a;
+  --night-400: #2c2c47;
+
+  /* ---- Hairlines & dividers ---- */
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- Moonlight text ---- */
+  --moon-100: #f5f3ef;
+  --moon-200: #d8d6e0;
+  --moon-300: #a9a7bd;
+  --moon-400: #74738c;
+  --moon-500: #4d4c63;
+
+  /* ---- Terracotta accent ---- */
+  --terra-300: #f0a488;
+  --terra-400: #e58b6f;
+  --terra-500: #d97757;
+  --terra-600: #c2624a;
+  --terra-700: #9d4d3a;
+  --terra-glow: rgba(217, 119, 87, 0.28);
+  --terra-tint: rgba(217, 119, 87, 0.12);
+
+  /* ---- Cool secondary: moonlit indigo ---- */
+  --indigo-300: #a5b4fc;
+  --indigo-400: #8b9cf7;
+  --indigo-500: #7c93f0;
+  --indigo-tint: rgba(124, 147, 240, 0.14);
+
+  /* ---- Cyan ---- */
+  --cyan-400: #62c4d3;
+  --cyan-500: #4fb3c4;
+
+  /* ---- Semantic (terminal-true) ---- */
+  --green-400: #6ec48a;
+  --green-tint: rgba(110, 196, 138, 0.14);
+  --amber-400: #e0a458;
+  --amber-tint: rgba(224, 164, 88, 0.14);
+  --red-400: #e0656f;
+  --red-tint: rgba(224, 101, 111, 0.14);
+
+  /* ============ SEMANTIC ALIASES — use these in components ============ */
+  --bg-page: var(--night-800);
+  --bg-void: var(--night-900);
+  --bg-sunken: var(--night-700);
+
+  --surface-card: var(--night-600);
+  --surface-raised: var(--night-500);
+  --surface-overlay: var(--night-400);
+  --surface-terminal: #0b0b14;
+
+  --border-soft: var(--line-soft);
+  --border-default: var(--line);
+  --border-strong: var(--line-strong);
+  --border-accent: rgba(217, 119, 87, 0.45);
+
+  --text-strong: var(--moon-100);
+  --text-body: var(--moon-200);
+  --text-muted: var(--moon-300);
+  --text-dim: var(--moon-400);
+  --text-disabled: var(--moon-500);
+  --text-on-accent: #1a0f0a;
+
+  --accent: var(--terra-500);
+  --accent-hover: var(--terra-400);
+  --accent-press: var(--terra-600);
+  --accent-tint: var(--terra-tint);
+  --accent-glow: var(--terra-glow);
+
+  --link: var(--indigo-400);
+  --link-hover: var(--indigo-300);
+  --focus-ring: var(--indigo-500);
+
+  --success: var(--green-400);
+  --warning: var(--amber-400);
+  --danger: var(--red-400);
+  --info: var(--cyan-400);
+
+  --code-comment: var(--moon-400);
+  --code-keyword: var(--indigo-400);
+  --code-string: var(--green-400);
+  --code-fn: var(--terra-400);
+  --code-num: var(--cyan-400);
+  --code-punct: var(--moon-300);
+  --code-prompt: var(--terra-500);
+
+  /* ---- Families: aliased to the self-hosted next/font variables ---- */
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), 'SFMono-Regular', ui-monospace,
+    'Cascadia Code', Menlo, Consolas, monospace;
+
+  /* ---- Weights ---- */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extra: 800;
+
+  /* ---- Type scale ---- */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 25px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 72px;
+  --text-6xl: 92px;
+
+  /* ---- Line heights ---- */
+  --leading-tight: 1.06;
+  --leading-snug: 1.22;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* ---- Letter spacing ---- */
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-eyebrow: 0.16em;
+
+  /* ---- Semantic roles ---- */
+  --display-font: var(--font-sans);
+  --display-weight: var(--fw-extra);
+  --display-tracking: var(--tracking-tight);
+
+  --heading-font: var(--font-sans);
+  --heading-weight: var(--fw-bold);
+
+  --body-font: var(--font-sans);
+  --body-weight: var(--fw-regular);
+
+  --eyebrow-font: var(--font-mono);
+  --eyebrow-weight: var(--fw-medium);
+  --eyebrow-tracking: var(--tracking-eyebrow);
+
+  --code-font: var(--font-mono);
+
+  /* ---- Spacing scale (4px base) ---- */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* ---- Radius ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation ---- */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --elev-4: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* ---- Glows ---- */
+  --glow-accent:
+    0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
+  --glow-cool:
+    0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
+  --glow-focus: 0 0 0 3px rgba(124, 147, 240, 0.45);
+
+  /* ---- Motion ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+
+  /* ---- Layout ---- */
+  --container-max: 1200px;
+  --container-prose: 720px;
+  --nav-height: 64px;
+}

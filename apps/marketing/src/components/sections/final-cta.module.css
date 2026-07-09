@@ -1,0 +1,45 @@
+.section {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-24) 0;
+  background: var(--bg-void);
+  border-top: 1px solid var(--border-default);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: var(--container-prose);
+  text-align: center;
+}
+
+.header {
+  font-size: clamp(1.75rem, 3.6vw, var(--text-3xl));
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-5);
+}
+
+.body {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-8);
+}
+
+.installBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+  margin: 0 auto var(--space-6);
+  max-width: 480px;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}

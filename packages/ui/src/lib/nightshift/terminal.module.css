@@ -1,0 +1,94 @@
+.terminal {
+  background: var(--surface-terminal);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--elev-3);
+  font-family: var(--font-mono);
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 11px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.dots {
+  display: flex;
+  gap: 7px;
+}
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dotRed {
+  background: #ff5f57;
+}
+.dotAmber {
+  background: #febc2e;
+}
+.dotGreen {
+  background: #28c840;
+}
+
+.title {
+  flex: 1;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  letter-spacing: var(--tracking-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 46px;
+}
+
+.body {
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--moon-200);
+}
+
+.line {
+  white-space: pre-wrap;
+}
+.dim {
+  color: var(--text-dim);
+}
+
+.tone-default {
+  color: var(--moon-200);
+}
+.tone-success {
+  color: var(--success);
+}
+.tone-warning {
+  color: var(--warning);
+}
+.tone-danger {
+  color: var(--danger);
+}
+.tone-info {
+  color: var(--info);
+}
+.tone-muted {
+  color: var(--text-dim);
+}
+.tone-accent {
+  color: var(--terra-400);
+}
+
+.prompt {
+  color: var(--code-prompt);
+  margin-right: var(--space-2);
+}
+
+.agent {
+  color: var(--terra-400);
+}

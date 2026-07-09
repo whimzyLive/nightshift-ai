@@ -1,0 +1,69 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-24) 0 var(--space-20);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.copy {
+  min-width: 0;
+}
+
+.headline {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-extra);
+  font-size: clamp(2.25rem, 5vw, var(--text-5xl));
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-5);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.subheadline {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+  max-width: 560px;
+  margin: 0 0 var(--space-8);
+}
+
+.installBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 520px;
+  margin-bottom: var(--space-6);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.visual {
+  min-width: 0;
+}
+
+.pipelineLine {
+  color: var(--terra-400);
+}
+
+@media (min-width: 960px) {
+  .inner {
+    grid-template-columns: 1.1fr 0.9fr;
+  }
+}

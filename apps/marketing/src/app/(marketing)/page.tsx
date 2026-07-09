@@ -1,157 +1,70 @@
-import { HeroBanner, FeatureCard } from '@nightshift-ai/ui';
-import styles from './page.module.css';
+import type { Metadata } from 'next';
 
-const features = [
-  {
-    icon: '⚡',
-    title: 'Computation Caching',
-    description:
-      'Nx caches the output of every task. Re-running a cached task takes milliseconds, not minutes.',
-    href: 'https://nx.dev/docs/features/cache-task-results',
+import { Faq } from '../../components/sections/faq';
+import { FinalCta } from '../../components/sections/final-cta';
+import { Hero } from '../../components/sections/hero';
+import { HowItWorks } from '../../components/sections/how-it-works';
+import { Problem } from '../../components/sections/problem';
+import { ProofBar } from '../../components/sections/proof-bar';
+import { Team } from '../../components/sections/team';
+import { WhyDifferent } from '../../components/sections/why-different';
+import { SiteFooter } from '../../components/site-footer';
+import { SiteNav } from '../../components/site-nav';
+import { CANONICAL_URL, JSON_LD } from '../../content/site';
+
+export const metadata: Metadata = {
+  title: 'nightshift — your AI software team that ships while you sleep',
+  description:
+    'nightshift is a free, MIT-licensed Claude Code plugin that runs your whole SDLC. It reads a Jira ticket and ships the spec, plan, code, and review automatically.',
+  alternates: {
+    canonical: CANONICAL_URL,
   },
-  {
-    icon: '🎯',
-    title: 'Affected Commands',
-    description:
-      'Run only the tasks that are affected by your latest changes. Skip everything else.',
-    href: 'https://nx.dev/docs/features/ci-features/affected',
+  icons: {
+    icon: '/brand/favicon.svg',
   },
-  {
-    icon: '🏗️',
-    title: 'Module Boundaries',
+  openGraph: {
+    type: 'website',
+    siteName: 'nightshift',
+    title: 'Your AI software team that ships while you sleep',
     description:
-      'Enforce architectural rules with ESLint. Keep your codebase modular as it grows.',
-    href: 'https://nx.dev/docs/features/enforce-module-boundaries',
+      'A Claude Code plugin that turns one terminal into a full delivery team — PM, architect, tech lead, engineers, QA. Ticket in, reviewed PR out. Free and MIT.',
+    url: CANONICAL_URL,
+    images: [
+      {
+        url: `${CANONICAL_URL}/og-image.png`,
+        alt: 'nightshift pipeline: Jira ticket to spec to plan to implementation to review to PR',
+      },
+    ],
   },
-  {
-    icon: '☁️',
-    title: 'Nx Cloud',
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Your AI software team that ships while you sleep',
     description:
-      'Remote caching, distributed task execution, and self-healing CI - all in one platform.',
-    href: 'https://cloud.nx.app/get-started',
+      'A Claude Code plugin that runs your whole SDLC — spec, plan, code, review — from one ticket. Free and MIT.',
+    images: [`${CANONICAL_URL}/og-image.png`],
   },
-  {
-    icon: '📦',
-    title: 'Shared UI Library',
-    description:
-      'This page itself imports components from packages/ui - a shared React library wired into the workspace.',
-  },
-  {
-    icon: '🔍',
-    title: 'Project Graph',
-    description:
-      'Visualize your workspace dependencies with a single command: npx nx graph.',
-    href: 'https://nx.dev/docs/features/explore-graph',
-  },
-];
+};
 
 export default function Page() {
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <span className={styles.logo}>NX</span>
-        <nav className={styles.nav}>
-          <a
-            href="https://nx.dev/docs/getting-started/intro"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Docs
-          </a>
-          <a href="https://nx.dev/blog" target="_blank" rel="noreferrer">
-            Blog
-          </a>
-          <a
-            href="https://cloud.nx.app/get-started"
-            target="_blank"
-            rel="noreferrer"
-            className={styles.cloudLink}
-          >
-            Connect to Nx Cloud
-          </a>
-        </nav>
-      </header>
-
-      <main className={styles.main}>
-        <HeroBanner
-          title="Nx + Next.js Starter"
-          subtitle="A production-ready monorepo template with App Router, shared UI libraries, and Nx superpowers built in."
-          ctaHref="https://cloud.nx.app/get-started"
-          ctaLabel="Enable Nx Cloud - Free Remote Cache"
-        />
-
-        <section className={styles.cloudCallout}>
-          <div className={styles.cloudCalloutInner}>
-            <span className={styles.cloudIcon}>☁️</span>
-            <div>
-              <strong>Speed up CI with Nx Cloud</strong>
-              <p>
-                Remote caching, distributed task execution (DTE), and
-                self-healing CI.{' '}
-                <a
-                  href="https://cloud.nx.app/get-started"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Connect your workspace - it&apos;s free to start.
-                </a>
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className={styles.featuresSection}>
-          <h2 className={styles.sectionTitle}>What&apos;s included</h2>
-          <div className={styles.featuresGrid}>
-            {features.map((f) => (
-              <FeatureCard key={f.title} {...f} />
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.commandsSection}>
-          <h2 className={styles.sectionTitle}>Quick commands</h2>
-          <div className={styles.commandsGrid}>
-            <div className={styles.commandBlock}>
-              <h3>Develop</h3>
-              <pre>
-                <code>npx nx serve web</code>
-              </pre>
-            </div>
-            <div className={styles.commandBlock}>
-              <h3>Build all</h3>
-              <pre>
-                <code>npx nx run-many -t build</code>
-              </pre>
-            </div>
-            <div className={styles.commandBlock}>
-              <h3>Test affected</h3>
-              <pre>
-                <code>npx nx affected -t test</code>
-              </pre>
-            </div>
-            <div className={styles.commandBlock}>
-              <h3>Visualize graph</h3>
-              <pre>
-                <code>npx nx graph</code>
-              </pre>
-            </div>
-          </div>
-        </section>
+    <>
+      {/* JSON-LD embedded verbatim from docs/gtm/site-brief.md §3. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
+      <SiteNav />
+      <main>
+        <Hero />
+        <ProofBar />
+        <Problem />
+        <HowItWorks />
+        <Team />
+        <WhyDifferent />
+        <Faq />
+        <FinalCta />
       </main>
-
-      <footer className={styles.footer}>
-        <p>
-          Built with{' '}
-          <a href="https://nx.dev" target="_blank" rel="noreferrer">
-            Nx
-          </a>{' '}
-          and{' '}
-          <a href="https://nextjs.org" target="_blank" rel="noreferrer">
-            Next.js
-          </a>
-        </p>
-      </footer>
-    </div>
+      <SiteFooter />
+    </>
   );
 }

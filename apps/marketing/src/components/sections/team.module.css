@@ -1,0 +1,39 @@
+.section {
+  padding: var(--space-24) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.intro {
+  max-width: var(--container-prose);
+  margin: 0 auto var(--space-10);
+  text-align: center;
+}
+
+.header {
+  font-size: clamp(1.75rem, 3.6vw, var(--text-3xl));
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.body {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.roleList {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--space-4);
+}

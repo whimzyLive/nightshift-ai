@@ -1,0 +1,26 @@
+.proofBar {
+  background: var(--surface-card);
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  padding: var(--space-5) 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.item {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--moon-100);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.separator {
+  color: var(--text-muted);
+}
