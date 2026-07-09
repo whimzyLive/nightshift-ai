@@ -252,9 +252,10 @@ sync with this graph.
 | NA-4 | NA-8 | Pulse's publish stage routes by the channel ownership NA-4 configures |
 | NA-4 | NA-10 | Launch routes trust-sensitive channels using the ownership NA-4 configures |
 | NA-5 | NA-9 | Report correlates against the KPI metric/source NA-5 sets up |
+| NA-6 | NA-8 | NA-6 ships the content-writer agent definition (context contract + landing copy); NA-8 extends it for per-channel drafts |
 | NA-6 | NA-10 | Launch reuses the landing-site handoff produced by NA-6 |
 | NA-8 | NA-9 | Report correlates against the UTM-tagged content log NA-8 produces |
-| NA-8 | NA-10 | Launch reuses the content-writer/copy-gate infrastructure NA-8 builds |
+| NA-8 | NA-10 | Launch reuses the per-channel content-writer extensions and copy-gate infrastructure NA-8 builds |
 | NA-8 | NA-11 | Engagement poll is step 3 of the pulse loop NA-8 implements |
 
 ## Product Checks

@@ -52,7 +52,7 @@ plugins/gtm/
 ├── agents/
 │   ├── product-marketing-manager.md # PMM — marketing mirror of sdlc's product-manager: vague request → GTM brief
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
-│   ├── content-writer.md        # per-channel drafts + media, obeys postiz integration schema
+│   ├── content-writer.md        # all copy production: landing-page + per-channel drafts + media; hard-requires product-marketing context
 │   └── growth-analyst.md        # KPI + analytics pull, digest, calendar tuning, social-proof harvest
 ├── commands/
 │   ├── init.md      # scaffold config, verify Postiz via postiz CLI, product-marketing context
@@ -87,6 +87,22 @@ marketingskills skills (`product-marketing` for context; `launch` / `content-str
 `copywriting` as needed) and the `postiz` skill for any Postiz operation (**never raw HTTP**). NA-3
 ships the agent definition; the brief-producing workflows belong to downstream stories
 (NA-4..NA-8, NA-11).
+
+### `content-writer` agent
+
+The single copy-production role (the consultancy's copywriter / conversion copywriter): **all**
+customer-facing copy is drafted by this agent, never inline in a command. Commands stay thin glue —
+they dispatch the writer and handle orchestration/handoff.
+
+**Context contract (enforced in the agent definition, inherited by every consumer):** before
+drafting anything, the agent MUST read `.agents/product-marketing.md` (positioning/ICP/audience)
+and `refs/voice-rules.md`, and MUST STOP with a clear error if the product-marketing context is
+missing — copy is never produced without locked positioning.
+
+**Delivery is split across stories:** **NA-6 ships the agent definition** (context contract +
+landing-page capability, using marketingskills `copywriting` + `cro`); **NA-8 extends it** with
+per-channel drafts, media generation, and postiz integration-schema compliance. Hence the
+`NA-6 Blocks NA-8` dependency edge.
 
 ## Commands
 
@@ -171,7 +187,9 @@ calendar adjustments (feeds next pulse).
 
 ### `/gtm:site`
 
-marketingskills `copywriting` + `cro` produce copy → `nightshift-design` brand tokens → build
+Thin orchestrator — no copy logic in the command. Dispatch the `content-writer` agent
+(task = landing page; skills `copywriting` + `cro`; the agent's context contract enforces
+`.agents/product-marketing.md` + voice rules) → apply `nightshift-design` brand tokens → build
 handoff: sdlc installed → dispatch its web-engineer; else write `docs/gtm/site-brief.md`.
 
 ### `/gtm:docs`
