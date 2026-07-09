@@ -52,7 +52,7 @@ plugins/gtm/
 ├── agents/
 │   ├── product-marketing-manager.md # PMM — marketing mirror of sdlc's product-manager: vague request → GTM brief
 │   ├── marketing-strategist.md  # positioning, calendar, channel mix
-│   ├── content-writer.md        # all copy production: landing-page + per-channel drafts + media; hard-requires product-marketing context
+│   ├── content-writer.md        # all copy production — NA-6 ships landing-page ladder; NA-8 adds per-channel drafts + media; hard-requires product-marketing context
 │   └── growth-analyst.md        # KPI + analytics pull, digest, calendar tuning, social-proof harvest
 ├── commands/
 │   ├── init.md      # scaffold config, verify Postiz via postiz CLI, product-marketing context
@@ -95,9 +95,10 @@ customer-facing copy is drafted by this agent, never inline in a command. Comman
 they dispatch the writer and handle orchestration/handoff.
 
 **Context contract (enforced in the agent definition, inherited by every consumer):** before
-drafting anything, the agent MUST read `.agents/product-marketing.md` (positioning/ICP/audience)
-and `refs/voice-rules.md`, and MUST STOP with a clear error if the product-marketing context is
-missing — copy is never produced without locked positioning.
+drafting anything, the agent MUST read `.agents/product-marketing.md` (repo root,
+positioning/ICP/audience) and `plugins/gtm/refs/voice-rules.md` (the plugin's `refs/voice-rules.md`,
+resolved via `${CLAUDE_PLUGIN_ROOT}` at run time), and MUST STOP with a clear error if the
+product-marketing context is missing — copy is never produced without locked positioning.
 
 **Task-scoped skill ladders (one agent, per-task loadout — skills load on demand, so the unused
 ladder costs nothing; this is deliberate instead of splitting a separate site-copywriter agent,
