@@ -67,3 +67,6 @@ tools/portability-denylist.txt
 .env
 .env*
 !.env.example
+
+# sdlc plugin-root marker — user/machine-specific cache path, never commit (rewritten by /sdlc:init)
+.claude/.sdlc-plugin-root
