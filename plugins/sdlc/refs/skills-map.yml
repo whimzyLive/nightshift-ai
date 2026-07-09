@@ -104,6 +104,18 @@ skills:
     when:
       - dep: electrodb
 
+  - name: atomic-design
+    description: Framework-agnostic atomic design methodology — decompose any UI into atoms, molecules, organisms, templates, and pages
+    domains: [web-engineer]
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/atomic-design
+    when:
+      - framework: React
+      - framework: Vue
+      - framework: Next.js
+      - framework: React Native
+      - framework: Expo
+
 # Frameworks / ORMs with no built-in skill suggestion — user must add via "Other":
 #   Svelte       → no built-in suggestion
 #   FastAPI      → no built-in suggestion

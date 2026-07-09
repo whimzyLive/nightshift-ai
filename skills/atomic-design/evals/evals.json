@@ -1,0 +1,40 @@
+{
+  "skill_name": "atomic-design",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Decompose a login form (heading, email field, password field, a submit button, and a 'forgot password' link) into atomic design levels.",
+      "expected_output": "The individual heading text, input controls, button, and link are atoms; the labelled email and password field groupings are molecules; the assembled login form is an organism; the surrounding auth-page skeleton is a template; the rendered login screen with real copy is a page.",
+      "assertions": [
+        "Classifies single controls (heading, input, button, link) as atoms",
+        "Classifies a label+input grouping as a molecule",
+        "Classifies the assembled form section as an organism",
+        "Distinguishes the placeholder layout (template) from the populated instance (page)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Decompose a site search bar that has an icon, a text input with placeholder text, and a submit button, sitting inside a page header alongside a logo and a row of navigation links.",
+      "expected_output": "The icon, text input, submit button, logo, and each individual navigation link are atoms; the search bar (icon + input + button) and the navigation-links grouping are molecules; the whole header combining the logo, navigation molecule, and search molecule is an organism; a page skeleton placing this header above a placeholder content area is a template; the same skeleton rendered with a real logo, real nav labels, and real page content is a page.",
+      "assertions": [
+        "Classifies the icon, input, button, logo, and individual links as atoms",
+        "Classifies the search bar (icon+input+button) as a molecule distinct from the atoms it contains",
+        "Classifies the navigation-links grouping as a molecule",
+        "Classifies the full header (logo + nav molecule + search molecule) as an organism",
+        "Identifies the placeholder page skeleton as a template, separate from the content-filled page"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Decompose a full content listing page: a page header (logo, nav links, search bar), a grid of item-summary cards (each with an image, a title, and a price), a pagination control (previous button, page-number buttons, next button), and a footer (copyright text and a row of links). The page currently shows real items with real prices and real images.",
+      "expected_output": "Images, titles, prices, individual buttons, copyright text, and individual links are atoms; the price display combined with its label, the previous/next button plus page-number cluster, and the search bar are molecules; the header, the grid of item-summary cards, the pagination control, and the footer are each organisms; the arrangement of header/grid/pagination/footer with placeholder items is the template; the same arrangement rendered with the real items, prices, and images described in the prompt is the page.",
+      "assertions": [
+        "Classifies images, titles, prices, and individual buttons/links as atoms",
+        "Classifies the pagination cluster (prev/next + page numbers) as a molecule",
+        "Classifies the item-summary card as its own composed unit built from atoms and/or molecules",
+        "Classifies the header, item grid, pagination control, and footer as separate organisms",
+        "Identifies the page as the template populated with the real items/prices/images given in the prompt, not a separate placeholder state"
+      ]
+    }
+  ]
+}
