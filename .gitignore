@@ -65,3 +65,5 @@ tools/portability-denylist.txt
 
 # Ignore env files for local development (never commit)
 .env
+.env*
+!.env.example
