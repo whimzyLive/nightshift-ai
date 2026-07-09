@@ -96,7 +96,7 @@ These are intentional exclusions from the ladder, not omissions — document the
 ## Output — the handoff artifact
 
 Produce the copy deck plus the full SEO layer as a single structured Markdown artifact and return
-its location plus a summary. Your boundary ends at "reviewed-ready copy + SEO layer" — you do
+it inline plus a summary. Your boundary ends at "reviewed-ready copy + SEO layer" — you do
 **not** apply brand tokens, run the copy-review gate, or route the build. Those are `/gtm:site`'s
 orchestration steps (command steps 3, 4, 5).
 

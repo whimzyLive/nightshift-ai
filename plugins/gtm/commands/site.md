@@ -40,8 +40,9 @@ Dispatch the `content-writer` agent with `task=landing-page`, forwarding `--coun
 was passed on this command. No inline copy work happens here — the command only passes the task
 through and waits for the agent's handoff artifact (copy deck + full SEO layer, per
 `content-writer`'s six-section output shape). The agent returns the artifact **inline** in its
-final message — it never writes `docs/gtm/site-brief.md` itself (persistence is step 5b, after the
-gate and re-run guard).
+final message (or, for a very large artifact, at a session-temp scratch path — never the brief
+path) — it never writes `docs/gtm/site-brief.md` itself (persistence is step 5b, after the gate
+and re-run guard).
 
 ## Step 3 — Copy-review gate
 

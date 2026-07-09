@@ -135,7 +135,9 @@ discoverability; run in this exact order):**
 `marketing-psychology` (subsumed by `copywriting`).
 
 **Output — the handoff artifact (see "Handoff artifact shape" below):** the agent produces the copy
-deck plus the full SEO layer as a single structured artifact and returns its location + a summary.
+deck plus the full SEO layer as a single structured artifact and returns it inline + a summary (a
+session-temp scratch location is acceptable for very large artifacts — never the brief path; the
+agent never writes `docs/gtm/site-brief.md` itself).
 The agent does **not** apply brand tokens, run the copy-review gate, or route the build — those are
 the command's orchestration steps (Artifact 3). The agent's boundary ends at "reviewed-ready copy +
 SEO layer".
