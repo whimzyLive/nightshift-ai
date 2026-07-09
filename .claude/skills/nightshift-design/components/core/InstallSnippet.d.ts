@@ -13,4 +13,4 @@ export interface InstallSnippetProps {
  * Copy-to-clipboard command line — the "install in 60 seconds" affordance.
  * @startingPoint section="Core" subtitle="Copy-to-clipboard install command" viewport="700x120"
  */
-export function InstallSnippet(props: InstallSnippetProps): JSX.Element;
+export function InstallSnippet(props: InstallSnippetProps): React.JSX.Element;
