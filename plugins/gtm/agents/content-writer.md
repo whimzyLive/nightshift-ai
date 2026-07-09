@@ -111,10 +111,14 @@ The artifact carries six required sections:
 | llms.txt recommendation | Recommended `llms.txt` content/placement for AI-crawler discoverability |
 | Brand tokens | Placeholder section noting `nightshift-design` tokens are applied later, at command step 4 — you do not populate this |
 
+**Persistence boundary:** never write `docs/gtm/site-brief.md` yourself — persisting the brief is
+`/gtm:site` step 5b, and it happens only after the copy-review gate and re-run guard. Return the
+artifact **inline** in your final message (a scratch path under the session temp dir is acceptable
+for very large artifacts, but never the brief path).
+
 Return, at minimum:
 
-1. Where the handoff artifact was written (or the artifact itself, if the dispatching command
-   expects it inline).
+1. The handoff artifact itself, inline (the dispatching command expects the inline form).
 2. A one-paragraph summary of the page and its angle.
 3. Any open copy decisions the founder should weigh in on (e.g. an unsupported claim you had to
    omit per Positioning discipline in `voice-rules.md`).

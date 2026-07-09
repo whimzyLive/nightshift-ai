@@ -23,11 +23,11 @@ agents only.
 Verify both exist:
 
 ```bash
-[ -f ".claude/project/marketing-context.md" ] && [ -s ".agents/product-marketing.md" ] \
+[ -s ".claude/project/marketing-context.md" ] && [ -s ".agents/product-marketing.md" ] \
   && echo "PRECONDITION=ok" || echo "PRECONDITION=missing"
 ```
 
-If either is missing or empty, **STOP** before dispatching anything, with exactly:
+If either file is missing or empty, **STOP** before dispatching anything, with exactly:
 
 > Run `/gtm:init` first — marketing context is not set up.
 
@@ -39,7 +39,9 @@ a cleaner message and avoids a wasted dispatch, but the agent enforces the same 
 Dispatch the `content-writer` agent with `task=landing-page`, forwarding `--council` when the flag
 was passed on this command. No inline copy work happens here — the command only passes the task
 through and waits for the agent's handoff artifact (copy deck + full SEO layer, per
-`content-writer`'s six-section output shape).
+`content-writer`'s six-section output shape). The agent returns the artifact **inline** in its
+final message — it never writes `docs/gtm/site-brief.md` itself (persistence is step 5b, after the
+gate and re-run guard).
 
 ## Step 3 — Copy-review gate
 
@@ -49,10 +51,11 @@ Run the shared gate on the returned copy artifact: the marketingskills `copy-edi
 `voice-rules.md` stay in force). This is the same gate `/gtm:pulse` will reuse once NA-8 lands.
 
 - **PASS** — proceed to step 4.
-- **FAIL** — report each violation with its offending span (per `voice-rules.md`'s gate outcome
-  contract) and **STOP**. Nothing is branded, nothing is written to `docs/gtm/site-brief.md`, and no
-  web-engineer dispatch happens. There is no automatic revision loop — the founder addresses the
-  violations and re-runs `/gtm:site`.
+- **FAIL** — emit the violation list (each violation with its offending span, per
+  `voice-rules.md`'s gate outcome contract) **plus the final report in the step-6 format** (noting
+  the run stopped on FAIL), then **end the run — steps 4–5 are skipped**. Nothing is branded,
+  nothing is written to `docs/gtm/site-brief.md`, and no web-engineer dispatch happens. There is no
+  automatic revision loop — the founder addresses the violations and re-runs `/gtm:site`.
 
 ## Step 4 — Apply brand tokens
 
