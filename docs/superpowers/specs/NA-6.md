@@ -127,7 +127,7 @@ discoverability; run in this exact order):**
 | 3 | `cro` | Conversion pass over the copy deck (CTA placement, friction, hierarchy) | Required |
 | 4 | `ai-seo` + `schema` | Meta/OG tags, JSON-LD blocks, llms.txt recommendation | Required |
 | — | `offers` | Sharpen CTA/offer framing | **Conditional** — loaded only when CTA framing is weak (available in the pinned catalogue) |
-| — | `marketing-council` | Multi-perspective critique pass | **Conditional** — only when the dispatch carries `--council`; launch-critical pages only; off by default; never in pulse |
+| — | `marketing-council` | Multi-perspective critique pass | **Conditional** — runs iff the dispatch carries `--council` (the flag is the sole trigger; "launch-critical" guides callers on when to pass it, not a second agent-side gate); if the skill is unavailable the agent skips the pass and flags the skip in its return; off by default; never in pulse |
 
 **Deliberately excluded from the ladder** (documented in the agent as intentional, not an omission):
 `customer-research` (no real customer voice pre-launch — revisit at NA-11), `competitor-profiling` /
@@ -135,7 +135,9 @@ discoverability; run in this exact order):**
 `marketing-psychology` (subsumed by `copywriting`).
 
 **Output — the handoff artifact (see "Handoff artifact shape" below):** the agent produces the copy
-deck plus the full SEO layer as a single structured artifact and returns its location + a summary.
+deck plus the full SEO layer as a single structured artifact and returns it inline + a summary (a
+session-temp scratch location is acceptable for very large artifacts — never the brief path; the
+agent never writes `docs/gtm/site-brief.md` itself).
 The agent does **not** apply brand tokens, run the copy-review gate, or route the build — those are
 the command's orchestration steps (Artifact 3). The agent's boundary ends at "reviewed-ready copy +
 SEO layer".
@@ -183,35 +185,48 @@ agents' mechanism).
 - `--council` (optional) — forwarded to the content-writer dispatch to enable the
   `marketing-council` critique pass; off by default; intended for launch-critical pages only.
 - `--overwrite` (optional) — non-interactive override of the re-run guard: regenerate
-  `docs/gtm/site-brief.md` without prompting (see step 5a).
+  `docs/gtm/site-brief.md` without prompting (see step 1b).
 
 **Step ladder:**
 
 1. **Precondition check** — verify `.claude/project/marketing-context.md` and
-   `.agents/product-marketing.md` exist. If either is missing, STOP: *"Run `/gtm:init` first —
-   marketing context is not set up."* (The agent enforces the same STOP, but the command fails fast
-   before dispatch to give a cleaner message.)
+   `.agents/product-marketing.md` exist and are non-empty. If either fails, STOP: *"Run `/gtm:init`
+   first — marketing context is not set up."* (Guard asymmetry, stated honestly: the agent
+   independently enforces only the `.agents/product-marketing.md` STOP; this precondition is the
+   sole gate for `marketing-context.md`.) Then **ensure `.claude/.gtm-plugin-root` exists** —
+   it is a gitignored per-machine cache the dispatched agent hard-requires; the command holds the
+   native `${CLAUDE_PLUGIN_ROOT}` value and writes the marker when absent, before dispatch.
+1b. **Re-run guard — decided BEFORE the copy run** (brief existence is knowable up front; the
+   founder's choice must not cost a wasted dispatch). If `docs/gtm/site-brief.md` exists and no
+   `--overwrite`: prompt **refine** / **regenerate** / **skip** now (mirrors the `/gtm:init`
+   re-init guard). **skip** = no new copy run at all — jump to routing (5c/5d) with the existing
+   brief unchanged, and report that it was not re-gated this run (founder's explicit choice).
+   `--overwrite` ⇒ regenerate without prompting; no existing brief ⇒ fresh.
 2. **Dispatch content-writer** with `task=landing-page` (and `--council` when the flag is set). No
-   inline copy work — the command only passes the task through. The agent runs its ladder and returns
-   the handoff artifact (copy deck + SEO layer).
-3. **Copy-review gate** — run the shared gate: the marketingskills `copy-editing` skill **plus**
-   `refs/voice-rules.md` (Artifact 2), the merged project+plugin rules. Same gate as pulse. On FAIL:
-   report each violation with its offending span and **STOP** — nothing is branded or handed off,
-   no automatic revision loop (decided — see Resolved decisions).
+   inline copy work — the command only passes the task through. The agent returns the handoff
+   artifact (copy deck + SEO layer) inline, plus its `marketing-council` status (ran /
+   skipped-unavailable / not requested).
+3. **Copy-review gate — a verdict, not an edit.** The command applies the gate: the marketingskills
+   `copy-editing` skill is loaded **as review criteria only** (never as an editor — the gate must
+   not rewrite or "improve" the artifact), evaluated together with `refs/voice-rules.md`
+   (Artifact 2) as the merged project+plugin rules. Same gate as pulse. Emit exactly PASS or FAIL.
+   On FAIL: report each violation with its offending span and **STOP** — nothing is branded or
+   handed off, no automatic revision loop (decided — see Resolved decisions).
 4. **Apply brand tokens** — apply `nightshift-design` brand tokens sourced from `brand/BRAND_KIT.md`
    (the project brand kit) to the copy/section artifact so the handoff carries brand-correct
    typography, colour, and voice tokens. (Brand-token application is styling metadata on the copy
    deck, not a visual build.)
 5. **Write the brief, then route the build:**
-   - **5a. Re-run guard (before writing)** — if `docs/gtm/site-brief.md` already exists, do NOT
-     silently overwrite (mirrors the `/gtm:init` re-init guard). With `--overwrite`: regenerate
-     without prompting. Otherwise prompt the founder with three options: **refine** (update the
-     existing brief with the newly generated changes), **regenerate** (fresh copy), or **skip**
-     (keep the existing brief untouched; continue to routing with it). Each written brief carries a
-     one-line provenance header (date + source command).
+   - **5a. Persist per the step-1b guard decision** — fresh/regenerate/`--overwrite`: write this
+     run's gated, branded artifact. **refine**: merge the new changes into the existing brief, then
+     **re-run the step-3 gate on the merged brief** (retained old spans were never gated this run —
+     only the merged whole passing satisfies AC-4 for the actual handoff artifact); merged-FAIL ⇒
+     existing brief untouched, this run's fresh artifact preserved at `docs/gtm/site-brief.new.md`,
+     run ends with the FAIL report. Each written brief carries a one-line provenance header
+     (date + source command).
    - **5b. Always write `docs/gtm/site-brief.md`** (AC-6) — the brief is the durable handoff
-     artifact in **both** branches, regardless of sdlc presence (on a 5a **skip**, the existing
-     brief is retained as that artifact; nothing new is written this run).
+     artifact routed in **both** branches, regardless of sdlc presence (on a step-1b **skip**, the
+     existing brief is retained as that artifact; no copy run occurred).
    - **5c. sdlc installed** — additionally dispatch sdlc's web-engineer agent **by agent name**
      (`sdlc:web-engineer` via the Agent tool) with the brief as its build input — never by a
      hardcoded file path (in a consumer repo the sdlc plugin lives under the
@@ -220,10 +235,13 @@ agents' mechanism).
    - **5d. sdlc absent** — no dispatch; the brief alone is the deliverable and the founder wires
      the build up or installs sdlc later.
    - **Both branches carry the full SEO layer** (AC-5) — the page map/IA, copy deck, JSON-LD
-     blocks, meta/OG tags, and llms.txt recommendation live in the brief, which is always written.
-6. **Report** — return: brief path + guard action taken, if any (fresh write / refine /
-   regenerate / skip / `--overwrite`), whether web-engineer was dispatched, gate result, and any
-   open copy decisions for the founder.
+     blocks, meta/OG tags, and llms.txt recommendation live in the brief.
+6. **Report** — completed-run fields (brief path, guard action, web-engineer dispatched or not)
+   apply only when the run reached step 5 and routed; a **step-3** gate-FAIL run instead states
+   explicitly that no brief was written and no guard ran, with the violation list, and a
+   **refine-merge** FAIL reports the untouched existing brief plus the preserved
+   `site-brief.new.md` path. Always include: gate result (PASS / FAIL / not-run-on-skip), the
+   agent's `marketing-council` status, and any open copy decisions for the founder.
 
 ---
 
@@ -263,13 +281,15 @@ multi-tenant service. The only access boundaries are structural:
 | Scenario | Behaviour |
 |----------|-----------|
 | `.agents/product-marketing.md` missing/empty | Agent STOPs with the "run `/gtm:init`" error; no copy produced. Command also fails fast at step 1 with the same guidance. |
-| `marketing-context.md` missing | Command STOPs at step 1 (precondition). |
-| Copy-review gate FAIL | Command STOPs after step 3; reports each violation + offending span; nothing branded or handed off. |
+| `marketing-context.md` missing/empty | Command STOPs at step 1 (precondition — the only guard for this file; the agent does not re-check it). |
+| `.claude/.gtm-plugin-root` missing | Non-error — step 1 writes it from the command's native `${CLAUDE_PLUGIN_ROOT}` before dispatch (gitignored per-machine cache, routinely absent on a fresh clone). |
+| Copy-review gate FAIL | Command STOPs after step 3; reports each violation + offending span in the step-6 FAIL format; nothing branded or handed off. |
+| Refine-merge gate FAIL | Existing brief untouched; this run's fresh gated artifact preserved at `docs/gtm/site-brief.new.md`; run ends with the FAIL report — no routing. |
 | `task=channel-draft` requested (NA-6) | Agent STOPs: "task=channel-draft is not available until NA-8." |
 | sdlc absent at handoff | Non-error — the brief (always written) is the deliverable; the report notes no web-engineer dispatch occurred. |
-| `docs/gtm/site-brief.md` already exists on re-run | Re-run guard (step 5a): prompt refine / regenerate / skip; `--overwrite` bypasses the prompt. Never silently overwritten. |
+| `docs/gtm/site-brief.md` already exists on re-run | Re-run guard (step 1b, BEFORE the copy run): prompt refine / regenerate / skip; `--overwrite` bypasses the prompt. Never silently overwritten. |
 | `brand/BRAND_KIT.md` missing | Degrade: proceed with unbranded copy deck and note the missing brand kit in the report (suggested default — do not hard-fail; brand is additive to copy). |
-| `--council` passed but `marketing-council` skill unavailable | Warn that the critique pass is skipped; continue (gate still runs). Suggested default — non-fatal. |
+| `--council` passed but `marketing-council` skill unavailable | Agent skips the pass and flags the skip in its return (documented agent fallback); command surfaces it in the report. Non-fatal; gate still runs. |
 
 ## Out of Scope
 
@@ -292,7 +312,7 @@ All former open questions were decided by the product owner in PR #53 review (20
   `claude plugin list` parsing.
 - **Gate FAIL behaviour** — STOP on errors. Violations are reported and the command stops; no
   automatic revision loop.
-- **`site-brief.md` re-run behaviour** — never overwrite silently. Re-run guard (step 5a) prompts
+- **`site-brief.md` re-run behaviour** — never overwrite silently. Re-run guard (step 1b, decided before the copy run) prompts
   refine / regenerate / skip, mirroring the `/gtm:init` re-init guard; `--overwrite` is the explicit
   non-interactive bypass. Every written brief carries a provenance header (date + source command).
 - **Brief always written** — `docs/gtm/site-brief.md` is produced in both handoff branches; the
