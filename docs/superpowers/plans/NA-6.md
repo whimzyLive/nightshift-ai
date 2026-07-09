@@ -215,8 +215,8 @@ Thin orchestrator — **no copy logic in the command** (AC-3). Commands receive 
   Run: `test -f plugins/gtm/commands/site.md && echo OK`
   Expected: `OK`
 
-  Run (no accidental agent resolver block — commands use native `${CLAUDE_PLUGIN_ROOT}`): `grep -c '.gtm-plugin-root' plugins/gtm/commands/site.md`
-  Expected: `0`
+  Run (no accidental agent resolver block — commands use native `${CLAUDE_PLUGIN_ROOT}`): `grep -cF '.claude/.gtm-plugin-root' plugins/gtm/commands/site.md`
+  Expected: `0` (fixed-string match on the full marker path — an unescaped-dot regex would count unrelated prose)
 
   Manual consistency checks:
   - Command contains NO copy logic — only dispatch/gate/brand/route (AC-3).

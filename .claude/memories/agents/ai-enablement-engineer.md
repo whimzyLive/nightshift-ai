@@ -3,13 +3,14 @@
 ## NA-6 — content-writer agent + voice-rules ref + /gtm:site command (`plugins/gtm`)
 
 - A plan's structural verification grep can accidentally match its own explanatory prose. The
-  NA-6 plan's Task 3 check `grep -c '.gtm-plugin-root' commands/site.md` expects `0` to prove "no
-  accidental agent resolver block" — but the unescaped `.` in that pattern matches any char, so a
-  sentence merely *explaining* "there is no `.claude/.gtm-plugin-root` resolver block here" still
-  trips the count to 1. When a verification grep is meant to detect a structural artifact (a
-  resolver header block), don't describe the artifact's literal marker filename in prose nearby —
-  reword to name the *mechanism* generically ("no plugin-root resolver block") so the check and the
-  prose don't collide. Always run the check for real rather than eyeballing the regex.
+  NA-6 plan's Task 3 check `grep -cF '.claude/.gtm-plugin-root' plugins/gtm/commands/site.md`
+  expects `0` to prove "no accidental agent resolver block" — use `-F` (fixed-string) on the full
+  marker path: an unescaped-dot regex (`grep -c '.gtm-plugin-root'`) matches any char before the
+  token and counts unrelated prose. Also: a sentence merely *explaining* "there is no
+  `.claude/.gtm-plugin-root` resolver block here" trips the count — when a verification grep
+  detects a structural artifact, don't name the artifact's literal marker in nearby prose; name the
+  *mechanism* generically ("no plugin-root resolver block"). Always run the check for real rather
+  than eyeballing the regex.
 - The gtm plugin's shared-gate boundary (`copy-editing` lives only on the command's gate step, never
   on the content-producing agent's `skills:` list) is easy to verify precisely: grep the file for
   the skill name and manually confirm the hit sits in prose ("deliberately not on this list") rather
