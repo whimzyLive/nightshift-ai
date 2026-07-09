@@ -1,0 +1,53 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3rem 1.5rem 2rem;
+  gap: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  background: #143055;
+  color: #96d1ff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid #1e4976;
+}
+
+.title {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+  color: #fff;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: #a3b4c8;
+  max-width: 560px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.cta {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: #096dd9;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.cta:hover {
+  background: #0558b0;
+}

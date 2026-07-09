@@ -1,0 +1,40 @@
+.link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.card {
+  background: #0d1f33;
+  border: 1px solid #1e3a55;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: border-color 0.2s, transform 0.2s;
+  height: 100%;
+}
+
+.link:hover .card,
+.card:hover {
+  border-color: #096dd9;
+  transform: translateY(-2px);
+}
+
+.icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e2eaf4;
+  margin: 0 0 0.5rem;
+}
+
+.description {
+  font-size: 0.875rem;
+  color: #7b95b0;
+  margin: 0;
+  line-height: 1.6;
+}

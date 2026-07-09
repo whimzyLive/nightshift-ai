@@ -1,0 +1,15 @@
+{
+  "name": "@nextjs-template/web",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "next": "~16.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "nx": {
+    "tags": [
+      "scope:web"
+    ]
+  }
+}
