@@ -42,7 +42,7 @@ environment and is never written to this file or any other file `/gtm:init` writ
 | Custom endpoint |              |
 | Value path      |              |
 | Auth env var    |              |
-| Verified value  | 3            |
+| Verified value  | 4            |
 
 **Secret hygiene:** only the `Auth env var` **name** is persisted above, never its value. The
 GitHub source persists no secret at all (it relies on ambient `gh` CLI auth). `Custom command` /
