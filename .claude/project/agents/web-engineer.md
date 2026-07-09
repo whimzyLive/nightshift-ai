@@ -3,6 +3,7 @@
 ## Project skills (invoke in order via the Skill tool)
 
 1. `payload` — Payload CMS 3 development (collections, fields, hooks, access control, queries, Local/REST API). Invoke before any work under apps/marketing/src/payload.config.ts, src/collections/, src/hooks/, or the (payload) route group.
+2. `ui-ux-pro-max` — UI/UX design intelligence (styles, palettes, font pairings, UX guidelines, charts; React/Next.js/Tailwind stacks). Invoke before designing, building, reviewing, or fixing any UI in apps/marketing or packages/ui.
 
 ## Directory guides (read before coding)
 
