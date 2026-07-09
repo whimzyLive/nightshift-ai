@@ -30,4 +30,24 @@ environment and is never written to this file or any other file `/gtm:init` writ
 | devto   | Rushi Patel | cmrc8fc340003o57rwrbk9mb4 | auto      | brand   | default | release-note, article-link, tip            |
 | x       | Rushi Patel | cmrc60gmz0001o57reda64cvn | draft     | founder | default | release-note, milestone, thread, demo-clip |
 
+## KPI
+
+| Token           | Value        |
+| --------------- | ------------ |
+| Metric name     | GitHub stars |
+| Source type     | managed      |
+| Provider        | github       |
+| GitHub metric   | stars        |
+| Custom command  |              |
+| Custom endpoint |              |
+| Value path      |              |
+| Auth env var    |              |
+| Verified value  | 3            |
+
+**Secret hygiene:** only the `Auth env var` **name** is persisted above, never its value. The
+GitHub source persists no secret at all (it relies on ambient `gh` CLI auth). `Custom command` /
+`Custom endpoint` strings are persisted verbatim and must reference an env var rather than embed a
+literal secret — the founder's env var value is read live from the environment at probe time and
+never written to this file.
+
 ## Voice
