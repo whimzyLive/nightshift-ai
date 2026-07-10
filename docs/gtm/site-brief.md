@@ -28,16 +28,16 @@ Home (/)                        ← this landing page
 
 ### URL map
 
-| Page | URL | Parent | Nav location | Priority | Status |
-|------|-----|--------|-------------|----------|--------|
-| Home / landing | `/` | — | — | High | This pass |
-| How it works | `/#how-it-works` | Home | Header | High | Anchor now |
-| The team (agents) | `/#agents` | Home | Header | Medium | Anchor now |
-| FAQ | `/#faq` | Home | Footer | Medium | Anchor now |
-| Docs | `/docs` | Home | Header + footer | High | Future slot |
-| Agents reference | `/agents` | Home | Footer | Medium | Future slot |
-| Changelog | `/changelog` | Home | Footer | Low | Future slot |
-| GitHub repo | `https://github.com/whimzyLive/nightshift-ai` | — | Header + footer | High | External |
+| Page              | URL                                           | Parent | Nav location    | Priority | Status      |
+| ----------------- | --------------------------------------------- | ------ | --------------- | -------- | ----------- |
+| Home / landing    | `/`                                           | —      | —               | High     | This pass   |
+| How it works      | `/#how-it-works`                              | Home   | Header          | High     | Anchor now  |
+| The team (agents) | `/#agents`                                    | Home   | Header          | Medium   | Anchor now  |
+| FAQ               | `/#faq`                                       | Home   | Footer          | Medium   | Anchor now  |
+| Docs              | `/docs`                                       | Home   | Header + footer | High     | Future slot |
+| Agents reference  | `/agents`                                     | Home   | Footer          | Medium   | Future slot |
+| Changelog         | `/changelog`                                  | Home   | Footer          | Low      | Future slot |
+| GitHub repo       | `https://github.com/whimzyLive/nightshift-ai` | —      | Header + footer | High     | External    |
 
 ### Navigation spec
 
@@ -80,10 +80,12 @@ Home (/)                        ← this landing page
 
 **Primary CTA (install block):**
 Label above the block: `Install in 60 seconds`
+
 ```
 /plugin marketplace add whimzyLive/nightshift-ai
 /plugin install sdlc@nightshift
 ```
+
 Button/affordance: `Copy install command`
 
 **Secondary CTA:** `Star nightshift on GitHub`
@@ -92,12 +94,14 @@ Button/affordance: `Copy install command`
 `Jira ticket → spec → plan → implementation → review → PR`
 
 _Headline alternatives:_
+
 - **A (locked one-liner, recommended):** "Your AI software team that ships while you sleep." — Matches the canonical positioning and the star-CTA business goal; the sleep line is the owned phrase.
 - **B:** "Ticket in, reviewed PR out." — Customer-language quote; sharper for a dev audience arriving from a link that already explains the category. Good as an A/B test variant.
 - **C:** "AI writes the code. nightshift runs the other 80%." — Leads with the wedge (process, not code). Strongest for cold visitors who think "another code assistant."
 
 _Primary-CTA alternatives:_
-- **A (recommended):** show the two-line command inline with `Copy install command` — the conversion *is* pasting a command; showing it removes a click.
+
+- **A (recommended):** show the two-line command inline with `Copy install command` — the conversion _is_ pasting a command; showing it removes a click.
 - **B:** button `Add to Claude Code` linking to install docs — cleaner visually, adds one step.
 
 ### Section 2 — Proof bar
@@ -117,6 +121,7 @@ _(No customer logos or testimonials — none exist yet. See open decisions.)_
 Coding assistants handle the middle 20%. The other 80% — the process — stays manual, or gets skipped on vibes and shipped unreviewed.
 
 **Sub-points (three):**
+
 - **Vague ticket, no spec.** "Add auth" becomes whatever you remember at 4pm.
 - **No enforced lifecycle.** Runbooks exist. Nobody follows them without enforcement.
 - **Self-review is a rubber stamp.** Reviewing your own AI output isn't review.
@@ -133,13 +138,13 @@ Coding assistants handle the middle 20%. The other 80% — the process — stays
 /auto PROJ-142
 ```
 
-| Step | What runs | What you get |
-|------|-----------|--------------|
-| 1 | PRD + spec | The ticket becomes a written spec |
-| 2 | Plan | An implementation plan, reviewed before code |
-| 3 | Implementation | Code written to the plan, on its own branch |
-| 4 | QA review | Independent review by a different agent than the author |
-| 5 | PR + ticket comment | A reviewed PR, with the paper trail linked back to the ticket |
+| Step | What runs           | What you get                                                  |
+| ---- | ------------------- | ------------------------------------------------------------- |
+| 1    | PRD + spec          | The ticket becomes a written spec                             |
+| 2    | Plan                | An implementation plan, reviewed before code                  |
+| 3    | Implementation      | Code written to the plan, on its own branch                   |
+| 4    | QA review           | Independent review by a different agent than the author       |
+| 5    | PR + ticket comment | A reviewed PR, with the paper trail linked back to the ticket |
 
 **Fast path note:** Small stories don't need the full ceremony. Stories at or under the lightweight threshold (default ≤3 points) skip straight to implementation.
 
@@ -161,12 +166,12 @@ Coding assistants handle the middle 20%. The other 80% — the process — stays
 
 Four value cards:
 
-| Card header | Body |
-|-------------|------|
-| The lifecycle is the product | Spec → plan → implement → review, enforced by the commands and the handoff protocol. Tests are the merge gate. Review is done by a different agent than the one who wrote the code. |
-| Generic agents, per-repo config | No hardcoding. Every project fact lives in one `project-context.md`. The same plugin runs a Node monorepo, a Python service, or a mobile app. |
-| Issue-tracker native | It reads the ticket, derives the branch, plan, and PR, and comments the result back to Jira and GitHub. |
-| Free, open, yours to fork | Built on open Claude Code primitives, MIT-licensed. Fork it, extend it, swap a role. No lock-in, no paid tier gate. |
+| Card header                     | Body                                                                                                                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The lifecycle is the product    | Spec → plan → implement → review, enforced by the commands and the handoff protocol. Tests are the merge gate. Review is done by a different agent than the one who wrote the code. |
+| Generic agents, per-repo config | No hardcoding. Every project fact lives in one `project-context.md`. The same plugin runs a Node monorepo, a Python service, or a mobile app.                                       |
+| Issue-tracker native            | It reads the ticket, derives the branch, plan, and PR, and comments the result back to Jira and GitHub.                                                                             |
+| Free, open, yours to fork       | Built on open Claude Code primitives, MIT-licensed. Fork it, extend it, swap a role. No lock-in, no paid tier gate.                                                                 |
 
 ### Section 7 — Objections / FAQ
 
@@ -197,10 +202,12 @@ Nothing. It's free and MIT-licensed. Adoption is the only metric we track.
 **Body:** Install takes about a minute. Point it at a ticket and watch the spec, plan, code, and review land — with the paper trail linked back where your team already works.
 
 **Install block (repeat of hero):**
+
 ```
 /plugin marketplace add whimzyLive/nightshift-ai
 /plugin install sdlc@nightshift
 ```
+
 Primary button: `Copy install command`
 Secondary button: `Star nightshift on GitHub`
 
@@ -211,22 +218,26 @@ Secondary button: `Star nightshift on GitHub`
 Applied after drafting; the copy deck above already reflects these decisions.
 
 **Quick wins (baked in):**
+
 - **Install command shown inline in the hero, not behind a click.** The conversion action is pasting a command — surfacing it removes a step and matches how this dev audience installs things.
 - **CTA copy communicates value, not action.** `Copy install command` and `Star nightshift on GitHub` over generic `Get started` / `Sign up`.
 - **Proof bar directly under the hero.** Concrete numbers (11 / 10 / 60 seconds / MIT) do the credibility job that customer logos would, given none exist yet.
 - **Install block repeated top and bottom** — primary CTA at both the first and last decision points.
 
 **High-impact / hierarchy:**
+
 - **One primary action throughout** (install), one consistent secondary (star). No competing CTAs.
 - **Problem section leads with the customer's own words** ("you lose it around the code") before any product claim.
 - **Objection handling given its own section** — the top objection ("another wrapper?") is the exact bounce risk for this category.
 - **`/auto` run rendered as a labeled table**, not prose — reads faster, more extractable (feeds AI-SEO).
 
 **Friction removed:**
+
 - No signup, no form, no email gate anywhere — install is a terminal command; the page's only job is to get them to copy it. Keep it that way.
 - Free/MIT stated in the proof bar, the value cards, and the FAQ so "what's the catch" is answered before it's asked.
 
 **Test ideas (post-launch, not blocking):**
+
 - Headline A vs C (locked one-liner vs the "other 80%" wedge) for cold traffic.
 - Star count as live proof vs omitted (see open decisions).
 - Hero visual: static pipeline line vs an animated/asciinema `/auto` run.
@@ -258,14 +269,7 @@ Applied after drafting; the copy deck above already reflects these decisions.
         "price": "0",
         "priceCurrency": "USD"
       },
-      "featureList": [
-        "11 specialized agents with tight charters",
-        "10 slash commands",
-        "Enforced lifecycle: spec, plan, implement, review",
-        "Issue-tracker native (Jira and GitHub)",
-        "Generic agents configured per repo via project-context.md",
-        "Independent review by a different agent than the author"
-      ],
+      "featureList": ["11 specialized agents with tight charters", "10 slash commands", "Enforced lifecycle: spec, plan, implement, review", "Issue-tracker native (Jira and GitHub)", "Generic agents configured per repo via project-context.md", "Independent review by a different agent than the author"],
       "author": { "@id": "https://github.com/whimzyLive#org" },
       "publisher": { "@id": "https://github.com/whimzyLive#org" }
     },
@@ -274,9 +278,7 @@ Applied after drafting; the copy deck above already reflects these decisions.
       "@id": "https://github.com/whimzyLive#org",
       "name": "whimzyLive",
       "url": "https://github.com/whimzyLive",
-      "sameAs": [
-        "https://github.com/whimzyLive/nightshift-ai"
-      ]
+      "sameAs": ["https://github.com/whimzyLive/nightshift-ai"]
     },
     {
       "@type": "FAQPage",
@@ -339,6 +341,7 @@ Applied after drafting; the copy deck above already reflects these decisions.
 **Note for build:** if the landing page ships on its own domain rather than the GitHub repo URL, swap every `url`/`@id` host accordingly and add a `WebSite` node. GitHub repo kept as canonical because that's the current Landing URL token.
 
 **Validation checklist:**
+
 - [ ] Passes Google Rich Results Test (FAQ + SoftwareApplication eligible)
 - [ ] `offers.price` = "0" matches the free/MIT claim on the page
 - [ ] FAQ JSON-LD text matches the visible Section 7 copy (required — no schema-only content)
@@ -394,6 +397,7 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
 > automatically: Jira ticket → spec → plan → implementation → review → PR.
 
 ## What it is
+
 - Category: AI SDLC automation / Claude Code plugin (multi-agent delivery workflow)
 - Flagship plugin: `sdlc`. Companion: `gtm`.
 - Price: free and open source, MIT-licensed. No paid tier.
@@ -401,10 +405,12 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
   (the code); nightshift runs the other 80% (the lifecycle around it).
 
 ## Who it's for
+
 - Individual builders and small product teams already using Claude Code.
 - The senior dev, tech lead, or founding engineer who owns the workflow.
 
 ## How it works
+
 - One command, `/auto <TICKET>`, runs the full lifecycle and comments the
   resulting PR back to the ticket.
 - Stages are enforced: spec before plan, plan before code, review before merge,
@@ -414,10 +420,12 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
   `project-context.md` file — the agents themselves are generic.
 
 ## Install
+
 /plugin marketplace add whimzyLive/nightshift-ai
 /plugin install sdlc@nightshift
 
 ## Links
+
 - Repository: https://github.com/whimzyLive/nightshift-ai
 - License: MIT
 ```
@@ -432,55 +440,55 @@ Source of truth: `.claude/skills/nightshift-design/` — tokens in `tokens/*.css
 
 ### Identity
 
-| Token | Value |
-| --- | --- |
-| Name | `nightshift` — always lowercase; reword to avoid sentence-initial capitalization |
-| Tagline (locked lockup) | `you sleep, it ships` — always lowercase, never substituted |
-| Signature prose phrase | "ships while you sleep" (prose form of the tagline — used in the hero headline) |
-| Wordmark | `.claude/skills/nightshift-design/assets/logo.svg` (dark bg) / `logo-light.svg` (light bg) — never retypeset |
-| Moon mark | `.claude/skills/nightshift-design/assets/logomark.svg` (nav 28px, avatar, favicon-scale) |
-| Favicon | `.claude/skills/nightshift-design/assets/favicon.svg` |
-| Load-bearing glyph | 🌙 only — no other emoji in body copy |
+| Token                   | Value                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Name                    | `nightshift` — always lowercase; reword to avoid sentence-initial capitalization                             |
+| Tagline (locked lockup) | `you sleep, it ships` — always lowercase, never substituted                                                  |
+| Signature prose phrase  | "ships while you sleep" (prose form of the tagline — used in the hero headline)                              |
+| Wordmark                | `.claude/skills/nightshift-design/assets/logo.svg` (dark bg) / `logo-light.svg` (light bg) — never retypeset |
+| Moon mark               | `.claude/skills/nightshift-design/assets/logomark.svg` (nav 28px, avatar, favicon-scale)                     |
+| Favicon                 | `.claude/skills/nightshift-design/assets/favicon.svg`                                                        |
+| Load-bearing glyph      | 🌙 only — no other emoji in body copy                                                                        |
 
 ### Color (launch subset — exact values in `tokens/colors.css`)
 
-| Role | Token | Hex |
-| --- | --- | --- |
-| Page background | `--night-800` | `#0d0d18` |
-| Deepest void | `--night-900` | `#08080f` |
-| Card / surface | `--night-600` | `#1a1a2e` |
-| Terminal surface | `--surface-terminal` | `#0b0b14` |
-| Primary text | `--moon-100` | `#f5f3ef` |
-| Body text | `--moon-200` | `#d8d6e0` |
-| Muted text | `--moon-300` | `#a9a7bd` |
-| **Brand accent (terracotta)** | `--terra-500` | `#d97757` |
-| Accent hover / press | `--terra-400` / `--terra-600` | `#e58b6f` / `#c2624a` |
-| Links / focus (indigo) | `--indigo-400` / `--indigo-500` | `#8b9cf7` / `#7c93f0` |
-| Data / info (cyan) | `--cyan-400` | `#62c4d3` |
-| Success / warning / danger | `--green-400` / `--amber-400` / `--red-400` | `#6ec48a` / `#e0a458` / `#e0656f` |
+| Role                          | Token                                       | Hex                               |
+| ----------------------------- | ------------------------------------------- | --------------------------------- |
+| Page background               | `--night-800`                               | `#0d0d18`                         |
+| Deepest void                  | `--night-900`                               | `#08080f`                         |
+| Card / surface                | `--night-600`                               | `#1a1a2e`                         |
+| Terminal surface              | `--surface-terminal`                        | `#0b0b14`                         |
+| Primary text                  | `--moon-100`                                | `#f5f3ef`                         |
+| Body text                     | `--moon-200`                                | `#d8d6e0`                         |
+| Muted text                    | `--moon-300`                                | `#a9a7bd`                         |
+| **Brand accent (terracotta)** | `--terra-500`                               | `#d97757`                         |
+| Accent hover / press          | `--terra-400` / `--terra-600`               | `#e58b6f` / `#c2624a`             |
+| Links / focus (indigo)        | `--indigo-400` / `--indigo-500`             | `#8b9cf7` / `#7c93f0`             |
+| Data / info (cyan)            | `--cyan-400`                                | `#62c4d3`                         |
+| Success / warning / danger    | `--green-400` / `--amber-400` / `--red-400` | `#6ec48a` / `#e0a458` / `#e0656f` |
 
 Rules: **one pointing color** — terracotta is the single brand accent, one accent per view; indigo/cyan/semantic colors are functional, not decorative. Components use semantic aliases (`--bg-page`, `--surface-card`, `--accent`, `--text-strong`, …).
 
 ### Typography
 
-| Role | Token | Face |
-| --- | --- | --- |
-| Headings & body | `--font-sans` | Inter — headings sentence case, never Title Case |
-| Anything you'd type (commands, agent names, paths, the install block, pipeline line) | `--font-mono` | JetBrains Mono |
-| Section eyebrows | mono `//` prefix, e.g. `// how it works` | JetBrains Mono |
+| Role                                                                                 | Token                                    | Face                                             |
+| ------------------------------------------------------------------------------------ | ---------------------------------------- | ------------------------------------------------ |
+| Headings & body                                                                      | `--font-sans`                            | Inter — headings sentence case, never Title Case |
+| Anything you'd type (commands, agent names, paths, the install block, pipeline line) | `--font-mono`                            | JetBrains Mono                                   |
+| Section eyebrows                                                                     | mono `//` prefix, e.g. `// how it works` | JetBrains Mono                                   |
 
 ### Per-section token mapping
 
-| Page section | Treatment |
-| --- | --- |
-| Hero | `--night-800` bg, wordmark lockup (`logo.svg`), headline Inter sentence-case `--moon-100`, install block on `--surface-terminal` in JetBrains Mono, primary CTA `--terra-500` (hover `--terra-400`), pipeline caption mono `--moon-300` |
-| Proof bar | `--night-600` surface, numbers mono `--moon-100`, separators `--moon-300` |
-| Problem | body `--moon-200`, sub-point leads `--moon-100`, eyebrow `// the other 80%` |
-| How it works | `/auto` block on `--surface-terminal`, table borders `--night-600`, step numbers `--terra-500`, eyebrow `// how it works` |
-| The team | agent names in mono (`product-manager`, `qa-engineer`), eyebrow `// the team` |
-| Why it's different | 4 cards on `--surface-card`, card headers `--moon-100`, single terracotta accent reserved for hover/border-active |
-| FAQ | questions `--moon-100`, answers `--moon-200`, eyebrow `// questions` |
-| Final CTA | mirror hero: terminal install block, `--terra-500` primary button, star button secondary (indigo link treatment or outline) |
+| Page section       | Treatment                                                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero               | `--night-800` bg, wordmark lockup (`logo.svg`), headline Inter sentence-case `--moon-100`, install block on `--surface-terminal` in JetBrains Mono, primary CTA `--terra-500` (hover `--terra-400`), pipeline caption mono `--moon-300` |
+| Proof bar          | `--night-600` surface, numbers mono `--moon-100`, separators `--moon-300`                                                                                                                                                               |
+| Problem            | body `--moon-200`, sub-point leads `--moon-100`, eyebrow `// the other 80%`                                                                                                                                                             |
+| How it works       | `/auto` block on `--surface-terminal`, table borders `--night-600`, step numbers `--terra-500`, eyebrow `// how it works`                                                                                                               |
+| The team           | agent names in mono (`product-manager`, `qa-engineer`), eyebrow `// the team`                                                                                                                                                           |
+| Why it's different | 4 cards on `--surface-card`, card headers `--moon-100`, single terracotta accent reserved for hover/border-active                                                                                                                       |
+| FAQ                | questions `--moon-100`, answers `--moon-200`, eyebrow `// questions`                                                                                                                                                                    |
+| Final CTA          | mirror hero: terminal install block, `--terra-500` primary button, star button secondary (indigo link treatment or outline)                                                                                                             |
 
 ### Voice (enforced, gate-checked)
 
