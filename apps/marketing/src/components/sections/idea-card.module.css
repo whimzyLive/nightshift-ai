@@ -1,0 +1,49 @@
+/* Card recipe (nightshift-design references/patterns.md#card-recipe) —
+ * hairline border required on dark, hover lift 2px + accent border + glow
+ * (AC4), transitions at token duration/easing.
+ */
+.card {
+  background: var(--ns-surface-card);
+  border: 1px solid var(--ns-border-default);
+  border-radius: var(--ns-radius-lg);
+  box-shadow: var(--ns-elev-2);
+  padding: 26px;
+  transition:
+    transform var(--ns-dur-base) var(--ns-ease-out),
+    box-shadow var(--ns-dur-base) var(--ns-ease-out),
+    border-color var(--ns-dur-base) var(--ns-ease-out);
+}
+
+.card:hover,
+.card:focus-within {
+  transform: translateY(-2px);
+  border-color: var(--ns-border-accent);
+  box-shadow: var(--ns-glow-accent);
+}
+
+.index {
+  font-family: var(--ns-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ns-accent);
+}
+
+.title {
+  margin: 14px 0 10px;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ns-text-strong);
+}
+
+.body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ns-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

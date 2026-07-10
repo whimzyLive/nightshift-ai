@@ -1,0 +1,36 @@
+.section {
+  padding: 96px 24px;
+  border-top: 1px solid var(--ns-border-default);
+}
+
+.inner {
+  max-width: var(--ns-container-max);
+  margin: 0 auto;
+}
+
+.header {
+  max-width: 720px;
+  margin: 0 auto 44px;
+  text-align: center;
+}
+
+.heading {
+  margin: 14px 0 12px;
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  color: var(--ns-text-strong);
+}
+
+.subhead {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ns-text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: 14px;
+}

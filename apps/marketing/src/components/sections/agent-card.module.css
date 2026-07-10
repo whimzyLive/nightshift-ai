@@ -1,0 +1,72 @@
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--ns-surface-card);
+  border: 1px solid var(--ns-border-default);
+  border-radius: var(--ns-radius-lg);
+  box-shadow: var(--ns-elev-2);
+  padding: 18px;
+  transition:
+    transform var(--ns-dur-base) var(--ns-ease-out),
+    box-shadow var(--ns-dur-base) var(--ns-ease-out),
+    border-color var(--ns-dur-base) var(--ns-ease-out);
+}
+
+.card:hover,
+.card:focus-within {
+  transform: translateY(-2px);
+  border-color: var(--ns-border-accent);
+  box-shadow: var(--ns-glow-accent);
+}
+
+.card.standby {
+  opacity: 0.55;
+}
+
+.monogram {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ns-radius-md);
+  font-family: var(--ns-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--ns-tone-tint, rgba(217, 119, 87, 0.14));
+  color: var(--ns-tone, var(--ns-accent));
+}
+
+.name {
+  margin: 0 0 4px;
+  font-family: var(--ns-font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ns-text-strong);
+}
+
+.owns {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ns-text-muted);
+}
+
+.standbyLabel {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--ns-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ns-text-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

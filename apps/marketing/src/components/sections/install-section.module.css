@@ -1,0 +1,105 @@
+.section {
+  position: relative;
+  overflow: hidden;
+  padding: 104px 24px;
+  background: var(--ns-bg-void);
+  border-top: 1px solid var(--ns-border-default);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.heading {
+  margin: 14px 0 28px;
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ns-text-strong);
+}
+
+.commands {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+/* InstallSnippet recipe (nightshift-design references/components.md) —
+ * terminal-well, accent border + glow on hover (AC4).
+ */
+.snippet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--ns-surface-terminal);
+  border: 1px solid var(--ns-border-default);
+  border-radius: var(--ns-radius-md);
+  font-family: var(--ns-font-mono);
+  font-size: 14px;
+  color: var(--ns-text-body);
+  transition:
+    border-color var(--ns-dur-base) var(--ns-ease-out),
+    box-shadow var(--ns-dur-base) var(--ns-ease-out);
+}
+
+.snippet:hover,
+.snippet:focus-within {
+  border-color: var(--ns-border-accent);
+  box-shadow: var(--ns-glow-accent);
+}
+
+.prompt {
+  color: var(--ns-accent);
+}
+
+.note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ns-text-dim);
+}
+
+.cta {
+  display: inline-flex;
+  margin-top: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: var(--ns-radius-md);
+  background: var(--ns-accent);
+  color: var(--ns-text-on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--ns-glow-accent);
+  transition:
+    transform var(--ns-dur-fast) var(--ns-ease-out),
+    background var(--ns-dur-fast) var(--ns-ease-out);
+}
+
+.cta:hover {
+  background: var(--ns-accent-hover);
+  transform: translateY(-1px);
+}
+
+.cta:active {
+  background: var(--ns-accent-press);
+  transform: none;
+}
+
+.cta:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ns-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snippet,
+  .cta {
+    transition: none;
+  }
+}

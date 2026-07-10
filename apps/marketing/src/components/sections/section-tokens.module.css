@@ -1,0 +1,53 @@
+/* Shared nightshift brand tokens for the below-the-hero product sections
+ * (NA-21). Mirrors the values in
+ * .claude/skills/nightshift-design/tokens/*.css, scoped to a wrapper class
+ * rather than imported site-wide — same rationale as the hero's local
+ * token block (hero.module.css, NA-16): the rest of the marketing chrome
+ * (nav/footer) is out of scope for this story. CSS custom properties
+ * inherit through the DOM regardless of CSS-module class hashing, so every
+ * section module below can reference `var(--ns-*)` once this class wraps
+ * them in page.tsx.
+ */
+.tokens {
+  --ns-bg-void: #08080f;
+  --ns-bg-page: #0d0d18;
+  --ns-surface-card: #1a1a2e;
+  --ns-surface-terminal: #0b0b14;
+  --ns-border-soft: rgba(255, 255, 255, 0.06);
+  --ns-border-default: rgba(255, 255, 255, 0.1);
+  --ns-border-accent: rgba(217, 119, 87, 0.45);
+  --ns-text-strong: #f5f3ef;
+  --ns-text-body: #d8d6e0;
+  --ns-text-muted: #a9a7bd;
+  --ns-text-dim: #74738c;
+  --ns-text-on-accent: #1a0f0a;
+  --ns-accent: #d97757;
+  --ns-accent-hover: #e58b6f;
+  --ns-accent-press: #c2624a;
+  --ns-indigo-400: #8b9cf7;
+  --ns-cyan-400: #62c4d3;
+  --ns-green-400: #6ec48a;
+  --ns-focus-ring: rgba(124, 147, 240, 0.45);
+  --ns-glow-accent:
+    0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
+  --ns-elev-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --ns-elev-3: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --ns-font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    sans-serif;
+  --ns-font-mono:
+    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo,
+    Consolas, monospace;
+  --ns-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ns-dur-fast: 120ms;
+  --ns-dur-base: 200ms;
+  --ns-dur-slow: 360ms;
+  --ns-radius-md: 10px;
+  --ns-radius-lg: 14px;
+  --ns-radius-pill: 999px;
+  --ns-container-max: 1200px;
+
+  background: var(--ns-bg-page);
+  color: var(--ns-text-body);
+  font-family: var(--ns-font-sans);
+}

@@ -233,3 +233,90 @@ revalidatePath: jest.fn(), revalidateTag: jest.fn() }))` at the top of the
   assertions go RED for the exact reason described in the review finding,
   then restore the fix. Gives real red→green evidence even when the fix
   was written before the test in the session's actual edit order.
+
+## 2026-07-10 — Story NA-21 — nightshift brand sections below the hero (how-it-works, team, install)
+
+**Learnings:**
+
+- This worktree's own branch can't literally `git checkout feat/<KEY>` if
+  another worktree already has that exact branch checked out — the
+  orchestrator pre-creates the impl branch and a worktree-local branch at
+  the same commit for each dispatched agent. Verify with
+  `git log --oneline -3 <worktree-branch>` vs `git log --oneline -3
+feat/<KEY>` — if they match, you're at the right starting point and
+  should just commit here; don't force-checkout the shared branch name.
+- The nightshift-design skill's static-mock reference JSX
+  (`ui_kits/marketing/sections.jsx`) is copy-paste gold for **content and
+  data shape** (the exact IDEAS/TEAM/PIPELINE_LINES arrays, copy voice) even
+  though its components aren't directly importable into a real Next.js app
+  (they're namespaced globals meant for `templates/page-starter.html`).
+  Reimplement the JSX by hand in the app, but lift the data verbatim.
+  `references/components.md` + `references/patterns.md` give the exact
+  hover/glow/hairline CSS recipes when hand-building instead of using the
+  skill's own components.
+- Extending the hero's per-component "mirror the tokens as local CSS custom
+  properties" pattern (NA-16) to a _group_ of sibling components: define the
+  `--ns-*` variables once on a shared wrapper `<div className={tokens}>` in
+  the page, not per-component. CSS custom properties inherit through the
+  DOM regardless of CSS-module class-name hashing, so every section's own
+  `.module.css` can reference `var(--ns-accent)` etc. without each file
+  redeclaring the full token set — avoids the NA-16 hero's per-component
+  duplication once there are 5+ sibling components sharing one brand.
+- A story's stated motion budget ("transform/opacity only, 120–360ms, one
+  ease") applies to the _reveal/hover_ tweens, not literally everything
+  with a duration — a scroll-triggered count-up (AC5-style) tweens a JS
+  number driving `textContent`, not a CSS transform/opacity property, and
+  needs longer (~1.2s) to actually read as "counting" rather than jumping.
+  Keep the same named ease (e.g. `power3.out`) across every tween anyway
+  ("one ease") even where duration reasonably exceeds the reveal budget,
+  and comment the deliberate exception so a reviewer doesn't file it as a
+  brand-adherence miss.
+- `apps/marketing-e2e`'s shared `tsconfig.base.json` intentionally omits the
+  `dom` lib (`"lib": ["es2022"]`) for the rest of the workspace (server/RSC
+  code has no DOM). A Playwright spec's `page.evaluate(() => ...)` callback
+  runs in the _browser_, so referencing `getComputedStyle`/`document`
+  inside it fails `tsc --build` with "cannot find name" even though the
+  code runs fine — fix by adding `"lib": ["es2022", "dom"]` as a
+  `compilerOptions` override scoped to `apps/marketing-e2e/tsconfig.json`
+  only, not the shared base config.
+- `firefox`/`webkit` Playwright browser binaries are not installed in this
+  sandbox (only chromium) — `nx e2e` runs all 3 configured projects
+  regardless of a `--project=chromium` CLI flag (nx doesn't forward it to
+  the underlying `playwright test` command the way `--grep` does). Confirm
+  a failure is a pre-existing environment gap, not your change, by running
+  the _existing_ `example.spec.ts` the same way — if it fails identically
+  on firefox/webkit and passes on chromium, the gap predates your work.
+
+**Patterns:**
+
+- Scroll-reveal + reduced-motion shape reused across every new organism
+  (`how-it-works-section.tsx`, `team-section.tsx`, `install-section.tsx`):
+  collect target refs into an array via a callback ref
+  (`cardRefs.current[i] = el`), then in `useIsomorphicLayoutEffect`,
+  `gsap.matchMedia()` with the same `reduceMotion`/`allowMotion` pair as
+  the hero (NA-16) — reduced branch does `gsap.set(targets, {autoAlpha:1,
+y:0})` immediately (no ScrollTrigger created at all); normal branch does
+  `gsap.from(targets, {autoAlpha:0, y:24, stagger, scrollTrigger:{trigger,
+start:'top 75%', once:true}})`. `once: true` on the ScrollTrigger (not
+  `toggleActions`) is the simplest way to satisfy "plays once per page
+  view" for a `.from()` reveal.
+  Reusable regression-test shape for this pattern (see
+  `specs/how-it-works-section.spec.tsx` etc.): mock `gsap.matchMedia().add`
+  to compute `conditions` from a stubbed `window.matchMedia` and only
+  invoke the handler if any condition matches (mirrors GSAP's real
+  contract); one test asserts `gsap.set(...autoAlpha:1,y:0)` fires and
+  `gsap.from` never gets called under `reduceMotion`; another asserts
+  `gsap.from` fires with a `scrollTrigger: {once: true}` object under
+  `allowMotion`.
+- Looping GSAP timeline gated by scroll visibility, for a "stream once
+  then repeat forever while on-screen" effect (the terminal's simulated
+  `/auto` run, AC2): `gsap.timeline({repeat:-1, repeatDelay, scrollTrigger:
+{trigger, start, end, toggleActions:'play pause resume pause'}})`, then
+  `.from(lineEl, {...}, i===0 ? 0 : '+=gap')` per line. Repeat naturally
+  re-applies each `.from()`'s start values on every loop (no manual
+  `.set()` reset needed between cycles) — GSAP re-renders the timeline's
+  start state whenever local time wraps back to 0.
+- React 19: use `ref` as a plain destructured prop (`function Card({...,
+ref}: Props & {ref?: Ref<HTMLDivElement>})`) instead of `forwardRef` —
+  confirmed working through a list `.map()` with a per-item callback ref
+  assigning into a parent-owned `useRef` array.

@@ -3,7 +3,11 @@
   "compilerOptions": {
     "allowJs": true,
     "outDir": "out-tsc/playwright",
-    "sourceMap": false
+    "sourceMap": false,
+    // page.evaluate() callbacks run in the browser, not Node — they need DOM
+    // types (getComputedStyle, document, etc.) that tsconfig.base.json
+    // deliberately omits for the rest of the workspace.
+    "lib": ["es2022", "dom"]
   },
   "include": [
     "**/*.ts",

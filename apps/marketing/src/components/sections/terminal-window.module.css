@@ -1,0 +1,80 @@
+.window {
+  border-radius: var(--ns-radius-lg);
+  border: 1px solid var(--ns-border-default);
+  box-shadow: var(--ns-elev-3);
+  overflow: hidden;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--ns-surface-card);
+  border-bottom: 1px solid var(--ns-border-soft);
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dotRed,
+.dotYellow,
+.dotGreen {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dotRed {
+  background: var(--ns-red, #e0656f);
+}
+
+.dotYellow {
+  background: var(--ns-amber, #e0a458);
+}
+
+.dotGreen {
+  background: var(--ns-green-400);
+}
+
+.title {
+  flex: 1;
+  text-align: center;
+  font-family: var(--ns-font-mono);
+  font-size: 12px;
+  color: var(--ns-text-muted);
+}
+
+.body {
+  min-height: 220px;
+  padding: 20px;
+  background: var(--ns-surface-terminal);
+  font-family: var(--ns-font-mono);
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--ns-text-body);
+}
+
+.line {
+  white-space: pre-wrap;
+}
+
+.prompt {
+  margin-right: 8px;
+  color: var(--ns-accent);
+}
+
+.muted {
+  color: var(--ns-text-dim);
+}
+
+.accent {
+  color: var(--ns-accent);
+}
+
+.success {
+  color: var(--ns-green-400);
+}
