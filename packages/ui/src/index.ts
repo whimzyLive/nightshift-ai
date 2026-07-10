@@ -1,3 +1,2 @@
-export * from './lib/ui';
-export * from './lib/hero-banner';
-export * from './lib/feature-card';
+// Empty shell — Tailwind-based components land here.
+export {};

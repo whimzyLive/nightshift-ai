@@ -7,6 +7,12 @@
       "skillPath": "skills/gsap-core/SKILL.md",
       "computedHash": "c4a01101d9e1aafbf4b49f75d74f9349790d8741981ba0237c990093863035a6"
     },
+    "hallmark": {
+      "source": "nutlope/hallmark",
+      "sourceType": "github",
+      "skillPath": "skills/hallmark/SKILL.md",
+      "computedHash": "8a8ecafd613f09e701330b5aa4a591ac539abb2605596df4a2394f03628d1d76"
+    },
     "motion-dev-animations": {
       "source": "199-biotechnologies/motion-dev-animations-skill",
       "sourceType": "github",
@@ -19,11 +25,11 @@
       "skillPath": "skills/payload/SKILL.md",
       "computedHash": "4abfcc828ca2cc0d9142b2fee2456f257f73dd7a37bd1cce2d354231b08b8767"
     },
-    "ui-ux-pro-max": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+    "tailwind-design-system": {
+      "source": "wshobson/agents",
       "sourceType": "github",
-      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
-      "computedHash": "b0f78bc58cc5a3ac68afdf6f2de214e147b09a3f8686447cb3804a921fa198c2"
+      "skillPath": "plugins/frontend-mobile-development/skills/tailwind-design-system/SKILL.md",
+      "computedHash": "cd61afd28f594e8b6712b61749209cbb4466e3eec4e4223793bbd97fc85c1b63"
     },
     "vercel-composition-patterns": {
       "source": "vercel-labs/agent-skills",

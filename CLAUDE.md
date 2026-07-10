@@ -21,3 +21,11 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+# UI Layer
+
+- ALL UI components are `.tsx` (TypeScript + JSX) — never `.jsx`, `.js`, or class components
+- Use Tailwind CSS (v4, CSS-first `@theme` config) for ALL styling across the UI layer (apps/marketing, packages/ui, and any future UI workspace) — utility classes in TSX, design tokens as CSS variables in `@theme`
+- Do NOT create CSS Modules (`*.module.css`), SCSS files, or hand-rolled per-component stylesheets
+- Exception: `apps/marketing/src/app/(payload)/custom.scss` is Payload's generated admin override — leave it alone
+- Invoke the `tailwind-design-system` skill before setting up or extending Tailwind config or building shared components in packages/ui
