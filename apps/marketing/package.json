@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "scripts": {
+    "seed": "payload run src/seed/seed.ts"
+  },
   "dependencies": {
     "@nightshift-ai/design-system": "workspace:*",
     "@nightshift-ai/ui": "workspace:*",

@@ -1,5 +1,115 @@
 # web-engineer memory
 
+## 2026-07-11 — Story NA-22 — CMS seed script (site-brief copy → SiteSettings/Home/WhySdlc globals)
+
+**Learnings:**
+
+- **`payload run <script.ts>` races its own process exit against a
+  fire-and-forget async top-level call.** `runBinScript()`
+  (`payload/dist/bin/index.js`) does `await import(pathToFileURL(scriptPath))`
+  then returns; the outer `bin()` immediately calls `process.exit(0)` once
+  that import() promise settles. Dynamic `import()` of an ESM module only
+  waits for the module's _own_ top-level synchronous execution (or a
+  top-level `await` inside it) — a bare `seedFn().then(...).catch(...)` at
+  the bottom of the script lets `import()` resolve before the promise
+  settles, so the CLI's `process.exit(0)` wins the race and kills the
+  process mid-flight. Symptom: `pnpm run seed` exits 0, prints nothing (not
+  even the success `console.log`), and the DB is untouched — looks like a
+  silent no-op, not a crash. Fix: `try { await seedFn(); } catch (e) { ...;
+process.exit(1); }` as genuine top-level await (supported — the `payload`
+  bin transpiles via `tsx/esm/api`'s `tsImport`, which supports TLA). Diagnosed
+  by directly reading `payload/dist/bin/index.js`'s `run` branch rather than
+  guessing from symptoms.
+- **Lexical `SerializedEditorState` shape for hand-built richText**, verified
+  against `lexical`'s own `ElementNode`/`TextNode`/`RootNode`
+  `exportJSON()` (not guessed): root and paragraph nodes are
+  `{ type, format: ElementFormatType ('' for default), indent: 0, version: 1,
+direction: 'ltr'|'rtl'|null, children: [...] }`; text nodes are
+  `{ type: 'text', format: 0, detail: 0, mode: 'normal', style: '', text,
+version: 1 }` (format here is a numeric bitmask, not the element's string
+  enum — easy to conflate the two `format` fields since they're both called
+  `format` but on different node kinds). `RootNode` doesn't override
+  `exportJSON()`, so root's shape is exactly `SerializedElementNode`, i.e.
+  identical field set to a paragraph node's, just `type: 'root'`.
+  `@payloadcms/richtext-lexical/lexical` is confirmed (again) to be
+  `export * from 'lexical'`, so `SerializedEditorState` from that subpath is
+  the real `lexical` package type, not a Payload-specific narrowing.
+- **Building a typed `textToLexical()` helper without `any` or excess-property
+  errors:** assign the per-paragraph node array to an _untyped_ intermediate
+  `const children = paragraphs.map(...)` (no contextual type flows into a
+  `.map()` callback from an unrelated variable declaration), then reference
+  that variable — not an inline literal — inside the object literal that gets
+  contextually typed against the function's `SerializedEditorState` return
+  annotation. TS excess-property checks only fire on _fresh object literals_
+  checked directly against a target type; a variable reference (even one
+  whose inferred type has "extra" fields relative to the loose
+  `SerializedLexicalNode` base) is checked via ordinary structural
+  assignability, which allows the extra fields. Avoided needing a single
+  broad `as SerializedEditorState`/`as any` cast on the whole tree this way —
+  only the outermost `{ root: {...} }` literal needs a narrow `as
+SerializedEditorState` (and even that turned out unnecessary since the root
+  literal's own keys are an exact match for `SerializedRootNode`).
+- **A fresh Nx-inferred project (no `project.json`, no `package.json`
+  `"scripts"` block yet)** picks up a new `"scripts": { "seed": "..." }`
+  entry automatically — no Nx config change needed for `pnpm run seed` (run
+  directly via the package manager, from `apps/marketing`) to work; Nx's own
+  target inference is irrelevant here since the task only needed a
+  package-manager script, not an `nx run` target.
+- **Payload global `updateGlobal()` is genuinely idempotent for this schema**
+  (confirmed via direct `psql` row counts, not just "should be"): re-running
+  the seed script left `home` at 1 row and `home_faq_items` at 6 rows both
+  before and after a second run — Postgres adapter deletes+reinserts array
+  child-table rows on every `updateGlobal()` rather than appending, so no
+  dedup logic is needed in the seed script itself.
+- Confirms the earlier NA-22 memory pattern: a shared dev Postgres from
+  another worktree/session can already be listening on `localhost:5432` even
+  when a fresh worktree has no `apps/marketing/.env` yet (this dispatch's
+  worktree had none — `.env.example` only). Created `.env` with the
+  docker-compose defaults (`postgresql`/`password123`/`nightshift`) plus a
+  freshly generated `PAYLOAD_SECRET`; didn't need to run `local-start`
+  myself since the shared container answered immediately. `psql` prompts
+  interactively for a password even with `PGPASSWORD`-less invocation from
+  this shell — piping the password via `<<< "password123"` heredoc-string
+  works reliably where a bare `-h ... -U ...` command without password prep
+  would hang on the prompt.
+- **Verifying rendered richText output end-to-end**: `curl` the page HTML
+  and grep for the literal paragraph text inside a `"payload-richtext"`
+  wrapper in the RSC flight-data payload (Next.js App Router streams
+  server-rendered content as escaped JSON literals in the HTML, not just
+  plain tag-wrapped text) — grepping for the exact brief sentence found it
+  embedded in `[\"$\",\"p\",\"0\",{\"children\":[\"...\"]}` chunks, confirming
+  both that the CMS data reached the page _and_ that the lexical→React
+  converter actually rendered it, not just that the DB write succeeded.
+
+**Pitfalls:**
+
+- `pnpm exec payload generate:types`-adjacent side effect: simply _booting_
+  Payload via `payload run <script>` (even with zero schema changes)
+  reformats the entire `payload-types.ts` to Payload's own non-prettier
+  line-wrap style on every run (autoGenerate fires on init). Always
+  `git status --porcelain apps/marketing/src/payload-types.ts` after any
+  `payload run`/`pnpm run seed` invocation and `git checkout --` it if the
+  diff is pure reflow (no real field changes) — same pattern as the
+  documented `generate:types` reflow issue, just triggered by a different
+  command this time.
+- `next dev` also touches `apps/marketing/next-env.d.ts` on every boot
+  (single/double-quote reflow) — discard with `git checkout --` same as the
+  documented `next build` noise; happens on `dev` too, not just `build`.
+
+**Patterns:**
+
+- When a Payload schema group has no dedicated "section header" field but
+  the copy brief has one (e.g. `problem` group only has `eyebrow`/`body`/
+  `points`, no `title`), and the front-end component only renders a `<p>`
+  (not `<h2>`) for that field: fold the header sentence into the start of
+  the `body` string, space-joined (not `\n\n` — a plain `<p>` collapses
+  newlines to spaces in HTML anyway, so a literal `\n\n` join would silently
+  render identically to a single space but looks confusingly line-broken in
+  the seed source). Don't invent new schema fields to hold brief content the
+  existing components can't render — check the consuming `.tsx` component
+  first to see whether a field would ever actually reach the page before
+  deciding where truncated/reshaped brief copy goes.
+
 ## 2026-07-10 — Story NA-22 — CI-fix pass (format:check + ui typecheck lib gaps)
 
 **Learnings:**
