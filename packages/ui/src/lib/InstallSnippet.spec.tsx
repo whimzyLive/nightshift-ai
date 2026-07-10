@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { InstallSnippet } from './InstallSnippet';
 
 describe('InstallSnippet', () => {
@@ -23,5 +23,42 @@ describe('InstallSnippet', () => {
   it('renders no label element when label is omitted', () => {
     render(<InstallSnippet command="/plugin install nightshift" />);
     expect(screen.queryByText(/install/i, { selector: 'span' })).toBeNull();
+  });
+
+  it('updates the aria-label to reflect the copied state', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<InstallSnippet command="/plugin install nightshift" />);
+    const button = screen.getByRole('button', { name: 'Copy install command' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(button.getAttribute('aria-label')).toBe('Copied install command');
+  });
+
+  it('does not throw and shows a non-crashing failed state when the Clipboard API is unavailable', async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    render(<InstallSnippet command="/plugin install nightshift" />);
+    const button = screen.getByRole('button', { name: 'Copy install command' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(button.getAttribute('aria-label')).toBe(
+      'Failed to copy install command',
+    );
+    expect(button.textContent).toBe('Failed');
+  });
+
+  it('does not throw and shows a non-crashing failed state when writeText rejects', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<InstallSnippet command="/plugin install nightshift" />);
+    const button = screen.getByRole('button', { name: 'Copy install command' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(button.getAttribute('aria-label')).toBe(
+      'Failed to copy install command',
+    );
   });
 });

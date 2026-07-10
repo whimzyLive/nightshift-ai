@@ -1,5 +1,87 @@
 # web-engineer memory
 
+## 2026-07-10 — Story NA-22 — review-fix pass #2 (payload cache poisoning, Button a11y+props, InstallSnippet clipboard, Eyebrow token, content graceful degradation)
+
+**Learnings:**
+
+- This dispatch's worktree (`worktree-agent-ac07b771b2199b1e7`) was checked
+  out to the old **spec** merge commit (7b9206c), 15 commits behind the real
+  `feat/NA-22` tip (6335ca9) — `apps/marketing/src/lib/` and
+  `packages/ui/src/lib/` didn't even exist at that commit. `feat/NA-22` was
+  already checked out in the _primary_ (non-worktree) checkout at the
+  correct tip, so `git checkout feat/NA-22` failed with "already used by
+  worktree." Confirms the shared-memory pattern below: `git status --short`
+  (clean) → `git reset --hard origin/feat/NA-22` synced the worktree's own
+  differently-named local branch to the real content without touching the
+  other worktree. Always verify `git rev-list --count HEAD..origin/<branch>`
+  is `0` (or check that the files a finding references actually exist)
+  before trusting "your worktree is based on it" from the dispatch prompt.
+- Read/Bash tools will silently read the _shared_ (non-worktree) checkout
+  path (`nightshift/apps/...` without the `.claude/worktrees/<id>/` prefix)
+  with no error and return correct-looking content — only Write/Edit refuse
+  with "isolated in the worktree ... Edit the worktree copy instead." Since
+  a stale Read doesn't error, always prefix **every** file path (Read
+  included) with the full worktree root from the very first tool call in a
+  session; don't rely on the Edit-time error to catch it, by then you've
+  already burned a Read/analysis pass on the wrong tree.
+- Tailwind v4 `@theme` block gotcha: you cannot write
+  `--tracking-eyebrow: var(--tracking-eyebrow);` inside `@theme` to expose
+  an existing `:root`-scoped token as a utility — the `@theme` block _is_
+  the `:root` declaration for that custom-property name, so this is a
+  circular self-reference. Fix: reference a **different**-named alias that
+  already points at the same value (here, `typography.css` already ships
+  `--eyebrow-tracking: var(--tracking-eyebrow);` for exactly this reason) —
+  `--tracking-eyebrow: var(--eyebrow-tracking);` inside `@theme` resolves
+  correctly and Tailwind emits both the `tracking-eyebrow` utility and a
+  non-circular `:root` value. Verified by grepping the **built** CSS for the
+  literal resolved value (`--tracking-eyebrow:.16em`), not just that the
+  utility class exists — a circular var() still generates the utility
+  class, it just resolves to nothing at runtime.
+- `packages/design-system/scripts/check-tokens.mjs` only diffs
+  `src/tokens/*.css` against the canonical `.claude/skills/nightshift-design/tokens/*.css`
+  files — it does **not** check `theme.css`. Adding new `@theme` mappings
+  there (e.g. `--color-on-accent`, `--tracking-eyebrow`) never trips the
+  token-parity gate, since those are Tailwind-utility bridges, not vendored
+  token declarations.
+- React 19's `cache()` (from `'react'`) works fine when unit-tested directly
+  with Jest + jsdom (no RSC render context needed) — wrapping an async
+  helper in `cache(async () => {...})` and calling it directly in a test
+  behaves like a plain memoized async function; no special test setup
+  required beyond what the un-wrapped version needed.
+- A discriminated union for a polymorphic `<a>`/`<button>` component
+  (`{ href: string } & AnchorHTMLAttributes` | `{ href?: undefined } &
+ButtonHTMLAttributes`) type-checks cleanly against every existing
+  href-only call site in this repo (`Hero`, `SiteHeader`, `FinalCta`,
+  `Control` all only ever passed `variant` + `href` + `children`) — no
+  call-site changes needed when tightening a previously-loose
+  `ButtonHTMLAttributes`-only prop type this way.
+- Destructuring `{ href, variant, children, className, ...rest }` from a
+  union-typed props object and then casting `rest` with `as
+X.HTMLAttributes<...>` per branch is enough to forward `aria-*`/`id`/
+  `onClick`/`data-*` to the right element without duplicating the
+  destructure per-branch — TS narrows `rest`'s type fine here since `href`
+  was already pulled out before the `if (href)` branch.
+
+**Pitfalls:**
+
+- None beyond what's captured above.
+
+**Patterns:**
+
+- TDD-verifying a fix with no pre-existing spec file across multiple
+  findings in one pass: write the test(s) first against the _already-fixed_
+  source (expected GREEN since the fix predates the test in edit order),
+  then `Write` the pre-fix source back in temporarily, rerun to confirm RED
+  for the exact reason the finding describes, then `Write` the fix back.
+  Faster than a scripted string-replace round-trip when the pre-fix version
+  is short enough to just paste twice (payload.ts, content.ts, Button.tsx,
+  SiteHeader.tsx, InstallSnippet.tsx were all done this way in this pass).
+- `console.error`-based graceful-degradation tests: `jest.spyOn(console,
+'error').mockImplementation()` in `beforeEach` + `.mockRestore()` in
+  `afterEach` keeps the expected-error path from polluting Jest's real
+  console output while still letting `expect(consoleErrorSpy).toHaveBeenCalled()`
+  assert the finding's required `console.error` call happened.
+
 ## 2026-07-10 — Story NA-22 — review-fix pass (Tailwind @source, e2e, admin fonts, dep hygiene, CMS labels, migration docs)
 
 **Learnings:**

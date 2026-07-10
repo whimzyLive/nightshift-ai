@@ -29,7 +29,11 @@
   --color-default: var(--border-default);
   --color-accent: var(--terra-500);
   --color-accent-hover: var(--terra-400);
+  --color-on-accent: var(--text-on-accent);
   --color-link: var(--indigo-400);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  /* Alias, not `--tracking-eyebrow` itself — this block IS the `:root`
+   * declaration for that name; self-referencing would be a circular var(). */
+  --tracking-eyebrow: var(--eyebrow-tracking);
 }

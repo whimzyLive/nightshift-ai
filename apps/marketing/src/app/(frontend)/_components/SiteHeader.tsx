@@ -47,11 +47,21 @@ export function SiteHeader({ siteSettings }: { siteSettings?: SiteSetting }) {
             <a
               key={link.id ?? i}
               href={link.href ?? '#'}
+              onClick={() => setOpen(false)}
               className="text-sm text-body"
             >
               {link.label ?? ''}
             </a>
           ))}
+          {siteSettings?.githubUrl ? (
+            <Button
+              variant="secondary"
+              href={siteSettings.githubUrl}
+              onClick={() => setOpen(false)}
+            >
+              {siteSettings.githubLabel ?? 'GitHub'}
+            </Button>
+          ) : null}
         </nav>
       ) : null}
     </header>

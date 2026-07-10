@@ -1,6 +1,20 @@
 'use client';
 import { useState } from 'react';
 
+type CopyState = 'idle' | 'copied' | 'failed';
+
+const ARIA_LABEL_BY_STATE: Record<CopyState, string> = {
+  idle: 'Copy install command',
+  copied: 'Copied install command',
+  failed: 'Failed to copy install command',
+};
+
+const LABEL_BY_STATE: Record<CopyState, string> = {
+  idle: 'Copy',
+  copied: 'Copied',
+  failed: 'Failed',
+};
+
 export function InstallSnippet({
   command,
   label,
@@ -9,11 +23,21 @@ export function InstallSnippet({
   /** Optional uppercase mono caption rendered above the command line. */
   label?: string;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<CopyState>('idle');
   const copy = async () => {
-    await navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    // `navigator.clipboard` is undefined outside secure contexts (plain
+    // HTTP, some embedded webviews) — guard existence and swallow a
+    // rejected writeText() so the button degrades to a visible "Failed"
+    // state instead of an unhandled promise rejection.
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(command);
+      setState('copied');
+    } catch {
+      setState('failed');
+    } finally {
+      setTimeout(() => setState('idle'), 1500);
+    }
   };
   return (
     <div className="flex flex-col gap-2">
@@ -27,10 +51,10 @@ export function InstallSnippet({
         <button
           type="button"
           onClick={copy}
-          aria-label="Copy install command"
+          aria-label={ARIA_LABEL_BY_STATE[state]}
           className="text-accent hover:text-accent-hover"
         >
-          {copied ? 'Copied' : 'Copy'}
+          {LABEL_BY_STATE[state]}
         </button>
       </div>
     </div>
