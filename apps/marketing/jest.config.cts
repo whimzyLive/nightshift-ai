@@ -13,6 +13,8 @@ const config = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/apps/marketing',
   testEnvironment: 'jsdom',
+  // Empty shell — no tests yet.
+  passWithNoTests: true,
 };
 
 const jestConfig = createJestConfig(config);

@@ -4,11 +4,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@nightshift-ai/ui": "workspace:^",
     "@payloadcms/db-postgres": "3.85.2",
     "@payloadcms/next": "3.85.2",
     "@payloadcms/richtext-lexical": "3.85.2",
-    "gsap": "^3.13.0",
     "graphql": "^16.14.2",
     "next": "~16.2.10",
     "payload": "3.85.2",
