@@ -1,18 +1,21 @@
 import { getPayload } from 'payload';
-import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical';
 
 import config from '../payload.config';
 import { HOME_SLUG, SITE_SETTINGS_SLUG, WHY_SDLC_SLUG } from '../globals/slugs';
 import type { Home, SiteSetting, WhySdlc } from '../payload-types';
 
+// The generated shape of every `richText` field value (all richText fields in
+// payload-types share this inline structure; `hero.intro` is one of them).
+type RichTextValue = NonNullable<NonNullable<WhySdlc['hero']>['intro']>;
+
 /**
- * Builds a minimal, valid Lexical `SerializedEditorState` — the shape
- * Payload's default `lexicalEditor()` preset expects for `richText` field
- * values (root > paragraph > text, per Payload's own serialization —
- * confirmed against `lexical`'s ElementNode/TextNode `exportJSON()`). One
- * entry in `paragraphs` becomes one paragraph node.
+ * Builds a minimal, valid Lexical editor state — the shape Payload's default
+ * `lexicalEditor()` preset expects for `richText` field values
+ * (root > paragraph > text, per Payload's own serialization — confirmed
+ * against `lexical`'s ElementNode/TextNode `exportJSON()`). One entry in
+ * `paragraphs` becomes one paragraph node.
  */
-function textToLexical(paragraphs: string[]): SerializedEditorState {
+function textToLexical(paragraphs: string[]): RichTextValue {
   const children = paragraphs.map((text) => ({
     type: 'paragraph',
     format: '' as const,
@@ -41,7 +44,7 @@ function textToLexical(paragraphs: string[]): SerializedEditorState {
       direction: children.length ? 'ltr' : null,
       children,
     },
-  } as SerializedEditorState;
+  } as RichTextValue;
 }
 
 // Copy below is sourced verbatim from docs/gtm/site-brief.md (the reviewed
