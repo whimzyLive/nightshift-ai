@@ -4,3 +4,8 @@
 /.nx/cache
 /.nx/workspace-data
 pnpm-lock.yaml
+
+# Vendored design tokens must stay byte-identical to the canonical source at
+# .claude/skills/nightshift-design/tokens/*.css — reformatting here would
+# desync the design-system:check-tokens parity check (NA-22).
+packages/design-system/src/tokens/*.css

@@ -4,12 +4,8 @@
  */
 :root {
   /* ---- Families ---- */
-  --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
-    sans-serif;
-  --font-mono:
-    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo,
-    Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
 
   /* ---- Weights ---- */
   --fw-regular: 400; /* @kind font */
@@ -43,7 +39,7 @@
   --tracking-snug: -0.01em;
   --tracking-normal: 0;
   --tracking-wide: 0.04em;
-  --tracking-eyebrow: 0.16em; /* mono eyebrows / labels, uppercase */
+  --tracking-eyebrow: 0.16em;  /* mono eyebrows / labels, uppercase */
 
   /* ---- Semantic roles ---- */
   --display-font: var(--font-sans);
