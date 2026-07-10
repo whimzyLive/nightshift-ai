@@ -28,8 +28,8 @@ for f in .prettierrc .prettierrc.json .prettierrc.yml .prettierrc.yaml .prettier
   prettier.config.js prettier.config.cjs prettier.config.mjs prettier.config.ts; do
   [ -e "$f" ] && has_config=1 && break
 done
-if [ -z "$has_config" ] && [ -f package.json ] && grep -q '"prettier"[[:space:]]*:' package.json; then
-  has_config=1
+if [ -z "$has_config" ] && [ -f package.json ]; then
+  node -e 'const p=require("./package.json"); process.exit(p && Object.prototype.hasOwnProperty.call(p,"prettier")?0:1)' 2>/dev/null && has_config=1
 fi
 [ -n "$has_config" ] || exit 0
 
@@ -37,15 +37,17 @@ fi
 prettier_bin="node_modules/.bin/prettier"
 [ -x "$prettier_bin" ] || exit 0
 
-# Collect the session's changed files (NUL-safe): tracked changes vs HEAD plus untracked
-# files, existence-filtered so deletions/renames never reach prettier. `git diff HEAD` fails
-# harmlessly on an unborn branch; untracked listing already honors .gitignore.
+# Collect the session's changed files (NUL-safe): tracked changes vs HEAD, staged-only
+# changes, plus untracked files, existence-filtered so deletions/renames never reach prettier.
+# `git diff HEAD` fails harmlessly on an unborn branch; untracked listing already honors
+# .gitignore. Duplicate paths across the three sources are harmless — prettier is idempotent.
 {
   git diff --name-only -z HEAD 2>/dev/null || true
+  git diff --name-only -z --cached 2>/dev/null || true
   git ls-files -z --others --exclude-standard 2>/dev/null || true
 } |
   while IFS= read -r -d '' path; do
-    [ -f "$path" ] && printf '%s\0' "$path"
+    [ -f "$path" ] && printf './%s\0' "$path"
   done |
   xargs -0 -r "$prettier_bin" --write --ignore-unknown >/dev/null 2>&1 || true
 
