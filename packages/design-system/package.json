@@ -12,6 +12,9 @@
     "./tokens/*.css": "./src/tokens/*.css",
     "./package.json": "./package.json"
   },
+  "dependencies": {
+    "tailwindcss": "^4.3.2"
+  },
   "nx": {
     "tags": [
       "scope:shared"

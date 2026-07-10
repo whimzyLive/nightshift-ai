@@ -13,6 +13,11 @@ export const SiteSettings: GlobalConfig = {
       defaultValue: 'https://github.com/whimzyLive/nightshift-ai',
     },
     {
+      name: 'githubLabel',
+      type: 'text',
+      defaultValue: 'GitHub',
+    },
+    {
       name: 'navLinks',
       type: 'array',
       fields: [

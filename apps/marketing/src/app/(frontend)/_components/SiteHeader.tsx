@@ -27,7 +27,7 @@ export function SiteHeader({ siteSettings }: { siteSettings?: SiteSetting }) {
         <div className="hidden sm:block">
           {siteSettings?.githubUrl ? (
             <Button variant="secondary" href={siteSettings.githubUrl}>
-              GitHub
+              {siteSettings.githubLabel ?? 'GitHub'}
             </Button>
           ) : null}
         </div>

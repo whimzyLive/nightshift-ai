@@ -4,9 +4,12 @@ import type { Home, SiteSetting } from '../../../payload-types';
 export function FinalCta({
   content,
   siteSettings,
+  starCtaLabel,
 }: {
   content?: Home['finalCta'];
   siteSettings?: SiteSetting;
+  /** Shared with Hero's identical GitHub CTA — sourced from `home.hero.starCtaLabel`. */
+  starCtaLabel?: string | null;
 }) {
   return (
     <section className="mx-auto max-w-3xl px-6 py-24 text-center">
@@ -20,7 +23,7 @@ export function FinalCta({
         ) : null}
         {siteSettings?.githubUrl ? (
           <Button variant="secondary" href={siteSettings.githubUrl}>
-            Star on GitHub
+            {starCtaLabel ?? 'Star on GitHub'}
           </Button>
         ) : null}
       </div>

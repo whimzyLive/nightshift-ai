@@ -27,13 +27,16 @@
   --color-success-500: #d97757; /* --terra-500 */
   --theme-success-500: #d97757; /* --terra-500 */
 
-  // ---- Fonts: Inter (UI) / JetBrains Mono (code) — matches packages/design-system/src/tokens/typography.css ----
+  // ---- Fonts: Inter (UI) / JetBrains Mono (code) — self-hosted via next/font
+  // in (payload)/layout.tsx (htmlProps className sets --font-inter /
+  // --font-jetbrains-mono on <html>); matches
+  // packages/design-system/src/tokens/typography.css ----
   --font-body:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
     sans-serif;
   --font-mono:
-    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo,
-    Consolas, monospace;
+    var(--font-jetbrains-mono), 'SFMono-Regular', ui-monospace, 'Cascadia Code',
+    Menlo, Consolas, monospace;
 }
 
 // nightshift is dark-mode-first — force the same palette under Payload's

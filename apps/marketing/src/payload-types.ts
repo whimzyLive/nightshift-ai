@@ -343,6 +343,7 @@ export interface SiteSetting {
   id: number;
   installCommand?: string | null;
   githubUrl?: string | null;
+  githubLabel?: string | null;
   navLinks?:
     | {
         label?: string | null;
@@ -581,6 +582,7 @@ export interface WhySdlc {
 export interface SiteSettingsSelect<T extends boolean = true> {
   installCommand?: T;
   githubUrl?: T;
+  githubLabel?: T;
   navLinks?:
     | T
     | {

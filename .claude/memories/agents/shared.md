@@ -1,5 +1,23 @@
 # shared cross-domain memory
 
+## 2026-07-10 — Story NA-22 — review-fix dispatch: branch name locked by another worktree entirely
+
+**Learnings:**
+
+- When the dispatch branch (e.g. `feat/<STORY-KEY>`) is checked out in
+  **another agent's worktree that's still alive** (not just the primary
+  checkout — `git worktree list` showed a second `.claude/worktrees/...`
+  path on the exact same branch, both already at the target commit), `git
+checkout <branch>` fails with "already used by worktree" and there's
+  nothing to fast-forward-merge (your own worktree branch is already an
+  ancestor with zero unique commits). Don't remove or touch the other
+  worktree — instead sync your own local branch's content to match:
+  `git reset --hard origin/<branch>` (safe only after confirming `git status`
+  is clean and your HEAD is an ancestor of the target). Your commits then
+  land on your own differently-named local branch; the orchestrator's
+  push/PR tooling maps that back to the real `<BRANCH_PREFIX>/<STORY-KEY>`
+  name later — you never need to literally be _on_ that branch name.
+
 ## 2026-07-10 — Story NA-22 — worktree/branch and Nx workspace gotchas
 
 **Learnings:**

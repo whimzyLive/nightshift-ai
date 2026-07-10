@@ -1,4 +1,11 @@
 @import 'tailwindcss';
+
+/* Tailwind v4's auto source detection doesn't follow symlinked workspace
+ * packages in node_modules — packages/ui ships UI primitives whose classes
+ * would otherwise be tree-shaken out of the built CSS. Explicitly register
+ * it as a source root. */
+@source '../../ui/src';
+
 @import './tokens/base.css';
 @import './tokens/colors.css';
 /* typography.css before fonts.css: typography.css (vendored verbatim from the

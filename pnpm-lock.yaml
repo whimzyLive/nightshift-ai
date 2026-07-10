@@ -196,7 +196,11 @@ importers:
 
   apps/marketing-e2e: {}
 
-  packages/design-system: {}
+  packages/design-system:
+    dependencies:
+      tailwindcss:
+        specifier: ^4.3.2
+        version: 4.3.2
 
   packages/ui:
     dependencies:

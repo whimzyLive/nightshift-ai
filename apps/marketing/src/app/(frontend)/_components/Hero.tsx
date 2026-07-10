@@ -16,7 +16,10 @@ export function Hero({
       <p className="mt-6 text-lg text-muted">{content?.subheadline ?? ''}</p>
       <div className="mt-8 flex flex-col items-center gap-4">
         {siteSettings?.installCommand ? (
-          <InstallSnippet command={siteSettings.installCommand} />
+          <InstallSnippet
+            command={siteSettings.installCommand}
+            label={content?.installCtaLabel ?? undefined}
+          />
         ) : null}
         {siteSettings?.githubUrl ? (
           <Button variant="secondary" href={siteSettings.githubUrl}>

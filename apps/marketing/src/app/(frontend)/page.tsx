@@ -28,7 +28,11 @@ export default async function HomePage() {
       <WhyDifferent content={home?.whyDifferent} />
       <Control content={home?.control} />
       <Faq content={home?.faq} />
-      <FinalCta content={home?.finalCta} siteSettings={siteSettings} />
+      <FinalCta
+        content={home?.finalCta}
+        siteSettings={siteSettings}
+        starCtaLabel={home?.hero?.starCtaLabel}
+      />
     </main>
   );
 }

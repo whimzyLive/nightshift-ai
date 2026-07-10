@@ -1,5 +1,98 @@
 # web-engineer memory
 
+## 2026-07-10 — Story NA-22 — review-fix pass (Tailwind @source, e2e, admin fonts, dep hygiene, CMS labels, migration docs)
+
+**Learnings:**
+
+- Tailwind v4's automatic source detection does **not** follow symlinked
+  workspace packages under `node_modules` (pnpm workspace `link:`/`workspace:*`
+  symlinks) — `packages/ui`'s classes were silently tree-shaken from the built
+  CSS even though `packages/design-system/src/theme.css` (which `apps/marketing`
+  imports) sits right next to it in the monorepo. Fix: an explicit
+  `@source '../../ui/src';` directive in `theme.css`, relative to the CSS
+  file's own location, not the consuming app. Verify by grepping the actual
+  **built** `.next/static/chunks/*.css` for a class that only exists in
+  `packages/ui` (e.g. `.bg-surface-terminal`) — grep only the first CSS chunk
+  file found is not enough, Next.js Turbopack splits Tailwind output across
+  several hashed chunk files; grep `*.css` (glob) across all of them.
+- Declaring a new direct `dependencies` entry in a workspace package's
+  `package.json` for a package that's already resolved in `pnpm-lock.yaml`
+  transitively (here: `tailwindcss@4.3.2`, already pulled in by
+  `@tailwindcss/postcss`) still requires `pnpm install` to add the
+  **importer** entry to the lockfile — but the diff stays minimal (a few
+  lines under that one importer, no version bumps elsewhere) because the
+  package is already resolved at that exact version. Don't skip `pnpm
+install` here out of over-caution about "modifying the lockfile" — a
+  reviewer finding that explicitly asks you to declare a dependency is the
+  explicit instruction the no-lockfile-edits guardrail carves an exception
+  for; just verify the diff is importer-only before staging.
+- Payload's generated `(payload)/layout.tsx` (`RootLayout` from
+  `@payloadcms/next/layouts`) accepts an `htmlProps` prop
+  (`React.HtmlHTMLAttributes<HTMLHtmlElement>`) that gets spread directly
+  onto the `<html>` element it renders — this is the supported extension
+  point for adding a `next/font` `.variable` className to the admin's
+  `<html>` without hand-editing the "DO NOT MODIFY" generated markup itself
+  (only the props passed into `<RootLayout>` change). Confirmed by reading
+  `@payloadcms/next/dist/layouts/Root/index.js` directly rather than
+  guessing. A reviewer finding can explicitly sanction editing a
+  generated/do-not-hand-edit file for one narrow, supported purpose — but
+  prefer the narrowest supported extension point (`htmlProps`) over a
+  free-form rewrite of the file.
+- A local dev Postgres provisioned via Payload's schema **push** mode (not
+  migrations) does not automatically pick up a new field added to a
+  `GlobalConfig` — `payload generate:types` only reads the config (no DB
+  schema check), so types regenerate fine, but the next `next build`
+  prerender fails at query time with `column ... does not exist`. Fix for a
+  throwaway local dev DB: `ALTER TABLE <table> ADD COLUMN IF NOT EXISTS
+<snake_case_field> <type>;` directly via psql (matches what push-mode would
+  have done) rather than writing a real migration for a single-field
+  addition. Confirmed via the exact `column site_settings.github_label does
+not exist` error from `next build`'s prerender of a page that calls
+  `payload.findGlobal`.
+- Regenerating `payload-types.ts` via
+  `pnpm --filter @nightshift-ai/marketing exec payload generate:types`
+  reformats **the entire file** to Payload's own (non-prettier) line-wrap
+  style, producing a much larger diff than the actual schema change (e.g. 44
+  lines changed for a 1-field addition). Run `pnpm exec prettier --write
+apps/marketing/src/payload-types.ts` immediately after regenerating —
+  collapses the diff back down to just the real change (2 lines for a
+  1-field addition here) and matches what the repo's own lint-staged hook
+  would do on commit anyway.
+- When two components render an identical CMS-sourced literal for the same
+  destination (Hero's and FinalCta's "Star on GitHub" buttons, both linking
+  `siteSettings.githubUrl`), the reviewer-preferred fix per "avoid schema
+  changes if wiring existing fields suffices" is to **thread the one
+  existing field through as an extra prop** (`home.hero.starCtaLabel` passed
+  into `<FinalCta starCtaLabel={...}>`) rather than adding a duplicate field
+  to the second component's own CMS group. Only add a new Payload field when
+  no existing field actually carries the needed copy (e.g. `SiteHeader`'s
+  short nav "GitHub" label is genuinely distinct from the "Star on GitHub"
+  CTA copy — that one did need a new `githubLabel` field on `SiteSettings`).
+- `packages/ui`'s `InstallSnippet` was missing the `label` prop the
+  canonical nightshift-design source component (`.claude/skills/nightshift-design/components/core/InstallSnippet.jsx`
+  / `.d.ts`) already documents (`label` optional uppercase mono caption) —
+  worth diffing a ported `packages/ui` primitive against its canonical
+  `.claude/skills/nightshift-design/components/` source when a CMS field
+  clearly wants to feed a prop the ported component doesn't yet expose,
+  rather than assuming the port is 1:1 complete.
+
+**Pitfalls:**
+
+- Don't grep only the first CSS file `find` returns when verifying a
+  Tailwind build-output fix — Next.js/Turbopack can split the compiled CSS
+  across multiple hashed chunk files, and the class you're checking for may
+  not be in the first one found (it wasn't, here — `.bg-accent` and
+  `.bg-surface-terminal` were both in a _different_ 30KB chunk, not the
+  288KB one that came up first alphabetically).
+
+**Patterns:**
+
+- Playwright e2e spec pinned to CMS-driven content that can legitimately
+  render as empty strings (no seeded CMS doc) should assert on **structural
+  landmarks** (`page.getByRole('banner'|'main'|'contentinfo')` +
+  `response.ok()`) instead of visible copy — resilient to both an empty CMS
+  and to future copy changes, while still catching a genuinely broken page.
+
 ## 2026-07-10 — Story NA-22 — Create Marketing Website (design-system + ui + full CMS-driven site)
 
 **Learnings:**
