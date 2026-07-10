@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -11,6 +11,13 @@ import styles from './hero.module.css';
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+// useLayoutEffect warns when it runs during SSR (no DOM to measure against);
+// fall back to useEffect on the server and use the real layout effect in the
+// browser so GSAP's initial styles/timelines apply before paint, avoiding a
+// flash of the final state.
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export interface HeroClientProps {
   headline: string;
@@ -36,7 +43,7 @@ export function HeroClient({
   const subheadRef = useRef<HTMLParagraphElement>(null);
   const ctaRef = useRef<HTMLAnchorElement>(null);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const section = sectionRef.current;
     const scene = sceneRef.current;
     if (!section || !scene) return;

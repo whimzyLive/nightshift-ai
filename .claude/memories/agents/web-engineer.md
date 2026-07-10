@@ -174,3 +174,62 @@ console.error('[context]', e); return sameDefaultsUsedAsFieldDefaultValue; }`.
   Narrow the return type to `Pick<GeneratedType, 'fieldsActuallyConsumed'>`
   rather than the full generated type — avoids having to fabricate a fake
   `id`/`createdAt` for the fallback case.
+
+## 2026-07-10 — Story NA-16 — Copilot review-fix pass (open-redirect validator, GSAP paint flash)
+
+**Learnings:**
+
+- **Correction to the "orphaned worktree" pitfall above**: the branch can
+  also be stuck checked out in the repo's **primary** (non-worktree)
+  checkout, not just a linked `git worktree`. `git worktree remove` only
+  works on linked worktrees — the primary one can't be removed. Fix there
+  is `git -C <primary-path> checkout <other-branch>` (e.g. `main`) after
+  discarding its trivial auto-generated diffs, which frees the branch for
+  your own worktree's `git checkout <branch>`. Symptom to watch for:
+  `git worktree list` shows the plugin's own repo root (no
+  `.claude/worktrees/...` suffix) holding the target branch.
+- `next build` (plain, no DB) regenerates `apps/marketing/next-env.d.ts`
+  with a formatting-only diff (single vs double quotes in the import path)
+  every run — expected noise, not a real change; discard before staging
+  (`git checkout -- apps/marketing/next-env.d.ts`) rather than committing it.
+- Payload global `validate` functions that reject `//scheme-relative` URLs
+  need the regex `/^\/(?!\/)/`, not `value.startsWith('/')` — the latter
+  also matches `//evil.example`, which browsers treat as an absolute
+  navigation to `evil.example` (protocol-relative URL), defeating the
+  "relative in-app path only" intent. Trim the input first so
+  whitespace-only values fall through to the "required" branch instead of
+  reaching the format check and returning the wrong error message.
+- Importing a Payload `GlobalConfig` module (e.g. `Hero.ts`) directly in a
+  jsdom Jest test to unit-test an exported validator function still pulls
+  in the config's other imports transitively — here `revalidateHero` →
+  `next/cache`, which throws `ReferenceError: TextEncoder is not defined`
+  at import time in jsdom. `jest.mock('next/cache', () => ({
+revalidatePath: jest.fn(), revalidateTag: jest.fn() }))` at the top of the
+  spec file is enough; no need to relocate the validator to its own module
+  just to test it.
+
+**Pitfalls:**
+
+- GSAP entrance tweens set up in a plain `useEffect` run after first paint,
+  so the browser can flash the tweens' end state (from CSS/inline styles)
+  before GSAP applies the `.from(...)` start state — visible as a brief
+  "pop" on load, most noticeable on slow devices. `useLayoutEffect` isn't
+  safe to call unconditionally in an SSR'd Next.js component (React warns
+  "useLayoutEffect does nothing on the server"); use the standard
+  isomorphic swap — `const useIsomorphicLayoutEffect = typeof window !==
+'undefined' ? useLayoutEffect : useEffect;` — module-scoped once, reused
+  by the component. jsdom runs layout effects synchronously, so existing
+  RTL tests for the effect's side effects (matchMedia registration, GSAP
+  calls) pass unchanged after the swap — no test updates needed for a
+  behavior-preserving hook swap.
+
+**Patterns:**
+
+- TDD-verifying a validator fix in a diff-review-fix pass without a
+  pre-existing spec file: write the new spec first, confirm it's GREEN
+  against the fixed source (expected, since the fix is already applied),
+  then temporarily swap the source back to the pre-fix version in place
+  (e.g. via a scripted string replace) and rerun to see the exact new
+  assertions go RED for the exact reason described in the review finding,
+  then restore the fix. Gives real red→green evidence even when the fix
+  was written before the test in the session's actual edit order.
