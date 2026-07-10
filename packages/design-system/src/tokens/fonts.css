@@ -1,0 +1,6 @@
+/* packages/design-system/src/tokens/fonts.css — token declarations only, no @import */
+:root {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, 'SFMono-Regular', monospace;
+}

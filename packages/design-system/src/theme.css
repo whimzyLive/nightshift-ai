@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+@import './tokens/base.css';
+@import './tokens/colors.css';
+/* typography.css before fonts.css: typography.css (vendored verbatim from the
+ * canonical skill source) still declares literal --font-sans/--font-mono values;
+ * fonts.css must be the last :root rule to touch those two properties so the
+ * next/font-linked values win the cascade (see Decided Items — fonts self-hosted
+ * via next/font). Do not reorder without re-checking this. */
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/fonts.css';
+
+@theme {
+  --color-page: var(--bg-page);
+  --color-void: var(--bg-void);
+  --color-surface: var(--surface-card);
+  --color-surface-terminal: var(--surface-terminal);
+  --color-strong: var(--text-strong);
+  --color-body: var(--text-body);
+  --color-muted: var(--text-muted);
+  --color-dim: var(--text-dim);
+  --color-default: var(--border-default);
+  --color-accent: var(--terra-500);
+  --color-accent-hover: var(--terra-400);
+  --color-link: var(--indigo-400);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}

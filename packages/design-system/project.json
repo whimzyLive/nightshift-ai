@@ -1,0 +1,15 @@
+{
+  "name": "design-system",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/design-system/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "check-tokens": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node packages/design-system/scripts/check-tokens.mjs"
+      }
+    }
+  }
+}
