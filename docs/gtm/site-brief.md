@@ -362,18 +362,18 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
 <meta property="og:title" content="Your AI software team that ships while you sleep" />
 <meta property="og:description" content="A Claude Code plugin that turns one terminal into a full delivery team — PM, architect, tech lead, engineers, QA. Ticket in, reviewed PR out. Free and MIT." />
 <meta property="og:url" content="https://github.com/whimzyLive/nightshift-ai" />
-<meta property="og:image" content="https://github.com/whimzyLive/nightshift-ai/og-image.png" />
+<meta property="og:image" content="https://raw.githubusercontent.com/whimzyLive/nightshift-ai/main/og-image.png" />
 <meta property="og:image:alt" content="nightshift pipeline: Jira ticket to spec to plan to implementation to review to PR" />
 
 <!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Your AI software team that ships while you sleep" />
 <meta name="twitter:description" content="A Claude Code plugin that runs your whole SDLC — spec, plan, code, review — from one ticket. Free and MIT." />
-<meta name="twitter:image" content="https://github.com/whimzyLive/nightshift-ai/og-image.png" />
+<meta name="twitter:image" content="https://raw.githubusercontent.com/whimzyLive/nightshift-ai/main/og-image.png" />
 <meta name="twitter:image:alt" content="nightshift pipeline: Jira ticket to spec to plan to implementation to review to PR" />
 ```
 
-**OG image direction (build/design step):** `--night-800` (#0d0d18) background, terracotta `--terra-500` (#d97757) accent, the `Jira ticket → spec → plan → implementation → review → PR` pipeline in JetBrains Mono, wordmark lockup from `.claude/skills/nightshift-design/assets/logo.svg`. The `og-image.png` path is a placeholder until the asset is generated at build.
+**OG image direction (build/design step):** `--night-800` (#0d0d18) background, terracotta `--terra-500` (#d97757) accent, the `Jira ticket → spec → plan → implementation → review → PR` pipeline in JetBrains Mono, wordmark lockup from `.claude/skills/nightshift-design/assets/logo.svg`. The `og-image.png` path is a placeholder until the asset is generated at build — it must be served from a direct-asset URL that returns raw image bytes (not an HTML wrapper page), e.g. `raw.githubusercontent.com` while GitHub is the canonical host; swap to the site's own domain once the page ships there.
 
 ---
 
