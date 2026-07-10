@@ -1,5 +1,100 @@
 # web-engineer memory
 
+## 2026-07-10 — Story NA-22 — Create Marketing Website (design-system + ui + full CMS-driven site)
+
+**Learnings:**
+
+- Worktree branch mismatch: my dispatch worktree's own branch
+  (`worktree-agent-<id>`) can be **behind** `<BRANCH_PREFIX>/<STORY-KEY>` on
+  origin even though the orchestrator said the branch "is checked out in
+  your worktree" — `git checkout <branch>` fails because that branch is
+  checked out in the _primary_ worktree, not mine. Fix: `git fetch origin &&
+git merge <branch> --ff-only` in my own worktree branch (safe, no new
+  branch, no touching the other worktree) — confirmed the ff-only merge
+  brought in a commit (`docs(plan): ...`) my worktree was missing.
+- lint-staged's `prettier --write --ignore-unknown` runs on **every commit**
+  and will reformat vendored/"must stay byte-identical" files (long CSS
+  custom-property values get line-wrapped) — this silently desyncs a
+  vendored-token parity check the moment you commit, even though the file
+  was byte-identical when written. Fix: add the vendored directory to
+  `.prettierignore` (`packages/design-system/src/tokens/*.css` this story),
+  then re-vendor and re-verify. Always re-diff vendored files against their
+  canonical source (and re-run the parity check) immediately after the
+  first commit that touches them — don't trust the pre-commit state.
+- Tailwind v4 CSS-first `@theme`: when two vendored token files both declare
+  the same custom property (canonical `typography.css` hardcodes literal
+  `--font-sans: 'Inter', ...`; a new `fonts.css` sets `--font-sans:
+var(--font-inter), ...` for next/font wiring), **CSS import order in
+  `theme.css` decides which one wins** — later `@import` wins for `:root`
+  rules of equal specificity. A plan/spec's prescribed import order can
+  silently defeat its own "fonts self-hosted via next/font" decision if the
+  next/font-linked file isn't imported _last_. Verify by grepping the built
+  `.next/static/chunks/*.css` for the final `--font-sans:` declaration
+  after `next build`, don't assume from source order alone.
+- `nx sync` needs to be run **twice** to converge in this workspace — the
+  first invocation both reports "workspace is out of sync" _and_ applies
+  the fix in the same run; only the second invocation reports "already up
+  to date". Don't treat the first run's warning as a failure.
+- A shared Postgres container from another worktree/session can already be
+  listening on `localhost:5432` (`docker ps`/`docker info` themselves may
+  hang/timeout in this sandbox even when the container is reachable) — try
+  `psql`/`nc` against the default docker-compose creds
+  (`postgresql`/`password123`/`nightshift`, see
+  `apps/marketing/docker-compose.yml`) before assuming you must run
+  `local-start` yourself. Check `\dt` for existing relations first so you
+  know whether you're reusing a clean or dirty DB.
+- Confirms and extends the NA-16 "static prerendering needs a migrated
+  schema" pitfall below: for this story the spec explicitly wants **ISR**
+  (`export const revalidate = 60`), not `force-dynamic` — so the correct
+  fix when `next build` fails on `relation "..." does not exist` is to
+  **apply the migration locally** (`payload migrate`) before building, not
+  to add `dynamic = 'force-dynamic'`. Only reach for `force-dynamic` when
+  the spec actually calls for per-request rendering; check which one the
+  spec/plan wants before "fixing" a build failure.
+- `@payloadcms/richtext-lexical/lexical` subpath is `export * from 'lexical'`
+  — confirmed via `dist/lexical-proxy/lexical.d.ts` — so
+  `SerializedEditorState` (and any other `lexical` package export) is
+  available from it directly; no need to import from the `lexical` package
+  itself or the richtext-lexical package root.
+- Payload admin theming (`(payload)/custom.scss`): almost everything the
+  admin paints from (`--theme-bg`, `--theme-text`, `--theme-input-bg`,
+  borders) derives from a `--theme-elevation-0..1000` scale defined in
+  `@payloadcms/ui/dist/scss/colors.scss`, which itself derives from
+  `--color-base-0..1000`. Overriding just the elevation scale (+ the direct
+  aliases `--theme-bg`/`--theme-text`/`--theme-input-bg`/`--theme-border-color`)
+  in a plain `:root` block repaints the whole admin without touching
+  Payload's own SCSS. Payload also reuses `--theme-success-500` for focus
+  rings and several "primary" affordances (`vars.scss`
+  `$focus-box-shadow`) — repurposing it as the brand accent color (rather
+  than leaving it green) is the standard way to get a single accent color
+  through the admin when Payload has no dedicated "accent" token.
+- `jest.mock('./module')` **without a factory** still `require()`s the real
+  module to build the automock shape — if that module (transitively)
+  imports an ESM-only package your babel-jest transform ignores in
+  `node_modules` (e.g. `payload`), automocking throws `Cannot use import
+statement outside a module` even though you never call the real
+  implementation. Fix: always pass an explicit factory,
+  `jest.mock('./module', () => ({ fn: jest.fn() }))`, when the module being
+  mocked has heavy/ESM transitive imports.
+
+**Pitfalls:**
+
+- Don't extrapolate "spirit" fixes (reordering CSS imports, adding
+  `.prettierignore` entries, adding a Jest factory) without also re-running
+  the exact verification command the plan specifies — in every case above
+  the deviation was necessary because the literal plan snippet, taken
+  verbatim, actively failed its own stated "Expected: PASS" outcome in this
+  environment.
+
+**Patterns:**
+
+- When a plan's own file list omits a config file a later step's command
+  needs (e.g. Task 1 asked for `pnpm nx test design-system` but didn't list
+  a `jest.config.cts` in Files), add the minimal config mirroring the
+  nearest sibling project's config (`packages/ui/jest.config.cts`) rather
+  than skipping the verification step — the plan's steps are the source of
+  truth over its own file inventory when they conflict.
+
 ## 2026-07-10 — Story NA-16 — interactive 3D hero landing page
 
 **Learnings:**
