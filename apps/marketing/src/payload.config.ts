@@ -8,6 +8,9 @@ import sharp from 'sharp';
 
 import { Media } from './collections/Media';
 import { Users } from './collections/Users';
+import { Home } from './globals/Home';
+import { SiteSettings } from './globals/SiteSettings';
+import { WhySdlc } from './globals/WhySdlc';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -20,6 +23,7 @@ export default buildConfig({
     },
   },
   collections: [Media, Users],
+  globals: [SiteSettings, Home, WhySdlc],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   db: postgresAdapter({

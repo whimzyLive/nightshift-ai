@@ -93,8 +93,16 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    'site-settings': SiteSetting;
+    home: Home;
+    'why-sdlc': WhySdlc;
+  };
+  globalsSelect: {
+    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    home: HomeSelect<false> | HomeSelect<true>;
+    'why-sdlc': WhySdlcSelect<false> | WhySdlcSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -326,6 +334,433 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings".
+ */
+export interface SiteSetting {
+  id: number;
+  installCommand?: string | null;
+  githubUrl?: string | null;
+  navLinks?:
+    | {
+        label?: string | null;
+        href?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  footerColumns?:
+    | {
+        heading?: string | null;
+        links?:
+          | {
+              label?: string | null;
+              href?: string | null;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "home".
+ */
+export interface Home {
+  id: number;
+  hero?: {
+    headline?: string | null;
+    subheadline?: string | null;
+    installCtaLabel?: string | null;
+    starCtaLabel?: string | null;
+  };
+  proofBar?: {
+    items?:
+      | {
+          value?: string | null;
+          label?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  problem?: {
+    eyebrow?: string | null;
+    body?: string | null;
+    points?:
+      | {
+          lead?: string | null;
+          body?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  howItWorks?: {
+    eyebrow?: string | null;
+    steps?:
+      | {
+          title?: string | null;
+          body?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+    autoRunCaption?: string | null;
+  };
+  workflow?: {
+    eyebrow?: string | null;
+    blocks?:
+      | {
+          label?: string | null;
+          body?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  team?: {
+    eyebrow?: string | null;
+    intro?: string | null;
+    agents?:
+      | {
+          name?: string | null;
+          role?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  whyDifferent?: {
+    eyebrow?: string | null;
+    cards?:
+      | {
+          heading?: string | null;
+          body?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  control?: {
+    eyebrow?: string | null;
+    body?: string | null;
+    linkLabel?: string | null;
+    linkHref?: string | null;
+  };
+  faq?: {
+    eyebrow?: string | null;
+    items?:
+      | {
+          question?: string | null;
+          answer?: {
+            root: {
+              type: string;
+              children: {
+                type: any;
+                version: number;
+                [k: string]: unknown;
+              }[];
+              direction: ('ltr' | 'rtl') | null;
+              format:
+                | 'left'
+                | 'start'
+                | 'center'
+                | 'right'
+                | 'end'
+                | 'justify'
+                | '';
+              indent: number;
+              version: number;
+            };
+            [k: string]: unknown;
+          } | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  finalCta?: {
+    heading?: string | null;
+    body?: string | null;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "why-sdlc".
+ */
+export interface WhySdlc {
+  id: number;
+  hero?: {
+    eyebrow?: string | null;
+    h1?: string | null;
+    intro?: {
+      root: {
+        type: string;
+        children: {
+          type: any;
+          version: number;
+          [k: string]: unknown;
+        }[];
+        direction: ('ltr' | 'rtl') | null;
+        format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+        indent: number;
+        version: number;
+      };
+      [k: string]: unknown;
+    } | null;
+  };
+  argumentSections?:
+    | {
+        heading?: string | null;
+        body?: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format:
+              | 'left'
+              | 'start'
+              | 'center'
+              | 'right'
+              | 'end'
+              | 'justify'
+              | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        } | null;
+        id?: string | null;
+      }[]
+    | null;
+  faq?: {
+    items?:
+      | {
+          question?: string | null;
+          answer?: {
+            root: {
+              type: string;
+              children: {
+                type: any;
+                version: number;
+                [k: string]: unknown;
+              }[];
+              direction: ('ltr' | 'rtl') | null;
+              format:
+                | 'left'
+                | 'start'
+                | 'center'
+                | 'right'
+                | 'end'
+                | 'justify'
+                | '';
+              indent: number;
+              version: number;
+            };
+            [k: string]: unknown;
+          } | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  finalCta?: {
+    heading?: string | null;
+    body?: string | null;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings_select".
+ */
+export interface SiteSettingsSelect<T extends boolean = true> {
+  installCommand?: T;
+  githubUrl?: T;
+  navLinks?:
+    | T
+    | {
+        label?: T;
+        href?: T;
+        id?: T;
+      };
+  footerColumns?:
+    | T
+    | {
+        heading?: T;
+        links?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+              id?: T;
+            };
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "home_select".
+ */
+export interface HomeSelect<T extends boolean = true> {
+  hero?:
+    | T
+    | {
+        headline?: T;
+        subheadline?: T;
+        installCtaLabel?: T;
+        starCtaLabel?: T;
+      };
+  proofBar?:
+    | T
+    | {
+        items?:
+          | T
+          | {
+              value?: T;
+              label?: T;
+              id?: T;
+            };
+      };
+  problem?:
+    | T
+    | {
+        eyebrow?: T;
+        body?: T;
+        points?:
+          | T
+          | {
+              lead?: T;
+              body?: T;
+              id?: T;
+            };
+      };
+  howItWorks?:
+    | T
+    | {
+        eyebrow?: T;
+        steps?:
+          | T
+          | {
+              title?: T;
+              body?: T;
+              id?: T;
+            };
+        autoRunCaption?: T;
+      };
+  workflow?:
+    | T
+    | {
+        eyebrow?: T;
+        blocks?:
+          | T
+          | {
+              label?: T;
+              body?: T;
+              id?: T;
+            };
+      };
+  team?:
+    | T
+    | {
+        eyebrow?: T;
+        intro?: T;
+        agents?:
+          | T
+          | {
+              name?: T;
+              role?: T;
+              id?: T;
+            };
+      };
+  whyDifferent?:
+    | T
+    | {
+        eyebrow?: T;
+        cards?:
+          | T
+          | {
+              heading?: T;
+              body?: T;
+              id?: T;
+            };
+      };
+  control?:
+    | T
+    | {
+        eyebrow?: T;
+        body?: T;
+        linkLabel?: T;
+        linkHref?: T;
+      };
+  faq?:
+    | T
+    | {
+        eyebrow?: T;
+        items?:
+          | T
+          | {
+              question?: T;
+              answer?: T;
+              id?: T;
+            };
+      };
+  finalCta?:
+    | T
+    | {
+        heading?: T;
+        body?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "why-sdlc_select".
+ */
+export interface WhySdlcSelect<T extends boolean = true> {
+  hero?:
+    | T
+    | {
+        eyebrow?: T;
+        h1?: T;
+        intro?: T;
+      };
+  argumentSections?:
+    | T
+    | {
+        heading?: T;
+        body?: T;
+        id?: T;
+      };
+  faq?:
+    | T
+    | {
+        items?:
+          | T
+          | {
+              question?: T;
+              answer?: T;
+              id?: T;
+            };
+      };
+  finalCta?:
+    | T
+    | {
+        heading?: T;
+        body?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
