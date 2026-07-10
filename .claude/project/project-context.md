@@ -44,7 +44,7 @@
 
 ## Code Review
 
-| Token        | Value                |
-| ------------ | -------------------- |
-| Review agent | `claude-superpowers` |
-| Review mode  | `on-update`          |
+| Token        | Value           |
+| ------------ | --------------- |
+| Review agent | `claude-inline` |
+| Review mode  | `on-create`     |
