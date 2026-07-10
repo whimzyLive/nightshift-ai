@@ -9,3 +9,6 @@ pnpm-lock.yaml
 # .claude/skills/nightshift-design/tokens/*.css — reformatting here would
 # desync the design-system:check-tokens parity check (NA-22).
 packages/design-system/src/tokens/*.css
+
+# Next.js-generated — regenerated on every build, never hand-formatted.
+apps/marketing/next-env.d.ts

@@ -1,5 +1,64 @@
 # web-engineer memory
 
+## 2026-07-10 — Story NA-22 — CI-fix pass (format:check + ui typecheck lib gaps)
+
+**Learnings:**
+
+- This dispatch's worktree had a `node_modules/` with only `.cache/`
+  populated (no `.modules.yaml`, no `.pnpm/`) even though the branch content
+  itself was correctly reset to `origin/feat/NA-22` tip — `pnpm nx run-many
+-t typecheck` failed with "Failed to process project graph" (`Could not
+  find ".modules.yaml"` + `ERR_MODULE_NOT_FOUND '@payloadcms/next'`), which
+  reads like a project-graph bug but is really just "no install happened in
+  this worktree yet." Fix: `pnpm install --frozen-lockfile` from the
+  worktree root (fast — reuses the shared pnpm store); confirmed
+  `pnpm-lock.yaml` was untouched via `git status --porcelain` immediately
+  after. Don't assume a project-graph error means the _code_ is broken —
+  check `node_modules/.modules.yaml` exists first.
+- `packages/ui/tsconfig.lib.json` and `tsconfig.spec.json` both extend
+  `tsconfig.base.json` (`"lib": ["es2022"]`, no `dom`) but the package's own
+  source (`InstallSnippet.tsx`, using `navigator.clipboard`) and its Jest
+  specs (`.getAttribute` on `HTMLElement`) need DOM types. Neither
+  `tsconfig.json` (the solution/reference file) nor `tsconfig.base.json` is
+  the right place to add `dom` — it must go in **both** leaf configs
+  (`tsconfig.lib.json` for source, `tsconfig.spec.json` for tests)
+  individually via `"lib": ["dom", "es2022"]` in `compilerOptions`, since
+  each is `tsc --build`'s own independent project reference and neither
+  inherits the other's `lib` override.
+- A stray `packages/design-system/tsconfig.tsbuildinfo` appears as untracked
+  after running `pnpm nx run-many -t typecheck` (composite-project
+  incremental build artifact) — it's not gitignored in this repo, but it's
+  also not part of any fix; just leave it untracked and don't `git add` it
+  (stage explicit paths, never `git add .`, per the no-lockfile/no-stray-
+  artifact commit hygiene this repo expects).
+- `pnpm nx format:write --files docs/superpowers/plans/NA-22.md` reformats
+  embedded fenced code blocks inside the markdown plan doc (double→single
+  quotes in CSS/JS snippets, added blank lines, multi-line if-blocks) — a
+  much larger diff (~340 lines) than the CI failure implies, but it's all
+  prettier-driven and `format:check` goes clean afterward; nothing to
+  hand-verify beyond that the doc still renders/reads correctly.
+- Next.js's generated `apps/marketing/next-env.d.ts` should be added to
+  `.prettierignore` (not reformatted) — matches the existing pattern in
+  that file for the vendored `design-system` token CSS (a comment
+  explaining _why_ the exclusion exists, right above the glob).
+
+**Pitfalls:**
+
+- None beyond the node_modules gap above — worth checking
+  `node_modules/.modules.yaml` existence as a first diagnostic step
+  whenever `nx run-many` fails at the _project graph_ stage (not a specific
+  task) in a freshly-reset worktree.
+
+**Patterns:**
+
+- CI-fix-only dispatches (prettier/tsconfig-only failures, no design or
+  component work) don't need the design-oriented project skills
+  (`payload`, `hallmark`, `nightshift-design`, `tailwind-design-system`,
+  `vercel-react-best-practices`, `vercel-composition-patterns`,
+  `atomic-design`, `motion-dev-animations`, `gsap-core`) invoked — going
+  straight to the config fix is the pragmatic call when the task explicitly
+  scopes to "Fix ONLY the CI failures below."
+
 ## 2026-07-10 — Story NA-22 — review-fix pass #2 (payload cache poisoning, Button a11y+props, InstallSnippet clipboard, Eyebrow token, content graceful degradation)
 
 **Learnings:**

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "./out-tsc/jest",
     "jsx": "react-jsx",
+    "lib": ["dom", "es2022"],
     "types": ["jest", "node"]
   },
   "include": [
