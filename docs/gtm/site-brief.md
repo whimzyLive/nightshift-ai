@@ -1,8 +1,10 @@
-<!-- generated 2026-07-10 by /gtm:site -->
+<!-- generated 2026-07-10 by /gtm:site (refined 2026-07-10 by /gtm:site — added day/night workflow section, control bridge, and /why-sdlc page) -->
 
 # Landing-page site brief — nightshift
 
 _Produced by `content-writer` (task=landing-page), gated PASS by the /gtm:site copy-review gate (voice-rules.md hard bans + copy-editing criteria; project Voice overrides: none), branded from `brand/BRAND_KIT.md`. Repo: whimzyLive/nightshift-ai._
+
+_Refined 2026-07-10 (`/gtm:site`, GUARD=refine): added home §5 "Review by day, ship by night" (`/#workflow`), home §8 "You stay in control" bridge, and the standalone `/why-sdlc` page, with matching JSON-LD, meta/OG, and llms.txt deltas. Merged brief re-gated PASS._
 
 ---
 
@@ -17,6 +19,8 @@ _Produced by `content-writer` (task=landing-page), gated PASS by the /gtm:site c
 ```
 Home (/)                        ← this landing page
 ├── How it works (/#how-it-works)      [on-page anchor now → future /how-it-works]
+├── Ship-while-you-sleep workflow (/#workflow)   [on-page anchor — this pass]
+├── Why SDLC (/why-sdlc)               [standalone page — this pass]
 ├── The team (/#agents)                [on-page anchor now → future /agents]
 ├── FAQ (/#faq)                        [on-page anchor]
 └── [future-page slots]
@@ -28,25 +32,27 @@ Home (/)                        ← this landing page
 
 ### URL map
 
-| Page              | URL                                           | Parent | Nav location    | Priority | Status      |
-| ----------------- | --------------------------------------------- | ------ | --------------- | -------- | ----------- |
-| Home / landing    | `/`                                           | —      | —               | High     | This pass   |
-| How it works      | `/#how-it-works`                              | Home   | Header          | High     | Anchor now  |
-| The team (agents) | `/#agents`                                    | Home   | Header          | Medium   | Anchor now  |
-| FAQ               | `/#faq`                                       | Home   | Footer          | Medium   | Anchor now  |
-| Docs              | `/docs`                                       | Home   | Header + footer | High     | Future slot |
-| Agents reference  | `/agents`                                     | Home   | Footer          | Medium   | Future slot |
-| Changelog         | `/changelog`                                  | Home   | Footer          | Low      | Future slot |
-| GitHub repo       | `https://github.com/whimzyLive/nightshift-ai` | —      | Header + footer | High     | External    |
+| Page                 | URL                                           | Parent | Nav location            | Priority | Status      |
+| -------------------- | --------------------------------------------- | ------ | ----------------------- | -------- | ----------- |
+| Home / landing       | `/`                                           | —      | —                       | High     | This pass   |
+| How it works         | `/#how-it-works`                              | Home   | Header                  | High     | Anchor now  |
+| The team (agents)    | `/#agents`                                    | Home   | Header                  | Medium   | Anchor now  |
+| Workflow (day/night) | `/#workflow`                                  | Home   | Footer + hero deep-link | High     | Anchor now  |
+| Why SDLC             | `/why-sdlc`                                   | Home   | Header + footer         | High     | This pass   |
+| FAQ                  | `/#faq`                                       | Home   | Footer                  | Medium   | Anchor now  |
+| Docs                 | `/docs`                                       | Home   | Header + footer         | High     | Future slot |
+| Agents reference     | `/agents`                                     | Home   | Footer                  | Medium   | Future slot |
+| Changelog            | `/changelog`                                  | Home   | Footer                  | Low      | Future slot |
+| GitHub repo          | `https://github.com/whimzyLive/nightshift-ai` | —      | Header + footer         | High     | External    |
 
 ### Navigation spec
 
-- **Header (left → right):** `🌙 nightshift` wordmark (links `/`) · How it works · The team · FAQ · GitHub (external) · **primary CTA button `Install the plugin`** (scrolls to hero/final install block). 4 nav links + 1 CTA.
+- **Header (left → right):** `🌙 nightshift` wordmark (links `/`) · How it works · Why SDLC · The team · FAQ · GitHub (external) · **primary CTA button `Install the plugin`** (scrolls to hero/final install block). 5 nav links + 1 CTA — within the 4–7 rule.
 - **Footer columns:**
-  - **Plugin:** How it works · The team · FAQ · Docs (soon)
+  - **Plugin:** How it works · Ship-while-you-sleep workflow (`/#workflow`) · Why SDLC (`/why-sdlc`) · The team · FAQ · Docs (soon)
   - **Project:** GitHub · Changelog (soon) · MIT License · Issues
   - **Company:** whimzyLive
-- **Breadcrumbs:** none (single-level page). Add when `/docs` and `/agents` ship.
+- **Breadcrumbs:** home stays breadcrumb-free. `/why-sdlc` gets `Home > Why SDLC` (mirrored by `BreadcrumbList` schema, §3). Extend when `/docs` and `/agents` ship.
 
 ### On-page section order (the scroll)
 
@@ -54,17 +60,21 @@ Home (/)                        ← this landing page
 2. Proof bar (the numbers)
 3. Problem — the connective tissue
 4. How it works — the pipeline + the `/auto` run
-5. The team — 11 agents, not a megaprompt
-6. Why it's different — value themes
-7. Objections / FAQ
-8. Final CTA (recap + install + star)
+5. Review by day, ship by night — the day/night workflow (`/#workflow`)
+6. The team — 11 agents, not a megaprompt
+7. Why it's different — value themes
+8. You stay in control — bridge to `/why-sdlc`
+9. Objections / FAQ
+10. Final CTA (recap + install + star)
 
 ### Internal linking plan
 
 - Hero and final-CTA install blocks both point to the same install instructions (the primary conversion, reinforced top and bottom).
 - Each header nav link is an on-page anchor; every section is reachable in one click.
 - Hub-and-spoke deferred until `/docs` and `/blog` exist. When they land: home = hub; docs pages and blog posts link back to `/` and to `/#how-it-works`.
-- No orphan risk this pass (single page). Future slots each need an inbound link from the footer at minimum before launch.
+- The hero's "ships while you sleep" phrase deep-links to `/#workflow`.
+- Home §8 bridge links to `/why-sdlc` with descriptive anchor ("why an SDLC beats one-shot AI"); `/why-sdlc` links back to `/` and `/#how-it-works` and ends on the mirrored install/star CTA — two-way link, no orphan.
+- No orphan risk this pass. `/why-sdlc` has its inbound footer link (Plugin column). Future slots each need an inbound link from the footer at minimum before launch.
 
 ---
 
@@ -152,7 +162,31 @@ Coding assistants handle the middle 20%. The other 80% — the process — stays
 
 **CTA (secondary, inline):** `See the commands on GitHub`
 
-### Section 5 — The team
+### Section 5 — Review by day, ship by night
+
+**Eyebrow:** `// your day, split in two`
+
+**Section header:** Review by day. Ship by night.
+
+**Body (thesis):** "Ships while you sleep" is a workflow, not a slogan. The split is simple: your day is for decisions, the night is for execution.
+
+**Three labeled blocks:**
+
+- **Day — you refine.** Every story gets pre-refined with clear acceptance criteria, and the complicated ones get a full spec. You read the refined stories and specs, decide what's ready, and approve them. You make the calls. You don't write the implementation.
+- **Night — the plugin implements.** `/auto` picks up the tickets and specs you already approved, triages each one, and routes it to the right approach — following the practices your domain agents enforce for that repo (from its `project-context.md`). Nothing runs on work you haven't signed off.
+- **Morning — you review.** You wake up to PRs ready for review. Each one addresses acceptance criteria you already agreed to, or a spec you already approved. You're reading a result you set up, not a surprise.
+
+**Closing line:** You kept every decision. The plugin did the execution. Prefer to drive a stage yourself? Each one has a verb: `/refine-issue`, `/spec`, `/impl`, `/review`.
+
+_(No new primary CTA — preserves the page's single install/star CTA pair. This section's job is belief, then hand off to §6.)_
+
+_Header alternatives:_
+
+- **A (recommended):** "Review by day. Ship by night." — mirrors the day/night hook cleanly; parallel structure reads fast.
+- **B:** "Your day is for decisions. The night is for code." — sharper on the actual split; slightly longer.
+- **C:** "You refine it awake. It builds it while you sleep." — most literal payoff of the hero line; a touch more narrative.
+
+### Section 6 — The team
 
 **Section header:** A team, not a megaprompt
 
@@ -160,7 +194,7 @@ Coding assistants handle the middle 20%. The other 80% — the process — stays
 
 **Role list (copy):** Product Manager · Architect · Tech Lead · Engineers · QA — each a separate agent, each leaving a document behind: PRD, spec, plan, review.
 
-### Section 6 — Why it's different
+### Section 7 — Why it's different
 
 **Section header:** Why builders choose it
 
@@ -173,7 +207,17 @@ Four value cards:
 | Issue-tracker native            | It reads the ticket, derives the branch, plan, and PR, and comments the result back to Jira and GitHub.                                                                             |
 | Free, open, yours to fork       | Built on open Claude Code primitives, MIT-licensed. Fork it, extend it, swap a role. No lock-in, no paid tier gate.                                                                 |
 
-### Section 7 — Objections / FAQ
+### Section 8 — You stay in control (bridge)
+
+**Eyebrow:** `// control`
+
+**Section header:** You decide how it gets built
+
+**Body:** Most AI dev tools abstract the process away until you can't see what you're getting — you only find out once the output lands, then negotiate your way back to what you meant. nightshift runs the opposite way: it keeps the software development lifecycle in front of you, with a hard gate at every phase that returns control before the next step runs.
+
+**Link (secondary, inline):** `Why an SDLC beats one-shot AI →` (links `/why-sdlc`)
+
+### Section 9 — Objections / FAQ
 
 **Section header:** Questions builders ask first
 
@@ -195,7 +239,7 @@ Review is done by a different agent than the author, tests are the merge gate, a
 **Q. What does it cost?**
 Nothing. It's free and MIT-licensed. Adoption is the only metric we track.
 
-### Section 8 — Final CTA
+### Section 10 — Final CTA
 
 **Header:** Put a ticket in tonight. Read a reviewed PR in the morning.
 
@@ -210,6 +254,57 @@ Nothing. It's free and MIT-licensed. Adoption is the only metric we track.
 
 Primary button: `Copy install command`
 Secondary button: `Star nightshift on GitHub`
+
+### New page — `/why-sdlc`
+
+**Breadcrumb:** Home > Why SDLC
+
+**Eyebrow:** `// why an sdlc`
+
+**Page H1:** You decide how it gets built — not the other way around
+
+**Subhead:** Frameworks, meta-frameworks, and meta-prompts keep promising to do everything for you. The thing they quietly take is control. nightshift is built to give it back.
+
+**Section — The trend: abstraction that takes the wheel**
+The pitch is always the same: describe an idea, let the tool handle the rest. The cost is visibility. You don't know what you'll get back until the AI has already produced it, and if it built the wrong thing — or the right thing the wrong way — you're stuck in a round of "no, like this," because you never got a say in how it was implemented. Guardrail tools help at the edges, but they still don't give you the control or visibility to steer the work while it's happening.
+
+**Section — The answer: the lifecycle you already trust**
+Software teams have always shipped the same way: incrementally. Break a large feature into user stories. Spec the hard ones. Implement in small, reviewable steps. That's the software development lifecycle, and it's incremental for a reason — smaller pieces are easier to diagnose, test, release, and control. nightshift enforces those exact principles when you work with AI agents, on open Claude Code primitives.
+
+**Section — Hard gates return control at every phase**
+Each phase ends at a hard gate that hands control back to you: refine, spec, plan, implement, review. You approve each one before the next begins, so you catch a wrong turn before it's implemented instead of after. Catching it at the gate also means no tokens spent building code you'd have thrown away.
+
+**Section — No building it all in one shot**
+Software built in one shot gets some things right and some things wrong, and you can't tell which until you've read the whole thing. nightshift doesn't work that way. Work breaks down the way an agile team breaks it down — epic → stories → spec → implementation — so every unit is small enough to review on its own.
+
+**Section — It builds the way you would**
+With the plugin installed, Claude Code follows these principles by default. Ask it to build something and it works the way you would if you were writing it yourself: refine, spec, implement in steps, review before merge. You stay the developer. It does the typing.
+
+**Short FAQ (page-level, feeds FAQPage schema):**
+
+**Q. Isn't this just another guardrail tool?**
+Guardrail tools constrain the output at the edges. nightshift changes the process: each phase ends at a hard gate that returns control to you, so you approve the direction before code is written, not after.
+
+**Q. Doesn't a full lifecycle slow me down?**
+Small stories skip the ceremony — stories at or under the lightweight threshold (default 3 points or fewer) go straight to implementation. The gates exist so you catch a wrong turn before it's built, which is faster than redoing it.
+
+**Page CTA (mirrors home):**
+Header: Put the lifecycle back in your hands
+
+```
+/plugin marketplace add whimzyLive/nightshift-ai
+/plugin install sdlc@nightshift
+```
+
+Primary button: `Copy install command` · Secondary: `Star nightshift on GitHub` · Tertiary link: `Back to overview` (`/`)
+
+_H1 alternatives:_
+
+- **A (recommended):** "You decide how it gets built — not the other way around." — leads with control, the whole thesis.
+- **B:** "The lifecycle is the point. Not the abstraction." — sharper against the meta-framework category; assumes more reader context.
+- **C:** "One-shot AI hands you a surprise. nightshift hands you control." — most direct contrast; slightly more marketing-forward.
+
+**Why a page, not a home section:** the control argument is a full positioning case (abstraction trend → incremental-SDLC answer → hard gates → no one-shot builds); differentiation/comparison pages are the highest-AI-citation content format, and a dedicated URL with its own title/meta/schema is far more citable than an on-page anchor; and it avoids two "why different" blocks fighting on one scroll — home §7 stays the quick value-card scan, `/why-sdlc` carries the deep argument.
 
 ---
 
@@ -269,7 +364,7 @@ Applied after drafting; the copy deck above already reflects these decisions.
         "price": "0",
         "priceCurrency": "USD"
       },
-      "featureList": ["11 specialized agents with tight charters", "10 slash commands", "Enforced lifecycle: spec, plan, implement, review", "Issue-tracker native (Jira and GitHub)", "Generic agents configured per repo via project-context.md", "Independent review by a different agent than the author"],
+      "featureList": ["11 specialized agents with tight charters", "10 slash commands", "Enforced lifecycle: spec, plan, implement, review", "Issue-tracker native (Jira and GitHub)", "Generic agents configured per repo via project-context.md", "Independent review by a different agent than the author", "Hard gates at every phase that return control to the developer"],
       "author": { "@id": "https://github.com/whimzyLive#org" },
       "publisher": { "@id": "https://github.com/whimzyLive#org" }
     },
@@ -333,18 +428,68 @@ Applied after drafting; the copy deck above already reflects these decisions.
           }
         }
       ]
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://github.com/whimzyLive/nightshift-ai#ship-while-you-sleep",
+      "name": "How to ship software while you sleep with nightshift",
+      "description": "The day/night workflow: refine and approve stories during the day, let the plugin implement approved work overnight, and review the resulting PRs in the morning.",
+      "step": [
+        { "@type": "HowToStep", "position": 1, "name": "Refine by day", "text": "Pre-refine every story with clear acceptance criteria and write a full spec for the complicated ones, using the refinement and spec commands." },
+        { "@type": "HowToStep", "position": 2, "name": "Review and approve", "text": "Review the refined stories and specs, decide what is ready, and approve them. You make the decisions; you do not write the implementation." },
+        { "@type": "HowToStep", "position": 3, "name": "Implement overnight", "text": "Run /auto on the approved tickets. It triages each one and routes it to the right approach, following the practices your domain agents enforce for that repo." },
+        { "@type": "HowToStep", "position": 4, "name": "Review the PRs in the morning", "text": "Wake up to PRs ready for review. Each one addresses acceptance criteria you already agreed to or a spec you already approved." }
+      ]
     }
   ]
 }
 ```
 
-**Note for build:** if the landing page ships on its own domain rather than the GitHub repo URL, swap every `url`/`@id` host accordingly and add a `WebSite` node. GitHub repo kept as canonical because that's the current Landing URL token.
+### New page `/why-sdlc` — its own `@graph`
+
+`WebPage` + `BreadcrumbList` + `FAQPage`; swap host if the page ships on its own domain.
+
+```json
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://github.com/whimzyLive/nightshift-ai/why-sdlc#webpage",
+      "name": "Why an SDLC beats one-shot AI — nightshift",
+      "description": "Most AI dev tools abstract the process away. nightshift enforces the software development lifecycle instead, with a hard gate at every phase that keeps the developer in control.",
+      "isPartOf": { "@id": "https://github.com/whimzyLive/nightshift-ai#software" },
+      "about": { "@id": "https://github.com/whimzyLive/nightshift-ai#software" }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://github.com/whimzyLive/nightshift-ai/why-sdlc#breadcrumb",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://github.com/whimzyLive/nightshift-ai" },
+        { "@type": "ListItem", "position": 2, "name": "Why SDLC", "item": "https://github.com/whimzyLive/nightshift-ai/why-sdlc" }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://github.com/whimzyLive/nightshift-ai/why-sdlc#faq",
+      "mainEntity": [
+        { "@type": "Question", "name": "Isn't this just another guardrail tool?", "acceptedAnswer": { "@type": "Answer", "text": "Guardrail tools constrain the output at the edges. nightshift changes the process: each phase ends at a hard gate that returns control to you, so you approve the direction before code is written, not after." } },
+        { "@type": "Question", "name": "Doesn't a full lifecycle slow me down?", "acceptedAnswer": { "@type": "Answer", "text": "Small stories skip the ceremony. Stories at or under the lightweight threshold (default 3 points or fewer) go straight to implementation. The gates exist so you catch a wrong turn before it is built, which is faster than redoing it." } }
+      ]
+    }
+  ]
+}
+```
+
+**Note for build:** if the landing page ships on its own domain rather than the GitHub repo URL, swap every `url`/`@id` host accordingly (including every `/why-sdlc` `@id`/`item`) and add a `WebSite` node. GitHub repo kept as canonical because that's the current Landing URL token.
 
 **Validation checklist:**
 
 - [ ] Passes Google Rich Results Test (FAQ + SoftwareApplication eligible)
 - [ ] `offers.price` = "0" matches the free/MIT claim on the page
-- [ ] FAQ JSON-LD text matches the visible Section 7 copy (required — no schema-only content)
+- [ ] FAQ JSON-LD text matches the visible Section 9 copy (required — no schema-only content)
+- [ ] `HowTo` step text matches the visible Section 5 copy; `/why-sdlc` `FAQPage` text matches the visible page FAQ (no schema-only content)
+- [ ] `BreadcrumbList` mirrors the on-page breadcrumb and the URL path
 - [ ] All URLs fully qualified, absolute
 
 ---
@@ -377,6 +522,32 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
 ```
 
 **OG image direction (build/design step):** `--night-800` (#0d0d18) background, terracotta `--terra-500` (#d97757) accent, the `Jira ticket → spec → plan → implementation → review → PR` pipeline in JetBrains Mono, wordmark lockup from `.claude/skills/nightshift-design/assets/logo.svg`. The `og-image.png` path is a placeholder until the asset is generated at build — it must be served from a direct-asset URL that returns raw image bytes (not an HTML wrapper page), e.g. `raw.githubusercontent.com` while GitHub is the canonical host; swap to the site's own domain once the page ships there.
+
+### New page `/why-sdlc` — meta / OG
+
+Home-page meta/OG unchanged — the locked one-liner still governs; the workflow section reinforces the existing positioning rather than shifting it. Title 52 chars; description ~156.
+
+```html
+<title>Why nightshift keeps you in control of AI-built code</title>
+<meta name="description" content="Most AI dev tools abstract the process away. nightshift enforces the software development lifecycle instead: a hard gate at every phase keeps you in control." />
+<link rel="canonical" href="https://github.com/whimzyLive/nightshift-ai/why-sdlc" />
+
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="nightshift" />
+<meta property="og:title" content="You decide how it gets built — not the other way around" />
+<meta property="og:description" content="Frameworks, meta-frameworks, and meta-prompts do everything for you and take control with it. nightshift puts the SDLC back in front of you, with a hard gate at every phase." />
+<meta property="og:url" content="https://github.com/whimzyLive/nightshift-ai/why-sdlc" />
+<meta property="og:image" content="https://raw.githubusercontent.com/whimzyLive/nightshift-ai/main/og-why-sdlc.png" />
+<meta property="og:image:alt" content="nightshift phases with a hard gate returning control at each: refine, spec, plan, implement, review" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="You decide how it gets built — not the other way around" />
+<meta name="twitter:description" content="nightshift enforces the SDLC when you work with AI agents. A hard gate at every phase returns control before the next step runs. Free and MIT." />
+<meta name="twitter:image" content="https://raw.githubusercontent.com/whimzyLive/nightshift-ai/main/og-why-sdlc.png" />
+<meta name="twitter:image:alt" content="nightshift phases with a hard gate returning control at each: refine, spec, plan, implement, review" />
+```
+
+**OG image direction (`og-why-sdlc.png`):** same token system as the home OG image — `--night-800` bg, `--terra-500` accent, JetBrains Mono; render the five phases with a gate glyph returning control at each. Placeholder path until generated at build; serve raw image bytes (`raw.githubusercontent.com` while GitHub is canonical), host-swap when the site gets its own domain.
 
 ---
 
@@ -416,6 +587,11 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
 - Stages are enforced: spec before plan, plan before code, review before merge,
   tests as the merge gate. Review is done by a different agent than the author.
 - Small stories (default ≤3 points) skip straight to implementation.
+- Every phase ends at a hard gate that returns control to you (refine, spec,
+  plan, implement, review) — you approve each step before the next runs.
+- Day/night workflow: refine and approve stories during the day; /auto
+  implements the approved work overnight; you review the resulting PRs in the
+  morning. You keep every decision; the plugin does the execution.
 - 11 specialized agents, 10 slash commands. Configured per repo via one
   `project-context.md` file — the agents themselves are generic.
 
@@ -428,7 +604,10 @@ Title 59 chars; description 158 chars. Lowercase `nightshift`.
 
 - Repository: https://github.com/whimzyLive/nightshift-ai
 - License: MIT
+- Why an SDLC (control vs one-shot AI): https://github.com/whimzyLive/nightshift-ai/why-sdlc
 ```
+
+_(The `/why-sdlc` link is domain-dependent — same canonical caveat as open decision #3. While GitHub is the canonical host and no standalone page exists there yet, point it at the marketing-domain `/why-sdlc` once it ships, or at a repo doc anchor in the interim.)_
 
 **Also for the build:** confirm `robots.txt` allows GPTBot, ClaudeBot, PerplexityBot, and Google-Extended so those engines can cite the page.
 
@@ -479,16 +658,19 @@ Rules: **one pointing color** — terracotta is the single brand accent, one acc
 
 ### Per-section token mapping
 
-| Page section       | Treatment                                                                                                                                                                                                                               |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hero               | `--night-800` bg, wordmark lockup (`logo.svg`), headline Inter sentence-case `--moon-100`, install block on `--surface-terminal` in JetBrains Mono, primary CTA `--terra-500` (hover `--terra-400`), pipeline caption mono `--moon-300` |
-| Proof bar          | `--night-600` surface, numbers mono `--moon-100`, separators `--moon-300`                                                                                                                                                               |
-| Problem            | body `--moon-200`, sub-point leads `--moon-100`, eyebrow `// the other 80%`                                                                                                                                                             |
-| How it works       | `/auto` block on `--surface-terminal`, table borders `--night-600`, step numbers `--terra-500`, eyebrow `// how it works`                                                                                                               |
-| The team           | agent names in mono (`product-manager`, `qa-engineer`), eyebrow `// the team`                                                                                                                                                           |
-| Why it's different | 4 cards on `--surface-card`, card headers `--moon-100`, single terracotta accent reserved for hover/border-active                                                                                                                       |
-| FAQ                | questions `--moon-100`, answers `--moon-200`, eyebrow `// questions`                                                                                                                                                                    |
-| Final CTA          | mirror hero: terminal install block, `--terra-500` primary button, star button secondary (indigo link treatment or outline)                                                                                                             |
+| Page section                 | Treatment                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero                         | `--night-800` bg, wordmark lockup (`logo.svg`), headline Inter sentence-case `--moon-100`, install block on `--surface-terminal` in JetBrains Mono, primary CTA `--terra-500` (hover `--terra-400`), pipeline caption mono `--moon-300`                                                                                               |
+| Proof bar                    | `--night-600` surface, numbers mono `--moon-100`, separators `--moon-300`                                                                                                                                                                                                                                                             |
+| Problem                      | body `--moon-200`, sub-point leads `--moon-100`, eyebrow `// the other 80%`                                                                                                                                                                                                                                                           |
+| How it works                 | `/auto` block on `--surface-terminal`, table borders `--night-600`, step numbers `--terra-500`, eyebrow `// how it works`                                                                                                                                                                                                             |
+| The team                     | agent names in mono (`product-manager`, `qa-engineer`), eyebrow `// the team`                                                                                                                                                                                                                                                         |
+| Why it's different           | 4 cards on `--surface-card`, card headers `--moon-100`, single terracotta accent reserved for hover/border-active                                                                                                                                                                                                                     |
+| Review by day, ship by night | three Day/Night/Morning blocks on `--surface-card`, block labels `--moon-100`, body `--moon-200`, commands (`/auto`, `/refine-issue`, `/spec`, `/impl`, `/review`, `project-context.md`) mono, eyebrow `// your day, split in two`; terracotta reserved as the view's single accent (active-block border/highlight)                   |
+| You stay in control (bridge) | body `--moon-200`, eyebrow `// control`, outbound `/why-sdlc` link in indigo link treatment (`--indigo-400`) — functional, not decorative                                                                                                                                                                                             |
+| FAQ                          | questions `--moon-100`, answers `--moon-200`, eyebrow `// questions`                                                                                                                                                                                                                                                                  |
+| Final CTA                    | mirror hero: terminal install block, `--terra-500` primary button, star button secondary (indigo link treatment or outline)                                                                                                                                                                                                           |
+| `/why-sdlc` page             | mirrors home tokens: `--night-800` bg, breadcrumb mono `--moon-300`, H1 Inter sentence-case `--moon-100`, eyebrow `// why an sdlc`, five argument sections body `--moon-200` with section headers `--moon-100`, page FAQ same treatment as home FAQ, mirrored install block on `--surface-terminal` with `--terra-500` primary button |
 
 ### Voice (enforced, gate-checked)
 
@@ -499,8 +681,9 @@ Technical peer, not marketer. Thesis → mechanism → proof. Numbers as proof, 
 ## Run metadata
 
 - **Copy-review gate:** PASS (2026-07-10) — zero hard-ban violations, zero positioning-discipline violations; project Voice overrides: none (empty section, plugin defaults governed).
-- **marketing-council:** not requested (no `--council` flag).
-- **CRO `offers` pass:** not triggered — CTA framing assessed strong (copyable command + free/MIT/60-second offer).
+- **Refine run (2026-07-10, GUARD=refine):** new-copy gate PASS and merged-brief re-gate PASS — same merged rule set; added home §5 workflow section, home §8 control bridge, `/why-sdlc` page, and their SEO deltas.
+- **marketing-council:** not requested (no `--council` flag) — both runs.
+- **CRO `offers` pass:** not triggered — CTA framing assessed strong (copyable command + free/MIT/60-second offer); unchanged in refine run (offer is unchanged: free/MIT, 60-second copyable install).
 
 ## Open copy decisions (founder)
 
@@ -509,3 +692,6 @@ Technical peer, not marketer. Thesis → mechanism → proof. Numbers as proof, 
 3. **Canonical URL / domain.** All SEO URLs use the current Landing URL token (GitHub repo). If the Payload `apps/marketing` site gets a dedicated domain, swap canonical, JSON-LD `@id`s, OG `url`, and llms.txt placement at build.
 4. **Headline test.** Ship variant A (locked one-liner); variant C ("AI writes the code. nightshift runs the other 80%.") worth A/B testing post-launch.
 5. **No cycle-time / review-pass-rate metrics.** Not yet tracked — no efficiency claims made. When dashboards land, they're the strongest proof upgrade.
+6. **Naming "superpowers" on the public site.** The SDLC plugin's superpowers dependency is real and verifiable in-repo, but it is not in the locked `.agents/product-marketing.md` (which says "open Claude Code primitives"). The `/why-sdlc` copy therefore does not name superpowers. To name it, add it to `product-marketing.md` first so the claim is traceable, then fold it in on a re-run.
+7. **The token-saving claim.** Rendered as mechanism ("no tokens spent building code you'd have thrown away") rather than a quantified claim — no supporting number exists in locked positioning, and a vague "a lot" risks the empty-superlative ban. Supply a measured figure to upgrade it to a citable proof point.
+8. **`/why-sdlc` split.** Standalone page + compact home bridge chosen (citable dedicated URL; differentiation pages are the highest-AI-citation format; avoids two "why different" blocks on one scroll). Compressible into a single home section after §7 if preferred — at the cost of the dedicated URL. All `/why-sdlc` URLs inherit open decision #3 (host swap at build).
