@@ -18,3 +18,10 @@
 **Root causes:** matchMedia mental model inverted — assumed callback always runs with conditions as booleans, but GSAP fires it only when ≥1 named condition MATCHES; mocks encoded the same wrong contract as the implementation; availability of the CMS fetch path not considered when switching the route to per-request SSR.
 **Preventions:** gsap.matchMedia must always register complementary conditions (reduce + no-preference) so one always matches; when mocking a third-party contract, derive mock behaviour from real matchMedia semantics (stub window.matchMedia) so the test would fail if the registration is wrong; any request-time CMS/DB read on a public route needs a try/catch fallback to defaults; jsdom cannot see "animation never runs" bugs — add a real-browser smoke for motion work.
 **Domains affected:** web-engineer
+
+## 2026-07-10 — Story NA-22
+
+**Issues found:** Critical: Tailwind v4 auto source detection missed symlinked workspace package (`packages/ui`) — primitives shipped unstyled; Critical (round 2): schema field added in fix (`SiteSettings.githubLabel`) without regenerating the migration — `column site_settings.github_label does not exist` at runtime. Important: stale e2e spec asserting deleted stub; admin fonts referenced in custom.scss but never loaded; `@import "tailwindcss"` without declared dep; AC2 gaps (hardcoded CTA labels, dead `hero.installCtaLabel` CMS field).
+**Root causes:** Tailwind v4 doesn't follow pnpm-symlinked workspace sources — needs explicit `@source`; unit tests/lint can't catch missing utility classes (only built-CSS grep can); schema changes and migrations are separate generated artifacts — changing one without regenerating the other passes typecheck.
+**Preventions:** After adding any cross-package Tailwind consumer, grep compiled `.next/static/chunks/*.css` for a package-only class; every Payload schema change on an unreleased branch regenerates the baseline migration (ts+json+index); e2e specs are in-scope when a page they assert changes; every CMS field added must be rendered somewhere or not added.
+**Domains affected:** web-engineer
