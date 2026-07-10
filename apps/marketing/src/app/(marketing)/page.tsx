@@ -1,5 +1,14 @@
-import { HeroBanner, FeatureCard } from '@nightshift-ai/ui';
+import { FeatureCard } from '@nightshift-ai/ui';
+
+import { HeroClient } from '../../components/hero/hero-client';
+import { getHeroContent } from '../../lib/get-hero-content';
 import styles from './page.module.css';
+
+// Hero content is CMS-editable and must reflect admin edits without a
+// redeploy (NA-16 AC6). Render at request time instead of prerendering at
+// build time — the latter would require a live, migrated Postgres schema
+// during `next build`, which isn't available in every build environment.
+export const dynamic = 'force-dynamic';
 
 const features = [
   {
@@ -45,7 +54,9 @@ const features = [
   },
 ];
 
-export default function Page() {
+export default async function Page() {
+  const hero = await getHeroContent();
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -73,11 +84,11 @@ export default function Page() {
       </header>
 
       <main className={styles.main}>
-        <HeroBanner
-          title="Nx + Next.js Starter"
-          subtitle="A production-ready monorepo template with App Router, shared UI libraries, and Nx superpowers built in."
-          ctaHref="https://cloud.nx.app/get-started"
-          ctaLabel="Enable Nx Cloud - Free Remote Cache"
+        <HeroClient
+          headline={hero.headline}
+          subhead={hero.subhead}
+          ctaLabel={hero.ctaLabel}
+          ctaHref={hero.ctaHref}
         />
 
         <section className={styles.cloudCallout}>
