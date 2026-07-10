@@ -97,8 +97,12 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    hero: Hero;
+  };
+  globalsSelect: {
+    hero: HeroSelect<false> | HeroSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -423,6 +427,38 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "hero".
+ */
+export interface Hero {
+  id: number;
+  headline: string;
+  subhead: string;
+  /**
+   * Label for the hero call-to-action button.
+   */
+  ctaLabel: string;
+  /**
+   * URL the hero CTA button links to.
+   */
+  ctaHref: string;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "hero_select".
+ */
+export interface HeroSelect<T extends boolean = true> {
+  headline?: T;
+  subhead?: T;
+  ctaLabel?: T;
+  ctaHref?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

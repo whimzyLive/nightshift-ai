@@ -1,0 +1,100 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  backface-visibility: hidden;
+}
+
+/* Depth order (back to front): far stars, near stars, moon, sun. */
+
+.starsFar {
+  transform: translateZ(-220px) scale(1.18);
+  opacity: 0.5;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(1px 1px at 12% 20%, rgba(245, 243, 239, 0.5), transparent),
+    radial-gradient(1px 1px at 32% 62%, rgba(245, 243, 239, 0.4), transparent),
+    radial-gradient(1px 1px at 55% 15%, rgba(245, 243, 239, 0.45), transparent),
+    radial-gradient(1px 1px at 68% 48%, rgba(245, 243, 239, 0.35), transparent),
+    radial-gradient(1px 1px at 78% 75%, rgba(245, 243, 239, 0.4), transparent),
+    radial-gradient(1px 1px at 90% 30%, rgba(245, 243, 239, 0.3), transparent),
+    radial-gradient(1px 1px at 22% 85%, rgba(245, 243, 239, 0.35), transparent);
+}
+
+.starsNear {
+  transform: translateZ(-120px) scale(1.1);
+  opacity: 0.75;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(
+      1.5px 1.5px at 18% 40%,
+      rgba(245, 243, 239, 0.75),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 46% 22%,
+      rgba(245, 243, 239, 0.6),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 62% 68%,
+      rgba(245, 243, 239, 0.65),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 84% 40%,
+      rgba(245, 243, 239, 0.55),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 30% 78%,
+      rgba(245, 243, 239, 0.5),
+      transparent
+    );
+}
+
+.moon {
+  inset: auto;
+  left: 16%;
+  top: 10%;
+  width: 180px;
+  height: 180px;
+  transform: translateZ(-40px);
+  border-radius: 999px;
+  background: radial-gradient(
+    circle at 35% 32%,
+    rgba(165, 180, 252, 0.9),
+    rgba(139, 156, 247, 0.35) 55%,
+    transparent 75%
+  );
+  box-shadow: 0 0 90px 20px rgba(124, 147, 240, 0.18);
+}
+
+.sun {
+  inset: auto;
+  right: 14%;
+  top: 6%;
+  width: 220px;
+  height: 220px;
+  transform: translateZ(60px);
+  border-radius: 999px;
+  background: radial-gradient(
+    circle at 40% 35%,
+    rgba(240, 164, 136, 0.95),
+    rgba(217, 119, 87, 0.45) 55%,
+    transparent 75%
+  );
+  box-shadow: 0 0 140px 40px rgba(217, 119, 87, 0.28);
+}
+
+@media (max-width: 640px) {
+  .moon {
+    width: 120px;
+    height: 120px;
+  }
+
+  .sun {
+    width: 150px;
+    height: 150px;
+  }
+}
