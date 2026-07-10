@@ -44,9 +44,9 @@
 
 **Pitfalls:**
 
-- None beyond the node_modules gap above — worth checking
+- None beyond the node*modules gap above — worth checking
   `node_modules/.modules.yaml` existence as a first diagnostic step
-  whenever `nx run-many` fails at the _project graph_ stage (not a specific
+  whenever `nx run-many` fails at the \_project graph* stage (not a specific
   task) in a freshly-reset worktree.
 
 **Patterns:**
