@@ -1,5 +1,94 @@
 # web-engineer memory
 
+## 2026-07-11 — Story NA-22 — brand polish pass + double-eyebrow bug fix
+
+**Learnings:**
+
+- **Worktree-path pitfall bit again, at the very start of the session this
+  time** (not mid-session): `Working directory` in the env block was already
+  the worktree root, but several early `Read`/`Bash` calls used the
+  no-prefix repo path (`.../nightshift/...`) instead of the
+  `.../nightshift/.claude/worktrees/<id>/...` path, and succeeded silently
+  against the _shared_ checkout — which was still on the old spec-merge
+  commit (7b9206c), 6 commits behind `origin/feat/NA-22`. Caught it only
+  when the first `Edit` call errored ("isolated in the worktree"). Fixed
+  with `git fetch origin feat/NA-22 && git reset --hard origin/feat/NA-22`
+  run with `cd` into the worktree path explicitly. Lesson reinforced: verify
+  `pwd`/`git log --oneline -3` **inside the literal worktree path** as the
+  very first Bash call of a session, before any Read — don't trust the env
+  block's stated cwd for subsequent relative assumptions.
+- **Tailwind v4 theme-key collisions are the norm, not the exception, when
+  a design-token file already uses Tailwind's own namespace convention.**
+  This repo's `tokens/typography.css`/`spacing.css` already name their keys
+  `--text-2xs..6xl`, `--leading-*`, `--tracking-*`, `--radius-*` — i.e. they
+  pre-adopted Tailwind v4's exact theme-key naming. That means _every one_
+  of those needs a **literal duplicate** inside `packages/design-system/src/theme.css`'s
+  `@theme` block (not a `var()` alias — self-reference, same circular-ref
+  gotcha as the earlier `--tracking-eyebrow` case, just with no alias name
+  available this time). Only genuinely differently-named tokens
+  (`--fw-*` vs Tailwind's `--font-weight-*`, `--elev-*`/`--glow-*` vs
+  `--shadow-*`) can use a `var()` alias safely. `packages/design-system/scripts/check-tokens.mjs`
+  only diffs `tokens/*.css` against the canonical skill source — confirmed
+  (again) it does **not** check `theme.css`, so literal duplication there
+  never trips the parity gate.
+- **Tailwind v4's numeric spacing scale coincidentally IS the design
+  token's spacing scale** (`--space-N` in the tokens file always equals
+  `N * 4px`, matching Tailwind's default `--spacing: 0.25rem` multiplier
+  exactly for every key the tokens file defines: `space-6`=24px=`p-6`,
+  `space-24`=96px=`p-24`, etc). Same coincidence for `font-weight`
+  (`--fw-bold`=700=Tailwind's `font-bold`, `--fw-extra`=800=`font-extrabold`)
+  and numeric transition `duration-*`/`duration-200`=`--dur-base`. These
+  three needed **zero** `@theme` additions — existing Tailwind utility
+  classes already render token-exact values. Don't add theme mappings for
+  scales that already agree; check the built CSS's computed value first
+  (`grep '\.p-6{' .next/static/chunks/*.css`) before assuming a gap exists.
+- **Avoid `--color-border-strong` as a theme key name** — Tailwind's
+  border-color utility naming is `border-<key>`, so a key literally named
+  `border-strong` produces the redundant class `border-border-strong`.
+  Named the alias `--color-line-strong` (→ utility `border-line-strong`)
+  instead, dropping the "border" word from the key since the utility prefix
+  already supplies it. Same pattern for `line-soft`/`line-accent`.
+- **`InstallSnippet`'s multi-line install command** (`installCommand` is
+  two `\n`-joined shell lines) needs one `<code>` **per line**, not one
+  `<span>` wrapping the whole block, for two reasons at once: (1) a `<div>`/
+  `<span>` row wrapper around multi-line text inside a single outer `<code>`
+  works visually but a `<span>` wrapping raw command text breaks
+  `InstallSnippet.spec.tsx`'s `queryByText(/install/i, {selector:'span'})`
+  assertion (which exists to prove the _label_ span is absent when
+  `label` is omitted — the command text landing inside any `<span>` is a
+  false-positive match); (2) block-level wrappers technically aren't valid
+  phrasing content inside a single `<code>` per the HTML5 content model.
+  Fix: outer layout `<div>`, one `<code>` per split line, `<span>` used only
+  for the non-text `$` prompt glyph.
+- **The nightshift-design skill's own `npm run validate` gate
+  (`.claude/skills/nightshift-design/package.json`)** validates the
+  _skill's own_ `components/`/`ui_kits/` reference sources, not the
+  consuming app — running `check:tokens`/`check:contrast` from inside that
+  directory after an app-only polish pass (no skill-dir edits) is a
+  no-op-but-confirmed-still-green check, not a check that exercises the new
+  app code. The actual token-parity gate for the app is
+  `pnpm nx run design-system:check-tokens`.
+
+**Pitfalls:**
+
+- `pnpm run seed` (booting Payload) reflows `payload-types.ts` even with
+  zero schema changes (autoGenerate on init) — same as documented in the
+  entry below, confirmed again here. `next dev`/`next build` similarly
+  reflow `next-env.d.ts` every run. Always `git status --porcelain` +
+  `git checkout --` both after any `payload run`/`next dev`/`nx build`
+  invocation, immediately before staging for commit — don't rely on doing
+  it once after the last command, since dev-server sanity-checks after a
+  build can re-dirty them.
+
+**Patterns:**
+
+- Bug-fix-at-the-data-layer + brand-polish-pass combined dispatch: fix the
+  literal bug in seed data first, re-run the seed script and verify via a
+  live `curl` + grep against the rendered HTML (not just re-reading the
+  seed source) that the DB and the rendered page both reflect the fix,
+  _then_ do the broader styling pass — keeps the narrow bug fix independently
+  verifiable before it's buried in a much larger stylistic diff.
+
 ## 2026-07-11 — Story NA-22 — CMS seed script (site-brief copy → SiteSettings/Home/WhySdlc globals)
 
 **Learnings:**

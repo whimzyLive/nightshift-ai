@@ -13,9 +13,12 @@ export default async function WhySdlcPage() {
     getSiteSettings(),
   ]);
   return (
-    <main className="mx-auto max-w-4xl px-6 py-16">
+    <main className="mx-auto max-w-copy px-6 py-16">
       <nav aria-label="Breadcrumb" className="mb-8 font-mono text-xs text-dim">
-        <Link href="/">Home</Link> <span aria-hidden>&gt;</span> Why SDLC
+        <Link href="/" className="hover:text-accent">
+          Home
+        </Link>{' '}
+        <span aria-hidden>&gt;</span> Why SDLC
       </nav>
       <WhySdlcHero content={content?.hero} />
       {(content?.argumentSections ?? []).map((s, i) => (

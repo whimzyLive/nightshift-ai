@@ -120,7 +120,7 @@ const homeData: Omit<Home, 'id' | 'createdAt' | 'updatedAt'> = {
     ],
   },
   problem: {
-    eyebrow: '// the other 80%',
+    eyebrow: 'the other 80%',
     body: "You don't lose time writing code. You lose it around the code. The AI already writes the code. What still eats the sprint is the connective tissue: turning a vague ticket into a real spec, a spec into a plan, keeping the plan honest while you implement, then reviewing the result without rubber-stamping your own work. Coding assistants handle the middle 20%. The other 80% — the process — stays manual, or gets skipped on vibes and shipped unreviewed.",
     points: [
       {
@@ -138,7 +138,7 @@ const homeData: Omit<Home, 'id' | 'createdAt' | 'updatedAt'> = {
     ],
   },
   howItWorks: {
-    eyebrow: '// how it works',
+    eyebrow: 'how it works',
     steps: [
       { title: 'PRD + spec', body: 'The ticket becomes a written spec' },
       { title: 'Plan', body: 'An implementation plan, reviewed before code' },
@@ -159,7 +159,7 @@ const homeData: Omit<Home, 'id' | 'createdAt' | 'updatedAt'> = {
       '/auto PROJ-142 — small stories (at or under the lightweight threshold, default ≤3 points) skip straight to implementation. Prefer to drive a single stage yourself? Each one has its own verb: /spec, /plan, /impl, /review.',
   },
   workflow: {
-    eyebrow: '// your day, split in two',
+    eyebrow: 'your day, split in two',
     blocks: [
       {
         label: 'Day — you refine.',
@@ -176,7 +176,7 @@ const homeData: Omit<Home, 'id' | 'createdAt' | 'updatedAt'> = {
     ],
   },
   team: {
-    eyebrow: '// the team',
+    eyebrow: 'the team',
     intro:
       '"Do everything" agents hallucinate across roles and leave no trail. nightshift splits the work across 11 agents, each with a tight charter, its own prompt and tools, and a clean handoff to the next. Narrow charters mean fewer hallucinations and an auditable artifact at every stage.',
     agents: [
@@ -208,13 +208,13 @@ const homeData: Omit<Home, 'id' | 'createdAt' | 'updatedAt'> = {
     ],
   },
   control: {
-    eyebrow: '// control',
+    eyebrow: 'control',
     body: "Most AI dev tools abstract the process away until you can't see what you're getting — you only find out once the output lands, then negotiate your way back to what you meant. nightshift runs the opposite way: it keeps the software development lifecycle in front of you, with a hard gate at every phase that returns control before the next step runs.",
     linkLabel: 'Why an SDLC beats one-shot AI →',
     linkHref: '/why-sdlc',
   },
   faq: {
-    eyebrow: '// questions',
+    eyebrow: 'questions',
     items: [
       {
         question: "Isn't this just another AI code-writer wrapper?",
@@ -262,7 +262,7 @@ const homeData: Omit<Home, 'id' | 'createdAt' | 'updatedAt'> = {
 
 const whySdlcData: Omit<WhySdlc, 'id' | 'createdAt' | 'updatedAt'> = {
   hero: {
-    eyebrow: '// why an sdlc',
+    eyebrow: 'why an sdlc',
     h1: 'You decide how it gets built — not the other way around',
     intro: textToLexical([
       'Frameworks, meta-frameworks, and meta-prompts keep promising to do everything for you. The thing they quietly take is control. nightshift is built to give it back.',

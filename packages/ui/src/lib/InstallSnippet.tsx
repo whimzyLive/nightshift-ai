@@ -42,17 +42,34 @@ export function InstallSnippet({
   return (
     <div className="flex flex-col gap-2">
       {label ? (
-        <span className="font-mono text-xs uppercase tracking-widest text-dim">
+        <span className="font-mono text-xs uppercase tracking-eyebrow text-dim">
           {label}
         </span>
       ) : null}
-      <div className="flex items-center justify-between gap-4 rounded-md bg-surface-terminal px-4 py-3 font-mono text-sm text-body">
-        <code>{command}</code>
+      {/* Terminal-well recipe: surface-terminal + hairline that warms to
+       * accent on hover (.claude/skills/nightshift-design/references/patterns.md
+       * "Terminal-on-glass"). Each line gets its own `$` prompt — the install
+       * command is two chained lines (marketplace add, then install), so a
+       * single shared prompt would misread as one command. */}
+      <div className="flex items-start justify-between gap-4 rounded-md border border-default bg-surface-terminal px-4 py-3 font-mono text-sm text-body shadow-elev-2 transition duration-200 ease-out hover:border-line-accent">
+        {/* One <code> per line (not one <span> wrapping the whole block) —
+         * a bare <div>/<span> row wrapper isn't valid phrasing content
+         * inside <code>, and keeps the command text out of any <span>. */}
+        <div className="flex flex-col gap-1">
+          {command.split('\n').map((line, i) => (
+            <code key={i} className="flex items-center gap-2">
+              <span aria-hidden className="text-accent">
+                $
+              </span>
+              {line}
+            </code>
+          ))}
+        </div>
         <button
           type="button"
           onClick={copy}
           aria-label={ARIA_LABEL_BY_STATE[state]}
-          className="text-accent hover:text-accent-hover"
+          className="shrink-0 text-accent hover:text-accent-hover"
         >
           {LABEL_BY_STATE[state]}
         </button>

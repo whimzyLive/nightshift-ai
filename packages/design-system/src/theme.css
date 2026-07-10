@@ -36,4 +36,114 @@
   /* Alias, not `--tracking-eyebrow` itself — this block IS the `:root`
    * declaration for that name; self-referencing would be a circular var(). */
   --tracking-eyebrow: var(--eyebrow-tracking);
+
+  /* ---- Additional colors: names distinct from the ones above, so a
+   * straight var() alias to tokens/colors.css is safe (no circular ref).
+   * Named `line-*` (not `border-*`) so the generated utility classes read
+   * `border-line-strong` rather than the redundant `border-border-strong`. ---- */
+  --color-line-soft: var(--border-soft);
+  --color-line-strong: var(--border-strong);
+  --color-line-accent: var(--border-accent);
+  --color-accent-press: var(--accent-press);
+
+  /* ---- Font sizes: Tailwind's `--text-*` namespace uses the exact same
+   * key names tokens/typography.css already declares at `:root` (2xs..6xl),
+   * so `var(--text-lg)` here would be a circular self-reference — same
+   * gotcha as `--tracking-eyebrow` above, just with no alias name to fall
+   * back on. Literal duplicates, kept in sync by hand with
+   * tokens/typography.css's `--text-*` scale. ---- */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 25px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 72px;
+  --text-6xl: 92px;
+
+  /* ---- Line-height: same name-collision as font sizes. ---- */
+  --leading-tight: 1.06;
+  --leading-snug: 1.22;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* ---- Letter-spacing: same name-collision (eyebrow already aliased above). ---- */
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* ---- Radius: Tailwind's `--radius-*` namespace also collides with
+   * tokens/spacing.css's own `--radius-*` keys — literal duplicates. ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  /* ---- Shadows: distinct names from tokens/spacing.css's `--elev-*` /
+   * `--glow-*`, so a straight alias is safe. ---- */
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+  --shadow-elev-4: var(--elev-4);
+  --shadow-glow-accent: var(--glow-accent);
+  --shadow-glow-cool: var(--glow-cool);
+  --shadow-glow-focus: var(--glow-focus);
+
+  /* ---- Easing: Tailwind ships default `ease-out`/`ease-in-out` utilities
+   * under these exact key names — literal duplicates so the utility
+   * classes resolve to the brand's curves instead of Tailwind's stock ones. ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---- Page containers: named distinctly from Tailwind's static
+   * `max-w-max`/`max-w-prose` utilities to avoid colliding with them.
+   * Mirrors tokens/spacing.css `--container-max` / `--container-prose`. ---- */
+  --container-page: 1200px;
+  --container-copy: 720px;
+}
+
+/* Signature decorative motifs — not part of the token registry by design
+ * (see .claude/skills/nightshift-design/references/patterns.md: "copy them
+ * from here verbatim"). Registered as Tailwind utilities via `@utility` so
+ * they compose with variants/className like any other utility class. */
+@utility moon-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60% 50% at 70% 20%,
+      rgba(217, 119, 87, 0.16),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 40% at 20% 0%,
+      rgba(124, 147, 240, 0.12),
+      transparent 70%
+    );
+  filter: blur(8px);
+}
+
+@utility starfield {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 65% 15%, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 40% 75%, rgba(255, 255, 255, 0.2), transparent),
+    radial-gradient(1px 1px at 10% 60%, rgba(255, 255, 255, 0.22), transparent);
+  background-repeat: no-repeat;
 }
