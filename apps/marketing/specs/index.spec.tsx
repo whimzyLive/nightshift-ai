@@ -1,6 +1,10 @@
-import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import Page from '../src/app/(marketing)/page';
+
+// jest.mock() factories are hoisted above module-scope const declarations,
+// so this can't reference an outer `mockedHero` const without a
+// ReferenceError (TDZ) — the literal is duplicated below instead.
+const mockedHeadline = 'Test headline';
 
 jest.mock('../src/lib/get-hero-content', () => ({
   getHeroContent: jest.fn().mockResolvedValue({
@@ -38,5 +42,13 @@ describe('Page', () => {
   it('should render successfully', async () => {
     const { baseElement } = render(await Page());
     expect(baseElement).toBeTruthy();
+  });
+
+  it('renders the mocked hero headline sourced from getHeroContent', async () => {
+    render(await Page());
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: mockedHeadline }),
+    ).toBeTruthy();
   });
 });

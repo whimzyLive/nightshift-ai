@@ -96,3 +96,81 @@
   by mocking `gsap.matchMedia`'s `add(query, handler)` to capture the
   handler and invoking it directly with both `{ reduceMotion: true }` and
   `{ reduceMotion: false }`, then asserting which GSAP calls fired.
+  **CORRECTED 2026-07-10 (NA-16 code review, see below): this pattern is a
+  CRITICAL bug** — see the entry below for why and the fix.
+
+## 2026-07-10 — Story NA-16 — code-review fix pass (matchMedia bug, DB fallback, tests)
+
+**Learnings:**
+
+- GSAP's real `MatchMedia.add(conditions, handler)` (gsap-core.js) only
+  invokes `handler` when **at least one** named condition's media query
+  actually matches (`active = 1` per matching query; `active && func(...)`).
+  Registering only `{ reduceMotion: '(prefers-reduced-motion: reduce)' }`
+  means a default user (no explicit motion preference either way) matches
+  _nothing_ → the handler never runs → no entrance animation, ever, for the
+  common case. Always pair `reduceMotion` with its complement
+  `allowMotion: '(prefers-reduced-motion: no-preference)'` so the handler
+  is guaranteed to fire. Read `node_modules/.pnpm/gsap@*/node_modules/gsap/gsap-core.js`
+  directly (`grep -n matchMedia`) to verify this contract instead of trusting
+  intuition about what "should" happen — this is exactly the bug the
+  previous memory entry (immediately above) shipped and mis-documented as a
+  correct pattern.
+- A jest mock that just captures `mm.add`'s handler and invokes it manually
+  with a hand-picked `{ conditions }` object (as the original hero-client
+  spec did) tests the mock's own fabricated behavior, not GSAP's real
+  "any-condition-matches" contract — it would pass even with the
+  single-condition bug in place. Fix: reimplement the mocked `add()` to
+  compute `conditions` from a stubbed `window.matchMedia(query).matches`
+  per query and only invoke `handler` if `Object.values(conditions).some(Boolean)`
+  — mirrors gsap-core's real semantics well enough to make the regression
+  test fail against the buggy source.
+- `@payload-config` is a tsconfig path alias (`./src/payload.config.ts`),
+  not a real installed package — `next/jest`'s automatic
+  tsconfig-paths-to-moduleNameMapper wiring does **not** cover it (unclear
+  why; possibly because it's not prefixed like a typical `@/*` wildcard).
+  `jest.mock('@payload-config', factory)` without options throws "Cannot
+  find module" before the mock can even apply. Pass `{ virtual: true }` as
+  the third arg to mock it without requiring real resolution.
+- Don't co-locate small "fallback/default content" data next to a Payload
+  `GlobalConfig`/`CollectionConfig` object if a plain server function needs
+  to import just the data — the config file's other imports (e.g. an
+  `afterChange` hook using `next/cache`'s `revalidatePath`) drag in
+  Next.js-internal code that breaks (`ReferenceError: TextEncoder is not
+defined`) when required from a jsdom test environment. Put the shared
+  literal in its own dependency-free module (e.g. `lib/hero-defaults.ts`)
+  and import it from both the Payload config and the plain data-access
+  function.
+
+**Pitfalls:**
+
+- `jest.mock('module', () => ({ fn: jest.fn().mockResolvedValue(outerConst) }))`
+  throws `ReferenceError: Cannot access 'outerConst' before initialization`
+  when `outerConst` is declared with `const`/`let` anywhere in the same
+  file — `jest.mock()` calls (and the ESM→CJS `require()`s they precede)
+  get hoisted above regular `const` declarations by babel-plugin-jest-hoist,
+  so the const's TDZ hasn't closed yet when the factory runs. Variables
+  prefixed with `mock` (case-insensitive, e.g. `mockFindGlobal`,
+  `mockGetPayload`) are a documented exception — babel-plugin-jest-hoist
+  hoists those declarations too, so referencing them from inside a
+  `jest.mock` factory works. For anything not `mock`-prefixed, either
+  duplicate the literal inline in the factory or read it back via
+  `jest.requireMock(...)` inside the test body instead.
+- Two concurrent dispatches for the same story branch can leave an orphaned
+  `git worktree` holding that branch checked out (e.g. a crashed/aborted
+  prior session). The Edit/Write tools refuse to touch files outside your
+  own assigned worktree even if you `cd` there via Bash, and `git checkout
+<branch>` fails with "branch already used by worktree" if another
+  worktree holds it. Fix: `git worktree remove <other-worktree-path>` (only
+  safe once it's clean — `git -C <path> status --porcelain` first, and
+  discard trivial auto-generated diffs like `next-env.d.ts` if that's all
+  that's dirty), then `git checkout <branch>` in your own worktree.
+
+**Patterns:**
+
+- Server-only "read CMS content, fall back to static defaults on any
+  failure" shape: `try { return await payload.findGlobal(...); } catch (e) {
+console.error('[context]', e); return sameDefaultsUsedAsFieldDefaultValue; }`.
+  Narrow the return type to `Pick<GeneratedType, 'fieldsActuallyConsumed'>`
+  rather than the full generated type — avoids having to fabricate a fake
+  `id`/`createdAt` for the fallback case.

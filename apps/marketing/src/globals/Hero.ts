@@ -1,6 +1,20 @@
 import type { GlobalConfig } from 'payload';
 
 import { revalidateHero } from '../hooks/revalidate';
+import { heroFieldDefaults } from '../lib/hero-defaults';
+
+// Blocks `javascript:` and other script-executing URL schemes from being
+// rendered straight into the hero's `<a href>` — only allow absolute
+// http(s) links or relative in-app paths.
+function validateCtaHref(value: string | null | undefined) {
+  if (!value) {
+    return 'CTA URL is required.';
+  }
+  if (/^https?:\/\//i.test(value) || value.startsWith('/')) {
+    return true;
+  }
+  return 'CTA URL must be an absolute http(s) URL or a relative path (e.g. /pricing).';
+}
 
 // Single-instance hero content for the marketing homepage — editable in the
 // Payload admin (Globals > Hero) without a code deploy. defaultValue on every
@@ -19,20 +33,19 @@ export const Hero: GlobalConfig = {
       name: 'headline',
       type: 'text',
       required: true,
-      defaultValue: 'Your AI software team that ships while you sleep',
+      defaultValue: heroFieldDefaults.headline,
     },
     {
       name: 'subhead',
       type: 'textarea',
       required: true,
-      defaultValue:
-        'A Claude Code plugin that turns one terminal into a full delivery team — product manager, architect, tech lead, engineers, and QA. It reads a Jira ticket and ships the spec, plan, code, and review.',
+      defaultValue: heroFieldDefaults.subhead,
     },
     {
       name: 'ctaLabel',
       type: 'text',
       required: true,
-      defaultValue: 'Install the plugin',
+      defaultValue: heroFieldDefaults.ctaLabel,
       admin: {
         description: 'Label for the hero call-to-action button.',
       },
@@ -41,7 +54,8 @@ export const Hero: GlobalConfig = {
       name: 'ctaHref',
       type: 'text',
       required: true,
-      defaultValue: 'https://github.com/whimzyLive/nightshift-ai',
+      defaultValue: heroFieldDefaults.ctaHref,
+      validate: validateCtaHref,
       admin: {
         description: 'URL the hero CTA button links to.',
       },
