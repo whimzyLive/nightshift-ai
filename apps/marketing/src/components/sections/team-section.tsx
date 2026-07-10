@@ -2,18 +2,11 @@
 
 import { useRef } from 'react';
 
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
 import { TEAM } from '../../lib/sections-content';
-import { useIsomorphicLayoutEffect } from './use-isomorphic-layout-effect';
+import { useScrollReveal } from './use-scroll-reveal';
 import { Eyebrow } from './eyebrow';
 import { AgentCard } from './agent-card';
 import styles from './team-section.module.css';
-
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
-}
 
 // "agent team grid" product section (AC1). Cards reveal on scroll via
 // ScrollTrigger, staggered, once per page view (AC3); hover lift + accent
@@ -22,56 +15,14 @@ export function TeamSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  useIsomorphicLayoutEffect(() => {
-    const section = sectionRef.current;
-    const cardEls = cardRefs.current.filter(
-      (el): el is NonNullable<typeof el> => el != null,
-    );
-    if (!section || cardEls.length === 0) return;
-
-    const mm = gsap.matchMedia();
-
-    mm.add(
-      {
-        reduceMotion: '(prefers-reduced-motion: reduce)',
-        allowMotion: '(prefers-reduced-motion: no-preference)',
-      },
-      (context) => {
-        const { reduceMotion } = context.conditions as {
-          reduceMotion: boolean;
-          allowMotion: boolean;
-        };
-
-        if (reduceMotion) {
-          gsap.set(cardEls, { autoAlpha: 1, y: 0 });
-          return;
-        }
-
-        // Brand motion budget: transform/opacity only, 120–360ms, one ease.
-        const tween = gsap.from(cardEls, {
-          autoAlpha: 0,
-          y: 24,
-          duration: 0.36,
-          stagger: 0.06,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: section,
-            start: 'top 75%',
-            once: true,
-          },
-        });
-
-        return () => {
-          tween.scrollTrigger?.kill();
-          tween.kill();
-        };
-      },
-    );
-
-    return () => {
-      mm.revert();
-    };
-  }, []);
+  useScrollReveal(
+    {
+      getTrigger: () => sectionRef.current,
+      getTargets: () => cardRefs.current,
+      stagger: 0.06,
+    },
+    [],
+  );
 
   return (
     <section ref={sectionRef} className={styles.section}>

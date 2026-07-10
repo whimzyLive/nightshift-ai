@@ -52,12 +52,15 @@ export function TerminalWindow({
           allowMotion: boolean;
         };
 
-        if (reduceMotion) {
-          // Simplify: show the completed run, no streaming, no loop.
-          gsap.set(lineEls, { autoAlpha: 1, y: 0 });
-          return;
-        }
+        // Simplify: show the completed run, no streaming, no loop. A
+        // no-op — lines are visible by default in CSS (nothing hid them),
+        // so there's nothing to reset (matches the other sections' reveals).
+        if (reduceMotion) return;
 
+        // No `clearProps` here (unlike the section reveal hook): this
+        // timeline loops forever (`repeat: -1`), so each line never
+        // permanently settles the way a once-only reveal does, and no
+        // `:hover` rule targets these lines — no stale-inline-style risk.
         const tl = gsap.timeline({
           repeat: -1,
           repeatDelay: 1.4,

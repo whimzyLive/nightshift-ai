@@ -88,20 +88,17 @@ describe('InstallSection', () => {
     );
   });
 
-  it('shows the final visible state immediately when reduced motion is preferred', () => {
+  it('does nothing when reduced motion is preferred — content is already visible by default', () => {
     stubMatchMedia('(prefers-reduced-motion: reduce)');
     const gsap = jest.requireMock('gsap').default;
 
     render(<InstallSection />);
 
-    expect(gsap.set).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ autoAlpha: 1, y: 0 }),
-    );
+    expect(gsap.set).not.toHaveBeenCalled();
     expect(gsap.from).not.toHaveBeenCalled();
   });
 
-  it('reveals the section via a ScrollTrigger tween for a default user with no motion preference', () => {
+  it('reveals the section via a ScrollTrigger tween for a default user with no motion preference, clearing inline styles on complete', () => {
     stubMatchMedia('(prefers-reduced-motion: no-preference)');
     const gsap = jest.requireMock('gsap').default;
 
@@ -112,6 +109,7 @@ describe('InstallSection', () => {
       expect.objectContaining({
         autoAlpha: 0,
         y: 24,
+        clearProps: 'transform,opacity,visibility',
         scrollTrigger: expect.objectContaining({ once: true }),
       }),
     );

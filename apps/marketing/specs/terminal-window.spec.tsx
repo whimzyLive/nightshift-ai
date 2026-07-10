@@ -96,16 +96,13 @@ describe('TerminalWindow', () => {
     );
   });
 
-  it('shows the completed run immediately with no looping timeline when reduced motion is preferred', () => {
+  it('does nothing (no looping timeline) when reduced motion is preferred — lines are already visible by default', () => {
     stubMatchMedia('(prefers-reduced-motion: reduce)');
     const gsap = jest.requireMock('gsap').default;
 
     render(<TerminalWindow lines={TERMINAL_LINES} />);
 
-    expect(gsap.set).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ autoAlpha: 1, y: 0 }),
-    );
+    expect(gsap.set).not.toHaveBeenCalled();
     expect(gsap.timeline).not.toHaveBeenCalled();
   });
 

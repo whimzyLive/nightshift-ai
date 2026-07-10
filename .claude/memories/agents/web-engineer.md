@@ -320,3 +320,98 @@ start:'top 75%', once:true}})`. `once: true` on the ScrollTrigger (not
 ref}: Props & {ref?: Ref<HTMLDivElement>})`) instead of `forwardRef` —
   confirmed working through a list `.map()` with a per-item callback ref
   assigning into a parent-owned `useRef` array.
+
+## 2026-07-10 — Story NA-21 — review-fix: GSAP clearProps residue, StatCounter prop leak, invisible specs, pipeline overflow
+
+**Learnings:**
+
+- The reduce-motion "no-op" fix (finding: `gsap.set(targets, {autoAlpha:1,
+y:0})` in the `reduceMotion` branch is unnecessary residue when nothing
+  ever hid the elements in CSS) is a genuine no-op: just `if (reduceMotion)
+return;`. Verified empirically per component — only fix it where the
+  target really is visible-by-default; `stat-counter.tsx`'s reduce branch
+  sets `numberEl.textContent` directly (real logic, not GSAP residue) and
+  was correctly left alone.
+- `clearProps` only matters for a _settle-once_ reveal (`gsap.from(...,
+scrollTrigger:{once:true})`) whose target has a CSS `:hover` rule on the
+  same tweened property (transform). A perpetually-looping timeline
+  (`repeat:-1`, like the terminal's streaming lines) never "settles" the
+  same way and had no `:hover` rule on the tweened lines — adding
+  `clearProps` there would be a no-op refactor for its own sake; documented
+  why it's absent instead of adding it reflexively everywhere `gsap.from`
+  appears.
+- Extracted `use-scroll-reveal.ts` (`useScrollReveal` hook) to unify the
+  ~40-line matchMedia reduce/allow scaffold across how-it-works-section,
+  team-section, and install-section. **Pitfall avoided:** the natural
+  first draft read `sectionRef.current` / `cardRefs.current` as plain
+  _values_ at the hook-call boundary (component render time) and passed
+  them into the hook's options object — but refs from the same render pass
+  aren't attached to the DOM yet during render (only after commit, before
+  layout effects run), so a naive extraction would silently break with a
+  stale `null` trigger on mount. Fixed by making the hook accept
+  `getTrigger: () => ...` / `getTargets: () => ...` **lazy accessor
+  functions**, evaluated only inside the internal `useIsomorphicLayoutEffect`
+  callback (i.e. after commit) — not at the call site. Any shared hook that
+  wraps ref values must take accessors, never resolved `.current` values,
+  if it defers reading them to an effect.
+- `StatCounterProps = Stat` vs `Omit<Stat, 'id'>`: TSX spread props
+  (`{...stat}`) do **not** trigger excess-property-checking, so the broken
+  `id`-required type was only ever caught at _spec_ render call sites
+  (`<StatCounter value={11} label="x" />` with no `id`), not at the real
+  call site in how-it-works-section.tsx. Don't assume a prop-type bug is
+  invisible everywhere just because the production call site compiles.
+
+**Pitfalls:**
+
+- `apps/marketing/tsconfig.spec.json` had `"references": [{"path":
+"./tsconfig.json"}]` pointing at a config with `"noEmit": true` — this
+  combination is fundamentally broken for direct `tsc --build` (TS6310
+  "referenced project may not disable emit") and even for a plain `tsc -p`
+  once composite-mode kicks in (TS6305 "output file has not been built").
+  This is _why_ Nx's `@nx/js/typescript` plugin silently never generates a
+  `typecheck` target for `@nightshift-ai/marketing` at all (confirmed via
+  `nx show project @nightshift-ai/marketing --json` — no `typecheck` key,
+  with or without a cold `nx reset`) — unlike `packages/ui` (whose
+  `tsconfig.spec.json` correctly references an emit-capable
+  `tsconfig.lib.json`) or `apps/marketing-e2e` (whose `tsconfig.json` has
+  no "references"/noEmit conflict at all). **`pnpm nx run-many -t
+typecheck` never touches the marketing app** — it only runs for
+  `@nightshift-ai/ui` and `@nightshift-ai/marketing-e2e`. To actually
+  verify marketing's spec types, run `tsc -p apps/marketing/tsconfig.spec.json`
+  directly (or via `rtk proxy pnpm exec tsc -p ...` — the rtk wrapper's
+  summarized "No errors found" can be **wrong/stale** relative to the full
+  log; cross-check `~/Library/Application Support/rtk/tee/*.log` or use
+  `rtk proxy` to get the real, unfiltered tsc output before trusting a
+  clean result).
+- Fixed the tsconfig.spec.json structure by making it `"extends":
+"./tsconfig.json"` (inherits `paths`, `lib`, `esModuleInterop`,
+  `resolveJsonModule` — extends does **not** inherit `"references"`, so
+  the noEmit conflict disappears) instead of extending
+  `../../tsconfig.base.json` directly, dropping the broken `references`
+  entirely, and widening `include` to real `src/**/*.{ts,tsx,js,jsx}` (not
+  just `*.spec.*`) — without this widening, importing `../src/...` from
+  `specs/` without project references throws TS6307 ("file is not listed
+  within the file list of project"; TS requires every transitively
+  imported file to match an `include` pattern when there's no reference
+  graph). Also had to override `"rootDir": "."` — inherited from
+  `tsconfig.json` as `"src"`, which rejects `specs/**` and root-level
+  `jest.config.cts` with TS6059 once those live outside `rootDir`.
+- The pipeline responsive fix used a plain CSS media query
+  (`max-width: 800px`, matching the existing sibling breakpoint in
+  `how-it-works-section.module.css`), not the nightshift-design DS
+  Pipeline component's `orientation` prop pattern — this repo's
+  `pipeline-stage.tsx` is a hand-built recipe, not an import of the DS
+  component, so there's no `orientation` prop to thread through; the CSS
+  breakpoint achieves the same "stack vertically below ~800px" result the
+  DS's `orientation="vertical"` layout describes.
+
+**Patterns:**
+
+- Playwright regression guard for the "GSAP inline-style residue blocks
+  CSS :hover" bug class: after `scrollIntoViewIfNeeded()`, poll
+  `{computed: getComputedStyle(el).transform, inline:
+(el as HTMLElement).style.transform}` until it equals `{computed:
+'none', inline: ''}` — checking computed transform alone isn't enough,
+  since an inline `transform: translate(0,0)` computes to the same
+  identity matrix as no transform at all but still wins every future
+  `:hover` cascade.

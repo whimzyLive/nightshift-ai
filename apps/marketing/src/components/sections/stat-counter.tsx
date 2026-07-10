@@ -13,7 +13,9 @@ if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-export type StatCounterProps = Stat;
+// `id` is only a React list key upstream (how-it-works-section.tsx) — the
+// component itself never reads it, so it's excluded from the props type.
+export type StatCounterProps = Omit<Stat, 'id'>;
 
 // Proof-number stats count up once when first scrolled into view (AC5).
 export function StatCounter({ value, suffix = '', label }: StatCounterProps) {

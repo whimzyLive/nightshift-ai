@@ -2,7 +2,7 @@ import { getHeroContent } from '../src/lib/get-hero-content';
 import { heroFieldDefaults } from '../src/lib/hero-defaults';
 
 const mockFindGlobal = jest.fn();
-const mockGetPayload = jest.fn(() =>
+const mockGetPayload = jest.fn((..._args: unknown[]) =>
   Promise.resolve({ findGlobal: mockFindGlobal }),
 );
 

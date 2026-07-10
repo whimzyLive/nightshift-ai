@@ -100,20 +100,17 @@ describe('TeamSection', () => {
     });
   });
 
-  it('shows cards in their final visible state immediately when reduced motion is preferred', () => {
+  it('does nothing when reduced motion is preferred — cards are already visible by default', () => {
     stubMatchMedia('(prefers-reduced-motion: reduce)');
     const gsap = jest.requireMock('gsap').default;
 
     render(<TeamSection />);
 
-    expect(gsap.set).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ autoAlpha: 1, y: 0 }),
-    );
+    expect(gsap.set).not.toHaveBeenCalled();
     expect(gsap.from).not.toHaveBeenCalled();
   });
 
-  it('reveals cards via a staggered ScrollTrigger tween for a default user with no motion preference', () => {
+  it('reveals cards via a staggered ScrollTrigger tween for a default user with no motion preference, clearing inline styles on complete', () => {
     stubMatchMedia('(prefers-reduced-motion: no-preference)');
     const gsap = jest.requireMock('gsap').default;
 
@@ -125,6 +122,7 @@ describe('TeamSection', () => {
         autoAlpha: 0,
         y: 24,
         stagger: expect.any(Number),
+        clearProps: 'transform,opacity,visibility',
         scrollTrigger: expect.objectContaining({ once: true }),
       }),
     );

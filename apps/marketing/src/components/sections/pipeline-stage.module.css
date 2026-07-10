@@ -4,6 +4,30 @@
   gap: 0;
 }
 
+/* Below ~800px, five padded stages + four connectors no longer fit a
+ * non-wrapping row (nightshift-design Pipeline component's documented
+ * `orientation: vertical` layout — components/terminal/Pipeline.jsx) —
+ * stack the stages and turn connectors into short vertical rules instead
+ * of horizontal-scrolling the page.
+ */
+@media (max-width: 800px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stage {
+    flex: initial;
+  }
+
+  .connector {
+    flex: 0 0 20px;
+    align-self: center;
+    width: 1px;
+    height: 20px;
+  }
+}
+
 .stage {
   display: flex;
   flex: 1;

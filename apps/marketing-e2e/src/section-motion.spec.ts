@@ -26,3 +26,31 @@ test('scrolling an agent card into view mutates its computed transform', async (
     })
     .not.toBe(initialTransform);
 });
+
+// Guards the regression class where GSAP's `gsap.from(..., clearProps: ...)`
+// is missing: without it, the reveal tween's inline `transform`/`opacity`/
+// `visibility` never get removed after it completes, so they permanently
+// outrank the CSS-module `:hover { transform: translateY(-2px) }` rule
+// (AC4). A settled card must have no inline transform style left at all —
+// only `clearProps` produces that; landing on the identity transform via an
+// inline `translate(0, 0)` would still block the hover rule.
+test('the revealed card settles with computed transform none and no inline transform style (AC4 hover-lift guard)', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  const card = page.getByTestId('agent-card-product-manager');
+
+  await card.scrollIntoViewIfNeeded();
+
+  await expect
+    .poll(
+      async () =>
+        card.evaluate((el) => ({
+          computed: getComputedStyle(el).transform,
+          inline: (el as HTMLElement).style.transform,
+        })),
+      { timeout: 5000 },
+    )
+    .toEqual({ computed: 'none', inline: '' });
+});
