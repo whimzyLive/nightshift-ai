@@ -415,3 +415,62 @@ typecheck` never touches the marketing app** — it only runs for
   since an inline `transform: translate(0,0)` computes to the same
   identity matrix as no transform at all but still wins every future
   `:hover` cascade.
+
+## 2026-07-10 — Story NA-21 — review-fix: marketing typecheck target + CSS cascade order
+
+**Learnings:**
+
+- `apps/marketing` gets **no** inferred `typecheck`/`build` target from the
+  root `@nx/js/typescript` plugin at all — not even a disabled/echo one.
+  Root cause (`@nx/js/dist/src/plugins/typescript/plugin.js`,
+  `checkIfConfigFileShouldBeProject`): the plugin explicitly refuses to
+  create _any_ project-graph node for a directory containing a
+  `next.config.{js,cjs,mjs,ts}` file, because Next.js projects aren't
+  compatible with TS project references and `tsc --build` typecheck would
+  fail. (Separately, if a tsconfig _did_ qualify but had `noEmit: true`,
+  the plugin still creates the target but replaces its command with a
+  no-op `echo "...disabled..."` — that's a different, more visible failure
+  mode than marketing's total absence of the target.) So for any Next.js
+  app project in this repo, don't try to "wire it into the inferred
+  plugin properly" — add an explicit `nx.targets.typecheck` in the
+  project's `package.json` using `nx:run-commands` +
+  `tsc -p tsconfig.spec.json --noEmit` (already used for
+  jest specs `include`, which pulls in both `src/**` and `specs/**`) run
+  with `cwd` set to the project root. Mirror the jest `test` target's
+  `inputs: ["default", "^production", {externalDependencies:[...]}]`
+  shape and add `dependsOn: ["^typecheck"]` so it composes with the
+  inferred typecheck target on `packages/ui` the same way
+  `@nightshift-ai/marketing-e2e`'s inferred target does.
+- To verify an `nx.targets` change without guessing: read
+  `node_modules/.pnpm/@nx+js@<version>*/node_modules/@nx/js/dist/src/plugins/typescript/plugin.js`
+  directly (grep for `noEmit`/`checkIfConfigFileShouldBeProject`) rather
+  than trusting `nx docs` or memory — the inference rules aren't
+  documented in a PLUGIN.md for `@nx/js`.
+- Flexbox gotcha relevant to CSS review findings: when a flex item has an
+  explicit (non-`auto`) `flex-basis` (e.g. `flex: 0 0 20px`), that value
+  governs the item's **main-axis** size outright — a same-axis `height`
+  (column direction) or `width` (row direction) declaration on that
+  element has **zero effect**, independent of cascade/specificity/source
+  order. So a `height: 20px` sitting in a mobile `@media` block whose
+  sibling `flex: 0 0 20px` already matches the base rule's value is dead
+  weight for two independent reasons (cascade order _and_ flex-basis
+  precedence) — safe to delete outright rather than just reorder.
+
+**Patterns:**
+
+- CSS module cascade-order fix convention already established by
+  `how-it-works-section.module.css` in this codebase: keep all base
+  (mobile-first-safe) rules first, put the `@media (max-width: ...)`
+  override block last in the file so same-specificity mobile overrides
+  actually win the cascade. Apply this ordering to any `*.module.css` file
+  under `apps/marketing/src/components/sections/` before adding new
+  responsive overrides.
+- TDD-verifying an `nx.targets` config addition (not app source): write
+  the target, run `nx run-many -t typecheck` to confirm the new project
+  shows up and passes, then inject a deliberate type error into a
+  `specs/*.spec.tsx` file and rerun the single project's target
+  (`nx run <proj>:typecheck --skip-nx-cache`) to see it fail for the
+  expected `TS2322`-class reason, then revert via `Edit` back to the
+  original string and confirm `git diff` on that file is empty again.
+  `--skip-nx-cache` is required for the second run since the first
+  (passing) run cached under the same task id.

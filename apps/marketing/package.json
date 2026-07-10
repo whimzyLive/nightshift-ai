@@ -21,6 +21,27 @@
       "scope:web"
     ],
     "targets": {
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsc -p tsconfig.spec.json --noEmit",
+          "cwd": "apps/marketing"
+        },
+        "cache": true,
+        "dependsOn": [
+          "^typecheck"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "externalDependencies": [
+              "typescript"
+            ]
+          }
+        ],
+        "outputs": []
+      },
       "local-start": {
         "executor": "nx:run-commands",
         "options": {
