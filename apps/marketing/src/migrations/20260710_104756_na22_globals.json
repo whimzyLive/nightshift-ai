@@ -1209,6 +1209,13 @@
           "notNull": false,
           "default": "'https://github.com/whimzyLive/nightshift-ai'"
         },
+        "github_label": {
+          "name": "github_label",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'GitHub'"
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp(3) with time zone",
@@ -2204,6 +2211,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "84a347c6-d623-4453-8eb6-696b31b23270",
+  "id": "252ce128-631e-4c61-896d-7bd9e137c9df",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

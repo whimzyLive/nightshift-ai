@@ -1,6 +1,6 @@
 # Migrations — deploy notes
 
-`20260710_095549_na22_globals` is the **schema baseline** for this app — it's a
+`20260710_104756_na22_globals` is the **schema baseline** for this app — it's a
 full init migration that creates every table (`media`, `users`, `payload_*`,
 the `home` / `site_settings` / `why_sdlc` globals and their array/block
 sub-tables), not an incremental change. Payload generated it as the first

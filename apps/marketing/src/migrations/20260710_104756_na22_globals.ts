@@ -115,6 +115,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   	"id" serial PRIMARY KEY NOT NULL,
   	"install_command" varchar,
   	"github_url" varchar DEFAULT 'https://github.com/whimzyLive/nightshift-ai',
+  	"github_label" varchar DEFAULT 'GitHub',
   	"updated_at" timestamp(3) with time zone,
   	"created_at" timestamp(3) with time zone
   );

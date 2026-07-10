@@ -188,6 +188,66 @@ statement outside a module` even though you never call the real
   than skipping the verification step — the plan's steps are the source of
   truth over its own file inventory when they conflict.
 
+## 2026-07-10 — Story NA-22 — review-fix pass (github_label missing from init migration)
+
+**Learnings:**
+
+- A shared local dev Postgres (per the earlier "shared container" memory)
+  can drift **ahead of** the committed migration files: it already had
+  `site_settings.github_label` (added by hand via `psql` in a prior session,
+  per that session's own memory entry) even though the committed
+  `20260710_095549_na22_globals.ts` baseline never created that column. Its
+  `payload_migrations` table recorded the old baseline as applied. Don't
+  trust a live DB's current schema as proof a migration file is correct —
+  diff the migration file's SQL/JSON directly against the Payload
+  `GlobalConfig` fields instead.
+- Regenerating a baseline init migration correctly: delete both the `.ts`
+  and `.json` for the migration, then run
+  `pnpm --filter @nightshift-ai/marketing exec payload migrate:create <name>`
+  from `apps/marketing` (not the repo root — `pnpm --filter ... exec` at
+  the root fails with "Command \"payload\" not found" because the
+  workspace package's own `node_modules/.bin` isn't resolved the same way;
+  `cd apps/marketing && pnpm exec payload ...` works). Needs a **reachable**
+  Postgres via `DATABASE_URL` (a fresh `.env` with the shared dev-container
+  creds is enough — `migrate:create`'s diff is snapshot-based, not
+  live-DB-introspection-based, so it doesn't matter whether that DB's
+  actual tables match; it just needs a real Payload instance to boot) plus
+  any non-empty `PAYLOAD_SECRET`.
+- `payload migrate:create` **automatically rewrites `migrations/index.ts`**
+  to import and register the new migration file — no manual edit needed
+  there (only the README's filename reference and deleting the old `.ts`/
+  `.json` are manual cleanup).
+- The regenerated migration's raw `.ts` comes out in Payload's own
+  (non-prettier) formatting — `pnpm exec prettier --write` on just the new
+  `.ts` collapses the diff against the old file down to exactly the
+  intended schema change (confirmed via `diff -u --ignore-all-space`
+  before/after prettier: dozens of line-wrap-only hunks collapsed to the
+  single added `"github_label" varchar DEFAULT 'GitHub',` line).
+- `payload migrate:create` also touches `payload-types.ts` as a side effect
+  of booting Payload (autoGenerate) even though the fields didn't change —
+  pure re-wrap noise (multi-line union types collapsed to one line). Since
+  no field was added/removed here (`githubLabel` was already in
+  `SiteSettings.ts`, just missing from the migration), `git checkout --`
+  it rather than committing unrelated reflow.
+- Docker commands (`docker run`, `docker ps -a --filter ...`) reliably
+  **hang/timeout** in this sandbox even for a brand-new container on an
+  unused port (15432) — consistent with the prior memory's note about
+  `docker ps`/`docker info` hanging. Don't burn a timeout budget on a
+  from-scratch docker Postgres for a "verify against genuinely fresh DB"
+  step; a JSON-snapshot diff (`tables['public.site_settings'].columns`)
+  - SQL grep + successful `next build` prerender against the already-
+    reachable shared DB is sufficient verification when docker is
+    unavailable.
+
+**Pitfalls:**
+
+- `pnpm --filter @nightshift-ai/marketing exec payload <cmd>` run from the
+  repo root can fail with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
+"payload" not found` when the workspace's own `node_modules/.bin/payload`
+  doesn't exist yet (fresh worktree, no `pnpm install` run) — the real fix
+  is `pnpm install --frozen-lockfile` at the worktree root first, not
+  switching invocation style.
+
 ## 2026-07-10 — Story NA-16 — interactive 3D hero landing page
 
 **Learnings:**
