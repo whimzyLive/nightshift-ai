@@ -1,2 +1,5 @@
-// Empty shell — Tailwind-based components land here.
-export {};
+export { Button } from './lib/Button';
+export { Badge } from './lib/Badge';
+export { Card } from './lib/Card';
+export { InstallSnippet } from './lib/InstallSnippet';
+export { Eyebrow } from './lib/Eyebrow';

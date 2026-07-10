@@ -186,7 +186,13 @@ importers:
 
   apps/marketing-e2e: {}
 
-  packages/ui: {}
+  packages/design-system: {}
+
+  packages/ui:
+    dependencies:
+      '@nightshift-ai/design-system':
+        specifier: workspace:*
+        version: link:../design-system
 
 packages:
 

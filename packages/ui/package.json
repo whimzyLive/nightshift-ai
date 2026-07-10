@@ -11,6 +11,9 @@
     },
     "./package.json": "./package.json"
   },
+  "dependencies": {
+    "@nightshift-ai/design-system": "workspace:*"
+  },
   "nx": {
     "tags": [
       "scope:shared"
