@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "./out-tsc/jest",
     "rootDir": ".",
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "tsBuildInfoFile": "./out-tsc/jest/tsconfig.spec.tsbuildinfo"
   },
   "include": [
     "jest.config.ts",
