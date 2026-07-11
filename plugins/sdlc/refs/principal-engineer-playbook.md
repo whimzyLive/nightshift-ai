@@ -164,11 +164,13 @@ subsection of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (JQL
 `--fields "key,summary"`). That subsection is the source of truth — **do not re-document the probe.**
 
 Define:
+
 - `SUBTASKS` — the ordered list of `{ key, summary }` exactly as the probe returns it
-  (`ORDER BY created ASC`; **never re-sort** by key or summary — fetch order *is* implementation order).
+  (`ORDER BY created ASC`; **never re-sort** by key or summary — fetch order _is_ implementation order).
 - `subtaskCount` — `SUBTASKS.length`.
 
 Branch on the count:
+
 - **`subtaskCount === 0`** → **no-regression path**: skip ALL sub-task sequencing. Steps 3–7 run
   exactly as they do today — one full-story implementation pass per phase, normal commit cadence,
   normal PR. An empty probe result is **not** an error.
@@ -182,20 +184,20 @@ Branch creation (Step 3) stays **once per story** regardless of `subtaskCount` �
 
 ## Defect variant — `WORK_KIND=defect` drives the ladder via `systematic-debugging`
 
-**Activation keys off `WORK_KIND=defect`, NOT `TRIAGE=lightweight`.** A lightweight *feature*
+**Activation keys off `WORK_KIND=defect`, NOT `TRIAGE=lightweight`.** A lightweight _feature_
 (`LIGHTWEIGHT=true`, `WORK_KIND=feature`) keeps the **normal feature ladder** below and is never
 misrouted into debugging. When `WORK_KIND=defect`, the `systematic-debugging` skill becomes the
 **impl driver** for the work Steps 2 and 4 do on the feature path — the rest of the ladder is
 unchanged:
 
-| Playbook step | Feature path (default) | Defect path (`WORK_KIND=defect`) |
-| ------------- | ---------------------- | -------------------------------- |
-| Step 2 (derive tasks) | derive agent-tagged task list from plan/story | **replaced** by systematic-debugging **phase 1 (reproduce)** + **phase 2 (root-cause/isolate)** — these *discover* the work; there is no plan doc and no pre-derived task list |
-| Step 3 (branch) | `feat/<STORY-KEY>` | `fix/<STORY-KEY>` (`BRANCH_PREFIX`) — same structure, defect prefix |
-| Step 4 (domain dispatch) | dispatch agents to write feature code | **replaced** by systematic-debugging **phase 3 (failing regression test)** + **phase 4 (fix + verify)**, where phase-3/4 *code-writing* is performed by **dispatching the same Active domain agents** (the skill orchestrates; the owning domain agent writes the test and the fix) |
-| Step 5 (push/verify) | per-phase push + silent-failure STOP | **unchanged** — applied after each debugging-phase domain-agent commit |
-| Step 6 (QA loop) | QA Engineer playbook inline | **unchanged in structure**; QA Step-7 verification is re-pointed to the defect regression-evidence contract (see `qa-engineer-playbook.md`) |
-| Step 7 (PR) | `feat/<STORY-KEY>` PR, `feat` type | `fix/<STORY-KEY>` PR, `fix` type |
+| Playbook step            | Feature path (default)                        | Defect path (`WORK_KIND=defect`)                                                                                                                                                                                                                                                    |
+| ------------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Step 2 (derive tasks)    | derive agent-tagged task list from plan/story | **replaced** by systematic-debugging **phase 1 (reproduce)** + **phase 2 (root-cause/isolate)** — these _discover_ the work; there is no plan doc and no pre-derived task list                                                                                                      |
+| Step 3 (branch)          | `feat/<STORY-KEY>`                            | `fix/<STORY-KEY>` (`BRANCH_PREFIX`) — same structure, defect prefix                                                                                                                                                                                                                 |
+| Step 4 (domain dispatch) | dispatch agents to write feature code         | **replaced** by systematic-debugging **phase 3 (failing regression test)** + **phase 4 (fix + verify)**, where phase-3/4 _code-writing_ is performed by **dispatching the same Active domain agents** (the skill orchestrates; the owning domain agent writes the test and the fix) |
+| Step 5 (push/verify)     | per-phase push + silent-failure STOP          | **unchanged** — applied after each debugging-phase domain-agent commit                                                                                                                                                                                                              |
+| Step 6 (QA loop)         | QA Engineer playbook inline                   | **unchanged in structure**; QA Step-7 verification is re-pointed to the defect regression-evidence contract (see `qa-engineer-playbook.md`)                                                                                                                                         |
+| Step 7 (PR)              | `feat/<STORY-KEY>` PR, `feat` type            | `fix/<STORY-KEY>` PR, `fix` type                                                                                                                                                                                                                                                    |
 
 So debugging replaces the **"decide what to do + write the code" middle of the ladder (Steps 2+4)**;
 branch (3), push/verify (5), QA (6), and PR (7) remain. Phase 4's fix is **not** the skill writing
@@ -210,7 +212,7 @@ multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contra
 2. **Phase 2 — root-cause / isolate.** Identify the owning file(s)/domain. This determines which
    Active domain agent owns phases 3–4 for each affected slice.
 3. **Phase 3 — add a failing regression test.** Dispatch the owning domain agent (`isolation:
-   "worktree"`, **commit not push**) to add a test that **FAILS** against current `develop` behaviour
+"worktree"`, **commit not push**) to add a test that **FAILS** against current `develop` behaviour
    and pins the bug.
 4. **Phase 4 — fix + verify.** Dispatch the owning domain agent to implement the fix so the phase-3
    test now **PASSES**, then run the project quality gate (`typecheck` + `test`). Multiple affected
@@ -304,12 +306,17 @@ Agent({
 
 1. Story key, e.g. `<STORY-KEY>`.
 2. The full phase section from the plan, verbatim.
-3. Relevant spec/plan context — entity names, field types, route paths, class/interface names,
+3. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
+   from the target agent's override, `.claude/project/agents/<agent-name>.md`, `## Project skills`)
+   with "Invoke these via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state
+   explicitly "No project skills apply for this task." The prompt MUST state exactly one of these
+   two so the agent knows whether `Skills loaded: none` is correct.
+4. Relevant spec/plan context — entity names, field types, route paths, class/interface names,
    secret keys, SSM helper names — plus any plan "grounding corrections" verbatim.
-4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new
+5. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new
    branch. Check it out, do your work, and commit."
-5. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
-6. "Commit your changes (use the `conventional-commit` skill; scope from the directory
+6. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
+7. "Commit your changes (use the `conventional-commit` skill; scope from the directory
    name; **commit type `fix` on the defect path (`WORK_KIND=defect`), `feat` otherwise** — the
    orchestrator tells you which). Do NOT push — the orchestrator handles pushes."
    - **When the story has sub-tasks** (`subtaskCount > 0`): you are given the ordered `SUBTASKS`
@@ -320,10 +327,10 @@ Agent({
      `<BRANCH_PREFIX>/<STORY-KEY>` branch (no new branch, no push). A sub-task with no work in your domain
      gets no commit in your phase — it is implemented in whichever phase owns its files, not
      dropped. When `subtaskCount === 0`, commit once for the phase as normal.
-7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
+8. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`)."
-8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-9. "Return exactly:\n  Status: complete|blocked\n  Note: <one line if blocked>\n  Summary: <one line — files changed, key entities/handlers touched>"
+9. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
+10. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
 
 Never send just a task title.
 
@@ -347,8 +354,17 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
   Remaining phases NOT dispatched.
   ```
   Do not fix the blocker yourself. Do not proceed.
+- **Verify `Skills loaded` covers the named set.** Compare the returned `Skills loaded` value
+  against the skills the dispatch prompt named (item 3 of the prompt contract), mechanically:
+  - Prompt **named skills** `S`: pass iff the line is present and **every** skill in `S` appears.
+    Missing line, empty value, `none`, or any named skill absent → **failure**.
+  - Prompt **declared no applicable skills**: pass iff `Skills loaded: none` (extra skills the
+    agent chose to load are tolerated). An absent line is still a violation → **failure**.
+    On failure → **STOP-and-redispatch that phase once** with the skill instruction re-emphasized.
+    A persistent failure on the single redispatch → **STOP and report to the user** (same shape as
+    the silent-failure STOP above).
 
-Extract only `Status` / `Note` / `Summary` from each agent return; discard the rest.
+Extract only `Status` / `Note` / `Summary` / `Skills loaded` from each agent return; discard the rest.
 
 ## Step 6 — Hand off to the QA Engineer (inline)
 

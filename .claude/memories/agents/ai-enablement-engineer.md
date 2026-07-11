@@ -173,3 +173,33 @@ command`) to appear verbatim on a single line across three files, watch for pros
   `# Frameworks / ORMs with no built-in skill suggestion` and `# Agent-to-skill domain mapping`
   comment blocks are documentation-only and don't require updating for a new entry unless the plan
   explicitly asks (it didn't here — left the per-agent summary comment untouched).
+
+## NA-26 — enforce project-skill loading in domain-agent dispatches (`plugins/sdlc/refs` + `agents`)
+
+- This story's dedicated worktree was checked out on a synthetic `worktree-agent-<hash>` branch,
+  one commit behind `origin/feat/NA-26` — `git checkout feat/NA-26` failed with "already used by
+  worktree at <main-repo-path>" because the main repo checkout (left over from `/sdlc:plan`) still
+  held the branch. Fix: confirm the other worktree is clean (`git -C <path> status --short` empty,
+  HEAD matches `origin/<branch>` exactly — no uncommitted work to lose), `git -C <path> checkout
+<base-branch>` there to free the ref, then `git checkout feat/NA-26` in this worktree. Only do
+  this when the other checkout is verified clean; never force-switch a dirty worktree.
+- A plan's grep-based verification that expects an exact multi-word phrase ("read each directory
+  guide it lists") to survive on one physical line can fail even on a file the plan tells you to
+  edit only lightly (add a trailing clause) — if the file's _pre-existing_ prose already hard-wraps
+  that phrase across two Markdown source lines, the phrase-preservation check fails through no
+  fault of the new edit. Since the plan explicitly names this exact check in its Task 5 Step 4
+  verification, re-wrap the existing sentence onto one line while inserting the new clause (cheap,
+  in-scope since you're already touching that paragraph) rather than leaving it to fail silently.
+- The plan's whole-story check `grep -rn "Behaviour\|behaviour" plugins/sdlc/refs/ plugins/sdlc/agents/
+plugins/sdlc/README.md` — "Expected: none" — is written as if the tree starts clean, but this
+  repo's plugin already carries plenty of pre-existing British-spelling prose in files/sections the
+  story never touches (`triage.md`, `jira-bug-template.md`, `skills-manifest.md`,
+  `project-context-template.md`, `solutions-architect.md`, and untouched paragraphs inside files
+  this story DOES edit). Read "Expected: none" as "none _introduced by this story's edits_" — diff
+  the flagged line numbers against your own edited spans before treating a non-empty grep as a
+  failure; don't rewrite unrelated pre-existing prose to force a literal zero-match, that would be
+  scope creep beyond the plan's named file/line anchors.
+- A 12-file, prose-only contract story (no code, no data model) still benefits from running every
+  task's own verification grep individually before the closing whole-story block — the per-task
+  greps catch numbering-contiguity regressions (e.g. an inserted list item bumping every later
+  number) that the whole-story greps don't check for.

@@ -16,7 +16,7 @@ git checkout <BRANCH_PREFIX>/<STORY-KEY> 2>/dev/null \
   || { echo "STOP: checkout failed — on $(git branch --show-current) instead of <BRANCH_PREFIX>/<STORY-KEY>"; exit 1; }
 ```
 
-If either check fails → return immediately: `Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching`.
+If either check fails → return immediately: `Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching` / `Skills loaded: none` (an early abort loads no skills, so `none` is correct).
 
 ## Branch and PR — do not create
 
@@ -57,15 +57,30 @@ Do not split memory updates into a separate commit — they belong with the work
 
 ## Return format
 
-Return exactly three lines to the Principal Engineer (no other prose):
+Return only these lines to the Principal Engineer (no other prose). The line count depends on status:
+
+**Complete return — exactly 3 lines** (`Note:` omitted):
 
 ```
-Status: complete|blocked
-Note: <one line if blocked, else omit>
+Status: complete
 Summary: <one line — what files changed, key entities/handlers/screens touched>
+Skills loaded: <comma-separated override skill names | none>
 ```
 
-Large outputs are dropped at the dispatch boundary — keep it to the three lines above.
+**Blocked return — exactly 4 lines** (`Note:` present):
+
+```
+Status: blocked
+Note: <one line — why blocked>
+Summary: <one line — what was attempted>
+Skills loaded: <comma-separated override skill names | none>
+```
+
+- `Skills loaded:` is **required on every return** (complete, blocked, or early abort). An absent line is a contract violation.
+- Its value lists only the **runtime override (project) skills** you invoked via the Skill tool this dispatch (e.g. `tailwind-design-system, react-components`) — never the frontmatter-preloaded generic skills.
+- Emit the literal `none` only when no applicable override skill was loaded. Whether `none` is a pass or a failure is decided **mechanically against your dispatch prompt** by the orchestrator: `none` passes iff the dispatch prompt declared no applicable skills; if the prompt named skills, `none`/missing/empty/partial is a failure.
+
+Large outputs are dropped at the dispatch boundary — keep it to the 3 lines (complete) / 4 lines (blocked) above.
 
 ## Things you never do
 

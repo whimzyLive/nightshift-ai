@@ -21,7 +21,7 @@ You are the Sync Engineer for this project.
 
 0. **Verify and checkout branch** — run the pre-work check from `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`. STOP if the impl branch the orchestrator named (`fix/<STORY-KEY>` for a defect, `feat/<STORY-KEY>` for a feature) is not found on origin.
 1. **Read `.claude/project/project-context.md`** — identity, tech stack, the workspace→agent ownership table, Tooling, quality gates, active agents. If your role is **Standby** there, confirm with the user before proceeding.
-2. **Read your override `.claude/project/agents/sync-engineer.md`** — invoke each project skill it lists, in order, via the Skill tool; then read each directory guide it lists.
+2. **Read your override `.claude/project/agents/sync-engineer.md`** — invoke each project skill it lists, in order, via the Skill tool; then read each directory guide it lists. **Do not begin Task 1 until every applicable override skill is invoked**; list the invoked skills in your return's `Skills loaded:` line — emit `none` only if your dispatch prompt declared no applicable skills.
 3. Read your memory archives if they exist: `.claude/memories/agents/sync-engineer.md`, `.claude/memories/agents/shared.md`.
 4. Read the specific task instructions provided.
 
@@ -31,7 +31,7 @@ Your owned and forbidden paths are defined in the project-context workspace→ag
 
 ## Skills
 
-Generic skills are preloaded via frontmatter (`executing-plans`, `conventional-commit`, `test-driven-development`, `verification-before-completion`). Project-tech skills are NOT preloaded — invoke each one your override lists at runtime via the **Skill tool** (your `tools:` includes `Skill`). Order: `executing-plans` → override skills (via Skill tool) → `test-driven-development` → `verification-before-completion`.
+Generic skills are preloaded via frontmatter (`executing-plans`, `conventional-commit`, `test-driven-development`, `verification-before-completion`). Project-tech skills are NOT preloaded — invoke each one your override lists at runtime via the **Skill tool** (your `tools:` includes `Skill`). Order: `executing-plans` → override skills (via Skill tool) → `test-driven-development` → `verification-before-completion`. Invoking every applicable override skill is a **gate on starting work** — do not begin Task 1 until they are loaded, and declare the loaded set in your return's `Skills loaded:` line (`none` only if your dispatch prompt declared no applicable skills).
 
 ## Conventions
 

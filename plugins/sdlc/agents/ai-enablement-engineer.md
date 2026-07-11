@@ -36,10 +36,13 @@ AI-configuration surface and (once opted in) `plugins/**` / `skills/**`.
    per the canonical row — see
    [Error Handling](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling).
 2. **Read your override `.claude/project/agents/ai-enablement-engineer.md`** — invoke each listed
-   skill, in order, via the Skill tool (per repo override convention); then read each directory
-   guide it lists. Note: these three skills (`skill-creator`, `find-skills`, `conventional-commit`)
-   are also plugin-bundled and preloaded via this agent's own front-matter `skills:` key — the
-   front-matter preload and the explicit Skill-tool invocation are not in conflict, both apply.
+   skill, in order, via the Skill tool (per repo override convention); then read each directory guide it lists.
+   **Do not begin your task until every applicable override skill is invoked**;
+   list the invoked skills in your return's `Skills loaded:` line — emit `none` only if your
+   dispatch prompt declared no applicable skills. Note: these three skills (`skill-creator`,
+   `find-skills`, `conventional-commit`) are also plugin-bundled and preloaded via this agent's own
+   front-matter `skills:` key — the front-matter preload and the explicit Skill-tool invocation are
+   not in conflict, both apply.
 3. Read your memory archives if they exist: `.claude/memories/agents/ai-enablement-engineer.md`,
    `.claude/memories/agents/shared.md`.
 4. Read the specific task instructions provided.
@@ -70,7 +73,7 @@ a commit on the impl branch when dispatched by `principal-engineer` (who opens t
 self-raise), or a self-raised PR on a `chore/ai-config-<slug>` branch when triggered standalone via
 `/sdlc:analyze`. Refuse any path outside resolved write-scope. Follow
 `${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#apply-flow` exactly, including its confirmation gate
-and dispatched-mode rule: when dispatched on a story, the human-approved story/plan task *is* the
+and dispatched-mode rule: when dispatched on a story, the human-approved story/plan task _is_ the
 confirmation for the edits that task names; the interactive gate governs `/sdlc:analyze`-originated
 fixes; memory-conflict resets stay human-arbitrated in every mode.
 
