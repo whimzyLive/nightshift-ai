@@ -261,12 +261,19 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
 
 **Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
-principal playbook Step 5):
+principal playbook Step 5) — a **snapshot to diff against later, not an assertion**; the primary
+may already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a
+violation:
 
 ```bash
 PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
-PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # must be empty
+PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
 ```
+
+If `PRIMARY_CLEAN_BEFORE` is non-empty the first time you capture it in this run, proceed anyway
+with a one-line warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated
+to this story — snapshotting and comparing, not blocking`); do not return `blocked` on pre-existing
+dirt you didn't cause.
 
 After the agent returns, push and confirm from the worktree:
 
@@ -276,17 +283,19 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
-Then assert the primary checkout was never touched:
+Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
+status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
+stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
 
 ```bash
 [ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
-  && [ -z "$(git -C "<primary-root>" status --porcelain)" ] \
+  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
   || echo "BLOCKED: fix agent wrote to the primary checkout instead of \$WORKTREE"
 ```
 
-If the primary checkout's HEAD moved or its working tree is no longer clean → **return `blocked`**
-immediately with that reason (same detectable-failure shape as the principal playbook's Step-5
-guard) — do not attempt to fix or revert it yourself.
+If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
+snapshot → **return `blocked`** immediately with that reason (same detectable-failure shape as the
+principal playbook's Step-5 guard) — do not attempt to fix or revert it yourself.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.
@@ -304,14 +313,21 @@ findings and no open AC gaps**. Minor issues: collect for the return report, do 
 ## Step 5 — Write learnings to memory
 
 After review rounds are clean, sync and record what was learned so future implementations avoid
-the same mistakes.
+the same mistakes — all of this happens in **`$WORKTREE`, never the primary checkout** (the
+primary never checks out the story branch — see Step 3). Re-provision is idempotent and cheap
+even when Step 3's fix loop never ran this pass (a first-pass-clean review skips Step 3 entirely,
+so this is the first point `$WORKTREE` is guaranteed to exist):
 
 ```bash
-git fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
+setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> <BRANCH_PREFIX>/<STORY-KEY> <BASE-BRANCH>) \
+  || { echo "STOP: worktree-setup.sh failed — see stderr above"; exit 1; }
+WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
+NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | cut -d= -f2-)
+git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE" merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Audit log** — append to `.claude/memories/reviews/patterns.md`:
+**1. Audit log** — append to `$WORKTREE/.claude/memories/reviews/patterns.md`:
 
 ```
 ## ${DATE} — Story <STORY-KEY>
@@ -323,25 +339,35 @@ DATE=$(date +%Y-%m-%d)
 
 **2. Agent memory** — for each agent that fixed something, append a
 `## ${DATE} — Story <STORY-KEY> — review fix` block to
-`.claude/memories/agents/<agent-name>.md` (cross-cutting → `shared.md`) with Learnings +
-Pitfalls. Then commit and push:
+`$WORKTREE/.claude/memories/agents/<agent-name>.md` (cross-cutting → `shared.md`) with Learnings +
+Pitfalls. Then commit and push, both from the worktree:
 
 ```bash
-git add .claude/memories/
-git commit -m "chore: update learnings after <STORY-KEY> review"
-git push origin <BRANCH_PREFIX>/<STORY-KEY>
+git -C "$WORKTREE" add .claude/memories/
+git -C "$WORKTREE" commit -m "chore: update learnings after <STORY-KEY> review"
+git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
 ## Step 6 — Quality gate
 
 ```bash
-git fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
+git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE" merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 ```
 
-Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate). If the change touched infra, also run the infra build with the stage flag from project-context.
+Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate)
+**inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the shared Nx
+cache exported so the gate run hits the warm cache (spec §3):
+
+```bash
+export NX_CACHE_DIRECTORY="$NX_CACHE_DIRECTORY"
+cd "$WORKTREE"
+# ... run the project-context Tooling + Quality Gate commands here ...
+```
+
+If the change touched infra, also run the infra build with the stage flag from project-context (still inside `$WORKTREE`).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
-**exact** error (Step 3 protocol), push, and re-run the FULL gate. Repeat until clean. Paste the
+**exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean. Paste the
 actual gate output — never claim a pass without it (`verification-before-completion`).
 
 > Treat the project-context quality-gate commands as a real gate: the test command may run
@@ -380,9 +406,13 @@ contract MUST hold — without it, return `blocked` (never `clean`):
 
    ```bash
    # Identify the phase-3 commit (regression test added, before the fix), then show fail→pass.
-   git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-   git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
-   # at the phase-3 commit the new test FAILS (assertion); at HEAD it PASSES — paste both outputs.
+   # Always inside $WORKTREE (the same one captured in Step 5) — never the primary checkout.
+   git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+   git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
+   git -C "$WORKTREE" checkout <phase-3-sha>          # detached, inside $WORKTREE only
+   # run the regression test here: FAILS (assertion) against the still-buggy behaviour — paste output.
+   git -C "$WORKTREE" checkout <BRANCH_PREFIX>/<STORY-KEY>   # back to HEAD, inside $WORKTREE
+   # run the regression test here again: PASSES — paste output.
    ```
 
 2. **The full test suite passes with no regressions** (the Step-6 gate output covers this).
@@ -393,8 +423,8 @@ phase-4 is the _implementer's_ inner check that the fix works; this Step-7 contr
 gate proving the regression evidence + clean suite.)
 
 ```bash
-git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
+git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
 ```
 
 Any plan task or AC with no corresponding evidence → dispatch the owning domain agent to

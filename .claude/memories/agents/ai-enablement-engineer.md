@@ -313,3 +313,37 @@ review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 prod
   all (an empty `git add` + `git commit` would fail with "nothing to commit"); the plan's own
   Files-changed table description ("inherits the idempotent provision via the QA playbook") was the
   tell that this file's isolation model was always implicit, never spelled out in its own prose.
+
+## NA-27 QA fix round (`plugins/sdlc`)
+
+- This dispatched worktree was one commit behind `origin/feat/NA-27` at start — the task's stated
+  base SHA (`bf61700`) didn't match `HEAD` (`730b30c`, the pre-worktree-model spec-merge commit).
+  Confirmed via `git branch --contains bf61700` that the local worktree branch was a strict ancestor
+  (no divergence), then `git merge --ff-only origin/feat/NA-27` in the worktree brought it current —
+  same low-risk pattern as prior stories' worktree-lag fixups, just via `origin/<branch>` fetched
+  fresh rather than a sibling worktree's local ref.
+- The most subtle finding in this batch (QA playbook Steps 5/6 running `git fetch && git merge
+--ff-only` bare, i.e. in the session/primary cwd) only actually corrupts the primary post-NA-27:
+  before the worktree model landed, the primary WAS the story branch (the ff-merge was a no-op /
+  intentional sync), so the bug was latent until this same story's own worktree-model change made
+  the primary sit on `<BASE-BRANCH>` permanently. A structural change to an invariant (here:
+  "primary never checks out the story branch") can silently invalidate leftover commands elsewhere
+  in the _same_ file that predate the invariant and were never touched by the change's own diff —
+  grep the whole playbook file for every bare `git fetch`/`git merge`/`git add`/`git commit` (no
+  `-C`) after landing a worktree-isolation change, not just the sections the plan's diff touched.
+- Fixing "assert primary status is EMPTY" → "assert primary status matches ITS OWN pre-dispatch
+  snapshot" needs the pre-existing-dirt escape hatch stated at the capture site too, not just the
+  assert site — otherwise a reader only sees "snapshot, then compare" at the assert and might still
+  read the capture-time comment (`# must be empty`) as a precondition the run should enforce. Update
+  the comment at the capture line in the same edit as the assert line; don't leave one half of the
+  paired instruction using old language.
+- `git rev-parse --abbrev-ref HEAD` returning the literal string `"HEAD"` for a detached checkout
+  (not empty, not an error) is an easy gate-writing mistake: a `[ -z "$WB" ]` guard reads as if it
+  covers "unreadable OR detached," but detached HEAD produces a non-empty value and silently falls
+  through to whatever check comes next. Any script deriving a branch name via `--abbrev-ref HEAD`
+  needs an explicit `"$WB" = "HEAD"` guard as a _second_, separate condition — never assume the
+  empty-check subsumes it.
+- `bash -n` only proves parse-validity, not runtime-correctness of shell string-hashing logic (the
+  `pnpm-lock.yaml` staleness check added here) — after writing it, trace the four cases by hand
+  (missing node_modules / missing hash file / hash match / hash mismatch) rather than relying on
+  syntax-check alone, since a portable-CLI script has no test harness in this repo to exercise it.

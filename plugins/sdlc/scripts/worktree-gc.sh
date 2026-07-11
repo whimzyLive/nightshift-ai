@@ -47,7 +47,9 @@ gc_main() {
     echo "worktree-gc.sh: run for $STORY_KEY (log context only — removal gate is base = $BASE for every candidate)" >&2
   fi
 
-  worktree_paths="$(git -C "$PRIMARY_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')"
+  # `sed` (not `awk '{print $2}'`) — a worktree path containing spaces would otherwise be truncated
+  # to its first whitespace-delimited field.
+  worktree_paths="$(git -C "$PRIMARY_ROOT" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')"
   [ -n "$worktree_paths" ] || return 0
 
   while IFS= read -r WT; do
@@ -63,14 +65,37 @@ gc_main() {
     WB="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
     WH="$(git -C "$WT" rev-parse HEAD 2>/dev/null || true)"
     if [ -z "$WB" ] || [ -z "$WH" ]; then
-      echo "worktree-gc.sh: $WT unreadable (detached HEAD or already removed) — skip" >&2
+      echo "worktree-gc.sh: $WT unreadable (already removed or corrupted) — skip" >&2
+      continue
+    fi
+
+    # `rev-parse --abbrev-ref HEAD` yields the literal string "HEAD" for a detached checkout (not
+    # empty) — the `-z "$WB"` check above never catches this case, so it needs its own guard.
+    if [ "$WB" = "HEAD" ]; then
+      echo "worktree-gc.sh: $WT is in a detached HEAD state — skip" >&2
       continue
     fi
 
     # The ONLY safe removal gate (spec Global Constraints): (a) never the base branch itself, AND
-    # (b) its head is fully merged into origin/<BASE-BRANCH>.
+    # (b) its head is fully merged into origin/<BASE-BRANCH>. Note: `merge-base --is-ancestor` only
+    # recognizes MERGE-COMMIT PR integration — a squash-merged PR produces a brand-new commit on
+    # origin/<BASE-BRANCH> that this worktree's HEAD is never an ancestor of, so a squash-merge
+    # workflow would need a different (e.g. patch-id-based) merged check.
     if [ "$WB" = "$BASE_BRANCH" ]; then
       echo "worktree-gc.sh: $WT is on the base branch itself ($BASE_BRANCH) — skip" >&2
+      continue
+    fi
+
+    # Defence-in-depth: never remove a worktree with uncommitted work, and never remove a worktree
+    # whose branch has zero commits since $BASE yet (freshly provisioned from origin/<BASE-BRANCH>
+    # by a concurrent session's dispatch still in flight — its HEAD trivially satisfies "ancestor of
+    # $BASE" the instant it's created, well before that session's first commit lands).
+    if [ -n "$(git -C "$WT" status --porcelain 2>/dev/null)" ]; then
+      echo "worktree-gc.sh: $WT has uncommitted changes — skip" >&2
+      continue
+    fi
+    if [ "$WH" = "$(git -C "$PRIMARY_ROOT" rev-parse "$BASE" 2>/dev/null || true)" ]; then
+      echo "worktree-gc.sh: $WT has zero commits since $BASE (freshly provisioned, in flight) — skip" >&2
       continue
     fi
 
