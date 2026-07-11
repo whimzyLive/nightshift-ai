@@ -397,6 +397,19 @@ as the silent-failure STOP below.
 This makes the isolation guarantee a hard, detectable failure instead of a silently-corrupted
 primary checkout.
 
+Also assert `$WORKTREE` itself is clean after the phase's commit — the shared, persistent
+`$WORKTREE` carries forward between phases and fix rounds, so a returning agent's forgotten
+uncommitted stray (e.g. a new source file never `git add`ed) would otherwise sit there silently
+until a LATER agent's `git add`/commit sweeps it in as an unintended, unattributed change:
+
+```bash
+[ -z "$(git -C "$WORKTREE" status --porcelain)" ] \
+  || echo "STOP: \$WORKTREE has stray uncommitted/untracked files after the phase commit — $(git -C "$WORKTREE" status --porcelain)"
+```
+
+A non-empty result → **fail the phase and STOP**, same shape as the silent-failure STOP, listing the
+stray files.
+
 - No new commits since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **STOP**, report. (With
   `subtaskCount > 0` a phase is expected to advance HEAD by **one commit per sub-task it touched**,
   not a single commit; "zero new commits" remains the silent-failure STOP condition. Exception: the

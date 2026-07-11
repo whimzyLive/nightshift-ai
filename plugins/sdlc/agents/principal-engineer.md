@@ -153,7 +153,8 @@ Agent({
 Before dispatching each phase, capture the primary checkout's HEAD + clean-tree state; after the
 agent returns, assert both are unchanged — an agent that wrote to the primary checkout instead of
 `$WORKTREE` fails the phase and STOPs (machine-checked, canonical rule in
-`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` Step 5). Remove the worktree
+`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` Step 5, which also asserts `$WORKTREE`
+itself is porcelain-clean after the phase's commit). Remove the worktree
 (`git worktree remove --force "$WORKTREE"`) right after the PR is raised (Step 7) — any later
 review-fix round re-provisions it idempotently.
 

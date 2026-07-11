@@ -108,8 +108,10 @@ dispatch the owning domain agent to fix what review finds.
 4. **Re-review** — repeat until no Critical/Important findings and no open AC gaps.
 5. **Learn** — write the audit log to `.claude/memories/reviews/patterns.md` and per-agent
    learnings to `.claude/memories/agents/<agent>.md`; commit + push.
-6. **Quality gate** — run the quality-gate commands from `.claude/project/project-context.md`; dispatch fixes on failure; repeat
-   until clean. Paste real output.
+6. **Quality gate** — assert `$WORKTREE` is porcelain-clean first (STOP with the stray-file list if
+   not — never silently clean), then run the quality-gate commands from
+   `.claude/project/project-context.md`; dispatch fixes on failure; repeat until clean. Paste real
+   output.
 7. **Verify** — line-by-line confirm every plan task AND every AC has evidence on the branch.
 8. **Return verdict** — `clean` only when review is clean, all ACs evidenced, gate green with
    pasted output, and learnings pushed. Otherwise `blocked` with the reason.

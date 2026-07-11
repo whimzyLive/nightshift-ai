@@ -87,15 +87,29 @@ gc_main() {
     fi
 
     # Defence-in-depth: never remove a worktree with uncommitted work, and never remove a worktree
-    # whose branch has zero commits since $BASE yet (freshly provisioned from origin/<BASE-BRANCH>
-    # by a concurrent session's dispatch still in flight — its HEAD trivially satisfies "ancestor of
-    # $BASE" the instant it's created, well before that session's first commit lands).
+    # whose branch has zero commits since it was provisioned (freshly provisioned worktree still in
+    # flight for a concurrent session's dispatch — its HEAD trivially satisfies "ancestor of $BASE"
+    # the instant it's created, well before that session's first commit lands).
     if [ -n "$(git -C "$WT" status --porcelain 2>/dev/null)" ]; then
       echo "worktree-gc.sh: $WT has uncommitted changes — skip" >&2
       continue
     fi
-    if [ "$WH" = "$(git -C "$PRIMARY_ROOT" rev-parse "$BASE" 2>/dev/null || true)" ]; then
-      echo "worktree-gc.sh: $WT has zero commits since $BASE (freshly provisioned, in flight) — skip" >&2
+    # Compare against the SHA recorded at THIS worktree's own provision time (worktree-setup.sh
+    # writes it to worktree-scoped git config `sdlc.provisionSha` right after creating/re-creating
+    # the worktree), not the CURRENT $BASE tip. Comparing to the current tip is a race: once $BASE
+    # advances past a worktree's original provision point, a concurrent session's still-in-flight,
+    # genuinely-zero-commit worktree no longer matches the NEW $BASE and falls through the guard,
+    # letting GC remove it (and force-delete its branch) mid-flight.
+    PROVISION_SHA="$(git -C "$WT" config --worktree --get sdlc.provisionSha 2>/dev/null || true)"
+    if [ -n "$PROVISION_SHA" ]; then
+      if [ "$WH" = "$PROVISION_SHA" ]; then
+        echo "worktree-gc.sh: $WT has zero commits since provision (freshly provisioned, in flight) — skip" >&2
+        continue
+      fi
+    elif [ "$WH" = "$(git -C "$PRIMARY_ROOT" rev-parse "$BASE" 2>/dev/null || true)" ]; then
+      # Fallback for worktrees provisioned before this guard existed (no recorded provisionSha yet)
+      # — the older, race-prone tip-equality check is still better than no guard at all.
+      echo "worktree-gc.sh: $WT has zero commits since $BASE (freshly provisioned, in flight; no recorded provisionSha — using tip-equality fallback) — skip" >&2
       continue
     fi
 

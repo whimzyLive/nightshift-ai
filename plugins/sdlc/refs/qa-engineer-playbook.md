@@ -354,6 +354,20 @@ git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
 git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE" merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 ```
 
+**Before running the gate, assert `$WORKTREE` is clean.** The gate now runs in the shared,
+persistent `$WORKTREE` where an earlier fix-round agent may have left uncommitted or untracked
+files behind (e.g. a forgotten `git add` of a new source file) — the gate would then pass against a
+tree that isn't actually what got pushed, a false green.
+
+```bash
+[ -z "$(git -C "$WORKTREE" status --porcelain)" ] \
+  || { echo "STOP: \$WORKTREE has stray uncommitted/untracked files before the quality gate — $(git -C "$WORKTREE" status --porcelain)"; exit 1; }
+```
+
+A non-empty result → list the stray files and **STOP** (same blocked shape as elsewhere in this
+playbook — dispatch the owning domain agent to either commit or discard them; never silently clean
+them yourself).
+
 Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate)
 **inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the shared Nx
 cache exported so the gate run hits the warm cache (spec §3):

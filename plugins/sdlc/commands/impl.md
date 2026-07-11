@@ -65,16 +65,18 @@ the Principal Engineer role directly.
    ```bash
    acli jira workitem comment create --key <STORY-KEY> \
      --body "Implementation complete.
-
-   PR: <IMPL_PR_URL>
-
-   All phases done. Review clean. Quality gate passed."
    ```
 
-   (`comment add` does not exist in this acli version — use `comment create --key`.)
+PR: <IMPL_PR_URL>
+
+All phases done. Review clean. Quality gate passed."
+
+````
+
+(`comment add` does not exist in this acli version — use `comment create --key`.)
 
 6. Report back: phases completed, the PR URL, review rounds, quality-gate evidence, any blockers
-   or open items for the reviewer.
+or open items for the reviewer.
 
 **IMPORTANT:** On the `full` path, only run after the plan PR is reviewed and merged (Step 2). On
 the `lightweight` path, no plan PR is required. Either way this makes real code changes across
@@ -102,7 +104,7 @@ to convergence, **then** release — the loop is the session's **tail**:
 ```bash
 # IMPL_PR_URL is the PR the Principal Engineer playbook opened. Drive the review-fix loop on it.
 /loop /sdlc:loop <IMPL_PR_URL>
-```
+````
 
 The native `/loop` re-invokes `sdlc:loop` each pass: it polls Copilot's review of the PR head, runs
 `/review-fix` inline on each round of comments, and exits when the head is Copilot-reviewed with no

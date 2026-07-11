@@ -347,3 +347,53 @@ review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 prod
   `pnpm-lock.yaml` staleness check added here) — after writing it, trace the four cases by hand
   (missing node_modules / missing hash file / hash match / hash mismatch) rather than relying on
   syntax-check alone, since a portable-CLI script has no test harness in this repo to exercise it.
+
+## NA-27 — external review-fix round on PR #72 (`plugins/sdlc`)
+
+- Dispatched worktree was FIVE commits behind `origin/feat/NA-27` this time (`730b30c`, the
+  pre-worktree-model spec-merge commit — the whole worktree-isolation implementation itself was
+  missing), not the usual one-commit lag. Same fix pattern held: `git merge-base` confirmed the
+  local branch was still a strict ancestor, so `git merge --ff-only feat/NA-27` (the branch ref, not
+  `origin/feat/NA-27` — both resolve the same commit here and `git merge` doesn't require exclusive
+  checkout, only `git checkout` does) brought the worktree current without touching the sibling
+  worktree that had the branch checked out. Don't assume "one commit behind" from prior stories —
+  always diff the stated base SHA against actual `HEAD` and `git log base..target` before assuming
+  the gap is trivial.
+- A GC race-condition fix (finding: guard compares a worktree's HEAD against the CURRENT base tip,
+  which drifts once the base branch advances past the worktree's true creation point) is better
+  fixed by recording an immutable "provision point" marker at creation time than by trying to make
+  the race window narrower. Used **worktree-scoped git config** (`extensions.worktreeConfig true` +
+  `git -C "$WT" config --worktree sdlc.provisionSha <sha>`) written ONLY in the two branches that
+  actually create a new worktree directory (re-provision-after-teardown and first-run-from-base) —
+  never in the reuse/fast-forward branch, since worktree-scoped config persists in that worktree's
+  own `.git/worktrees/<name>/config.worktree` across every later idempotent re-invocation of the
+  setup script, so re-writing it on reuse would silently reset the very reference point the guard
+  depends on. Always keep an old-style fallback check (here: tip-equality against current base) for
+  worktrees provisioned before the new guard existed and therefore have no recorded marker.
+- A "Case 1 registration probe matches but the directory was removed out-of-band" bug needs the
+  registration check split from the case dispatch: compute a boolean (`REGISTERED=...`), insert a
+  `[ ! -d "$WT" ]` pre-check between the probe and the `if/elif/else` case chain that prunes the
+  stale registration AND flips the boolean back to false, then dispatch on the boolean — this lets
+  execution "fall through" cleanly into the branch-exists/create cases without duplicating their
+  logic or fighting bash's linear if/elif structure.
+- When a spec's package-manager token (`.claude/project/project-context.md` "Package manager" row)
+  needs to drive both the install command AND the lockfile name/hash check, resolve it once into two
+  paired variables (`INSTALL_CMD`, `LOCK_FILE_NAME`) via a single `case` statement with an explicit
+  `*)` fallback that warns to stderr and re-assigns the pnpm defaults — this keeps "unknown token"
+  and "pnpm" behaviourally identical (same code path afterward) rather than needing a separate
+  guard later in the script.
+- A "gate can false-green on untracked leftovers" fix (assert `git status --porcelain` is empty
+  before the gate/before each phase's assertion) needs the exact same one-liner duplicated at BOTH
+  the QA-playbook Step 6 (pre-gate) and the principal-playbook Step 5 (post-phase-commit) sites —
+  they're structurally identical checks guarding different moments (before a shared quality gate vs.
+  after every phase dispatch) and a reviewer finding one doesn't imply the other was already fixed;
+  grep the whole plugin for `status --porcelain` before declaring a "shared worktree cleanliness"
+  finding fully resolved.
+- `impl.md`'s `--body "..."` heredoc-style quoted string is printed VERBATIM into the Jira comment —
+  a Markdown reformat that indents the continuation lines to match the surrounding fenced-code-block
+  indentation (3 spaces, matching the numbered-list continuation) silently changes the literal
+  comment text that gets posted. Verified this repo's `lint-staged` config only runs
+  `prettier --write --ignore-unknown` on staged files; prettier's Markdown printer does not reformat
+  the _contents_ of fenced code blocks (only surrounding prose), so a column-0 fix to quoted
+  continuation lines inside a ```bash fence survives a real commit — confirmed via `git show
+  HEAD:plugins/sdlc/commands/impl.md`after committing, no`<!-- prettier-ignore -->` needed here.
