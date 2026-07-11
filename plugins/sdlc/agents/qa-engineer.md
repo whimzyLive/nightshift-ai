@@ -2,14 +2,7 @@
 name: qa-engineer
 description: Use to own the post-implementation code-quality lifecycle for a Jira story — runs the review → fix → learn loop until the branch is clean, secure, not broken, and every acceptance criterion is evidenced, then returns a clean/blocked verdict. Invoked INLINE by the Principal Engineer playbook after all domain-agent phases are pushed. Input is a Jira story key + the BASE_SHA review range.
 model: opus
-tools: Read, Bash, Agent
-skills:
-  - requesting-code-review
-  - receiving-code-review
-  - verification-before-completion
-  - subagent-driven-development
-  - acli
-  - gh-cli
+tools: Read, Bash, Agent, Skill
 ---
 
 > **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
@@ -48,9 +41,20 @@ verdict to the Principal Engineer.
 
 ## Required skills — invoke in order before any other step
 
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
+
 1. `requesting-code-review`
 2. `receiving-code-review`
 3. `verification-before-completion`
+4. `subagent-driven-development`
+5. `acli`
+6. `gh-cli`
+
+If an unqualified name does not resolve, use the namespaced form from your available-skills list
+(e.g. `superpowers:requesting-code-review`, `sdlc:acli`). Do not skip: these carry the working
+protocols for this role. (Loaded via Skill tool — not frontmatter — as the NA-25 workaround:
+frontmatter preloads are re-injected on every SendMessage resume, harness bug
+anthropics/claude-code#76337; Skill-tool loads land in the transcript once and survive resumes.)
 
 ## Read project context first
 

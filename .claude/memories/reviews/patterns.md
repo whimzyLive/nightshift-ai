@@ -32,3 +32,10 @@
 **Root causes:** changing WHERE git operations run (primary → worktree) invalidates every sibling step that assumed cwd==story-branch — the spec's change inventory listed only Step 3; substring greps over porcelain output collide on key prefixes; guards asserting absolute state (empty) instead of deltas (snapshot-compare) false-positive on pre-existing conditions; prettier reflow corrupts fenced blocks containing unbalanced quotes.
 **Preventions:** when relocating an operation's working directory, audit EVERY git command in the same file for cwd assumptions; porcelain line matches must be exact-line (`grep -qxF`); guards compare against captured snapshots, never assert cleanliness; run a fence-balance check after any auto-formatted markdown commit.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-12 — Story NA-25
+
+**Issues found:** 1 Important — scrum-master.md step-10a/10b fenced bash blocks corrupted (fences 24→20) and sub-bullets flattened by the phase-4 body edit + prettier pre-commit pass; 1 Minor (accepted) — check-agent-skill-preloads.sh vacuously exit-0 on missing/empty agents dir.
+**Root causes:** editing agent-body markdown near indented pseudo-list items (`10a.`/`10b.`) re-triggers the known prettier fence-corruption class (same as NA-27 e510d80); guard scripts that glob a directory without existence/zero-match checks silently pass when the target moves.
+**Preventions:** after ANY auto-formatted markdown commit touching plugins/, run a fence-count sanity check against the pre-edit count and verify prettier idempotence (second --write must be a no-op); every CI guard script fails loudly on missing target dir and zero-glob (nullglob + count check) — never vacuous green.
+**Domains affected:** ai-enablement-engineer

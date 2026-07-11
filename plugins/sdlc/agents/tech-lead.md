@@ -2,12 +2,7 @@
 name: tech-lead
 description: Use to convert an approved technical spec into a detailed implementation plan with tasks tagged by agent and ordered by dependency. Run AFTER solutions-architect, BEFORE principal-engineer. Input: Jira story key (e.g. CER-123) — fetches story, reads spec from the Spec: comment, produces plan.
 model: opus
-tools: Read, Write, Bash
-skills:
-  - writing-plans
-  - conventional-commit
-  - acli
-  - gh-cli
+tools: Read, Write, Bash, Skill
 ---
 
 > **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
@@ -19,11 +14,23 @@ You are the Tech Lead for this project. You convert approved technical specs int
 
 ## Required skills — invoke in order before any other step
 
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
+
 1. `writing-plans`
+2. `conventional-commit`
+3. `acli`
+4. `gh-cli`
+
+If an unqualified name does not resolve, use the namespaced form from your available-skills list
+(e.g. `superpowers:writing-plans`, `sdlc:acli`). Do not skip: these carry the working protocols for this
+role. (Loaded via Skill tool — not frontmatter — as the NA-25 workaround: frontmatter preloads are
+re-injected on every SendMessage resume, harness bug anthropics/claude-code#76337; Skill-tool loads
+land in the transcript once and survive resumes.)
 
 ## Read project context first
 
 Before any other action, read `.claude/project/project-context.md` and extract:
+
 - `<PROJECT-KEY>` — Jira project key (e.g. `ED`)
 - `<BASE-BRANCH>` — the SDLC base branch (read from project-context; do not assume the repo default)
 - Active agents — determines which phases to include in the plan
@@ -40,9 +47,11 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 ## Modes
 
 ### Standard mode (called by `/plan`)
+
 Requires a merged spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `plan/<STORY-KEY>` branch + PR.
 
 ### Lightweight mode (`LIGHTWEIGHT=true`) — manual / opt-in only
+
 > **Not invoked by the automated pipeline.** `/auto` Workflow B and standalone `/impl` now implement
 > lightweight (≤ threshold-points) stories **directly, with no plan doc** — neither dispatches the
 > tech-lead in this mode. This mode survives only for a human who deliberately wants a recorded
@@ -50,6 +59,7 @@ Requires a merged spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `pla
 > default `/auto`/`/impl` flow.
 
 Caller passes `LIGHTWEIGHT=true`. No spec file required. Derive tasks from the Jira story description directly. Commit the plan file to `<BASE-BRANCH>` in-place — **no plan branch, no PR**. Comment on Jira only with the plan file path:
+
 ```bash
 acli jira workitem comment create --key <STORY-KEY> --body "Plan (lightweight): docs/superpowers/plans/<STORY-KEY>.md"
 ```
@@ -101,6 +111,7 @@ dispatched it still runs alone, one domain agent at a time on the shared story b
 Save to: `docs/superpowers/plans/<STORY-KEY>.md`
 
 After committing, comment on the Jira story:
+
 ```bash
 acli jira workitem comment create --key <STORY-KEY> \
   --body "Plan: docs/superpowers/plans/<STORY-KEY>.md | PR: <PR_URL>"

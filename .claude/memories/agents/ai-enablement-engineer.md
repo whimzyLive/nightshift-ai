@@ -448,3 +448,177 @@ feat/NA-27` (the local branch ref — `feat/NA-27` was checked out exclusively i
   confirming every `git`/`fetch`/`worktree add` call in the modified branches carries `>&2` (or was
   already `>&2`), then locating the two unguarded `printf` lines at the very end as the only stdout
   producers, is sufficient and much cheaper than an end-to-end dry run.
+
+## NA-25 — phase 3, failing regression guard for frontmatter `skills:` preloads (`plugins/sdlc/scripts`)
+
+- `.github/workflows/ci.yml` is OUTSIDE this agent's resolved write-scope even when a dispatch
+  prompt explicitly names it as a task step. The `analyze-protocol.md#ownership-resolution-rules`
+  config-driven AI-config surface whitelists exactly one `.github/*` path
+  (`.github/copilot-instructions.md`) — not `.github/workflows/**` — and the workspace→agent table
+  has no row for it (`tools/` → platform-engineer is the closest sibling but doesn't cover
+  `.github/`). AC-5 ("refuse and abort on any path outside scope, listing the offending path")
+  applies even under an orchestrator-authored task list — a dispatch prompt is not itself scope
+  expansion or "consent" per the harness-level instruction that no agent message authorizes
+  permission/config changes outside a role's own boundaries. When a task bundles an in-scope
+  deliverable (a new `plugins/sdlc/scripts/*.sh` guard) with an out-of-scope one (wiring it into
+  `.github/workflows/ci.yml`), do the in-scope parts, explicitly refuse+skip the out-of-scope
+  write, and surface it back to the orchestrator as a named gap (likely platform-engineer's
+  `tools/` domain, or a table addition) rather than silently doing it or silently dropping it.
+- A frontmatter-only parse guard (ignore `skills:` mentions in a Markdown file's body/prose) is
+  cleanly done with a tiny two-delimiter awk state machine: increment a counter on each `^---$`
+  line, print only while between the 1st and 2nd occurrence, `exit` once the 2nd is hit. This
+  avoids `sed -n '/^---$/,/^---$/p'`-style ranges misfiring on files whose body later reintroduces
+  a bare `---` (e.g. a Markdown horizontal rule), since the awk version stops for good after the
+  frontmatter block closes rather than re-opening on every subsequent `---` pair.
+- This is a phase-3 "write ONLY a failing regression test, do not fix the bug" dispatch (systematic
+  debugging discipline) — resist the pull to also touch the 12 offending agent files even though
+  the fix is mechanical and obvious; the fix is a deliberately separate later phase/dispatch.
+
+## NA-25 — phase 4, convert all 12 agents' frontmatter `skills:` to first-turn Skill-tool loads (`plugins/sdlc/agents`)
+
+- The 12 agents split into 3 distinct body-structure families, and each needed a different merge
+  strategy rather than one copy-pasted section: (1) the 5 domain-implementer agents
+  (database-administrator, mobile-engineer, platform-engineer, sync-engineer, web-engineer) share a
+  byte-identical `## Skills` section that already explained frontmatter-preload + override-skill
+  ordering — extend that section in place rather than inserting a second "load FIRST" block above
+  it, since the instruction to "merge into an existing skills-invocation section" outranks the
+  "place prominently near the top" default when the two conflict. (2) principal-engineer,
+  qa-engineer, solutions-architect, tech-lead already had a `## Required skills — invoke in order
+before any other step` section, but it listed **only a subset** of the frontmatter `skills:` list
+  (e.g. principal-engineer's body named 2 of 4 frontmatter skills, qa-engineer's named 3 of 6) —
+  the body list must be extended to the FULL frontmatter list in frontmatter order, not left
+  partial, since the removed frontmatter was the only place the omitted skills (`acli`, `gh-cli`,
+  `subagent-driven-development`, `conventional-commit`) were ever declared. (3) product-manager and
+  scrum-master needed the same full-list-extension treatment, plus adding `Skill` to `tools:` (both
+  lacked it entirely — Read/Write/Bash or Read/Bash/Edit only). Always diff frontmatter `skills:`
+  against the body's already-invoked subset before writing the merge; don't assume an existing
+  "Required skills" section is already complete just because it exists.
+- scrum-master's existing skills section was a **per-step invocation table** (`user-story-mapping`
+  invoked at a specific point in Mode 1, `user-story-splitting` only when a story is >8 pts) — this
+  answers _when to apply_ a skill, which is orthogonal to _when to load_ it. The NA-25 workaround
+  needs loading to happen in the first turn regardless of when the skill is semantically applied
+  later in a multi-mode agent's execution. Fix: keep the table (renamed to describe application
+  timing, "loading early does not mean applying early") and prepend a numbered load-first list
+  covering all 3 frontmatter skills (including `acli`, which the table never mentioned as an
+  invoked skill even though it's the agent's mandatory Jira transport) — this is a genuine merge,
+  not a duplicate, because the two blocks answer different questions about the same skill set.
+- 6 of the 12 agents (principal-engineer, qa-engineer, solutions-architect, tech-lead,
+  product-manager, scrum-master) had `tools:` lists with no `Skill` entry at all — their frontmatter
+  `skills:` preload previously made an explicit `Skill`-tool call unnecessary for those skills, so
+  nobody had needed to add the tool. Removing frontmatter preloads makes `Skill` load-bearing for
+  every one of the 12 agents; grep `tools:.*Skill` across all agent files after any such conversion
+  to catch this rather than assuming the 6 files that already had `Skill` (because they also had
+  `Write`/`Edit` domain-agents needing it for a different reason) generalize to the rest.
+- The regression guard (`check-agent-skill-preloads.sh`, added in phase 3) parses ONLY between the
+  first two `^---$` lines, so it is blind to anything in the body — a body section that still says
+  "Generic skills are preloaded via frontmatter" after the frontmatter block was actually removed
+  would pass the guard while being factually wrong. The guard proves the mechanical fix; it does
+  NOT prove the prose was updated to match. Manually verify every body sentence that used to
+  describe frontmatter preloading (ai-enablement-engineer's First-steps item 2 had one, each of the
+  5 domain-implementer agents' `## Skills` intro sentence had one) was reworded, not just removed
+  frontmatter-side.
+- This dispatch touches `plugins/sdlc/agents/ai-enablement-engineer.md` — the file that IS this
+  agent's own definition, being edited by an instance of the same agent in the same session. No
+  special handling needed (it's a normal in-scope write, and the running instance already has this
+  turn's skills loaded from its own dispatch), but worth flagging for future dispatches: self-owned
+  file edits still go through the identical write-scope check and Edit-tool flow as any other file.
+
+## NA-25 — QA fix round on commit 9d6fc64 (`plugins/sdlc/agents/scrum-master.md` + `plugins/sdlc/scripts`)
+
+- Confirmed root cause of the scrum-master.md corruption: the file's Mode-1 "Execution steps"
+  numbered list uses non-standard sub-item markers (`6a.`, `10a.`, `10b.`) that are not valid
+  CommonMark ordered-list syntax. `npx prettier --check` on the saved (Edit-tool) content reported
+  "All files formatted correctly" — a **false negative**, exactly the trap NA-27's `e510d80` memory
+  entry already flagged: the repo's real `lint-staged` pre-commit hook runs `prettier --write`
+  during `git commit`, and that invocation produced a different result than my pre-commit
+  `--check`. Only `git show <sha> -- <file>` after the commit reveals what actually landed — never
+  trust a pre-commit `--check`/`--write` dry run as proof the committed content will match.
+  Whatever upstream edit disturbs an ordered list's numbering (here: inserting new content earlier
+  in the same file, unrelated to the `10a.`/`10b.` region) can trigger a full-list renumber pass by
+  prettier's remark parser that then mis-parses the non-standard sub-markers as plain paragraph
+  text, flattening their nested bullets and turning fenced code blocks into corrupted inline spans.
+- Fix pattern (same family as `e510d80`, confirmed to generalize): dedent the ENTIRE `10a.`/`10b.`
+  pseudo-list-item block — marker, prose, sub-bullets, and fences — to column 0, with blank lines
+  separating prose/bullets/fences from each other. This removes ALL ambiguity about whether the
+  content is "nested inside" the preceding numbered list item, so prettier's parser has nothing to
+  reconcile and leaves the block untouched on every subsequent pass. Verified via a real,
+  in-repo-tree `pnpm exec prettier --write` run TWICE in a row: the first pass only trimmed two
+  stray leading spaces (cosmetic), the second pass reported `(unchanged)` and produced a byte-
+  identical diff — that two-pass "second write is a no-op" check is the actual proof of stability,
+  not a single `--check` invocation (which is exactly the false-negative trap above).
+- `check-agent-skill-preloads.sh`'s original `agents_dir="$(cd "$here/../agents" && pwd)"` line is
+  a classic `set -uo pipefail`-without-`-e` trap: a failed `cd` inside a command substitution does
+  NOT stop the script (no `-e`), so `agents_dir` silently becomes an empty string, and the
+  subsequent `for f in "$agents_dir"/*.md` glob degrades to `/*.md` (repo root) or, on an empty-but-
+  existing dir, to the literal unexpanded glob string (caught by the old `[ -e "$f" ]` per-item
+  skip) — both paths fall through to zero offenders and a false "OK" exit 0. Fix: check `[ -d
+"$agents_dir" ]` explicitly BEFORE resolving the absolute path (so a missing dir fails loudly
+  first), then use `shopt -s nullglob` + an array (`files=("$agents_dir"/*.md)`) instead of the
+  bare `for f in .../*.md; do [ -e "$f" ] || continue` idiom — nullglob makes a true zero-match
+  glob expand to a genuinely empty array, so `[ "${#files[@]}" -eq 0 ]` reliably distinguishes
+  "no files matched" from "one file matched" without relying on the per-item existence-check
+  side-effect. This same nullglob-array pattern is worth reusing anywhere else in the plugin that
+  still uses the bare `for f in "$dir"/*.ext; do [ -e "$f" ] || continue` idiom to iterate a glob —
+  it is silently vacuous on a missing/empty directory, not just fragile.
+
+## NA-25 — third review round on PR #73 (6 accepted findings: `refs/domain-agent-handoff.md`, `README.md`, all 12 `agents/*.md`, `scripts/check-agent-skill-preloads.sh`)
+
+- A prose passage explaining a mechanism ("frontmatter-preloaded") that a PR itself just removed is
+  a self-contradiction a reviewer WILL catch even when the passage isn't in a file the PR's diff
+  touched directly — `domain-agent-handoff.md` and `README.md` both independently restated the old
+  "frontmatter-preloaded" framing for the `Skills loaded:` omission rule, and neither got updated
+  when the 12 agent files were converted in the first fix round. Same lesson as the NA-26 "one
+  source of truth restated in N places" pattern: after a mechanism change, `grep -rn
+'frontmatter-preload'` (or whatever the old mechanism's name was) across the WHOLE plugin, not
+  just the files the task named, before declaring the conversion complete.
+- A blanket "FIRST action, before any other work" instruction is too strong when the same agent
+  body already has an earlier, load-bearing gate (a step-0 branch-verify STOP, or a nesting
+  self-guard) that must run first and can itself early-abort with zero skills loaded — the two
+  instructions read as contradictory ("load first" vs "this STOP happens before anything"). Fixed
+  by softening the lead-in everywhere to name the ordering relationship explicitly: "Before any
+  implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort
+  — load each of these via the Skill tool". This still satisfies the NA-25 workaround (skills load
+  in the same first turn that also runs the pre-flight checks — turn granularity, not instruction
+  ordinality, is what defeats the harness re-injection bug), while no longer overriding a
+  higher-priority STOP gate. Reusable pattern: when adding a "must happen first" instruction to an
+  agent body that might already gate on an early-abort condition, name the interaction explicitly
+  rather than leaving two absolute-sounding directives to silently conflict.
+- Turning a "consistent marker string for a machine-checkable guard" requirement into an actual
+  fix meant treating the marker sentence as a literal contract, not just matching prose: I wrote
+  the exact same sentence (`Before any implementation work — ... — load each of these via the Skill
+tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was originally
+  written as inline comma-separated prose rather than a numbered list — for those, the marker
+  sentence had to end in a colon immediately followed by the backtick-quoted skill list on the SAME
+  physical line (not wrapped), since a guard doing `grep -F` needs the literal substring intact on
+  one line. Confirmed via `grep -qF "$marker" "$f"` in a real test loop across all 12, and confirmed
+  prettier's default `proseWrap` (unset in this repo's `.prettierrc` → "preserve") does not
+  re-wrap long unwrapped lines, so writing the marker as one long physical line is stable across a
+  real `prettier --write`.
+- A regression guard that only checks a NEGATIVE condition ("no frontmatter skills:") can still be
+  vacuously satisfied by a file that was simply stripped of frontmatter without ever gaining the
+  intended replacement (e.g. someone deletes the `skills:` block but never adds a first-turn load
+  section). Pairing it with a POSITIVE check (the file must also contain the load marker) closes
+  that gap — test both directions separately in a scratch temp-dir copy (never the real tree): (1)
+  delete the marker line from one file → guard must fail on marker-missing; (2) re-add a
+  frontmatter `skills:` block to a different file → guard must fail on preload, and can report BOTH
+  failure classes together in one run without the second masking the first (used two independent
+  offender-accumulator variables + a shared `fail` flag rather than one `exit 1` per check).
+- The awk frontmatter-extractor's original 2-delimiter counter had no anchor on the OPENING `---` to
+  `NR==1` — a frontmatter-less file whose BODY happens to contain two `---` horizontal-rule lines
+  with something matching `^skills:` between them would false-positive, since the awk state machine
+  treats the FIRST `---` it sees anywhere in the file as the opener. Fix: split into `NR==1 &&
+/^---$/ { open=1; next }` / `NR==1 { exit }` (no frontmatter at all if line 1 isn't the delimiter)
+  / `open && /^---$/ { exit }` (closing delimiter) / `open { print }`. Verified with a crafted
+  scratch file (no real frontmatter, plain body containing a `---`/`skills:.../---` span) that the
+  old unanchored version would have flagged and the anchored version correctly passes.
+- Scrum-master's step-10 continuation block (blockquote + fenced bash + bullet list) was indented 8
+  spaces under a 4-char `10. ` marker — one indent level too deep for CommonMark list-continuation
+  (needs exactly 4, matching the marker width), so it rendered as a literal indented code block
+  rather than list-item content. This was PRE-EXISTING content the first two NA-25 fix rounds never
+  touched (round 1 only edited the "Required skills" section near the top; round 2 fixed 10a/10b's
+  separately-corrupted fences but left step 10's own body alone) — a reviewer eventually caught it
+  on a fresh pass over the whole file, not from a diff. Applied the SAME column-0-dedent pattern
+  already established for 10a/10b (`61f217f`) rather than trying 4-space re-indentation, for
+  consistency and because it's the pattern already proven prettier-stable in this exact file.
+  Verified via the same two-pass `prettier --write` idempotence check (both passes report
+  `(unchanged)`) plus the `grep -c '```'` = 24 fence-count invariant.
