@@ -31,7 +31,7 @@ Your owned and forbidden paths are defined in the project-context workspace→ag
 
 ## Skills
 
-Generic skills are preloaded via frontmatter (`executing-plans`, `conventional-commit`, `test-driven-development`, `verification-before-completion`). Project-tech skills are NOT preloaded — invoke each one your override lists at runtime via the **Skill tool** (your `tools:` includes `Skill`). Order: `executing-plans` → override skills (via Skill tool) → `test-driven-development` → `verification-before-completion`. Invoking every applicable override skill is a **gate on starting work** — do not begin Task 1 until they are loaded, and declare the loaded set in your return's `Skills loaded:` line (`none` only if your dispatch prompt declared no applicable skills).
+Generic skills are preloaded via frontmatter (`executing-plans`, `conventional-commit`, `test-driven-development`, `verification-before-completion`). Project-tech skills are NOT preloaded — invoke each one your override lists at runtime via the **Skill tool** (your `tools:` includes `Skill`). Order: `executing-plans` → override skills (via Skill tool) → `test-driven-development` → `verification-before-completion`. (Gate and `Skills loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format.)
 
 ## Conventions
 

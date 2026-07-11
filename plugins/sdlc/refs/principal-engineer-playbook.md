@@ -307,7 +307,8 @@ Agent({
 1. Story key, e.g. `<STORY-KEY>`.
 2. The full phase section from the plan, verbatim.
 3. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
-   from the target agent's override, `.claude/project/agents/<agent-name>.md`, `## Project skills`)
+   from the target agent's override, `.claude/project/agents/<agent-name>.md`, the override's skills
+   section — whatever heading it uses, the section listing skills to invoke via the Skill tool)
    with "Invoke these via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state
    explicitly "No project skills apply for this task." The prompt MUST state exactly one of these
    two so the agent knows whether `Skills loaded: none` is correct.
@@ -344,7 +345,8 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 
 - No new commits since pre-dispatch HEAD → agent failed silently. **STOP**, report. (With
   `subtaskCount > 0` a phase is expected to advance HEAD by **one commit per sub-task it touched**,
-  not a single commit; "zero new commits" remains the silent-failure STOP condition.)
+  not a single commit; "zero new commits" remains the silent-failure STOP condition. Exception: the
+  Skills-loaded RETURN-CONTRACT redispatch below is explicitly exempt from this rule.)
 - Push fails (conflict/auth) → **STOP**, report.
 - Agent returned `Status: blocked` → **STOP** immediately:
   ```
@@ -353,17 +355,27 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
   Next step: <what user must do>
   Remaining phases NOT dispatched.
   ```
-  Do not fix the blocker yourself. Do not proceed.
-- **Verify `Skills loaded` covers the named set.** Compare the returned `Skills loaded` value
-  against the skills the dispatch prompt named (item 3 of the prompt contract), mechanically:
+  Do not fix the blocker yourself. Do not proceed. This STOP is unconditional — a `Status: blocked`
+  return never reaches the `Skills loaded` verification below, so it carries no skill-coverage
+  obligation (`Skills loaded: none` on an early-abort blocked return is expected, not a failure).
+- **Verify `Skills loaded` covers the named set — applies only to `Status: complete` returns.**
+  Compare the returned `Skills loaded` value against the skills the dispatch prompt named (item 3
+  of the prompt contract), mechanically:
   - Prompt **named skills** `S`: pass iff the line is present and **every** skill in `S` appears.
     Missing line, empty value, `none`, or any named skill absent → **failure**.
-  - Prompt **declared no applicable skills**: pass iff `Skills loaded: none` (extra skills the
-    agent chose to load are tolerated). An absent line is still a violation → **failure**.
+  - Prompt **declared no applicable skills**: pass iff the line is present and non-empty —
+    `Skills loaded: none` passes, and so does a line listing extra skills the agent chose to load
+    on its own initiative (the handoff forbids emitting `none` when a skill was actually loaded, so
+    both honest forms are valid). Failure only on a missing or empty line.
 
-  On failure → **STOP-and-redispatch that phase once** with the skill instruction re-emphasized.
-  A persistent failure on the single redispatch → **STOP and report to the user** (same shape as
-  the silent-failure STOP above).
+  On failure → **STOP-and-redispatch that phase once**, scoped as a RETURN-CONTRACT redispatch: the
+  phase's work is already committed, so the redispatch prompt tells the agent (a) the phase's code
+  changes already landed, (b) invoke the named skills now, verify the already-committed work against
+  them, fixing only if a skill mandates a change, and (c) re-emit a compliant return. Because the
+  work may already conform, **zero new commits from this redispatch is an acceptable outcome** — it
+  is exempt from the "no new commits → silent failure" STOP above; only judge it on whether the
+  re-emitted `Skills loaded` line now passes. A persistent failure on the single redispatch →
+  **STOP and report to the user** (same shape as the silent-failure STOP above).
 
 Extract only `Status` / `Note` / `Summary` / `Skills loaded` from each agent return; discard the rest.
 

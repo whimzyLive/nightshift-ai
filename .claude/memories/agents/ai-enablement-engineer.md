@@ -227,3 +227,48 @@ plugins/sdlc/README.md` — "Expected: none" — is written as if the tree start
   grep the parallel agent-file prose for the old field count/list too (`grep -n "Extract"
 plugins/sdlc/agents/principal-engineer.md`) — it's easy for the spec/plan to fix the playbook
   (source of truth) and miss the agent file's independent restatement of the same contract.
+
+## NA-26 — PR #70 review, round 2 (10 accepted internal-contradiction findings, `plugins/sdlc/refs` + `agents` + `README.md`)
+
+- A single Skills-loaded semantic rule ("what counts as invoked", "pass iff", "blocked exempt",
+  "extras tolerated") was independently restated in up to 5 places (handoff Return format, principal
+  playbook Step 5, QA playbook Step 3, README enforcement summary, and each of the 6 domain-agent
+  profiles). When a reviewer finds a contradiction between two restatements, fixing only the two
+  named sites isn't enough — grep every restatement site (`Skills loaded`, `pass iff`, `gate on
+starting work`, `Project skills`) across the whole plugin before declaring done; a phrase can drift
+  independently in a site the finding didn't name (here: README's summary paragraph, which nobody
+  flagged directly but silently restated the pre-fix "none passes only when declared" wording).
+- Established a durable "one source of truth + pointers" pattern for this kind of shared mechanical
+  rule: principal playbook Step 5 owns the pass/fail mechanics for orchestrator-side verification;
+  domain-agent-handoff.md's Return format owns the agent-side `Skills loaded:` semantics (including
+  the preloaded-skill and no-instruction-fallback clauses). Every other site (QA playbook, README,
+  the 5 sibling agent-profile `## Skills` paragraphs) should be a one-line pointer with only the
+  consequence that differs locally (e.g. QA: "return blocked immediately, no redispatch" vs
+  principal: "redispatch once then STOP") — never a full re-derivation. `grep -rn "pass iff"` across
+  `refs/*.md README.md` after an edit is the cheapest way to confirm only the two source-of-truth
+  files still contain the actual mechanics.
+- A hardcoded doc-internal heading reference (e.g. "`## Project skills`" naming a specific override
+  section heading) breaks the moment a real consumer override uses a different heading for the same
+  concept (this repo's own `.claude/project/agents/ai-enablement-engineer.md` uses "## Skills
+  (plugin-bundled — invoke via the Skill tool)"). Prefer describing the section by its _role_
+  ("the override's skills section — whatever heading it uses, the section listing skills to invoke
+  via the Skill tool") over quoting a literal heading string that other repos are free to rename.
+- A "STOP-and-redispatch on Skills-loaded failure" rule silently collides with a sibling "zero new
+  commits since pre-dispatch HEAD = silent failure" rule when the redispatch targets a phase whose
+  code work already landed in the first dispatch — the redispatch produces zero _new_ commits by
+  design (only the return-line semantics were wrong, not the code). Fix pattern: scope that specific
+  redispatch as a narrow "verify already-committed work against the named skills; fix only if a
+  skill mandates a change; re-emit a compliant return" prompt, and explicitly exempt it from the
+  zero-new-commits STOP in the same sentence that defines the exemption trigger — don't leave the
+  general rule and the exemption in two disconnected paragraphs a reader has to reconcile themselves.
+- `git worktree list` showing `feat/NA-26` "locked" (checked out read-only in the repo's main
+  worktree, left over from a prior `/sdlc:plan`/`/sdlc:impl` run) with the dispatched worktree
+  sitting on a synthetic `worktree-agent-<hash>` branch one merge-commit _ahead_ of
+  `origin/feat/NA-26` (a spec PR had merged into main and been merged back into the worktree branch)
+  meant neither the prior story's "checkout the target branch" nor "ff-only merge the target into
+  local" pattern applied cleanly. Since the task only needs this worktree's branch to fast-forward
+  cleanly onto the target for the orchestrator later, `git reset --hard origin/<branch>` on the
+  dispatched worktree's own synthetic branch (never on a branch checked out elsewhere) is the
+  correct, lowest-risk move when the worktree's local history has _diverged_ from the target
+  (not just lagged behind it) and the working tree is otherwise clean — confirm `git status --short`
+  is empty before resetting, since `--hard` discards anything uncommitted.

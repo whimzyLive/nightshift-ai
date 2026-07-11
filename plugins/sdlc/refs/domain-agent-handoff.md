@@ -16,7 +16,8 @@ git checkout <BRANCH_PREFIX>/<STORY-KEY> 2>/dev/null \
   || { echo "STOP: checkout failed — on $(git branch --show-current) instead of <BRANCH_PREFIX>/<STORY-KEY>"; exit 1; }
 ```
 
-If either check fails → return immediately: `Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching` / `Skills loaded: none` (an early abort loads no skills, so `none` is correct).
+If either check fails → return immediately (full 4-line blocked shape — see Return format below):
+`Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching` / `Summary: aborted before work — branch missing` / `Skills loaded: none` (an early abort loads no skills, so `none` is correct).
 
 ## Branch and PR — do not create
 
@@ -77,8 +78,9 @@ Skills loaded: <comma-separated override skill names | none>
 ```
 
 - `Skills loaded:` is **required on every return** (complete, blocked, or early abort). An absent line is a contract violation.
-- Its value lists only the **runtime override (project) skills** you invoked via the Skill tool this dispatch (e.g. `tailwind-design-system, react-components`) — never the frontmatter-preloaded generic skills.
+- Its value lists every **runtime override (project) skill** you invoked/applied this dispatch (e.g. `tailwind-design-system, react-components`) — including any skill the dispatch prompt named that happens to also be frontmatter-preloaded (for those, "invoked" means you applied it to the task; listing it is what satisfies the orchestrator's set-coverage check). Only omit a frontmatter-preloaded skill the dispatch prompt did **not** name — never pad the line with those.
 - Emit the literal `none` only when no applicable override skill was loaded. Whether `none` is a pass or a failure is decided **mechanically against your dispatch prompt** by the orchestrator: `none` passes iff the dispatch prompt declared no applicable skills; if the prompt named skills, `none`/missing/empty/partial is a failure.
+- If your dispatch prompt neither names skills nor declares none applicable, select the applicable skills from your override yourself, invoke them, and list them — `none` then means none were applicable to the task.
 
 Large outputs are dropped at the dispatch boundary — keep it to the 3 lines (complete) / 4 lines (blocked) above.
 

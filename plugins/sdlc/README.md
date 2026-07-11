@@ -65,11 +65,15 @@ that scope.
 
 Domain-agent dispatches enforce project-skill loading via a three-part contract: the **dispatch
 prompt names** the applicable override skills (or explicitly declares that no project skills apply),
-the **domain agent declares** the skills it invoked on a required `Skills loaded:` return line, and
-the **orchestrator verifies** the returned set covers the named set. Verification is mechanical:
-`Skills loaded: none` passes only when the prompt declared no applicable skills; a missing, empty,
-or partial line where skills were named fails. On failure the principal playbook redispatches the
-phase once then STOPs; the QA fix loop returns `blocked` immediately. See
+the **domain agent declares** the skills it invoked/applied on a required `Skills loaded:` return
+line — including any named skill that happens to be frontmatter-preloaded — and the **orchestrator
+verifies** the returned set covers the named set, but only on `Status: complete` returns (a
+`Status: blocked` return, including an early-abort `Skills loaded: none`, is exempt). Verification is
+mechanical: when the prompt declared no applicable skills, a present non-empty line passes —
+`none`, or a line listing extra skills the agent chose to load, both pass; a missing, empty, or
+(when skills were named) partial line fails. On failure the principal playbook redispatches the
+phase once (a return-contract-only redispatch — zero new commits is an acceptable outcome) then
+STOPs; the QA fix loop returns `blocked` immediately. See
 `plugins/sdlc/refs/principal-engineer-playbook.md` (Steps 4-5) and
 `plugins/sdlc/refs/qa-engineer-playbook.md` (Step 3).
 

@@ -216,7 +216,8 @@ the `Agent` tool, **`isolation: "worktree"`** (it writes code). The prompt MUST 
 1. Story key.
 2. The reviewer findings for that domain, **verbatim**.
 3. **Applicable override skills** — EITHER name the target agent's applicable project skills
-   (from its override `.claude/project/agents/<agent-name>.md`, `## Project skills`) with "Invoke
+   (from its override `.claude/project/agents/<agent-name>.md`, the override's skills section —
+   whatever heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke
    these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
    skills apply for this task." Exactly one of the two.
 4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
@@ -237,12 +238,10 @@ git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 - No new commit since pre-dispatch HEAD → agent failed silently. **Return `blocked`** to the
   Principal Engineer with the reason.
 - `Status: blocked` → **return `blocked`** immediately; do not attempt the fix yourself.
-- **Verify `Skills loaded` covers the named set** (same mechanical rule as the domain-agent
-  handoff): prompt named skills `S` → pass iff every skill in `S` appears; prompt declared none →
-  pass iff `Skills loaded: none`; a missing/empty/partial line where skills were named → failure.
-  On failure → **return `blocked` immediately — no redispatch.** This path **differs** from the
-  principal playbook's Step 5 (which redispatches once then STOPs): QA's existing silent-failure
-  rule already returns `blocked` immediately, so the skill check follows that same path.
+- **Verify `Skills loaded` covers the named set.** Same mechanical rule as principal playbook Step 5
+  (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
+  return `blocked` immediately, no redispatch. (Applies only to `Status: complete` returns, and
+  extra skills the agent lists beyond the named set still pass, per Step 5.)
 
 ## Step 4 — Re-review
 

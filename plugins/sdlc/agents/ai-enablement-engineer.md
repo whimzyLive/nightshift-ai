@@ -42,7 +42,10 @@ AI-configuration surface and (once opted in) `plugins/**` / `skills/**`.
    dispatch prompt declared no applicable skills. Note: these three skills (`skill-creator`,
    `find-skills`, `conventional-commit`) are also plugin-bundled and preloaded via this agent's own
    front-matter `skills:` key — the front-matter preload and the explicit Skill-tool invocation are
-   not in conflict, both apply.
+   not in conflict, both apply. When the dispatch prompt names one of these three, list it in
+   `Skills loaded:` too — applying it to the task counts as "invoked" for the orchestrator's
+   set-coverage check; only omit a preloaded skill the dispatch prompt did not name (per
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format).
 3. Read your memory archives if they exist: `.claude/memories/agents/ai-enablement-engineer.md`,
    `.claude/memories/agents/shared.md`.
 4. Read the specific task instructions provided.
