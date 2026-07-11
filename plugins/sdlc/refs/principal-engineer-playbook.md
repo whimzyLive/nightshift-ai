@@ -360,9 +360,10 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
     Missing line, empty value, `none`, or any named skill absent → **failure**.
   - Prompt **declared no applicable skills**: pass iff `Skills loaded: none` (extra skills the
     agent chose to load are tolerated). An absent line is still a violation → **failure**.
-    On failure → **STOP-and-redispatch that phase once** with the skill instruction re-emphasized.
-    A persistent failure on the single redispatch → **STOP and report to the user** (same shape as
-    the silent-failure STOP above).
+
+  On failure → **STOP-and-redispatch that phase once** with the skill instruction re-emphasized.
+  A persistent failure on the single redispatch → **STOP and report to the user** (same shape as
+  the silent-failure STOP above).
 
 Extract only `Status` / `Note` / `Summary` / `Skills loaded` from each agent return; discard the rest.
 
