@@ -137,34 +137,50 @@ Rules:
 
 ## Dispatching agents
 
-For each group, dispatch using the Agent tool with `isolation: "worktree"`:
+Before Phase 1, provision one orchestrator-managed worktree for the whole story
+(`${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> <BRANCH_PREFIX>/<STORY-KEY> <BASE-BRANCH>`),
+capturing its two printed lines, `WORKTREE` and `NX_CACHE_DIRECTORY`. For each group, dispatch using
+the Agent tool — the harness's `isolation: "worktree"` param is NOT set (the orchestrator now owns
+isolation via that single worktree, threaded into every dispatch prompt):
 
 ```
 Agent({
   subagent_type: "database-administrator",
-  isolation: "worktree",
   prompt: "..."
 })
 ```
 
-All domain agents use `isolation: "worktree"` — they write code, they need isolation.
+Before dispatching each phase, capture the primary checkout's HEAD + clean-tree state; after the
+agent returns, assert both are unchanged — an agent that wrote to the primary checkout instead of
+`$WORKTREE` fails the phase and STOPs (machine-checked, canonical rule in
+`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` Step 5). Remove the worktree
+(`git worktree remove --force "$WORKTREE"`) right after the PR is raised (Step 7) — any later
+review-fix round re-provisions it idempotently.
 
 ## Prompt construction for each agent
 
 Each agent prompt MUST include all of the following (agent starts cold — no context from this conversation):
 
-1. Story key: e.g. `ED-456`
-2. The specific tasks from the plan (verbatim — paste the full phase section)
-3. **Applicable override skills** — EITHER name the target agent's applicable project skills (from
+1. **Mandatory first instruction** (verbatim, with the real captured `$WORKTREE` substituted):
+   "Your working directory for ALL work is `<WORKTREE>` — `cd` into it before any read, edit,
+   build, test, or commit. Do NOT operate in the primary checkout."
+2. **Cache instruction** (verbatim, with the real captured `$NX_CACHE_DIRECTORY` substituted):
+   "Before running any `nx` command (build/test/quality gate), export
+   `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache."
+3. Story key: e.g. `ED-456`
+4. The specific tasks from the plan (verbatim — paste the full phase section)
+5. **Applicable override skills** — EITHER name the target agent's applicable project skills (from
    its override `.claude/project/agents/<agent-name>.md`, the override's skills section — whatever
    heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke these
    via the Skill tool BEFORE starting Task 1", OR state "No project skills apply for this task."
    Exactly one of the two.
-4. Relevant spec context (entity names, field types, API shapes, route paths)
-5. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new branch. Check out this branch, do your work, and commit."
-6. "Do NOT create a PR — the Principal Engineer will open one after all phases and review are complete."
-7. "Commit your changes. Do NOT push — the Principal Engineer handles all pushes to origin."
-8. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
+6. Relevant spec context (entity names, field types, API shapes, route paths)
+7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
+   (the working directory named in item 1). Do NOT create a new branch. Do your work there and
+   commit."
+8. "Do NOT create a PR — the Principal Engineer will open one after all phases and review are complete."
+9. "Commit your changes. Do NOT push — the Principal Engineer handles all pushes to origin."
+10. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
 
 Never send an agent just a task title — include enough context to work without asking questions.
 
