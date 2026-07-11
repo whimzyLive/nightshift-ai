@@ -389,11 +389,33 @@ review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 prod
   after every phase dispatch) and a reviewer finding one doesn't imply the other was already fixed;
   grep the whole plugin for `status --porcelain` before declaring a "shared worktree cleanliness"
   finding fully resolved.
-- `impl.md`'s `--body "..."` heredoc-style quoted string is printed VERBATIM into the Jira comment —
-  a Markdown reformat that indents the continuation lines to match the surrounding fenced-code-block
-  indentation (3 spaces, matching the numbered-list continuation) silently changes the literal
-  comment text that gets posted. Verified this repo's `lint-staged` config only runs
-  `prettier --write --ignore-unknown` on staged files; prettier's Markdown printer does not reformat
-  the _contents_ of fenced code blocks (only surrounding prose), so a column-0 fix to quoted
-  continuation lines inside a ```bash fence survives a real commit — confirmed via `git show
-  HEAD:plugins/sdlc/commands/impl.md`after committing, no`<!-- prettier-ignore -->` needed here.
+- `impl.md`'s `--body "..."` quoted string is printed VERBATIM into the Jira comment, so a naive
+  "restore column-0 continuation lines" fix is NOT prettier-stable when that fence sits nested
+  inside an indented numbered-list item (`5.` here) — verified the hard way: the first commit's
+  `lint-staged` (`prettier --write --ignore-unknown`) actually corrupted the fence (split it into
+  two mismatched fences, leaked the quoted body out as bare paragraphs, broke the bash string).
+  Root cause, confirmed by minimal repro (`printf` a 2-item list with a fenced block containing a
+  dedented vs. indented blank-line continuation and diff `prettier --write` before/after): prettier's
+  remark-based Markdown parser requires EVERY line inside a fence nested in a list item — including
+  blank-line-separated continuations — to satisfy the item's content indentation (here 3 spaces,
+  from `5. `); a column-0 continuation line breaks the parser's list-item/fence association at PARSE
+  time, so no post-hoc `<!-- prettier-ignore -->` can glue the split nodes back together (ignore
+  comments only suppress re-printing of already-correctly-parsed nodes, they can't fix a mis-parse).
+  Re-indenting the continuation to 3 spaces "fixes" prettier-stability but reintroduces the exact
+  content-corruption bug being fixed (the leading spaces leak into the literal Jira comment text).
+  The actual fix that satisfies both constraints: DEDENT THE WHOLE FENCE OUT OF THE LIST ITEM (fence
+  markers and body at column 0, not nested/indented under `5.`) — CommonMark still associates it
+  visually with the preceding list item as long as there's no blank-line-terminated topic break, and
+  prettier's parser no longer needs to reconcile fence-body indentation against list-item content
+  indentation, so it leaves the block completely untouched (verified `diff` before/after `prettier
+--write` = empty). **Always verify a Markdown/bash-artifact fix by actually running this repo's
+  real `prettier --write` on a scratch copy in the repo's own directory before committing** — testing
+  from `/tmp` gave a false "no changes" negative (config/plugin resolution differs outside the repo
+  tree), and `git show HEAD:<file>` after commit is the only way to see what `lint-staged` really did
+  (it silently re-stages its own output as part of the same commit, past the point your Edit tool
+  call can inspect). Do all such scratch-file prettier reproduction testing in a `/tmp`-adjacent
+  scratch dir or with an explicit absolute `cd` guard — a bare `cd <primary-repo-root>` in a Bash
+  call (rather than the dispatched worktree path) silently runs subsequent commands against the
+  PRIMARY checkout, which for a domain agent is a hard violation if anything gets staged/committed
+  there; confirm `pwd` and `git worktree list` immediately after any such `cd` before trusting `git
+log`/`git status` output.
