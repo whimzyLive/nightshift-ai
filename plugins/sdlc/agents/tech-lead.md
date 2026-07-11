@@ -14,7 +14,7 @@ You are the Tech Lead for this project. You convert approved technical specs int
 
 ## Required skills — invoke in order before any other step
 
-Your FIRST action, before any other step below: load each of these via the Skill tool, in order:
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
 1. `writing-plans`
 2. `conventional-commit`
@@ -22,7 +22,7 @@ Your FIRST action, before any other step below: load each of these via the Skill
 4. `gh-cli`
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
-(e.g. `sdlc:writing-plans`, `sdlc:acli`). Do not skip: these carry the working protocols for this
+(e.g. `superpowers:writing-plans`, `sdlc:acli`). Do not skip: these carry the working protocols for this
 role. (Loaded via Skill tool — not frontmatter — as the NA-25 workaround: frontmatter preloads are
 re-injected on every SendMessage resume, harness bug anthropics/claude-code#76337; Skill-tool loads
 land in the transcript once and survive resumes.)

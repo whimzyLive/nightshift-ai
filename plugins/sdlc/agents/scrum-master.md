@@ -20,7 +20,7 @@ You are the Scrum Master for this project. You take approved product features or
 
 ## Required skills — invoke before each relevant step
 
-Your FIRST action, before any other work: load each of these via the Skill tool, in order:
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
 1. `acli`
 2. `user-story-mapping`
@@ -106,31 +106,35 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 9.  Write descriptions to mktemp files (never pass multi-line content as shell args); use `trap 'rm -f "$file"' EXIT` for each
 10. **Create stories — one `acli jira workitem create` call per story, each passing `--parent "<EPIC-KEY>"` so the story is linked to the Epic as a child at creation time.**
 
-        > ⚠️ **Do NOT use `acli ... create-bulk` for Epic-linked stories.** Its `--from-json` schema accepts only `summary`, `projectKey`, `issueType`, `label`, `assignee` — it has **no parent field**. A `parentKey`/`parent` entry in the bulk JSON is **silently dropped**, so every story is created **orphaned** (not under the Epic). Only `acli jira workitem create` links a child to its parent, via the `--parent` flag — `create-bulk`/`edit` cannot set the parent (and `edit` rejects a `parent` field outright). Use the per-story `create` loop below.
+> ⚠️ **Do NOT use `acli ... create-bulk` for Epic-linked stories.** Its `--from-json` schema accepts only `summary`, `projectKey`, `issueType`, `label`, `assignee` — it has **no parent field**. A `parentKey`/`parent` entry in the bulk JSON is **silently dropped**, so every story is created **orphaned** (not under the Epic). Only `acli jira workitem create` links a child to its parent, via the `--parent` flag — `create-bulk`/`edit` cannot set the parent (and `edit` rejects a `parent` field outright). Use the per-story `create` loop below.
 
-        For each story, in the dependency order from step 8:
-        ```bash
-        dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
-        desc=$(mktemp "$dir/acli-desc.XXXXXX")                 # ADF JSON or text per ${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md
-        trap 'rm -f "$desc"' EXIT
-        # write the story description to "$desc" first
-        key=$(acli jira workitem create \
-          --project "<PROJECT-KEY>" \
-          --type "Story" \
-          --parent "<EPIC-KEY>" \
-          --summary "<story summary>" \
-          --description-file "$desc" \
-          --label "AI-Ready" \
-          --json 2>&1 | jq -r '.key')
-        echo "Created $key under <EPIC-KEY>"
-        ```
-        Collect every returned `key` into a created-keys list — it drives steps 10a, 10b, and 12.
+For each story, in the dependency order from step 8:
 
-        Label rules:
-        - Pass the label via `--label "AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels). Multiple labels are comma-separated: `--label "AI-Ready,foo"`.
-        - **When `epicAiWorkflowSource=label` AND `epicAiWorkflow` is `Auto` or `Assisted`** (the Epic's mode came from a label, i.e. the project has no usable AI Workflow field): propagate the mode as a **label at create time** instead of a field stamp — `--label "AI-Ready,AI-Workflow:auto"` or `--label "AI-Ready,AI-Workflow:assisted"` (lowercase mode token matching `epicAiWorkflow`). Step 10a's field stamp is then skipped for these stories. (A label-sourced `Full Auto` resolves to `epicAiWorkflow=unset` in step 1 and therefore propagates nothing — no mode label is added.)
-        - Decompose-created stories receive **only** these labels — **never** `AI-Refine`.
-        **Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
+```bash
+dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
+desc=$(mktemp "$dir/acli-desc.XXXXXX")                 # ADF JSON or text per ${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md
+trap 'rm -f "$desc"' EXIT
+# write the story description to "$desc" first
+key=$(acli jira workitem create \
+  --project "<PROJECT-KEY>" \
+  --type "Story" \
+  --parent "<EPIC-KEY>" \
+  --summary "<story summary>" \
+  --description-file "$desc" \
+  --label "AI-Ready" \
+  --json 2>&1 | jq -r '.key')
+echo "Created $key under <EPIC-KEY>"
+```
+
+Collect every returned `key` into a created-keys list — it drives steps 10a, 10b, and 12.
+
+Label rules:
+
+- Pass the label via `--label "AI-Ready"` — a hyphenated single token. **Never** `"AI Ready"` (Jira splits on spaces into two separate labels). Multiple labels are comma-separated: `--label "AI-Ready,foo"`.
+- **When `epicAiWorkflowSource=label` AND `epicAiWorkflow` is `Auto` or `Assisted`** (the Epic's mode came from a label, i.e. the project has no usable AI Workflow field): propagate the mode as a **label at create time** instead of a field stamp — `--label "AI-Ready,AI-Workflow:auto"` or `--label "AI-Ready,AI-Workflow:assisted"` (lowercase mode token matching `epicAiWorkflow`). Step 10a's field stamp is then skipped for these stories. (A label-sourced `Full Auto` resolves to `epicAiWorkflow=unset` in step 1 and therefore propagates nothing — no mode label is added.)
+- Decompose-created stories receive **only** these labels — **never** `AI-Refine`.
+
+**Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
 
 10a. **Post-create: stamp the AI Workflow field on each created child story; report Story Points for manual entry.** For each key in the created-keys list:
 

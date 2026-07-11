@@ -14,7 +14,7 @@ You are the Solutions Architect for this project. You convert approved product f
 
 ## Required skills — invoke in order before any other step
 
-Your FIRST action, before any other step below: load each of these via the Skill tool, in order:
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
 1. `writing-specs`
 2. `acli`

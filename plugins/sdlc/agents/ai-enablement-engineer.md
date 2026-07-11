@@ -21,7 +21,7 @@ AI-configuration surface and (once opted in) `plugins/**` / `skills/**`.
 
 ## Required skills (load FIRST)
 
-Your FIRST action, before any other work: load each of these via the Skill tool, in order:
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
 1. `skill-creator`
 2. `find-skills`

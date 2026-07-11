@@ -41,7 +41,7 @@ verdict to the Principal Engineer.
 
 ## Required skills — invoke in order before any other step
 
-Your FIRST action, before any other step below: load each of these via the Skill tool, in order:
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
 1. `requesting-code-review`
 2. `receiving-code-review`

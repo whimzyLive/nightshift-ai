@@ -26,9 +26,8 @@ Your owned and forbidden paths are defined in the project-context workspace→ag
 
 ## Skills
 
-Your FIRST action, before any other work: load each of these four generic skills via the Skill
-tool, in order: `executing-plans`, `conventional-commit`, `test-driven-development`,
-`verification-before-completion`. If an unqualified name does not resolve, use the namespaced form
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool: `executing-plans`, `conventional-commit`, `test-driven-development`,
+`verification-before-completion`, in order. If an unqualified name does not resolve, use the namespaced form
 from your available-skills list (e.g. `superpowers:executing-plans`). Do not skip: these carry the
 working protocols for this role. (Loaded via Skill tool — not frontmatter — as the NA-25
 workaround: frontmatter preloads are re-injected on every SendMessage resume, harness bug

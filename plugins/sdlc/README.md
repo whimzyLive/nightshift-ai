@@ -66,8 +66,11 @@ that scope.
 Domain-agent dispatches enforce project-skill loading via a three-part contract: the **dispatch
 prompt names** the applicable override skills (or explicitly declares that no project skills apply),
 the **domain agent declares** the skills it invoked/applied on a required `Skills loaded:` return
-line — including any named skill that happens to be frontmatter-preloaded — and the **orchestrator
-verifies** the returned set covers the named set, but only on `Status: complete` returns (a
+line — including any named skill that happens to be one of the agent's own required first-turn
+skills (loaded via the Skill tool per the agent's "Required skills (load FIRST)" section, not
+frontmatter — NA-25 moved every generic skill off frontmatter `skills:` since the harness
+re-injects it in full on every SendMessage resume, anthropics/claude-code#76337) — and the
+**orchestrator verifies** the returned set covers the named set, but only on `Status: complete` returns (a
 `Status: blocked` return, including an early-abort `Skills loaded: none`, is exempt). Verification is
 mechanical: when the prompt declared no applicable skills, a present non-empty line passes —
 `none`, or a line listing extra skills the agent chose to load, both pass; a missing, empty, or
