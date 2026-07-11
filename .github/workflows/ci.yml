@@ -31,3 +31,4 @@ jobs:
 
       - run: pnpm nx format:check --base="remotes/origin/main"
       - run: pnpm nx run-many -t lint test build typecheck e2e
+      - run: bash plugins/sdlc/scripts/check-agent-skill-preloads.sh
