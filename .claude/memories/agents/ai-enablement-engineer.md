@@ -272,3 +272,44 @@ starting work`, `Project skills`) across the whole plugin before declaring done;
   correct, lowest-risk move when the worktree's local history has _diverged_ from the target
   (not just lagged behind it) and the working tree is otherwise clean — confirm `git status --short`
   is empty before resetting, since `--hard` discards anything uncommitted.
+
+## NA-27 — orchestrator-managed worktree + shared Nx cache + agent-reuse flag (`plugins/sdlc`)
+
+- This story's dispatched worktree had NO `node_modules` at all (not stale — genuinely absent), so
+  the very first `git commit` failed on the repo's `husky` pre-commit hook (`lint-staged` binary not
+  found), not on anything story-related. `pnpm install --prefer-offline` (no `--frozen-lockfile`
+  needed here since the lockfile was already correct) fixed it in ~30s via the shared pnpm store.
+  Symptom to recognize fast next time: `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL … "lint-staged" not
+found` on a first commit attempt in a fresh worktree means `node_modules` is missing, not that the
+  commit content is wrong — check `ls node_modules/.bin | wc -l` before assuming a real failure.
+- A published, multi-repo plugin script that needs a per-repo config value the sibling scripts treat
+  as an orchestrator-supplied positional arg (e.g. `<BASE-BRANCH>` in the playbooks/agent docs) can
+  instead read it directly from `.claude/project/project-context.md` at runtime when the caller is a
+  bare hook/script with no orchestrator handing it in (here: `worktree-gc.sh`, invoked bare from
+  `SessionEnd` with zero args). Mirrored `read-review-config.sh`'s `read_token` sed/grep pattern
+  (`^\|[[:space:]]*<Token>[[:space:]]*\|` → `[A-Za-z0-9_./-]+` capture, defaulted on read-failure)
+  rather than inventing a new one — keeps the "read a single-value token row" convention in one
+  recognizable shape across the plugin's scripts, and the `|| true` guards are load-bearing under
+  `set -uo pipefail` for the exact same silently-swallow-no-match reason documented there.
+- When a plan Task explicitly writes out a script's full case-by-case algorithm (here: Task 1 Step 3,
+  the three idempotent worktree-resolution cases with their exact git subcommands per case), transcribe
+  it near-verbatim rather than re-deriving the git plumbing — the plan had already resolved subtleties
+  (e.g. case 1 fetches/merges via `git -C "$WT"`, not the primary root; case 2/3 fetch via the primary
+  root) that are easy to get backwards if you rewrite from the prose summary instead of the literal
+  step text.
+- A prompt-contract numbered list that gains two new **mandatory first instructions** (cwd + Nx-cache,
+  per spec §1/§3) is cleanest inserted as items 1–2 with every existing item renumbered down, rather
+  than appended at the end — the spec explicitly calls them "the mandatory first instruction," and
+  renumbering only the prose items (not the underlying meaning) is a pure count-shift with no risk of
+  changing behavior, so do it directly instead of leaving a `1a`/`1b` insertion that reads oddly.
+- For a per-file "mirror the playbook change in the agent doc" task (Tasks 9–10) where the spec's
+  Files-changed table gives only a one-line description (not the full worktree/guard bash blocks the
+  playbook carries), a condensed prose mirror is the right level of fidelity — the agent-file's own
+  header already says "retained as background reference, playbook is source of truth," so duplicating
+  every bash snippet there would create a second copy to keep in sync rather than one clean pointer.
+- A plan task with an explicit escape hatch ("If no such prose exists, make no change and note it in
+  the commit body") should actually take that hatch when true — grepping `plugins/sdlc/commands/
+review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 produced no commit at
+  all (an empty `git add` + `git commit` would fail with "nothing to commit"); the plan's own
+  Files-changed table description ("inherits the idempotent provision via the QA playbook") was the
+  tell that this file's isolation model was always implicit, never spelled out in its own prose.
