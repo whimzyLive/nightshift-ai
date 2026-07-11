@@ -156,7 +156,8 @@ Each agent prompt MUST include all of the following (agent starts cold — no co
 1. Story key: e.g. `ED-456`
 2. The specific tasks from the plan (verbatim — paste the full phase section)
 3. **Applicable override skills** — EITHER name the target agent's applicable project skills (from
-   its override `.claude/project/agents/<agent-name>.md`, `## Project skills`) with "Invoke these
+   its override `.claude/project/agents/<agent-name>.md`, the override's skills section — whatever
+   heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke these
    via the Skill tool BEFORE starting Task 1", OR state "No project skills apply for this task."
    Exactly one of the two.
 4. Relevant spec context (entity names, field types, API shapes, route paths)
