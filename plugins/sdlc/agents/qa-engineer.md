@@ -55,6 +55,7 @@ verdict to the Principal Engineer.
 ## Read project context first
 
 Before any other action, read `.claude/project/project-context.md` and extract:
+
 - `<BASE-BRANCH>` — the SDLC base branch (read from project-context)
 - Active agents list — determines which domain agent owns a given fix
 - Quality gate commands — the quality-gate commands from `.claude/project/project-context.md`
@@ -82,13 +83,13 @@ dispatch the owning domain agent to fix what review finds.
 
 ## Quality dimensions you are responsible for
 
-| Dimension | What "pass" means |
-|-----------|-------------------|
-| Correctness | Behaves per the plan + ACs; no regressions to existing behavior |
-| Cleanliness | Readable, follows project conventions, no dead/duplicated code |
-| Security | No injection, secret-leak, auth-bypass, or unsafe-input handling |
-| Not broken | the quality-gate commands from `.claude/project/project-context.md` green on the real pushed tree |
-| AC-complete | Every acceptance criterion is met with named evidence |
+| Dimension   | What "pass" means                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------- |
+| Correctness | Behaves per the plan + ACs; no regressions to existing behavior                                   |
+| Cleanliness | Readable, follows project conventions, no dead/duplicated code                                    |
+| Security    | No injection, secret-leak, auth-bypass, or unsafe-input handling                                  |
+| Not broken  | the quality-gate commands from `.claude/project/project-context.md` green on the real pushed tree |
+| AC-complete | Every acceptance criterion is met with named evidence                                             |
 
 ## The loop (summary — see playbook for the authoritative steps)
 
@@ -96,13 +97,21 @@ dispatch the owning domain agent to fix what review finds.
    plan **and the story's ACs** as requirements, across all five review axes.
 2. **Triage** — classify each finding by severity + domain. AC gaps and security findings are
    Critical by default. Verify each finding is real before queuing a fix.
-3. **Fix** — dispatch the owning domain agent (`isolation: "worktree"`) with findings verbatim;
-   it commits, YOU push.
+3. **Fix** — before dispatching, re-provision the shared per-story worktree idempotently
+   (`worktree-setup.sh` — a no-op if it already exists and is current), then dispatch the owning
+   domain agent (working directory `$WORKTREE`, no harness `isolation: "worktree"` — the
+   orchestrator owns isolation) with findings verbatim; it commits, YOU push. On
+   `SDLC agent reuse = enabled` (project-context Tooling, shipped default), reuse the same domain
+   agent instance that ran the phase via `SendMessage` instead of a fresh dispatch, falling back to
+   fresh when the instance is unavailable. A machine-checked primary-checkout guard runs after every
+   fix dispatch — an agent that wrote outside `$WORKTREE` fails the round.
 4. **Re-review** — repeat until no Critical/Important findings and no open AC gaps.
 5. **Learn** — write the audit log to `.claude/memories/reviews/patterns.md` and per-agent
    learnings to `.claude/memories/agents/<agent>.md`; commit + push.
-6. **Quality gate** — run the quality-gate commands from `.claude/project/project-context.md`; dispatch fixes on failure; repeat
-   until clean. Paste real output.
+6. **Quality gate** — assert `$WORKTREE` is porcelain-clean first (STOP with the stray-file list if
+   not — never silently clean), then run the quality-gate commands from
+   `.claude/project/project-context.md`; dispatch fixes on failure; repeat until clean. Paste real
+   output.
 7. **Verify** — line-by-line confirm every plan task AND every AC has evidence on the branch.
 8. **Return verdict** — `clean` only when review is clean, all ACs evidenced, gate green with
    pasted output, and learnings pushed. Otherwise `blocked` with the reason.

@@ -202,7 +202,8 @@ unchanged:
 So debugging replaces the **"decide what to do + write the code" middle of the ladder (Steps 2+4)**;
 branch (3), push/verify (5), QA (6), and PR (7) remain. Phase 4's fix is **not** the skill writing
 code directly — it dispatches the owning domain agent exactly as Step 4 would, preserving the
-multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contract.
+multi-agent quality bar and the orchestrator-owned-worktree (`cd "$WORKTREE"`) + commit-not-push
+contract.
 
 ### The 4 phases mapped onto dispatch + verify
 
@@ -211,9 +212,9 @@ multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contra
    domain agent yet. **If reproduction is impossible → STOP / `blocked`** — do not guess a fix.
 2. **Phase 2 — root-cause / isolate.** Identify the owning file(s)/domain. This determines which
    Active domain agent owns phases 3–4 for each affected slice.
-3. **Phase 3 — add a failing regression test.** Dispatch the owning domain agent
-   (`isolation: "worktree"`, **commit not push**) to add a test that **FAILS** against current
-   `develop` behaviour and pins the bug.
+3. **Phase 3 — add a failing regression test.** Dispatch the owning domain agent (working directory
+   `$WORKTREE` from Step 3, **commit not push**) to add a test that **FAILS** against current
+   `<BASE-BRANCH>` behaviour and pins the bug.
 4. **Phase 4 — fix + verify.** Dispatch the owning domain agent to implement the fix so the phase-3
    test now **PASSES**, then run the project quality gate (`typecheck` + `test`). Multiple affected
    domains run **sequentially in the normal dependency order** (database-administrator →
@@ -232,17 +233,29 @@ before/after evidence points (see `qa-engineer-playbook.md` §defect verificatio
 > 2.5, 3, 5, 6, 7, 8 run as written (Step 1's plan-file STOP is already relaxed by `LIGHTWEIGHT=true`,
 > which the defect path always carries since a Bug triages lightweight).
 
-## Step 3 — Create the implementation branch (YOU do this)
+## Step 3 — Provision the story worktree and create the implementation branch (YOU do this)
+
+The **primary checkout is NEVER switched to the story branch.** The branch is created **inside** a
+dedicated per-story worktree, so provisioning can never deadlock on "branch already checked out
+elsewhere". This single worktree is reused for every phase in Step 4, re-provisioned idempotently
+before any later fix-round dispatch (QA loop, `/review-fix`, `/sdlc:loop`), and torn down after the
+PR is raised (Step 7) — see `${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh`.
 
 ```bash
-git checkout -b <BRANCH_PREFIX>/<STORY-KEY> origin/develop 2>/dev/null \
-  || git checkout <BRANCH_PREFIX>/<STORY-KEY>
-git push -u origin <BRANCH_PREFIX>/<STORY-KEY>
+setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> <BRANCH_PREFIX>/<STORY-KEY> <BASE-BRANCH>) \
+  || { echo "STOP: worktree-setup.sh failed — see stderr above; do not dispatch any domain agent"; exit 1; }
+WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
+NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | cut -d= -f2-)
+git -C "$WORKTREE" push -u origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
-One branch per story — even when `subtaskCount > 0`, you create `<BRANCH_PREFIX>/<STORY-KEY>` exactly once
-here; the sub-task loop in Step 4 is commit-only (no per-sub-task `git checkout -b`). Domain agents
-never create branches or PRs. PR is opened only in Step 7, after QA returns `clean`.
+A non-zero exit from `worktree-setup.sh` is a hard failure — **STOP** the impl phase and report;
+never fall back to dispatching a writing agent into the primary checkout.
+
+One branch per story — even when `subtaskCount > 0`, `worktree-setup.sh` creates `<BRANCH_PREFIX>/<STORY-KEY>`
+exactly once here (its case 3 — neither the branch nor the worktree existed yet); the sub-task loop
+in Step 4 is commit-only (no per-sub-task branch). Domain agents never create branches or PRs. PR is
+opened only in Step 7, after QA returns `clean`.
 
 ## Step 4 — Dispatch domain agents (NON-NEGOTIABLE order, one at a time)
 
@@ -291,33 +304,39 @@ with no work in this phase produces no commit here; see the third bullet):
 When `subtaskCount === 0`, ignore this subsection entirely: each phase is a single full-story pass
 with the normal commit cadence (today's behaviour, unchanged).
 
-Dispatch with the `Agent` tool, **`isolation: "worktree"`** (domain agents write code, they
-need isolation):
+Dispatch with the `Agent` tool. The harness's **`isolation: "worktree"` param is NOT set** — the
+orchestrator now owns isolation via the single per-story worktree provisioned in Step 3:
 
 ```
 Agent({
   subagent_type: "<agent-name>",
-  isolation: "worktree",
   prompt: "<see prompt contract>"
 })
 ```
 
 ### Domain-agent prompt contract (agent starts cold — include ALL of this)
 
-1. Story key, e.g. `<STORY-KEY>`.
-2. The full phase section from the plan, verbatim.
-3. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
+1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
+   "Your working directory for ALL work is `<WORKTREE>` — `cd` into it before any read, edit,
+   build, test, or commit. Do NOT operate in the primary checkout."
+2. **Cache instruction (verbatim, with the real captured `$NX_CACHE_DIRECTORY` substituted):**
+   "Before running any `nx` command (build/test/quality gate), export
+   `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache."
+3. Story key, e.g. `<STORY-KEY>`.
+4. The full phase section from the plan, verbatim.
+5. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
    from the target agent's override, `.claude/project/agents/<agent-name>.md`, the override's skills
    section — whatever heading it uses, the section listing skills to invoke via the Skill tool)
    with "Invoke these via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state
    explicitly "No project skills apply for this task." The prompt MUST state exactly one of these
    two so the agent knows whether `Skills loaded: none` is correct.
-4. Relevant spec/plan context — entity names, field types, route paths, class/interface names,
+6. Relevant spec/plan context — entity names, field types, route paths, class/interface names,
    secret keys, SSM helper names — plus any plan "grounding corrections" verbatim.
-5. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new
-   branch. Check it out, do your work, and commit."
-6. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
-7. "Commit your changes (use the `conventional-commit` skill; scope from the directory
+7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
+   (the working directory named in item 1). Do NOT create a new branch. Do your work there and
+   commit."
+8. "Do NOT create a PR — the orchestrator opens one after all phases and review are clean."
+9. "Commit your changes (use the `conventional-commit` skill; scope from the directory
    name; **commit type `fix` on the defect path (`WORK_KIND=defect`), `feat` otherwise** — the
    orchestrator tells you which). Do NOT push — the orchestrator handles pushes."
    - **When the story has sub-tasks** (`subtaskCount > 0`): you are given the ordered `SUBTASKS`
@@ -328,22 +347,70 @@ Agent({
      `<BRANCH_PREFIX>/<STORY-KEY>` branch (no new branch, no push). A sub-task with no work in your domain
      gets no commit in your phase — it is implemented in whichever phase owns its files, not
      dropped. When `subtaskCount === 0`, commit once for the phase as normal.
-8. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
-   your commit (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`)."
-9. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-10. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
+10. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
+    your commit (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`)."
+11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
+12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
 
 Never send just a task title.
 
 ## Step 5 — Phase completion verification (after EACH phase)
 
+**Before dispatching the phase**, capture the primary checkout's state so a violation is machine-
+detectable, not prose-only (spec §5). This is a **snapshot to diff against later, not an
+assertion** — the primary may already be dirty (unrelated developer WIP) before this story's first
+dispatch, and that pre-existing dirt is not itself a violation:
+
 ```bash
-git log <BRANCH_PREFIX>/<STORY-KEY> --oneline -5      # local HEAD must have advanced
-git push origin <BRANCH_PREFIX>/<STORY-KEY>           # YOU push
+PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
+PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
+```
+
+If `PRIMARY_CLEAN_BEFORE` is non-empty the very first time you capture it for this story, that
+means the primary checkout was already dirty before any dispatch — proceed anyway with a one-line
+warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated to this story —
+snapshotting and comparing, not blocking`); do not STOP on pre-existing dirt you didn't cause.
+
+**After the agent returns**, run the worktree HEAD-advance/push checks against `$WORKTREE` (never
+the primary checkout — the domain agent's commits live there):
+
+```bash
+git -C "$WORKTREE" log <BRANCH_PREFIX>/<STORY-KEY> --oneline -5      # local HEAD must have advanced
+git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>           # YOU push, from the worktree
 git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
-- No new commits since pre-dispatch HEAD → agent failed silently. **STOP**, report. (With
+Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
+status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
+stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
+
+```bash
+[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
+  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
+  || echo "STOP: domain agent wrote to the primary checkout instead of \$WORKTREE"
+```
+
+If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
+snapshot → the agent ignored the cwd instruction (Step 4 prompt-contract item 1) and wrote to (or
+committed in) the primary checkout instead of `$WORKTREE` — **fail the phase and STOP**, same shape
+as the silent-failure STOP below.
+This makes the isolation guarantee a hard, detectable failure instead of a silently-corrupted
+primary checkout.
+
+Also assert `$WORKTREE` itself is clean after the phase's commit — the shared, persistent
+`$WORKTREE` carries forward between phases and fix rounds, so a returning agent's forgotten
+uncommitted stray (e.g. a new source file never `git add`ed) would otherwise sit there silently
+until a LATER agent's `git add`/commit sweeps it in as an unintended, unattributed change:
+
+```bash
+[ -z "$(git -C "$WORKTREE" status --porcelain)" ] \
+  || echo "STOP: \$WORKTREE has stray uncommitted/untracked files after the phase commit — $(git -C "$WORKTREE" status --porcelain)"
+```
+
+A non-empty result → **fail the phase and STOP**, same shape as the silent-failure STOP, listing the
+stray files.
+
+- No new commits since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **STOP**, report. (With
   `subtaskCount > 0` a phase is expected to advance HEAD by **one commit per sub-task it touched**,
   not a single commit; "zero new commits" remains the silent-failure STOP condition. Exception: the
   Skills-loaded RETURN-CONTRACT redispatch below is explicitly exempt from this rule.)
@@ -451,6 +518,17 @@ gh pr edit "$PR_URL" --add-reviewer "@copilot" || echo "warn: @copilot reviewer 
 ```
 
 Capture `PR_URL` (full `https://github.com/...`) for the caller (`/impl` posts it to Jira).
+
+**Teardown the impl worktree** immediately after the PR is raised:
+
+```bash
+git worktree remove --force "$WORKTREE"
+```
+
+This satisfies AC-1 literally — the impl worktree does not sit idle after the PR. It does **not**
+strand later review-fix rounds: any subsequent QA fix round, standalone `/review-fix`, or
+`/sdlc:loop` entry re-provisions the same worktree idempotently (`worktree-setup.sh`, invariant 2)
+before dispatching its next fix agent.
 
 ## Step 8 — Final report (to the caller / user)
 

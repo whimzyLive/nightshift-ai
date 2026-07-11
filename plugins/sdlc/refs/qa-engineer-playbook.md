@@ -210,33 +210,95 @@ See the workspace→agent table in `.claude/project/project-context.md`.
 
 ## Step 3 — Fix loop
 
-For each Critical / Important group (grouped by domain), dispatch the owning domain agent with
-the `Agent` tool, **`isolation: "worktree"`** (it writes code). The prompt MUST include:
+**Idempotent re-provision, BEFORE dispatching any fix agent.** This loop can be entered in a fresh
+session after Step-7 impl teardown or a GC sweep — the worktree may not exist. Re-provision it
+(a no-op when it already exists and is current) and capture the two lines for every dispatch below:
 
-1. Story key.
-2. The reviewer findings for that domain, **verbatim**.
-3. **Applicable override skills** — EITHER name the target agent's applicable project skills
+```bash
+setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> <BRANCH_PREFIX>/<STORY-KEY> <BASE-BRANCH>) \
+  || { echo "STOP: worktree-setup.sh failed — see stderr above; do not dispatch any fix agent"; exit 1; }
+WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
+NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | cut -d= -f2-)
+```
+
+For each Critical / Important group (grouped by domain), dispatch the owning domain agent with the
+`Agent` tool. The harness's `isolation: "worktree"` param is NOT set — the orchestrator owns
+isolation via the `$WORKTREE` re-provisioned above. **Branch the dispatch mechanism on the `SDLC
+agent reuse` token** (`.claude/project/project-context.md` Tooling):
+
+- `disabled` → today's behaviour: dispatch a **fresh** `Agent({ subagent_type: "<agent-name>", ... })`
+  for this fix round.
+- `enabled` (shipped default) → **reuse** the same domain-agent instance that ran this domain's
+  implementation phase, via `SendMessage` (relaying the resume as authorized same-task control —
+  consistent with `scrum-master.md`'s resume-trust rule), avoiding re-paid frontmatter/skill
+  injection. **Fall back to a fresh `Agent(...)` dispatch** whenever the reused instance is
+  unavailable (session boundary, the instance already returned/terminated) — this is the explicit
+  fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
+  frontmatter skill injection (harness bug #76337) — wasted tokens, not a correctness risk.
+
+Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST include:
+
+1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
+   "Your working directory for ALL work is `<WORKTREE>` — `cd` into it before any read, edit,
+   build, test, or commit. Do NOT operate in the primary checkout."
+2. **Cache instruction (verbatim, with the real captured `$NX_CACHE_DIRECTORY` substituted):**
+   "Before running any `nx` command (build/test/quality gate), export
+   `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache — this also covers your own
+   quality-gate run in Step 6."
+3. Story key.
+4. The reviewer findings for that domain, **verbatim**.
+5. **Applicable override skills** — EITHER name the target agent's applicable project skills
    (from its override `.claude/project/agents/<agent-name>.md`, the override's skills section —
    whatever heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke
    these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
    skills apply for this task." Exactly one of the two.
-4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
-   commit (use the `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
-5. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
+6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
+   (the working directory named in item 1). Fix ONLY these issues, and commit (use the
+   `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
+7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit."
-6. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-7. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
+8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
+9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
 
-After the agent returns, push and confirm:
+**Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
+principal playbook Step 5) — a **snapshot to diff against later, not an assertion**; the primary
+may already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a
+violation:
 
 ```bash
-git push origin <BRANCH_PREFIX>/<STORY-KEY>
+PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
+PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
+```
+
+If `PRIMARY_CLEAN_BEFORE` is non-empty the first time you capture it in this run, proceed anyway
+with a one-line warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated
+to this story — snapshotting and comparing, not blocking`); do not return `blocked` on pre-existing
+dirt you didn't cause.
+
+After the agent returns, push and confirm from the worktree:
+
+```bash
+git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
 git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
-- No new commit since pre-dispatch HEAD → agent failed silently. **Return `blocked`** to the
-  Principal Engineer with the reason.
+Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
+status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
+stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
+
+```bash
+[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
+  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
+  || echo "BLOCKED: fix agent wrote to the primary checkout instead of \$WORKTREE"
+```
+
+If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
+snapshot → **return `blocked`** immediately with that reason (same detectable-failure shape as the
+principal playbook's Step-5 guard) — do not attempt to fix or revert it yourself.
+
+- No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
+  to the Principal Engineer with the reason.
 - `Status: blocked` → **return `blocked`** immediately; do not attempt the fix yourself.
 - **Verify `Skills loaded` covers the named set.** Same mechanical rule as principal playbook Step 5
   (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
@@ -251,14 +313,21 @@ findings and no open AC gaps**. Minor issues: collect for the return report, do 
 ## Step 5 — Write learnings to memory
 
 After review rounds are clean, sync and record what was learned so future implementations avoid
-the same mistakes.
+the same mistakes — all of this happens in **`$WORKTREE`, never the primary checkout** (the
+primary never checks out the story branch — see Step 3). Re-provision is idempotent and cheap
+even when Step 3's fix loop never ran this pass (a first-pass-clean review skips Step 3 entirely,
+so this is the first point `$WORKTREE` is guaranteed to exist):
 
 ```bash
-git fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
+setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> <BRANCH_PREFIX>/<STORY-KEY> <BASE-BRANCH>) \
+  || { echo "STOP: worktree-setup.sh failed — see stderr above"; exit 1; }
+WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
+NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | cut -d= -f2-)
+git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE" merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Audit log** — append to `.claude/memories/reviews/patterns.md`:
+**1. Audit log** — append to `$WORKTREE/.claude/memories/reviews/patterns.md`:
 
 ```
 ## ${DATE} — Story <STORY-KEY>
@@ -270,25 +339,49 @@ DATE=$(date +%Y-%m-%d)
 
 **2. Agent memory** — for each agent that fixed something, append a
 `## ${DATE} — Story <STORY-KEY> — review fix` block to
-`.claude/memories/agents/<agent-name>.md` (cross-cutting → `shared.md`) with Learnings +
-Pitfalls. Then commit and push:
+`$WORKTREE/.claude/memories/agents/<agent-name>.md` (cross-cutting → `shared.md`) with Learnings +
+Pitfalls. Then commit and push, both from the worktree:
 
 ```bash
-git add .claude/memories/
-git commit -m "chore: update learnings after <STORY-KEY> review"
-git push origin <BRANCH_PREFIX>/<STORY-KEY>
+git -C "$WORKTREE" add .claude/memories/
+git -C "$WORKTREE" commit -m "chore: update learnings after <STORY-KEY> review"
+git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
 ## Step 6 — Quality gate
 
 ```bash
-git fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
+git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE" merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
 ```
 
-Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate). If the change touched infra, also run the infra build with the stage flag from project-context.
+**Before running the gate, assert `$WORKTREE` is clean.** The gate now runs in the shared,
+persistent `$WORKTREE` where an earlier fix-round agent may have left uncommitted or untracked
+files behind (e.g. a forgotten `git add` of a new source file) — the gate would then pass against a
+tree that isn't actually what got pushed, a false green.
+
+```bash
+[ -z "$(git -C "$WORKTREE" status --porcelain)" ] \
+  || { echo "STOP: \$WORKTREE has stray uncommitted/untracked files before the quality gate — $(git -C "$WORKTREE" status --porcelain)"; exit 1; }
+```
+
+A non-empty result → list the stray files and **STOP** (same blocked shape as elsewhere in this
+playbook — dispatch the owning domain agent to either commit or discard them; never silently clean
+them yourself).
+
+Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate)
+**inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the shared Nx
+cache exported so the gate run hits the warm cache (spec §3):
+
+```bash
+export NX_CACHE_DIRECTORY="$NX_CACHE_DIRECTORY"
+cd "$WORKTREE"
+# ... run the project-context Tooling + Quality Gate commands here ...
+```
+
+If the change touched infra, also run the infra build with the stage flag from project-context (still inside `$WORKTREE`).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
-**exact** error (Step 3 protocol), push, and re-run the FULL gate. Repeat until clean. Paste the
+**exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean. Paste the
 actual gate output — never claim a pass without it (`verification-before-completion`).
 
 > Treat the project-context quality-gate commands as a real gate: the test command may run
@@ -327,9 +420,13 @@ contract MUST hold — without it, return `blocked` (never `clean`):
 
    ```bash
    # Identify the phase-3 commit (regression test added, before the fix), then show fail→pass.
-   git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-   git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
-   # at the phase-3 commit the new test FAILS (assertion); at HEAD it PASSES — paste both outputs.
+   # Always inside $WORKTREE (the same one captured in Step 5) — never the primary checkout.
+   git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+   git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
+   git -C "$WORKTREE" checkout <phase-3-sha>          # detached, inside $WORKTREE only
+   # run the regression test here: FAILS (assertion) against the still-buggy behaviour — paste output.
+   git -C "$WORKTREE" checkout <BRANCH_PREFIX>/<STORY-KEY>   # back to HEAD, inside $WORKTREE
+   # run the regression test here again: PASSES — paste output.
    ```
 
 2. **The full test suite passes with no regressions** (the Step-6 gate output covers this).
@@ -340,8 +437,8 @@ phase-4 is the _implementer's_ inner check that the fix works; this Step-7 contr
 gate proving the regression evidence + clean suite.)
 
 ```bash
-git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
+git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
 ```
 
 Any plan task or AC with no corresponding evidence → dispatch the owning domain agent to

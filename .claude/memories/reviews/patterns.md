@@ -25,3 +25,10 @@
 **Root causes:** parallel prose (agent profile vs playbook) duplicating a contract drifts when the spec's change inventory names only some of the duplicate sites; prettier's markdown reflow silently reattaches lazy-continuation paragraphs, undoing plain dedents.
 **Preventions:** when a contract changes, grep ALL files that restate it (agents/ + refs/) — not just the spec's inventory; verify markdown structure post-commit (prettier may reparse), use blank-line-separated paragraphs for bullet-scope-critical prose.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-12 — Story NA-27
+
+**Issues found:** 1 Critical — qa-engineer-playbook Steps 5/6 kept `git merge --ff-only origin/<BRANCH>` in the primary cwd, which post-NA-27 (primary stays on main) fast-forwards local main onto the story branch, corrupting the primary and stranding the learnings commit; 5 Important — worktree-setup registration grep prefix-collision (NA-2 vs NA-27), case-1 re-entry deadlock on never-pushed branch, GC destroying in-flight zero-commit worktrees, primary-guard assert-empty false-positive on pre-dirty checkout, impl.md markdown-fence corruption from an auto-formatter.
+**Root causes:** changing WHERE git operations run (primary → worktree) invalidates every sibling step that assumed cwd==story-branch — the spec's change inventory listed only Step 3; substring greps over porcelain output collide on key prefixes; guards asserting absolute state (empty) instead of deltas (snapshot-compare) false-positive on pre-existing conditions; prettier reflow corrupts fenced blocks containing unbalanced quotes.
+**Preventions:** when relocating an operation's working directory, audit EVERY git command in the same file for cwd assumptions; porcelain line matches must be exact-line (`grep -qxF`); guards compare against captured snapshots, never assert cleanliness; run a fence-balance check after any auto-formatted markdown commit.
+**Domains affected:** ai-enablement-engineer

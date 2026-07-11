@@ -272,3 +272,179 @@ starting work`, `Project skills`) across the whole plugin before declaring done;
   correct, lowest-risk move when the worktree's local history has _diverged_ from the target
   (not just lagged behind it) and the working tree is otherwise clean — confirm `git status --short`
   is empty before resetting, since `--hard` discards anything uncommitted.
+
+## NA-27 — orchestrator-managed worktree + shared Nx cache + agent-reuse flag (`plugins/sdlc`)
+
+- This story's dispatched worktree had NO `node_modules` at all (not stale — genuinely absent), so
+  the very first `git commit` failed on the repo's `husky` pre-commit hook (`lint-staged` binary not
+  found), not on anything story-related. `pnpm install --prefer-offline` (no `--frozen-lockfile`
+  needed here since the lockfile was already correct) fixed it in ~30s via the shared pnpm store.
+  Symptom to recognize fast next time: `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL … "lint-staged" not
+found` on a first commit attempt in a fresh worktree means `node_modules` is missing, not that the
+  commit content is wrong — check `ls node_modules/.bin | wc -l` before assuming a real failure.
+- A published, multi-repo plugin script that needs a per-repo config value the sibling scripts treat
+  as an orchestrator-supplied positional arg (e.g. `<BASE-BRANCH>` in the playbooks/agent docs) can
+  instead read it directly from `.claude/project/project-context.md` at runtime when the caller is a
+  bare hook/script with no orchestrator handing it in (here: `worktree-gc.sh`, invoked bare from
+  `SessionEnd` with zero args). Mirrored `read-review-config.sh`'s `read_token` sed/grep pattern
+  (`^\|[[:space:]]*<Token>[[:space:]]*\|` → `[A-Za-z0-9_./-]+` capture, defaulted on read-failure)
+  rather than inventing a new one — keeps the "read a single-value token row" convention in one
+  recognizable shape across the plugin's scripts, and the `|| true` guards are load-bearing under
+  `set -uo pipefail` for the exact same silently-swallow-no-match reason documented there.
+- When a plan Task explicitly writes out a script's full case-by-case algorithm (here: Task 1 Step 3,
+  the three idempotent worktree-resolution cases with their exact git subcommands per case), transcribe
+  it near-verbatim rather than re-deriving the git plumbing — the plan had already resolved subtleties
+  (e.g. case 1 fetches/merges via `git -C "$WT"`, not the primary root; case 2/3 fetch via the primary
+  root) that are easy to get backwards if you rewrite from the prose summary instead of the literal
+  step text.
+- A prompt-contract numbered list that gains two new **mandatory first instructions** (cwd + Nx-cache,
+  per spec §1/§3) is cleanest inserted as items 1–2 with every existing item renumbered down, rather
+  than appended at the end — the spec explicitly calls them "the mandatory first instruction," and
+  renumbering only the prose items (not the underlying meaning) is a pure count-shift with no risk of
+  changing behavior, so do it directly instead of leaving a `1a`/`1b` insertion that reads oddly.
+- For a per-file "mirror the playbook change in the agent doc" task (Tasks 9–10) where the spec's
+  Files-changed table gives only a one-line description (not the full worktree/guard bash blocks the
+  playbook carries), a condensed prose mirror is the right level of fidelity — the agent-file's own
+  header already says "retained as background reference, playbook is source of truth," so duplicating
+  every bash snippet there would create a second copy to keep in sync rather than one clean pointer.
+- A plan task with an explicit escape hatch ("If no such prose exists, make no change and note it in
+  the commit body") should actually take that hatch when true — grepping `plugins/sdlc/commands/
+review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 produced no commit at
+  all (an empty `git add` + `git commit` would fail with "nothing to commit"); the plan's own
+  Files-changed table description ("inherits the idempotent provision via the QA playbook") was the
+  tell that this file's isolation model was always implicit, never spelled out in its own prose.
+
+## NA-27 QA fix round (`plugins/sdlc`)
+
+- This dispatched worktree was one commit behind `origin/feat/NA-27` at start — the task's stated
+  base SHA (`bf61700`) didn't match `HEAD` (`730b30c`, the pre-worktree-model spec-merge commit).
+  Confirmed via `git branch --contains bf61700` that the local worktree branch was a strict ancestor
+  (no divergence), then `git merge --ff-only origin/feat/NA-27` in the worktree brought it current —
+  same low-risk pattern as prior stories' worktree-lag fixups, just via `origin/<branch>` fetched
+  fresh rather than a sibling worktree's local ref.
+- The most subtle finding in this batch (QA playbook Steps 5/6 running `git fetch && git merge
+--ff-only` bare, i.e. in the session/primary cwd) only actually corrupts the primary post-NA-27:
+  before the worktree model landed, the primary WAS the story branch (the ff-merge was a no-op /
+  intentional sync), so the bug was latent until this same story's own worktree-model change made
+  the primary sit on `<BASE-BRANCH>` permanently. A structural change to an invariant (here:
+  "primary never checks out the story branch") can silently invalidate leftover commands elsewhere
+  in the _same_ file that predate the invariant and were never touched by the change's own diff —
+  grep the whole playbook file for every bare `git fetch`/`git merge`/`git add`/`git commit` (no
+  `-C`) after landing a worktree-isolation change, not just the sections the plan's diff touched.
+- Fixing "assert primary status is EMPTY" → "assert primary status matches ITS OWN pre-dispatch
+  snapshot" needs the pre-existing-dirt escape hatch stated at the capture site too, not just the
+  assert site — otherwise a reader only sees "snapshot, then compare" at the assert and might still
+  read the capture-time comment (`# must be empty`) as a precondition the run should enforce. Update
+  the comment at the capture line in the same edit as the assert line; don't leave one half of the
+  paired instruction using old language.
+- `git rev-parse --abbrev-ref HEAD` returning the literal string `"HEAD"` for a detached checkout
+  (not empty, not an error) is an easy gate-writing mistake: a `[ -z "$WB" ]` guard reads as if it
+  covers "unreadable OR detached," but detached HEAD produces a non-empty value and silently falls
+  through to whatever check comes next. Any script deriving a branch name via `--abbrev-ref HEAD`
+  needs an explicit `"$WB" = "HEAD"` guard as a _second_, separate condition — never assume the
+  empty-check subsumes it.
+- `bash -n` only proves parse-validity, not runtime-correctness of shell string-hashing logic (the
+  `pnpm-lock.yaml` staleness check added here) — after writing it, trace the four cases by hand
+  (missing node_modules / missing hash file / hash match / hash mismatch) rather than relying on
+  syntax-check alone, since a portable-CLI script has no test harness in this repo to exercise it.
+
+## NA-27 — external review-fix round on PR #72 (`plugins/sdlc`)
+
+- Dispatched worktree was FIVE commits behind `origin/feat/NA-27` this time (`730b30c`, the
+  pre-worktree-model spec-merge commit — the whole worktree-isolation implementation itself was
+  missing), not the usual one-commit lag. Same fix pattern held: `git merge-base` confirmed the
+  local branch was still a strict ancestor, so `git merge --ff-only feat/NA-27` (the branch ref, not
+  `origin/feat/NA-27` — both resolve the same commit here and `git merge` doesn't require exclusive
+  checkout, only `git checkout` does) brought the worktree current without touching the sibling
+  worktree that had the branch checked out. Don't assume "one commit behind" from prior stories —
+  always diff the stated base SHA against actual `HEAD` and `git log base..target` before assuming
+  the gap is trivial.
+- A GC race-condition fix (finding: guard compares a worktree's HEAD against the CURRENT base tip,
+  which drifts once the base branch advances past the worktree's true creation point) is better
+  fixed by recording an immutable "provision point" marker at creation time than by trying to make
+  the race window narrower. Used **worktree-scoped git config** (`extensions.worktreeConfig true` +
+  `git -C "$WT" config --worktree sdlc.provisionSha <sha>`) written ONLY in the two branches that
+  actually create a new worktree directory (re-provision-after-teardown and first-run-from-base) —
+  never in the reuse/fast-forward branch, since worktree-scoped config persists in that worktree's
+  own `.git/worktrees/<name>/config.worktree` across every later idempotent re-invocation of the
+  setup script, so re-writing it on reuse would silently reset the very reference point the guard
+  depends on. Always keep an old-style fallback check (here: tip-equality against current base) for
+  worktrees provisioned before the new guard existed and therefore have no recorded marker.
+- A "Case 1 registration probe matches but the directory was removed out-of-band" bug needs the
+  registration check split from the case dispatch: compute a boolean (`REGISTERED=...`), insert a
+  `[ ! -d "$WT" ]` pre-check between the probe and the `if/elif/else` case chain that prunes the
+  stale registration AND flips the boolean back to false, then dispatch on the boolean — this lets
+  execution "fall through" cleanly into the branch-exists/create cases without duplicating their
+  logic or fighting bash's linear if/elif structure.
+- When a spec's package-manager token (`.claude/project/project-context.md` "Package manager" row)
+  needs to drive both the install command AND the lockfile name/hash check, resolve it once into two
+  paired variables (`INSTALL_CMD`, `LOCK_FILE_NAME`) via a single `case` statement with an explicit
+  `*)` fallback that warns to stderr and re-assigns the pnpm defaults — this keeps "unknown token"
+  and "pnpm" behaviourally identical (same code path afterward) rather than needing a separate
+  guard later in the script.
+- A "gate can false-green on untracked leftovers" fix (assert `git status --porcelain` is empty
+  before the gate/before each phase's assertion) needs the exact same one-liner duplicated at BOTH
+  the QA-playbook Step 6 (pre-gate) and the principal-playbook Step 5 (post-phase-commit) sites —
+  they're structurally identical checks guarding different moments (before a shared quality gate vs.
+  after every phase dispatch) and a reviewer finding one doesn't imply the other was already fixed;
+  grep the whole plugin for `status --porcelain` before declaring a "shared worktree cleanliness"
+  finding fully resolved.
+- `impl.md`'s `--body "..."` quoted string is printed VERBATIM into the Jira comment, so a naive
+  "restore column-0 continuation lines" fix is NOT prettier-stable when that fence sits nested
+  inside an indented numbered-list item (`5.` here) — verified the hard way: the first commit's
+  `lint-staged` (`prettier --write --ignore-unknown`) actually corrupted the fence (split it into
+  two mismatched fences, leaked the quoted body out as bare paragraphs, broke the bash string).
+  Root cause, confirmed by minimal repro (`printf` a 2-item list with a fenced block containing a
+  dedented vs. indented blank-line continuation and diff `prettier --write` before/after): prettier's
+  remark-based Markdown parser requires EVERY line inside a fence nested in a list item — including
+  blank-line-separated continuations — to satisfy the item's content indentation (here 3 spaces,
+  from `5. `); a column-0 continuation line breaks the parser's list-item/fence association at PARSE
+  time, so no post-hoc `<!-- prettier-ignore -->` can glue the split nodes back together (ignore
+  comments only suppress re-printing of already-correctly-parsed nodes, they can't fix a mis-parse).
+  Re-indenting the continuation to 3 spaces "fixes" prettier-stability but reintroduces the exact
+  content-corruption bug being fixed (the leading spaces leak into the literal Jira comment text).
+  The actual fix that satisfies both constraints: DEDENT THE WHOLE FENCE OUT OF THE LIST ITEM (fence
+  markers and body at column 0, not nested/indented under `5.`) — CommonMark still associates it
+  visually with the preceding list item as long as there's no blank-line-terminated topic break, and
+  prettier's parser no longer needs to reconcile fence-body indentation against list-item content
+  indentation, so it leaves the block completely untouched (verified `diff` before/after `prettier
+--write` = empty). **Always verify a Markdown/bash-artifact fix by actually running this repo's
+  real `prettier --write` on a scratch copy in the repo's own directory before committing** — testing
+  from `/tmp` gave a false "no changes" negative (config/plugin resolution differs outside the repo
+  tree), and `git show HEAD:<file>` after commit is the only way to see what `lint-staged` really did
+  (it silently re-stages its own output as part of the same commit, past the point your Edit tool
+  call can inspect). Do all such scratch-file prettier reproduction testing in a `/tmp`-adjacent
+  scratch dir or with an explicit absolute `cd` guard — a bare `cd <primary-repo-root>` in a Bash
+  call (rather than the dispatched worktree path) silently runs subsequent commands against the
+  PRIMARY checkout, which for a domain agent is a hard violation if anything gets staged/committed
+  there; confirm `pwd` and `git worktree list` immediately after any such `cd` before trusting `git
+log`/`git status` output.
+
+## NA-27 — Copilot fix round on PR #72 (`plugins/sdlc/scripts`)
+
+- The dispatched worktree's own branch (a synthetic `worktree-agent-<hash>`) was, once again, a
+  strict ancestor of `origin/feat/NA-27` (this time five commits behind, at `730b30c` — the
+  pre-worktree-model spec-merge point). Same low-risk fix as prior NA-27/NA-26 rounds: `git
+merge-base --is-ancestor HEAD feat/NA-27` to confirm no divergence, then `git merge --ff-only
+feat/NA-27` (the local branch ref — `feat/NA-27` was checked out exclusively in the sibling
+  primary worktree, so only `git checkout` there is blocked, not `git merge`). This is now a
+  recurring pattern across at least 3 stories — always diff stated base SHA against actual `HEAD`
+  before assuming a fresh worktree is current.
+- A two-branch "admits local-OR-remote, but body always fetches/merges origin unconditionally" bug
+  (worktree-setup.sh Case 2) is fixed the same way Case 1 already handles it: probe
+  `ls-remote --exit-code --heads origin "$BRANCH"` into a boolean ONCE, then gate both the fetch and
+  the later ff-only merge on that same boolean, instead of re-deriving remote-existence at each
+  call site (which is how the original bug crept in — the `elif` entry condition and the fetch call
+  independently assumed "matched the elif => origin has it").
+- worktree-gc.sh's `sdlc-*|agent-*` basename-only candidate filter is a classic "matches by name,
+  not by identity" gap — the fix is a second `case "$WT" in "$WORKTREES_ROOT"/*) ;; ...` gate right
+  after the basename `case`, reusing the already-robustly-resolved `PRIMARY_ROOT` (git
+  `rev-parse --show-toplevel`, absolute + symlink-resolved) rather than re-deriving repo root with
+  a fresh `pwd`/`readlink` — the worktree paths from `git worktree list --porcelain` are already
+  absolute, so a plain `"$WORKTREES_ROOT"/*` glob-case match is sufficient, no extra `realpath`
+  needed.
+- Verifying a stdout-contract fix (`WORKTREE=`/`NX_CACHE_DIRECTORY=` exactly two lines) doesn't
+  require actually running the script end-to-end against a live repo — a full read-through
+  confirming every `git`/`fetch`/`worktree add` call in the modified branches carries `>&2` (or was
+  already `>&2`), then locating the two unguarded `printf` lines at the very end as the only stdout
+  producers, is sufficient and much cheaper than an end-to-end dry run.

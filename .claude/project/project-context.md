@@ -35,6 +35,13 @@
 ## Tooling
 
 | Test | `pnpm nx run-many -t test` |
+| Shared Nx cache | `<repo-root>/.nx/cache` (absolute path; the primary checkout's cache — do NOT mutate committed `nx.json`) |
+| SDLC agent reuse | `enabled` |
+
+`SDLC agent reuse` scopes to impl-phase fix rounds only (QA Engineer playbook Step 3): `enabled`
+reuses the domain agent that ran the phase across its fix-round dispatches instead of a fresh
+`Agent(...)` each round; `disabled` is the documented off-switch, restoring a fresh dispatch every
+round.
 
 ## Triage
 

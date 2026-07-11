@@ -12,6 +12,11 @@
 # script fires only once, at the end of the top-level flow. Calling it from a nested command would
 # emit the sentinel mid-flow and release the worker slot before the parent finishes.
 #
+# Also runs worktree-gc.sh (merged-into-origin/<BASE-BRANCH> worktree reclamation) as session-
+# teardown cleanup, alongside the scoped-temp clean below — so no merged SDLC-managed or stray
+# harness worktree persists past a normal session end even when the impl-phase Step-7 teardown was
+# skipped (blocked/aborted run).
+#
 # Usage:
 #   bash session-complete.sh              # bare marker — no PR (refine/review-fix/folded-plan)
 #   bash session-complete.sh <pr-url>     # marker with optional |PR=<url> suffix (spec/plan/impl)
@@ -41,6 +46,12 @@ here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 clean_key="$(bash "$here/session-key.sh" 2>/dev/null || true)"
 [ -n "$clean_key" ] && rm -rf "./.tmp/$clean_key" 2>/dev/null || true
 rmdir ./.tmp 2>/dev/null || true
+
+# Worktree GC — reclaims any SDLC-managed (sdlc-*) or stray harness (agent-*) worktree whose
+# branch is fully merged into origin/<BASE-BRANCH>. Always exits 0 on its own, but `|| true` here
+# too so a GC failure can never abort this script before the sentinel below. Runs in BOTH modes
+# (worker and interactive) — GC is session-teardown reclamation, not worker-only like the sentinel.
+bash "$here/worktree-gc.sh" 2>/dev/null || true
 
 # Completion sentinel — WORKER CONTRACT ONLY. Emitted solely when SDLC_SESSION_KEY is set (the
 # harness injects it). An interactive session (key unset) prints nothing and exits 0 here — but
