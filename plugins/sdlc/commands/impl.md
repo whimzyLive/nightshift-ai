@@ -28,6 +28,7 @@ the Principal Engineer role directly.
    > which under the automation harness emits the session-complete sentinel and releases this worker
    > slot mid-`/impl`. `/impl` owns the single release at the very end. Apply the **ref** inline,
    > never the **command** (`refs/triage.md` emits no sentinel).
+
 2. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
    Whether the plan file is **required** depends on `TRIAGE`:
    - **`TRIAGE=full`** → the plan file MUST exist at that path (merged to `develop`). If missing →
@@ -48,27 +49,31 @@ the Principal Engineer role directly.
    defect variant (reproduce → root-cause → failing regression test → fix+verify, dispatching domain
    agents) on a `fix/<STORY-KEY>` branch, and the playbook threads `WORK_KIND` on to the QA Engineer
    (re-pointing Step-7 to the defect regression-evidence contract); `WORK_KIND=feature` keeps the
-   normal feature ladder. The two flags are orthogonal — a lightweight *feature* keeps the feature
+   normal feature ladder. The two flags are orthogonal — a lightweight _feature_ keeps the feature
    ladder.
    That playbook is the single source of truth for the implementation workflow:
-   pre-flight → branch → ordered domain-agent dispatch (`isolation: "worktree"`) → per-phase
-   push/verify → **hand off to the QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`, run
+   pre-flight → provision one orchestrator-managed per-story worktree (`worktree-setup.sh`) →
+   ordered domain-agent dispatch (each threaded `WORKTREE` + `NX_CACHE_DIRECTORY` — no per-dispatch
+   harness isolation) → per-phase push/verify (with a machine-checked primary-checkout guard) →
+   **hand off to the QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`, run
    inline: code-review loop until clean → memory writes → quality gate → AC/plan verification) →
-   PR on a `clean` QA verdict. Dispatch domain agents and the QA loop with the `Agent` tool from
-   THIS session. Capture the PR URL it produces as `IMPL_PR_URL`.
+   PR on a `clean` QA verdict, then tear down the worktree. Dispatch domain agents and the QA loop
+   with the `Agent` tool from THIS session. Capture the PR URL it produces as `IMPL_PR_URL`.
 5. When the playbook completes, comment the PR on the story (use the real captured URL — a full
    `https://github.com/...`, never a placeholder):
    ```bash
    acli jira workitem comment create --key <STORY-KEY> \
      --body "Implementation complete.
+   ```
 
 PR: <IMPL_PR_URL>
 
 All phases done. Review clean. Quality gate passed."
-   ```
-   (`comment add` does not exist in this acli version — use `comment create --key`.)
+
+````
+(`comment add` does not exist in this acli version — use `comment create --key`.)
 6. Report back: phases completed, the PR URL, review rounds, quality-gate evidence, any blockers
-   or open items for the reviewer.
+or open items for the reviewer.
 
 **IMPORTANT:** On the `full` path, only run after the plan PR is reviewed and merged (Step 2). On
 the `lightweight` path, no plan PR is required. Either way this makes real code changes across
@@ -96,7 +101,7 @@ to convergence, **then** release — the loop is the session's **tail**:
 ```bash
 # IMPL_PR_URL is the PR the Principal Engineer playbook opened. Drive the review-fix loop on it.
 /loop /sdlc:loop <IMPL_PR_URL>
-```
+````
 
 The native `/loop` re-invokes `sdlc:loop` each pass: it polls Copilot's review of the PR head, runs
 `/review-fix` inline on each round of comments, and exits when the head is Copilot-reviewed with no
