@@ -18,3 +18,10 @@
 **Root causes:** matchMedia mental model inverted — assumed callback always runs with conditions as booleans, but GSAP fires it only when ≥1 named condition MATCHES; mocks encoded the same wrong contract as the implementation; availability of the CMS fetch path not considered when switching the route to per-request SSR.
 **Preventions:** gsap.matchMedia must always register complementary conditions (reduce + no-preference) so one always matches; when mocking a third-party contract, derive mock behaviour from real matchMedia semantics (stub window.matchMedia) so the test would fail if the registration is wrong; any request-time CMS/DB read on a public route needs a try/catch fallback to defaults; jsdom cannot see "animation never runs" bugs — add a real-browser smoke for motion work.
 **Domains affected:** web-engineer
+
+## 2026-07-11 — Story NA-26
+
+**Issues found:** 1 Important — principal-engineer.md profile's "Collecting results" section still extracted only Status/Note while the new contract added Summary/Skills loaded (the same "discards the line it must verify" defect class the spec fixed in the playbook); 1 Minor — markdown indentation attached the STOP-and-redispatch consequence to one sub-bullet instead of the parent rule.
+**Root causes:** parallel prose (agent profile vs playbook) duplicating a contract drifts when the spec's change inventory names only some of the duplicate sites; prettier's markdown reflow silently reattaches lazy-continuation paragraphs, undoing plain dedents.
+**Preventions:** when a contract changes, grep ALL files that restate it (agents/ + refs/) — not just the spec's inventory; verify markdown structure post-commit (prettier may reparse), use blank-line-separated paragraphs for bullet-scope-critical prose.
+**Domains affected:** ai-enablement-engineer

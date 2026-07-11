@@ -173,3 +173,102 @@ command`) to appear verbatim on a single line across three files, watch for pros
   `# Frameworks / ORMs with no built-in skill suggestion` and `# Agent-to-skill domain mapping`
   comment blocks are documentation-only and don't require updating for a new entry unless the plan
   explicitly asks (it didn't here — left the per-agent summary comment untouched).
+
+## NA-26 — enforce project-skill loading in domain-agent dispatches (`plugins/sdlc/refs` + `agents`)
+
+- This story's dedicated worktree was checked out on a synthetic `worktree-agent-<hash>` branch,
+  one commit behind `origin/feat/NA-26` — `git checkout feat/NA-26` failed with "already used by
+  worktree at <main-repo-path>" because the main repo checkout (left over from `/sdlc:plan`) still
+  held the branch. Fix: confirm the other worktree is clean (`git -C <path> status --short` empty,
+  HEAD matches `origin/<branch>` exactly — no uncommitted work to lose), `git -C <path> checkout
+<base-branch>` there to free the ref, then `git checkout feat/NA-26` in this worktree. Only do
+  this when the other checkout is verified clean; never force-switch a dirty worktree.
+- A plan's grep-based verification that expects an exact multi-word phrase ("read each directory
+  guide it lists") to survive on one physical line can fail even on a file the plan tells you to
+  edit only lightly (add a trailing clause) — if the file's _pre-existing_ prose already hard-wraps
+  that phrase across two Markdown source lines, the phrase-preservation check fails through no
+  fault of the new edit. Since the plan explicitly names this exact check in its Task 5 Step 4
+  verification, re-wrap the existing sentence onto one line while inserting the new clause (cheap,
+  in-scope since you're already touching that paragraph) rather than leaving it to fail silently.
+- The plan's whole-story check `grep -rn "Behaviour\|behaviour" plugins/sdlc/refs/ plugins/sdlc/agents/
+plugins/sdlc/README.md` — "Expected: none" — is written as if the tree starts clean, but this
+  repo's plugin already carries plenty of pre-existing British-spelling prose in files/sections the
+  story never touches (`triage.md`, `jira-bug-template.md`, `skills-manifest.md`,
+  `project-context-template.md`, `solutions-architect.md`, and untouched paragraphs inside files
+  this story DOES edit). Read "Expected: none" as "none _introduced by this story's edits_" — diff
+  the flagged line numbers against your own edited spans before treating a non-empty grep as a
+  failure; don't rewrite unrelated pre-existing prose to force a literal zero-match, that would be
+  scope creep beyond the plan's named file/line anchors.
+- A 12-file, prose-only contract story (no code, no data model) still benefits from running every
+  task's own verification grep individually before the closing whole-story block — the per-task
+  greps catch numbering-contiguity regressions (e.g. an inserted list item bumping every later
+  number) that the whole-story greps don't check for.
+
+## NA-26 review-fix follow-up
+
+- Same worktree-branch-lock issue recurred, but this time the sibling worktree holding
+  `feat/NA-26` (the repo's _main_ worktree) had already fast-forwarded to the branch's true head —
+  freeing it via `checkout <base-branch>` there wasn't needed/available. When the dispatched
+  worktree's own branch is a strict ancestor of the target branch (`git merge-base --is-ancestor
+<local-HEAD> <target-branch>`), `git merge --ff-only <target-branch>` on the current
+  worktree-local branch is the lower-risk fix — it never touches the other worktree, can't lose
+  uncommitted work there, and leaves you on your own synthetic branch with the right file content
+  and history, ready to commit. Reserve force-freeing the other worktree's checkout for when a
+  true ff-only isn't possible.
+- The playbook's per-sub-bullet consequence text ("On failure → STOP-and-redispatch...") reads as
+  attached to only the _last_ sub-bullet under a two-case list unless it's dedented to the parent
+  bullet's own paragraph indent (2 spaces under a `- ` top bullet, not 4 spaces continuing a nested
+  `- ` sub-bullet). When a reviewer flags "this consequence should apply to both sub-cases,"
+  dedenting by exactly the sub-bullet's own indent width (here 2 spaces) turns it back into a
+  continuation paragraph of the parent bullet in Markdown's nesting model — no rewording needed.
+- The `principal-engineer.md` agent file's prose (`## Collecting results`) and the playbook's
+  authoritative rule (`## Step 5`) both name the same 3-vs-4-field return contract independently —
+  when a playbook change adds a field to the domain-agent return contract (e.g. `Skills loaded`),
+  grep the parallel agent-file prose for the old field count/list too (`grep -n "Extract"
+plugins/sdlc/agents/principal-engineer.md`) — it's easy for the spec/plan to fix the playbook
+  (source of truth) and miss the agent file's independent restatement of the same contract.
+
+## NA-26 — PR #70 review, round 2 (10 accepted internal-contradiction findings, `plugins/sdlc/refs` + `agents` + `README.md`)
+
+- A single Skills-loaded semantic rule ("what counts as invoked", "pass iff", "blocked exempt",
+  "extras tolerated") was independently restated in up to 5 places (handoff Return format, principal
+  playbook Step 5, QA playbook Step 3, README enforcement summary, and each of the 6 domain-agent
+  profiles). When a reviewer finds a contradiction between two restatements, fixing only the two
+  named sites isn't enough — grep every restatement site (`Skills loaded`, `pass iff`, `gate on
+starting work`, `Project skills`) across the whole plugin before declaring done; a phrase can drift
+  independently in a site the finding didn't name (here: README's summary paragraph, which nobody
+  flagged directly but silently restated the pre-fix "none passes only when declared" wording).
+- Established a durable "one source of truth + pointers" pattern for this kind of shared mechanical
+  rule: principal playbook Step 5 owns the pass/fail mechanics for orchestrator-side verification;
+  domain-agent-handoff.md's Return format owns the agent-side `Skills loaded:` semantics (including
+  the preloaded-skill and no-instruction-fallback clauses). Every other site (QA playbook, README,
+  the 5 sibling agent-profile `## Skills` paragraphs) should be a one-line pointer with only the
+  consequence that differs locally (e.g. QA: "return blocked immediately, no redispatch" vs
+  principal: "redispatch once then STOP") — never a full re-derivation. `grep -rn "pass iff"` across
+  `refs/*.md README.md` after an edit is the cheapest way to confirm only the two source-of-truth
+  files still contain the actual mechanics.
+- A hardcoded doc-internal heading reference (e.g. "`## Project skills`" naming a specific override
+  section heading) breaks the moment a real consumer override uses a different heading for the same
+  concept (this repo's own `.claude/project/agents/ai-enablement-engineer.md` uses "## Skills
+  (plugin-bundled — invoke via the Skill tool)"). Prefer describing the section by its _role_
+  ("the override's skills section — whatever heading it uses, the section listing skills to invoke
+  via the Skill tool") over quoting a literal heading string that other repos are free to rename.
+- A "STOP-and-redispatch on Skills-loaded failure" rule silently collides with a sibling "zero new
+  commits since pre-dispatch HEAD = silent failure" rule when the redispatch targets a phase whose
+  code work already landed in the first dispatch — the redispatch produces zero _new_ commits by
+  design (only the return-line semantics were wrong, not the code). Fix pattern: scope that specific
+  redispatch as a narrow "verify already-committed work against the named skills; fix only if a
+  skill mandates a change; re-emit a compliant return" prompt, and explicitly exempt it from the
+  zero-new-commits STOP in the same sentence that defines the exemption trigger — don't leave the
+  general rule and the exemption in two disconnected paragraphs a reader has to reconcile themselves.
+- `git worktree list` showing `feat/NA-26` "locked" (checked out read-only in the repo's main
+  worktree, left over from a prior `/sdlc:plan`/`/sdlc:impl` run) with the dispatched worktree
+  sitting on a synthetic `worktree-agent-<hash>` branch one merge-commit _ahead_ of
+  `origin/feat/NA-26` (a spec PR had merged into main and been merged back into the worktree branch)
+  meant neither the prior story's "checkout the target branch" nor "ff-only merge the target into
+  local" pattern applied cleanly. Since the task only needs this worktree's branch to fast-forward
+  cleanly onto the target for the orchestrator later, `git reset --hard origin/<branch>` on the
+  dispatched worktree's own synthetic branch (never on a branch checked out elsewhere) is the
+  correct, lowest-risk move when the worktree's local history has _diverged_ from the target
+  (not just lagged behind it) and the working tree is otherwise clean — confirm `git status --short`
+  is empty before resetting, since `--hard` discards anything uncommitted.

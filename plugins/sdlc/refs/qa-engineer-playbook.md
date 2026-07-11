@@ -17,6 +17,7 @@ subagent — it would be unable to dispatch the reviewer or fixers and would ret
 ## Role
 
 You own the quality of what ships. After the code is written, you make sure it is:
+
 - **Correct** — does what the plan/ACs require, no regressions.
 - **Clean** — readable, follows project conventions, no dead/duplicated code.
 - **Secure** — no injection, secret-leak, auth-bypass, or unsafe-input issues.
@@ -57,15 +58,15 @@ The loop runs in one of two modes. The caller picks the mode; the steps below ar
 lean ad-hoc variant used by `/review` with no story key — it reviews the current change set with
 no Jira ticket, plan, or PR.
 
-| | Story mode | Diff mode (ad-hoc, no story key) |
-|---|---|---|
-| Trigger | `<STORY-KEY>` provided | no story key — review the current diff |
-| Review target | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>` | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
-| Requirements given to reviewer (Step 1) | plan + acceptance criteria | the change's own intent (commit subjects + changed-file summary) — there are no ACs |
-| Fix commits (Step 3) | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user |
-| Learnings memory (Step 5) | required | **skip** — no story to key the entry to |
-| AC + plan verification (Step 7) | required | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green |
-| Verdict (Step 8) | full block incl. AC + learnings lines | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)` |
+|                                         | Story mode                                                                    | Diff mode (ad-hoc, no story key)                                                                                                                                                                                                                     |
+| --------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trigger                                 | `<STORY-KEY>` provided                                                        | no story key — review the current diff                                                                                                                                                                                                               |
+| Review target                           | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>`                   | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
+| Requirements given to reviewer (Step 1) | plan + acceptance criteria                                                    | the change's own intent (commit subjects + changed-file summary) — there are no ACs                                                                                                                                                                  |
+| Fix commits (Step 3)                    | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user                                                                                                                       |
+| Learnings memory (Step 5)               | required                                                                      | **skip** — no story to key the entry to                                                                                                                                                                                                              |
+| AC + plan verification (Step 7)         | required                                                                      | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green                                                                                                                                               |
+| Verdict (Step 8)                        | full block incl. AC + learnings lines                                         | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)`                                                                                                                                                         |
 
 Everything else (request review → triage → fix → re-review → quality gate → return verdict) is
 identical. In Diff mode, wherever a step says `<BRANCH_PREFIX>/<STORY-KEY>`, operate on the current branch /
@@ -146,7 +147,7 @@ fetched comments:
   (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`): `"$dir/review-fix-summary.json"` = PR
   **body** + general/issue comments + review-summary bodies; `"$dir/review-fix-inline.json"` =
   **unresolved** inline review comments. Read BOTH. The only
-  exclusion is inline threads explicitly marked *Resolved* (filtered at fetch via GraphQL
+  exclusion is inline threads explicitly marked _Resolved_ (filtered at fetch via GraphQL
   `reviewThreads.isResolved`, since a resolved comment is already addressed). The PR body and all
   generic comments have no resolved state and are ALWAYS included — they carry intent the
   line-anchored notes assume.
@@ -196,6 +197,7 @@ out of scope, and record the one-line rationale for each discard so the caller c
 PR. Accepted comments flow into the Step 3 fix loop; discarded ones go in the return report only.
 
 **Severity:**
+
 - **Critical / Important** — must fix before the PR is created.
 - **Minor / nit** — list in the return report, do not block.
 - **AC gap** — treat as Critical regardless of how the reviewer framed it; the ticket exists to
@@ -213,12 +215,17 @@ the `Agent` tool, **`isolation: "worktree"`** (it writes code). The prompt MUST 
 
 1. Story key.
 2. The reviewer findings for that domain, **verbatim**.
-3. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
+3. **Applicable override skills** — EITHER name the target agent's applicable project skills
+   (from its override `.claude/project/agents/<agent-name>.md`, the override's skills section —
+   whatever heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke
+   these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
+   skills apply for this task." Exactly one of the two.
+4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
    commit (use the `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
-4. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
+5. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit."
-5. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-6. "Return exactly:\n  Status: complete|blocked\n  Note: <one line if blocked>\n  Summary: <one line — what changed>"
+6. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
+7. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
 
 After the agent returns, push and confirm:
 
@@ -231,6 +238,10 @@ git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 - No new commit since pre-dispatch HEAD → agent failed silently. **Return `blocked`** to the
   Principal Engineer with the reason.
 - `Status: blocked` → **return `blocked`** immediately; do not attempt the fix yourself.
+- **Verify `Skills loaded` covers the named set.** Same mechanical rule as principal playbook Step 5
+  (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
+  return `blocked` immediately, no redispatch. (Applies only to `Status: complete` returns, and
+  extra skills the agent lists beyond the named set still pass, per Step 5.)
 
 ## Step 4 — Re-review
 
@@ -291,11 +302,11 @@ Apply `verification-before-completion`. Produce line-by-line checklists, each it
 with evidence (git log, file existence, or test output) — no item checked off on assertion alone:
 
 1. **Every plan task** in `docs/superpowers/plans/<STORY-KEY>.md` → has a corresponding commit/file/test.
-   *(Full path only. On the lightweight path there is no plan doc — skip this checklist; the AC
-   checklist below is the completion contract.)*
+   _(Full path only. On the lightweight path there is no plan doc — skip this checklist; the AC
+   checklist below is the completion contract.)_
 2. **Every acceptance criterion** on the Jira story → is met by code that exists on the branch,
-   with the specific evidence (handler/test/file) named. *(Always — and the primary gate on the
-   lightweight path.)*
+   with the specific evidence (handler/test/file) named. _(Always — and the primary gate on the
+   lightweight path.)_
 
 **On the defect path (`WORK_KIND=defect`) — ALSO require the systematic-debugging completion
 contract (AC17).** A defect has **no plan doc**, so checklist 1 is skipped (as on any lightweight
@@ -309,7 +320,7 @@ contract MUST hold — without it, return `blocked` (never `clean`):
    - at **HEAD** (fix applied) it **passes**.
 
    > Why not `BASE_SHA`: at develop's merge-base the test file does not yet exist, so running it
-   > there fails to *compile/resolve* rather than *assert* — it cannot distinguish "failed because
+   > there fails to _compile/resolve_ rather than _assert_ — it cannot distinguish "failed because
    > the bug is present" from "failed to build". The **phase-3 commit** is the correct pre-fix point:
    > the test exists there and exercises code that compiles, failing only on the assertion the fix
    > later satisfies.
@@ -320,11 +331,12 @@ contract MUST hold — without it, return `blocked` (never `clean`):
    git log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
    # at the phase-3 commit the new test FAILS (assertion); at HEAD it PASSES — paste both outputs.
    ```
+
 2. **The full test suite passes with no regressions** (the Step-6 gate output covers this).
 
 This is **in addition** to the existing lightweight ACs-as-contract fallback — the defect path
-*adds* the failing→passing regression-test requirement. (No double-verify: systematic-debugging
-phase-4 is the *implementer's* inner check that the fix works; this Step-7 contract is QA's *outer*
+_adds_ the failing→passing regression-test requirement. (No double-verify: systematic-debugging
+phase-4 is the _implementer's_ inner check that the fix works; this Step-7 contract is QA's _outer_
 gate proving the regression evidence + clean suite.)
 
 ```bash

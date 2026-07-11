@@ -52,6 +52,7 @@ invoked when you hand off the quality loop — not here.
 ## Read project context first
 
 Before any other action, read `.claude/project/project-context.md` and extract:
+
 - `<PROJECT-KEY>` — Jira project key (e.g. `ED`)
 - `<BASE-BRANCH>` — the SDLC base branch (read from project-context; do not assume the repo default)
 - Active agents list — skip phases for agents listed as Standby
@@ -127,6 +128,7 @@ last): it consumes no artifacts from other domain agents and nothing consumes it
 ```
 
 Rules:
+
 - ALL phases are sequential — never run any two agents at the same time, including
   `ai-enablement-engineer`: it is dependency-free in **order** only, not in concurrency — when
   dispatched it still runs alone, one writer on the story branch at a time
@@ -153,11 +155,16 @@ Each agent prompt MUST include all of the following (agent starts cold — no co
 
 1. Story key: e.g. `ED-456`
 2. The specific tasks from the plan (verbatim — paste the full phase section)
-3. Relevant spec context (entity names, field types, API shapes, route paths)
-4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new branch. Check out this branch, do your work, and commit."
-5. "Do NOT create a PR — the Principal Engineer will open one after all phases and review are complete."
-6. "Commit your changes. Do NOT push — the Principal Engineer handles all pushes to origin."
-7. "Return in this exact format (3 lines max):\n  Status: complete|blocked\n  Note: <one line if blocked>"
+3. **Applicable override skills** — EITHER name the target agent's applicable project skills (from
+   its override `.claude/project/agents/<agent-name>.md`, the override's skills section — whatever
+   heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke these
+   via the Skill tool BEFORE starting Task 1", OR state "No project skills apply for this task."
+   Exactly one of the two.
+4. Relevant spec context (entity names, field types, API shapes, route paths)
+5. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out. Do NOT create a new branch. Check out this branch, do your work, and commit."
+6. "Do NOT create a PR — the Principal Engineer will open one after all phases and review are complete."
+7. "Commit your changes. Do NOT push — the Principal Engineer handles all pushes to origin."
+8. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
 
 Never send an agent just a task title — include enough context to work without asking questions.
 
@@ -192,21 +199,31 @@ git log origin/<BRANCH_PREFIX>/<STORY-KEY>..<BRANCH_PREFIX>/<STORY-KEY> --onelin
 If no new commits since pre-dispatch HEAD → agent failed silently. STOP and report to user before continuing.
 If push fails → STOP and report to user (conflict or auth issue).
 
+**Verify `Skills loaded` covers the named set.** This is a mechanical set-coverage check against
+what the dispatch prompt named in item 3 of its prompt contract, with its own STOP-and-redispatch-once
+consequence on failure — see `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` Step 5 for
+the full rule (source of truth; do not re-derive it here).
+
 ## Collecting results
 
 After each phase completes, extract from the agent's return message:
+
 - `Status:` field — `complete` or `blocked`
 - `Note:` field — only if blocked
+- `Summary:` field — one-line summary of what changed
+- `Skills loaded:` field — used by the set-coverage check above
 
-**Do not carry forward large agent outputs into your context.** Extract the 3 fields above and discard the rest.
+**Do not carry forward large agent outputs into your context.** Extract the 4 fields above and discard the rest.
 
 If `Status: blocked` → STOP immediately. Report to user:
+
 ```
 BLOCKED at Phase N (<agent-name>).
 Reason: <Note field from agent>
 Next step: <what user needs to do>
 Remaining phases NOT dispatched.
 ```
+
 Do not attempt to fix the blocker yourself. Do not proceed to the next phase.
 
 ## Post-implementation — hand off to the QA Engineer
