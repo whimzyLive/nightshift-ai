@@ -203,3 +203,27 @@ plugins/sdlc/README.md` — "Expected: none" — is written as if the tree start
   task's own verification grep individually before the closing whole-story block — the per-task
   greps catch numbering-contiguity regressions (e.g. an inserted list item bumping every later
   number) that the whole-story greps don't check for.
+
+## NA-26 review-fix follow-up
+
+- Same worktree-branch-lock issue recurred, but this time the sibling worktree holding
+  `feat/NA-26` (the repo's _main_ worktree) had already fast-forwarded to the branch's true head —
+  freeing it via `checkout <base-branch>` there wasn't needed/available. When the dispatched
+  worktree's own branch is a strict ancestor of the target branch (`git merge-base --is-ancestor
+<local-HEAD> <target-branch>`), `git merge --ff-only <target-branch>` on the current
+  worktree-local branch is the lower-risk fix — it never touches the other worktree, can't lose
+  uncommitted work there, and leaves you on your own synthetic branch with the right file content
+  and history, ready to commit. Reserve force-freeing the other worktree's checkout for when a
+  true ff-only isn't possible.
+- The playbook's per-sub-bullet consequence text ("On failure → STOP-and-redispatch...") reads as
+  attached to only the _last_ sub-bullet under a two-case list unless it's dedented to the parent
+  bullet's own paragraph indent (2 spaces under a `- ` top bullet, not 4 spaces continuing a nested
+  `- ` sub-bullet). When a reviewer flags "this consequence should apply to both sub-cases,"
+  dedenting by exactly the sub-bullet's own indent width (here 2 spaces) turns it back into a
+  continuation paragraph of the parent bullet in Markdown's nesting model — no rewording needed.
+- The `principal-engineer.md` agent file's prose (`## Collecting results`) and the playbook's
+  authoritative rule (`## Step 5`) both name the same 3-vs-4-field return contract independently —
+  when a playbook change adds a field to the domain-agent return contract (e.g. `Skills loaded`),
+  grep the parallel agent-file prose for the old field count/list too (`grep -n "Extract"
+plugins/sdlc/agents/principal-engineer.md`) — it's easy for the spec/plan to fix the playbook
+  (source of truth) and miss the agent file's independent restatement of the same contract.

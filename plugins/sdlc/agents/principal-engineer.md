@@ -198,14 +198,21 @@ git log origin/<BRANCH_PREFIX>/<STORY-KEY>..<BRANCH_PREFIX>/<STORY-KEY> --onelin
 If no new commits since pre-dispatch HEAD → agent failed silently. STOP and report to user before continuing.
 If push fails → STOP and report to user (conflict or auth issue).
 
+**Verify `Skills loaded` covers the named set.** This is a mechanical set-coverage check against
+what the dispatch prompt named in item 3 of its prompt contract, with its own STOP-and-redispatch-once
+consequence on failure — see `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` Step 5 for
+the full rule (source of truth; do not re-derive it here).
+
 ## Collecting results
 
 After each phase completes, extract from the agent's return message:
 
 - `Status:` field — `complete` or `blocked`
 - `Note:` field — only if blocked
+- `Summary:` field — one-line summary of what changed
+- `Skills loaded:` field — used by the set-coverage check above
 
-**Do not carry forward large agent outputs into your context.** Extract the 3 fields above and discard the rest.
+**Do not carry forward large agent outputs into your context.** Extract the 4 fields above and discard the rest.
 
 If `Status: blocked` → STOP immediately. Report to user:
 
