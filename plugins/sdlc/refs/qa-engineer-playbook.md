@@ -210,33 +210,86 @@ See the workspace→agent table in `.claude/project/project-context.md`.
 
 ## Step 3 — Fix loop
 
-For each Critical / Important group (grouped by domain), dispatch the owning domain agent with
-the `Agent` tool, **`isolation: "worktree"`** (it writes code). The prompt MUST include:
+**Idempotent re-provision, BEFORE dispatching any fix agent.** This loop can be entered in a fresh
+session after Step-7 impl teardown or a GC sweep — the worktree may not exist. Re-provision it
+(a no-op when it already exists and is current) and capture the two lines for every dispatch below:
 
-1. Story key.
-2. The reviewer findings for that domain, **verbatim**.
-3. **Applicable override skills** — EITHER name the target agent's applicable project skills
+```bash
+setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> <BRANCH_PREFIX>/<STORY-KEY> <BASE-BRANCH>) \
+  || { echo "STOP: worktree-setup.sh failed — see stderr above; do not dispatch any fix agent"; exit 1; }
+WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
+NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | cut -d= -f2-)
+```
+
+For each Critical / Important group (grouped by domain), dispatch the owning domain agent with the
+`Agent` tool. The harness's `isolation: "worktree"` param is NOT set — the orchestrator owns
+isolation via the `$WORKTREE` re-provisioned above. **Branch the dispatch mechanism on the `SDLC
+agent reuse` token** (`.claude/project/project-context.md` Tooling):
+
+- `disabled` → today's behaviour: dispatch a **fresh** `Agent({ subagent_type: "<agent-name>", ... })`
+  for this fix round.
+- `enabled` (shipped default) → **reuse** the same domain-agent instance that ran this domain's
+  implementation phase, via `SendMessage` (relaying the resume as authorized same-task control —
+  consistent with `scrum-master.md`'s resume-trust rule), avoiding re-paid frontmatter/skill
+  injection. **Fall back to a fresh `Agent(...)` dispatch** whenever the reused instance is
+  unavailable (session boundary, the instance already returned/terminated) — this is the explicit
+  fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
+  frontmatter skill injection (harness bug #76337) — wasted tokens, not a correctness risk.
+
+Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST include:
+
+1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
+   "Your working directory for ALL work is `<WORKTREE>` — `cd` into it before any read, edit,
+   build, test, or commit. Do NOT operate in the primary checkout."
+2. **Cache instruction (verbatim, with the real captured `$NX_CACHE_DIRECTORY` substituted):**
+   "Before running any `nx` command (build/test/quality gate), export
+   `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache — this also covers your own
+   quality-gate run in Step 6."
+3. Story key.
+4. The reviewer findings for that domain, **verbatim**.
+5. **Applicable override skills** — EITHER name the target agent's applicable project skills
    (from its override `.claude/project/agents/<agent-name>.md`, the override's skills section —
    whatever heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke
    these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
    skills apply for this task." Exactly one of the two.
-4. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote. Check it out, fix ONLY these issues, and
-   commit (use the `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
-5. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
+6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
+   (the working directory named in item 1). Fix ONLY these issues, and commit (use the
+   `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
+7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
    your commit."
-6. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-7. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
+8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
+9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
 
-After the agent returns, push and confirm:
+**Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
+principal playbook Step 5):
 
 ```bash
-git push origin <BRANCH_PREFIX>/<STORY-KEY>
+PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
+PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # must be empty
+```
+
+After the agent returns, push and confirm from the worktree:
+
+```bash
+git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
 git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
-- No new commit since pre-dispatch HEAD → agent failed silently. **Return `blocked`** to the
-  Principal Engineer with the reason.
+Then assert the primary checkout was never touched:
+
+```bash
+[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
+  && [ -z "$(git -C "<primary-root>" status --porcelain)" ] \
+  || echo "BLOCKED: fix agent wrote to the primary checkout instead of \$WORKTREE"
+```
+
+If the primary checkout's HEAD moved or its working tree is no longer clean → **return `blocked`**
+immediately with that reason (same detectable-failure shape as the principal playbook's Step-5
+guard) — do not attempt to fix or revert it yourself.
+
+- No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
+  to the Principal Engineer with the reason.
 - `Status: blocked` → **return `blocked`** immediately; do not attempt the fix yourself.
 - **Verify `Skills loaded` covers the named set.** Same mechanical rule as principal playbook Step 5
   (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
