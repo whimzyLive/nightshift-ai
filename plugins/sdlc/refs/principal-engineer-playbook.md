@@ -211,9 +211,9 @@ multi-agent quality bar and the `isolation: "worktree"` + commit-not-push contra
    domain agent yet. **If reproduction is impossible → STOP / `blocked`** — do not guess a fix.
 2. **Phase 2 — root-cause / isolate.** Identify the owning file(s)/domain. This determines which
    Active domain agent owns phases 3–4 for each affected slice.
-3. **Phase 3 — add a failing regression test.** Dispatch the owning domain agent (`isolation:
-"worktree"`, **commit not push**) to add a test that **FAILS** against current `develop` behaviour
-   and pins the bug.
+3. **Phase 3 — add a failing regression test.** Dispatch the owning domain agent
+   (`isolation: "worktree"`, **commit not push**) to add a test that **FAILS** against current
+   `develop` behaviour and pins the bug.
 4. **Phase 4 — fix + verify.** Dispatch the owning domain agent to implement the fix so the phase-3
    test now **PASSES**, then run the project quality gate (`typecheck` + `test`). Multiple affected
    domains run **sequentially in the normal dependency order** (database-administrator →
