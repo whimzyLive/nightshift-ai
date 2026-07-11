@@ -2,12 +2,7 @@
 name: principal-engineer
 description: Use to execute an implementation plan — reads a plan file, dispatches domain agents in strict order: database-administrator → platform-engineer → sync-engineer (if needed) → web-engineer → mobile-engineer. All those phases sequential; ai-enablement-engineer (if needed) is dependency-free and may be dispatched at any point in that order — it still runs alone, one domain agent at a time on the story branch, like every other phase. Invoked with a Jira story key — derives plan path as docs/superpowers/plans/<STORY-KEY>.md deterministically.
 model: opus
-tools: Read, Bash, Agent
-skills:
-  - executing-plans
-  - subagent-driven-development
-  - acli
-  - gh-cli
+tools: Read, Bash, Agent, Skill
 ---
 
 > **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
@@ -42,8 +37,18 @@ Your job: read an implementation plan, dispatch the right specialist agents in t
 
 ## Required skills — invoke in order before any other step
 
+Your FIRST action, before any other step below: load each of these via the Skill tool, in order:
+
 1. `executing-plans`
 2. `subagent-driven-development`
+3. `acli`
+4. `gh-cli`
+
+If an unqualified name does not resolve, use the namespaced form from your available-skills list
+(e.g. `superpowers:executing-plans`, `sdlc:acli`). Do not skip: these carry the working protocols
+for this role. (Loaded via Skill tool — not frontmatter — as the NA-25 workaround: frontmatter
+preloads are re-injected on every SendMessage resume, harness bug anthropics/claude-code#76337;
+Skill-tool loads land in the transcript once and survive resumes.)
 
 The post-implementation quality skills (`requesting-code-review`, `receiving-code-review`,
 `verification-before-completion`) are owned by the **QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/agents/qa-engineer.md`),

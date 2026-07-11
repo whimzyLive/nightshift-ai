@@ -473,3 +473,52 @@ feat/NA-27` (the local branch ref — `feat/NA-27` was checked out exclusively i
 - This is a phase-3 "write ONLY a failing regression test, do not fix the bug" dispatch (systematic
   debugging discipline) — resist the pull to also touch the 12 offending agent files even though
   the fix is mechanical and obvious; the fix is a deliberately separate later phase/dispatch.
+
+## NA-25 — phase 4, convert all 12 agents' frontmatter `skills:` to first-turn Skill-tool loads (`plugins/sdlc/agents`)
+
+- The 12 agents split into 3 distinct body-structure families, and each needed a different merge
+  strategy rather than one copy-pasted section: (1) the 5 domain-implementer agents
+  (database-administrator, mobile-engineer, platform-engineer, sync-engineer, web-engineer) share a
+  byte-identical `## Skills` section that already explained frontmatter-preload + override-skill
+  ordering — extend that section in place rather than inserting a second "load FIRST" block above
+  it, since the instruction to "merge into an existing skills-invocation section" outranks the
+  "place prominently near the top" default when the two conflict. (2) principal-engineer,
+  qa-engineer, solutions-architect, tech-lead already had a `## Required skills — invoke in order
+before any other step` section, but it listed **only a subset** of the frontmatter `skills:` list
+  (e.g. principal-engineer's body named 2 of 4 frontmatter skills, qa-engineer's named 3 of 6) —
+  the body list must be extended to the FULL frontmatter list in frontmatter order, not left
+  partial, since the removed frontmatter was the only place the omitted skills (`acli`, `gh-cli`,
+  `subagent-driven-development`, `conventional-commit`) were ever declared. (3) product-manager and
+  scrum-master needed the same full-list-extension treatment, plus adding `Skill` to `tools:` (both
+  lacked it entirely — Read/Write/Bash or Read/Bash/Edit only). Always diff frontmatter `skills:`
+  against the body's already-invoked subset before writing the merge; don't assume an existing
+  "Required skills" section is already complete just because it exists.
+- scrum-master's existing skills section was a **per-step invocation table** (`user-story-mapping`
+  invoked at a specific point in Mode 1, `user-story-splitting` only when a story is >8 pts) — this
+  answers _when to apply_ a skill, which is orthogonal to _when to load_ it. The NA-25 workaround
+  needs loading to happen in the first turn regardless of when the skill is semantically applied
+  later in a multi-mode agent's execution. Fix: keep the table (renamed to describe application
+  timing, "loading early does not mean applying early") and prepend a numbered load-first list
+  covering all 3 frontmatter skills (including `acli`, which the table never mentioned as an
+  invoked skill even though it's the agent's mandatory Jira transport) — this is a genuine merge,
+  not a duplicate, because the two blocks answer different questions about the same skill set.
+- 6 of the 12 agents (principal-engineer, qa-engineer, solutions-architect, tech-lead,
+  product-manager, scrum-master) had `tools:` lists with no `Skill` entry at all — their frontmatter
+  `skills:` preload previously made an explicit `Skill`-tool call unnecessary for those skills, so
+  nobody had needed to add the tool. Removing frontmatter preloads makes `Skill` load-bearing for
+  every one of the 12 agents; grep `tools:.*Skill` across all agent files after any such conversion
+  to catch this rather than assuming the 6 files that already had `Skill` (because they also had
+  `Write`/`Edit` domain-agents needing it for a different reason) generalize to the rest.
+- The regression guard (`check-agent-skill-preloads.sh`, added in phase 3) parses ONLY between the
+  first two `^---$` lines, so it is blind to anything in the body — a body section that still says
+  "Generic skills are preloaded via frontmatter" after the frontmatter block was actually removed
+  would pass the guard while being factually wrong. The guard proves the mechanical fix; it does
+  NOT prove the prose was updated to match. Manually verify every body sentence that used to
+  describe frontmatter preloading (ai-enablement-engineer's First-steps item 2 had one, each of the
+  5 domain-implementer agents' `## Skills` intro sentence had one) was reworded, not just removed
+  frontmatter-side.
+- This dispatch touches `plugins/sdlc/agents/ai-enablement-engineer.md` — the file that IS this
+  agent's own definition, being edited by an instance of the same agent in the same session. No
+  special handling needed (it's a normal in-scope write, and the running instance already has this
+  turn's skills loaded from its own dispatch), but worth flagging for future dispatches: self-owned
+  file edits still go through the identical write-scope check and Edit-tool flow as any other file.

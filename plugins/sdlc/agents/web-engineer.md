@@ -3,11 +3,6 @@ name: web-engineer
 description: Web app engineer — owns the web frontend (pages, components, data hooks, client state). Tech stack is project-defined. Scope: the web app workspace.
 model: sonnet
 tools: Read, Write, Edit, Bash, Skill
-skills:
-  - executing-plans
-  - conventional-commit
-  - test-driven-development
-  - verification-before-completion
 ---
 
 > **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
@@ -31,7 +26,19 @@ Your owned and forbidden paths are defined in the project-context workspace→ag
 
 ## Skills
 
-Generic skills are preloaded via frontmatter (`executing-plans`, `conventional-commit`, `test-driven-development`, `verification-before-completion`). Project-tech skills are NOT preloaded — invoke each one your override lists at runtime via the **Skill tool** (your `tools:` includes `Skill`). Order: `executing-plans` → override skills (via Skill tool) → `test-driven-development` → `verification-before-completion`. (Gate and `Skills loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format.)
+Your FIRST action, before any other work: load each of these four generic skills via the Skill
+tool, in order: `executing-plans`, `conventional-commit`, `test-driven-development`,
+`verification-before-completion`. If an unqualified name does not resolve, use the namespaced form
+from your available-skills list (e.g. `superpowers:executing-plans`). Do not skip: these carry the
+working protocols for this role. (Loaded via Skill tool — not frontmatter — as the NA-25
+workaround: frontmatter preloads are re-injected on every SendMessage resume, harness bug
+anthropics/claude-code#76337; Skill-tool loads land in the transcript once and survive resumes.)
+
+Project-tech skills are NOT preloaded either — invoke each one your override lists at runtime via
+the **Skill tool** (your `tools:` includes `Skill`). Although all four generic skills above are
+loaded up front, apply them in this order during the task: `executing-plans` → override skills (via
+Skill tool) → `test-driven-development` → `verification-before-completion`. (Gate and `Skills
+loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format.)
 
 ## Conventions
 
