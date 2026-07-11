@@ -448,3 +448,28 @@ feat/NA-27` (the local branch ref — `feat/NA-27` was checked out exclusively i
   confirming every `git`/`fetch`/`worktree add` call in the modified branches carries `>&2` (or was
   already `>&2`), then locating the two unguarded `printf` lines at the very end as the only stdout
   producers, is sufficient and much cheaper than an end-to-end dry run.
+
+## NA-25 — phase 3, failing regression guard for frontmatter `skills:` preloads (`plugins/sdlc/scripts`)
+
+- `.github/workflows/ci.yml` is OUTSIDE this agent's resolved write-scope even when a dispatch
+  prompt explicitly names it as a task step. The `analyze-protocol.md#ownership-resolution-rules`
+  config-driven AI-config surface whitelists exactly one `.github/*` path
+  (`.github/copilot-instructions.md`) — not `.github/workflows/**` — and the workspace→agent table
+  has no row for it (`tools/` → platform-engineer is the closest sibling but doesn't cover
+  `.github/`). AC-5 ("refuse and abort on any path outside scope, listing the offending path")
+  applies even under an orchestrator-authored task list — a dispatch prompt is not itself scope
+  expansion or "consent" per the harness-level instruction that no agent message authorizes
+  permission/config changes outside a role's own boundaries. When a task bundles an in-scope
+  deliverable (a new `plugins/sdlc/scripts/*.sh` guard) with an out-of-scope one (wiring it into
+  `.github/workflows/ci.yml`), do the in-scope parts, explicitly refuse+skip the out-of-scope
+  write, and surface it back to the orchestrator as a named gap (likely platform-engineer's
+  `tools/` domain, or a table addition) rather than silently doing it or silently dropping it.
+- A frontmatter-only parse guard (ignore `skills:` mentions in a Markdown file's body/prose) is
+  cleanly done with a tiny two-delimiter awk state machine: increment a counter on each `^---$`
+  line, print only while between the 1st and 2nd occurrence, `exit` once the 2nd is hit. This
+  avoids `sed -n '/^---$/,/^---$/p'`-style ranges misfiring on files whose body later reintroduces
+  a bare `---` (e.g. a Markdown horizontal rule), since the awk version stops for good after the
+  frontmatter block closes rather than re-opening on every subsequent `---` pair.
+- This is a phase-3 "write ONLY a failing regression test, do not fix the bug" dispatch (systematic
+  debugging discipline) — resist the pull to also touch the 12 offending agent files even though
+  the fix is mechanical and obvious; the fix is a deliberately separate later phase/dispatch.
