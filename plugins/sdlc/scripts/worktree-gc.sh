@@ -52,6 +52,11 @@ gc_main() {
   worktree_paths="$(git -C "$PRIMARY_ROOT" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')"
   [ -n "$worktree_paths" ] || return 0
 
+  # Resolved once, off the already-robustly-resolved PRIMARY_ROOT (`git rev-parse --show-toplevel`
+  # — absolute, symlink-resolved), so every candidate below is checked against THIS repo's own
+  # worktrees directory, never a lookalike elsewhere on the filesystem.
+  WORKTREES_ROOT="$PRIMARY_ROOT/.claude/worktrees"
+
   while IFS= read -r WT; do
     [ -n "$WT" ] || continue
     wt_base="$(basename "$WT")"
@@ -60,6 +65,18 @@ gc_main() {
     case "$wt_base" in
       sdlc-*|agent-*) ;;
       *) continue ;;
+    esac
+
+    # Basename matching alone isn't a safe gate — an unrelated worktree elsewhere on disk could
+    # happen to share a candidate directory name (e.g. another repo's own "agent-foo" worktree).
+    # Require the candidate to actually live under this repo's .claude/worktrees/ before it's ever
+    # eligible for removal.
+    case "$WT" in
+      "$WORKTREES_ROOT"/*) ;;
+      *)
+        echo "worktree-gc.sh: $WT matched by name but is not under $WORKTREES_ROOT — skip" >&2
+        continue
+        ;;
     esac
 
     WB="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"

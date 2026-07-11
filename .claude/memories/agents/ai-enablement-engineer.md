@@ -419,3 +419,32 @@ review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 prod
   PRIMARY checkout, which for a domain agent is a hard violation if anything gets staged/committed
   there; confirm `pwd` and `git worktree list` immediately after any such `cd` before trusting `git
 log`/`git status` output.
+
+## NA-27 — Copilot fix round on PR #72 (`plugins/sdlc/scripts`)
+
+- The dispatched worktree's own branch (a synthetic `worktree-agent-<hash>`) was, once again, a
+  strict ancestor of `origin/feat/NA-27` (this time five commits behind, at `730b30c` — the
+  pre-worktree-model spec-merge point). Same low-risk fix as prior NA-27/NA-26 rounds: `git
+merge-base --is-ancestor HEAD feat/NA-27` to confirm no divergence, then `git merge --ff-only
+feat/NA-27` (the local branch ref — `feat/NA-27` was checked out exclusively in the sibling
+  primary worktree, so only `git checkout` there is blocked, not `git merge`). This is now a
+  recurring pattern across at least 3 stories — always diff stated base SHA against actual `HEAD`
+  before assuming a fresh worktree is current.
+- A two-branch "admits local-OR-remote, but body always fetches/merges origin unconditionally" bug
+  (worktree-setup.sh Case 2) is fixed the same way Case 1 already handles it: probe
+  `ls-remote --exit-code --heads origin "$BRANCH"` into a boolean ONCE, then gate both the fetch and
+  the later ff-only merge on that same boolean, instead of re-deriving remote-existence at each
+  call site (which is how the original bug crept in — the `elif` entry condition and the fetch call
+  independently assumed "matched the elif => origin has it").
+- worktree-gc.sh's `sdlc-*|agent-*` basename-only candidate filter is a classic "matches by name,
+  not by identity" gap — the fix is a second `case "$WT" in "$WORKTREES_ROOT"/*) ;; ...` gate right
+  after the basename `case`, reusing the already-robustly-resolved `PRIMARY_ROOT` (git
+  `rev-parse --show-toplevel`, absolute + symlink-resolved) rather than re-deriving repo root with
+  a fresh `pwd`/`readlink` — the worktree paths from `git worktree list --porcelain` are already
+  absolute, so a plain `"$WORKTREES_ROOT"/*` glob-case match is sufficient, no extra `realpath`
+  needed.
+- Verifying a stdout-contract fix (`WORKTREE=`/`NX_CACHE_DIRECTORY=` exactly two lines) doesn't
+  require actually running the script end-to-end against a live repo — a full read-through
+  confirming every `git`/`fetch`/`worktree add` call in the modified branches carries `>&2` (or was
+  already `>&2`), then locating the two unguarded `printf` lines at the very end as the only stdout
+  producers, is sufficient and much cheaper than an end-to-end dry run.

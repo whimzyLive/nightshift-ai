@@ -97,18 +97,31 @@ if $REGISTERED; then
 elif git -C "$PRIMARY_ROOT" show-ref --verify --quiet "refs/heads/$BRANCH" \
   || git -C "$PRIMARY_ROOT" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
   # Case 2: branch exists (local or origin) but no worktree — re-provision after a teardown/GC.
-  if ! git -C "$PRIMARY_ROOT" fetch origin "$BRANCH"; then
-    echo "worktree-setup.sh: fetch of origin/$BRANCH failed" >&2
-    exit 1
+  #
+  # The entry condition above admits a LOCAL-only branch too (never pushed) — probe for
+  # origin/$BRANCH once (as Case 1 does) and only fetch/ff when it actually exists, rather than
+  # fetching unconditionally, which would hard-fail every re-provision of a never-pushed branch
+  # (breaks idempotent re-provision, invariant 2).
+  REMOTE_EXISTS=false
+  if git -C "$PRIMARY_ROOT" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+    REMOTE_EXISTS=true
   fi
-  if ! git -C "$PRIMARY_ROOT" worktree add "$WT" "$BRANCH"; then
+  if $REMOTE_EXISTS; then
+    if ! git -C "$PRIMARY_ROOT" fetch origin "$BRANCH" >&2; then
+      echo "worktree-setup.sh: fetch of origin/$BRANCH failed" >&2
+      exit 1
+    fi
+  else
+    echo "worktree-setup.sh: origin/$BRANCH does not exist yet (never pushed) — re-provisioning from the local branch, skipping fetch" >&2
+  fi
+  if ! git -C "$PRIMARY_ROOT" worktree add "$WT" "$BRANCH" >&2; then
     echo "worktree-setup.sh: could not re-provision worktree at $WT for existing branch $BRANCH" >&2
     exit 1
   fi
   # `worktree add "$WT" "$BRANCH"` checks out the LOCAL branch ref as-is — fast-forward it to the
   # freshly fetched origin head (mirrors Case 1) so a stale local ref doesn't leave the re-provisioned
   # worktree behind origin/$BRANCH.
-  if git -C "$PRIMARY_ROOT" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+  if $REMOTE_EXISTS; then
     if ! git -C "$WT" merge --ff-only "origin/$BRANCH" >&2; then
       echo "worktree-setup.sh: $WT could not fast-forward to origin/$BRANCH (local branch has diverged — resolve manually)" >&2
       exit 1
@@ -123,11 +136,11 @@ elif git -C "$PRIMARY_ROOT" show-ref --verify --quiet "refs/heads/$BRANCH" \
 else
   # Case 3: neither exists — first run. Create the branch INSIDE the worktree from the base; the
   # primary checkout is never touched.
-  if ! git -C "$PRIMARY_ROOT" fetch origin "$BASE_BRANCH"; then
+  if ! git -C "$PRIMARY_ROOT" fetch origin "$BASE_BRANCH" >&2; then
     echo "worktree-setup.sh: fetch of origin/$BASE_BRANCH failed" >&2
     exit 1
   fi
-  if ! git -C "$PRIMARY_ROOT" worktree add -b "$BRANCH" "$WT" "origin/$BASE_BRANCH"; then
+  if ! git -C "$PRIMARY_ROOT" worktree add -b "$BRANCH" "$WT" "origin/$BASE_BRANCH" >&2; then
     echo "worktree-setup.sh: could not create worktree $WT with new branch $BRANCH from origin/$BASE_BRANCH" >&2
     exit 1
   fi
