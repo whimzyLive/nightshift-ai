@@ -171,15 +171,7 @@ C:\\Users\\y\n'`) and the two false-positive shapes found in `plugins/sdlc/refs/
   section — vendored it anyway since it lives in the same small `agents/` directory as the two core
   files and splitting one file out of a 3-file directory for an "optional but harmless" doc isn't
   worth the inconsistency.
-- Vetted every bundled script across all five directories, not just the ones read in the first
-  pass (spec requires reading bundled scripts before vendoring): `subprocess.run(["claude", "-p",
-...])` calls in `run_eval.py`/`improve_description.py` and `subprocess.run(["lsof", "-ti", ...])`
-  - `os.kill(...)` in `eval-viewer/generate_review.py` are local CLI/process-management invocations
-    (not RCE from untrusted input, not exfiltration); `eval-viewer/viewer.html`'s `fetch()` calls only
-    hit the local `/api/feedback` endpoint served by that same local script (same-origin, no external
-    host). `aggregate_benchmark.py`, `generate_report.py`, `package_skill.py`, `quick_validate.py`,
-    `utils.py` — grepped for network/exec primitives, no matches. No external network exfiltration
-    found anywhere in the vendored tree.
+- Vetted every bundled script across all five directories, not just the ones read in the first pass (spec requires reading bundled scripts before vendoring): the `subprocess.run(["claude", "-p", ...])` calls in `run_eval.py`/`improve_description.py`, together with the `subprocess.run(["lsof", "-ti", ...])` and `os.kill(...)` calls in `eval-viewer/generate_review.py`, are local CLI/process-management invocations (not RCE from untrusted input, not exfiltration); `eval-viewer/viewer.html`'s `fetch()` calls only hit the local `/api/feedback` endpoint served by that same local script (same-origin, no external host). `aggregate_benchmark.py`, `generate_report.py`, `package_skill.py`, `quick_validate.py`, `utils.py` — grepped for network/exec primitives, no matches. No external network exfiltration found anywhere in the vendored tree.
 - `git clone` works fine for vendoring even though this session's `curl`/`wget` are blocked by a
   context-mode hook (only for the http fetch path, not git's own transport) — used `git clone
 --depth 50 <repo>` into the scratchpad, read files with the Read tool, then `rm -rf` the clone
