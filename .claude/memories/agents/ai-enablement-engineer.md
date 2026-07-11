@@ -522,3 +522,41 @@ before any other step` section, but it listed **only a subset** of the frontmatt
   special handling needed (it's a normal in-scope write, and the running instance already has this
   turn's skills loaded from its own dispatch), but worth flagging for future dispatches: self-owned
   file edits still go through the identical write-scope check and Edit-tool flow as any other file.
+
+## NA-25 — QA fix round on commit 9d6fc64 (`plugins/sdlc/agents/scrum-master.md` + `plugins/sdlc/scripts`)
+
+- Confirmed root cause of the scrum-master.md corruption: the file's Mode-1 "Execution steps"
+  numbered list uses non-standard sub-item markers (`6a.`, `10a.`, `10b.`) that are not valid
+  CommonMark ordered-list syntax. `npx prettier --check` on the saved (Edit-tool) content reported
+  "All files formatted correctly" — a **false negative**, exactly the trap NA-27's `e510d80` memory
+  entry already flagged: the repo's real `lint-staged` pre-commit hook runs `prettier --write`
+  during `git commit`, and that invocation produced a different result than my pre-commit
+  `--check`. Only `git show <sha> -- <file>` after the commit reveals what actually landed — never
+  trust a pre-commit `--check`/`--write` dry run as proof the committed content will match.
+  Whatever upstream edit disturbs an ordered list's numbering (here: inserting new content earlier
+  in the same file, unrelated to the `10a.`/`10b.` region) can trigger a full-list renumber pass by
+  prettier's remark parser that then mis-parses the non-standard sub-markers as plain paragraph
+  text, flattening their nested bullets and turning fenced code blocks into corrupted inline spans.
+- Fix pattern (same family as `e510d80`, confirmed to generalize): dedent the ENTIRE `10a.`/`10b.`
+  pseudo-list-item block — marker, prose, sub-bullets, and fences — to column 0, with blank lines
+  separating prose/bullets/fences from each other. This removes ALL ambiguity about whether the
+  content is "nested inside" the preceding numbered list item, so prettier's parser has nothing to
+  reconcile and leaves the block untouched on every subsequent pass. Verified via a real,
+  in-repo-tree `pnpm exec prettier --write` run TWICE in a row: the first pass only trimmed two
+  stray leading spaces (cosmetic), the second pass reported `(unchanged)` and produced a byte-
+  identical diff — that two-pass "second write is a no-op" check is the actual proof of stability,
+  not a single `--check` invocation (which is exactly the false-negative trap above).
+- `check-agent-skill-preloads.sh`'s original `agents_dir="$(cd "$here/../agents" && pwd)"` line is
+  a classic `set -uo pipefail`-without-`-e` trap: a failed `cd` inside a command substitution does
+  NOT stop the script (no `-e`), so `agents_dir` silently becomes an empty string, and the
+  subsequent `for f in "$agents_dir"/*.md` glob degrades to `/*.md` (repo root) or, on an empty-but-
+  existing dir, to the literal unexpanded glob string (caught by the old `[ -e "$f" ]` per-item
+  skip) — both paths fall through to zero offenders and a false "OK" exit 0. Fix: check `[ -d
+"$agents_dir" ]` explicitly BEFORE resolving the absolute path (so a missing dir fails loudly
+  first), then use `shopt -s nullglob` + an array (`files=("$agents_dir"/*.md)`) instead of the
+  bare `for f in .../*.md; do [ -e "$f" ] || continue` idiom — nullglob makes a true zero-match
+  glob expand to a genuinely empty array, so `[ "${#files[@]}" -eq 0 ]` reliably distinguishes
+  "no files matched" from "one file matched" without relying on the per-item existence-check
+  side-effect. This same nullglob-array pattern is worth reusing anywhere else in the plugin that
+  still uses the bare `for f in "$dir"/*.ext; do [ -e "$f" ] || continue` idiom to iterate a glob —
+  it is silently vacuous on a missing/empty directory, not just fragile.

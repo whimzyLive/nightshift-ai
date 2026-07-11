@@ -26,13 +26,34 @@
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-agents_dir="$(cd "$here/../agents" && pwd)"
+agents_dir="$here/../agents"
+
+# Fail fast if the agents dir is missing — with `set -uo pipefail` (no `-e`), a failed `cd` in a
+# command substitution does NOT stop the script; it silently produces an empty $agents_dir, which
+# then makes the loop below glob against `/*.md` (repo root) and find nothing. Checking `-d`
+# explicitly, before resolving the absolute path, catches that case loudly instead of letting the
+# rest of the script run against the wrong directory.
+if [ ! -d "$agents_dir" ]; then
+  echo "check-agent-skill-preloads: FAILED — agents directory not found at $agents_dir" >&2
+  exit 1
+fi
+agents_dir="$(cd "$agents_dir" && pwd)"
+
+# nullglob so a no-match glob expands to zero elements (an empty array) instead of the literal,
+# non-existent path "$agents_dir/*.md" — without it, the fail-fast check below would never see an
+# empty match and the guard would stay vacuously green on an empty agents dir.
+shopt -s nullglob
+files=("$agents_dir"/*.md)
+shopt -u nullglob
+
+if [ "${#files[@]}" -eq 0 ]; then
+  echo "check-agent-skill-preloads: FAILED — no agent .md files found in $agents_dir" >&2
+  exit 1
+fi
 
 offenders=""
 
-for f in "$agents_dir"/*.md; do
-  [ -e "$f" ] || continue
-
+for f in "${files[@]}"; do
   # Extract the frontmatter block: everything between the first `---` line and the next `---`
   # line. awk stops emitting once it hits the closing delimiter, so body prose/code fences that
   # happen to contain the literal text "skills:" are never considered.

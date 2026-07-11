@@ -132,18 +132,30 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
         - Decompose-created stories receive **only** these labels — **never** `AI-Refine`.
         **Note:** `--parent` only works when the story is in the **same project** as the Epic. Epic and stories must share the same `projectKey`.
 
-    10a. **Post-create: stamp the AI Workflow field on each created child story; report Story Points for manual entry.** For each key in the created-keys list: - **Custom-field stamps go through `jira-set-field.sh`, never `acli jira workitem edit`** — acli has no flag for setting custom-field values (verified through 1.3.22), so the plugin ships a REST helper. It authenticates via the same `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract as the acli skill's headless auth; when those are absent it exits 2 (skip) rather than failing. - **Story Points are NOT written.** The plugin does not set the points field — auto-stamping is dropped until acli exposes custom-field values natively (the REST-token env contract proved too fragile to require of every consumer). Instead, surface each story's step-6a estimate in the final return (step 15) as `<CHILD-KEY>: estimated N pts — set Story Points manually in Jira`. - **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted` **and `epicAiWorkflowSource=field`**, set the AI Workflow custom field by display name (never `customfield_*`); best-effort, same swallow pattern:
-    `bash
-      bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "AI Workflow" "<epicAiWorkflow>" option --if-empty \
-        || echo "WARN: AI Workflow stamp failed for <CHILD-KEY> (exit $?) — continuing"
-      `
-    If `epicAiWorkflowSource=label`: **skip this field stamp** — the mode already rode the child's create-time `--label` (step 10); writing the field would fail on a project that has no usable field, which is the very case the label source signals.
-    If `epicAiWorkflow` is `unset`: **skip this edit entirely** for that story. Do not write an empty or null value. - If an `edit` call fails for a story: surface the failing key in the agent return (non-silent) — the story exists but without that stamp. Do not abort the remaining stories. Example: `"Warning: AI Workflow stamp failed for <KEY>."` - **Never add `AI-Refine` to a decompose-created story** in this step or any other.
-    10b. **Verify every story is linked to the Epic — mandatory gate, never skip.** Confirm the children actually attached before proceeding to dependency links:
-    `bash
-    acli jira workitem search --jql "parent = <EPIC-KEY> AND key in (<comma-joined created keys>) ORDER BY key" --json | jq -r '.[].key'
-    `
-    The returned set **must equal** the created-keys list. If any created key is missing, the `create` did not link it — **FAIL LOUD**: surface the orphaned key(s) in the agent return and stop; do **not** silently continue to dependency-linking. (`acli jira workitem view --json` does **not** surface `parent`, so verify via this `parent = <EPIC-KEY>` JQL — never via `view`.)
+10a. **Post-create: stamp the AI Workflow field on each created child story; report Story Points for manual entry.** For each key in the created-keys list:
+
+- **Custom-field stamps go through `jira-set-field.sh`, never `acli jira workitem edit`** — acli has no flag for setting custom-field values (verified through 1.3.22), so the plugin ships a REST helper. It authenticates via the same `ATLASSIAN_SITE` / `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` env contract as the acli skill's headless auth; when those are absent it exits 2 (skip) rather than failing.
+- **Story Points are NOT written.** The plugin does not set the points field — auto-stamping is dropped until acli exposes custom-field values natively (the REST-token env contract proved too fragile to require of every consumer). Instead, surface each story's step-6a estimate in the final return (step 15) as `<CHILD-KEY>: estimated N pts — set Story Points manually in Jira`.
+- **AI Workflow:** if `epicAiWorkflow` is `Auto` or `Assisted` **and `epicAiWorkflowSource=field`**, set the AI Workflow custom field by display name (never `customfield_*`); best-effort, same swallow pattern:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-set-field.sh "<CHILD-KEY>" "AI Workflow" "<epicAiWorkflow>" option --if-empty \
+  || echo "WARN: AI Workflow stamp failed for <CHILD-KEY> (exit $?) — continuing"
+```
+
+If `epicAiWorkflowSource=label`: **skip this field stamp** — the mode already rode the child's create-time `--label` (step 10); writing the field would fail on a project that has no usable field, which is the very case the label source signals.
+If `epicAiWorkflow` is `unset`: **skip this edit entirely** for that story. Do not write an empty or null value.
+
+- If an `edit` call fails for a story: surface the failing key in the agent return (non-silent) — the story exists but without that stamp. Do not abort the remaining stories. Example: `"Warning: AI Workflow stamp failed for <KEY>."`
+- **Never add `AI-Refine` to a decompose-created story** in this step or any other.
+
+10b. **Verify every story is linked to the Epic — mandatory gate, never skip.** Confirm the children actually attached before proceeding to dependency links:
+
+```bash
+acli jira workitem search --jql "parent = <EPIC-KEY> AND key in (<comma-joined created keys>) ORDER BY key" --json | jq -r '.[].key'
+```
+
+The returned set **must equal** the created-keys list. If any created key is missing, the `create` did not link it — **FAIL LOUD**: surface the orphaned key(s) in the agent return and stop; do **not** silently continue to dependency-linking. (`acli jira workitem view --json` does **not** surface `parent`, so verify via this `parent = <EPIC-KEY>` JQL — never via `view`.)
 
 11. Issue keys are captured inline by the per-story `create` loop in step 10 (the `key=$(... | jq -r '.key')` capture) — no separate collection step is needed.
 12. **Link blocking dependencies.** Use the `link create` form (the positional `link <a> <b>` form is unreliable; do not use it). **acli's direction is counter-intuitive — verified against the Jira UI: `--in` is the BLOCKER, `--out` is the BLOCKED story.** So to express "**A blocks B**" (A is the prerequisite, B depends on A), put the blocker in `--in`:
