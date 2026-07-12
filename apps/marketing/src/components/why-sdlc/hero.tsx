@@ -21,16 +21,19 @@ export function Hero({ intro }: { intro: WhySdlcIntro | null }) {
         borderColor: 'var(--border-default)',
       }}
     >
+      {/* Bright centre kept off-screen top-left and heavily blurred so the
+          glow fades to nothing well inside the section — no hard clip edge
+          against the page background. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute rounded-full blur-[10px]"
+        className="pointer-events-none absolute rounded-full blur-[60px]"
         style={{
-          top: -120,
-          left: -60,
-          width: 420,
-          height: 420,
+          top: -260,
+          left: -200,
+          width: 620,
+          height: 620,
           background:
-            'radial-gradient(circle, var(--terra-glow), transparent 62%)',
+            'radial-gradient(circle, var(--terra-glow), transparent 66%)',
         }}
       />
       <div className="relative z-[1] mx-auto" style={{ maxWidth: 820 }}>

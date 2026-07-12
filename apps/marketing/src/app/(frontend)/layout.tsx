@@ -1,4 +1,4 @@
-import { CursorGlow, Footer, NavBar } from '@nightshift-ai/ui';
+import { CursorGlow, Footer, NavBar, ScrollProgress } from '@nightshift-ai/ui';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
@@ -30,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="min-h-screen bg-[var(--bg-page)] text-[var(--text-body)] antialiased">
         <CursorGlow />
+        <ScrollProgress />
         <NavBar />
         <main
           className="mx-auto max-w-[var(--container-max)] px-7"

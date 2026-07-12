@@ -148,14 +148,14 @@ export function Hero() {
         <div className="relative">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute rounded-full blur-[10px]"
+            className="pointer-events-none absolute rounded-full blur-[60px]"
             style={{
-              top: '-4.375rem',
-              left: '-3.125rem',
-              width: '26.25rem',
-              height: '26.25rem',
+              top: '-7rem',
+              left: '-6rem',
+              width: '32rem',
+              height: '32rem',
               background:
-                'radial-gradient(circle, var(--terra-glow), transparent 62%)',
+                'radial-gradient(circle, var(--terra-glow), transparent 66%)',
             }}
           />
           <Terminal

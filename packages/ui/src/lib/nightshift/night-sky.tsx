@@ -256,6 +256,29 @@ export function NightSky({
             style={halo.style}
           />
         ))}
+
+        {/* Crescent moon — the one solid celestial asset. The crescent is
+            carved by an inset shadow (dark bite bottom-right) + an indigo rim;
+            an outer glow lifts it off the void. Rides the mid parallax plane
+            and drifts on a slow float. */}
+        <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
+          <motion.div
+            className="absolute rounded-full"
+            style={{
+              top: 178,
+              left: '84%',
+              width: 110,
+              height: 110,
+              background:
+                'radial-gradient(circle at 40% 38%, #fffaf2, #efe8db 55%, #d3cabb 100%)',
+              boxShadow:
+                '0 0 52px 12px rgba(245,243,239,0.42), inset -30px -8px 0 -8px rgba(13,13,24,0.9), inset -20px 4px 26px -10px rgba(139,156,247,0.45)',
+              filter: 'blur(0.5px)',
+            }}
+            animate={animate ? { y: [0, -22, 0] } : undefined}
+            transition={{ duration: 20, ease: 'easeInOut', repeat: Infinity }}
+          />
+        </motion.div>
       </div>
 
       {meteors.length > 0 && (

@@ -136,7 +136,11 @@ export function HowItWorks() {
                     background: 'var(--surface-card)',
                     border: '1px solid',
                     borderColor: s.border,
-                    boxShadow: s.glow,
+                    // Active stage keeps its accent glow; the rest get a soft
+                    // drop + inset top highlight so the flat fill reads raised.
+                    boxShadow:
+                      s.glow ??
+                      'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.05)',
                   }}
                 >
                   <span
@@ -186,6 +190,7 @@ export function HowItWorks() {
           style={{
             borderColor: 'var(--border-default)',
             background: 'var(--surface-card)',
+            boxShadow: 'var(--elev-3), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
         >
           <div
@@ -248,6 +253,7 @@ export function HowItWorks() {
               background: 'var(--surface-card)',
               border: '1px solid var(--border-soft)',
               padding: '14px 16px',
+              boxShadow: 'var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}
           >
             <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
@@ -271,6 +277,7 @@ export function HowItWorks() {
               background: 'var(--surface-card)',
               border: '1px solid var(--border-soft)',
               padding: '14px 16px',
+              boxShadow: 'var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)',
             }}
           >
             <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
