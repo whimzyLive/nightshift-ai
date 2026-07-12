@@ -1,0 +1,6 @@
+/* nightshift — webfonts
+ * Heading/body: Inter (clean geometric sans — the brand's "Geist/Inter feel")
+ * Code/UI chrome: JetBrains Mono (the brand's "JetBrains Mono / Geist Mono feel")
+ * Both loaded from Google Fonts. Self-host the .woff2 for production if offline use is needed.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap');

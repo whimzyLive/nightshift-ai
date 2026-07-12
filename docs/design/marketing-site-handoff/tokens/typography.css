@@ -1,0 +1,64 @@
+/* nightshift — typography tokens
+ * Pairing: Inter (sans, headings + body) · JetBrains Mono (code, labels, UI chrome)
+ * Monospace carries the "terminal texture" — used for eyebrows, badges, metadata, commands.
+ */
+:root {
+  /* ---- Families ---- */
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    sans-serif;
+  --font-mono:
+    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo,
+    Consolas, monospace;
+
+  /* ---- Weights ---- */
+  --fw-regular: 400; /* @kind font */
+  --fw-medium: 500; /* @kind font */
+  --fw-semibold: 600; /* @kind font */
+  --fw-bold: 700; /* @kind font */
+  --fw-extra: 800; /* @kind font */
+
+  /* ---- Type scale (1.250 major-third-ish, tuned) ---- */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 25px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 72px;
+  --text-6xl: 92px;
+
+  /* ---- Line heights ---- */
+  --leading-tight: 1.06;
+  --leading-snug: 1.22;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* ---- Letter spacing ---- */
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-eyebrow: 0.16em; /* mono eyebrows / labels, uppercase */
+
+  /* ---- Semantic roles ---- */
+  --display-font: var(--font-sans);
+  --display-weight: var(--fw-extra);
+  --display-tracking: var(--tracking-tight);
+
+  --heading-font: var(--font-sans);
+  --heading-weight: var(--fw-bold);
+
+  --body-font: var(--font-sans);
+  --body-weight: var(--fw-regular);
+
+  --eyebrow-font: var(--font-mono);
+  --eyebrow-weight: var(--fw-medium);
+  --eyebrow-tracking: var(--tracking-eyebrow);
+
+  --code-font: var(--font-mono);
+}

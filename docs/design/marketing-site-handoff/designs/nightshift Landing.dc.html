@@ -1,0 +1,4028 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="./support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/fonts.css"
+        />
+        <link
+          rel="stylesheet"
+          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/colors.css"
+        />
+        <link
+          rel="stylesheet"
+          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/typography.css"
+        />
+        <link
+          rel="stylesheet"
+          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/spacing.css"
+        />
+        <link
+          rel="stylesheet"
+          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/base.css"
+        />
+        <link
+          rel="stylesheet"
+          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/styles.css"
+        />
+        <script src="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/_ds_bundle.js"></script>
+        <style>
+          html,
+          body {
+            margin: 0;
+            background: #0d0d18;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+          }
+          #ns-root,
+          #ns-root * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
+          a {
+            color: var(--link);
+            text-decoration: none;
+          }
+          a:hover {
+            color: var(--link-hover);
+          }
+          @keyframes ns-blink {
+            0%,
+            55% {
+              opacity: 1;
+            }
+            56%,
+            100% {
+              opacity: 0;
+            }
+          }
+          .ns-stars {
+            display: none;
+          }
+          .ns-glow {
+            position: absolute;
+            width: 420px;
+            height: 420px;
+            border-radius: 50%;
+            pointer-events: none;
+            filter: blur(10px);
+            background: radial-gradient(
+              circle,
+              var(--terra-glow),
+              transparent 62%
+            );
+          }
+
+          /* ---- animated night sky ---- */
+          #ns-sky {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+          }
+          .ns-layer {
+            position: absolute;
+            inset: -12%;
+            background-repeat: repeat;
+            transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: transform;
+          }
+          #ns-moons {
+            position: absolute;
+            inset: 0;
+            transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: transform;
+          }
+          .ns-moon {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(2px);
+            animation: ns-float 20s ease-in-out infinite;
+          }
+          @keyframes ns-float {
+            0%,
+            100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-22px);
+            }
+          }
+          .ns-meteor {
+            position: absolute;
+            height: 2px;
+            width: 230px;
+            border-radius: 2px;
+            background: linear-gradient(
+              90deg,
+              transparent,
+              rgba(217, 119, 87, 0.55) 58%,
+              #ffffff
+            );
+            filter: drop-shadow(0 0 9px rgba(245, 243, 239, 0.9))
+              drop-shadow(0 0 4px rgba(217, 119, 87, 0.8));
+            opacity: 0;
+          }
+          @keyframes ns-shoot {
+            0% {
+              opacity: 0;
+              transform: translate(-130px, -60px) rotate(24deg) scaleX(0.25);
+            }
+            14% {
+              opacity: 1;
+            }
+            82% {
+              opacity: 1;
+            }
+            100% {
+              opacity: 0;
+              transform: translate(760px, 340px) rotate(24deg) scaleX(1);
+            }
+          }
+          @keyframes ns-shoot-click {
+            0% {
+              opacity: 1;
+              transform: translate(0, 0) rotate(24deg) scaleX(0.3);
+            }
+            80% {
+              opacity: 1;
+            }
+            100% {
+              opacity: 0;
+              transform: translate(560px, 250px) rotate(24deg) scaleX(1);
+            }
+          }
+          .ns-click-pop {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            margin: -5px 0 0 -5px;
+            border-radius: 50%;
+            pointer-events: none;
+            background: radial-gradient(
+              circle,
+              rgba(245, 243, 239, 0.95),
+              rgba(217, 119, 87, 0.55) 55%,
+              transparent 72%
+            );
+            animation: ns-pop 0.6s var(--ease-out) forwards;
+          }
+          @keyframes ns-pop {
+            0% {
+              transform: scale(0.4);
+              opacity: 1;
+            }
+            100% {
+              transform: scale(5);
+              opacity: 0;
+            }
+          }
+
+          /* ---- section reveal (blurred parallax on scroll) ---- */
+          .ns-reveal {
+            opacity: 0;
+            filter: blur(16px);
+            transform: translateY(42px);
+            transition:
+              opacity 0.85s var(--ease-out),
+              filter 0.85s var(--ease-out),
+              transform 0.85s var(--ease-out);
+          }
+          .ns-reveal.is-in {
+            opacity: 1;
+            filter: blur(0);
+            transform: none;
+          }
+          .ns-reveal.fx-done {
+            filter: none;
+            transform: none;
+          }
+          .ns-frost {
+            background: rgba(8, 8, 15, 0.6) !important;
+            backdrop-filter: blur(16px) saturate(1.15);
+            -webkit-backdrop-filter: blur(16px) saturate(1.15);
+          }
+
+          /* ---- cursor glow ---- */
+          #ns-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 28px;
+            height: 28px;
+            margin: -14px 0 0 -14px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9998;
+            background: radial-gradient(
+              circle,
+              rgba(217, 119, 87, 0.5),
+              rgba(217, 119, 87, 0) 70%
+            );
+            mix-blend-mode: screen;
+            transition:
+              width 0.24s var(--ease-out),
+              height 0.24s var(--ease-out),
+              background 0.24s var(--ease-out),
+              opacity 0.3s;
+            will-change: transform;
+            opacity: 0;
+          }
+          #ns-cursor.is-active {
+            width: 84px;
+            height: 84px;
+            margin: -42px 0 0 -42px;
+            background: radial-gradient(
+              circle,
+              rgba(217, 119, 87, 0.42),
+              rgba(124, 147, 240, 0.16) 58%,
+              transparent 72%
+            );
+          }
+          #ns-cursor-dot {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 6px;
+            margin: -3px 0 0 -3px;
+            border-radius: 50%;
+            background: var(--accent);
+            pointer-events: none;
+            z-index: 9999;
+            transition: opacity 0.3s;
+            will-change: transform;
+            opacity: 0;
+          }
+
+          /* ---- hover micro-interactions ---- */
+          .ns-lift {
+            transition:
+              transform 0.3s var(--ease-out),
+              border-color 0.3s var(--ease-out),
+              box-shadow 0.3s var(--ease-out) !important;
+          }
+          .ns-lift.is-hover {
+            transform: translateY(-4px);
+            border-color: var(--border-accent) !important;
+            box-shadow:
+              0 20px 44px -14px rgba(0, 0, 0, 0.65),
+              0 0 0 1px rgba(217, 119, 87, 0.22) !important;
+          }
+
+          /* ---- neon headings + readable paragraphs over the sky ---- */
+          /* glow lives as a WIDE halo only — never within ~8px of the glyph, so edges stay razor-sharp */
+          #ns-root h1,
+          #ns-root h2 {
+            text-shadow:
+              0 0 28px rgba(245, 243, 239, 0.15),
+              0 0 64px rgba(124, 147, 240, 0.13);
+          }
+          @keyframes ns-neon {
+            0%,
+            100% {
+              text-shadow:
+                0 0 24px rgba(217, 119, 87, 0.38),
+                0 0 54px rgba(217, 119, 87, 0.2);
+            }
+            50% {
+              text-shadow:
+                0 0 34px rgba(217, 119, 87, 0.55),
+                0 0 78px rgba(217, 119, 87, 0.32);
+            }
+          }
+          #ns-root h1 a {
+            animation: ns-neon 3.6s ease-in-out infinite;
+          }
+          #ns-root p {
+            text-shadow: 0 1px 2px rgba(8, 8, 15, 0.5);
+          }
+
+          @keyframes ns-twinkle {
+            0%,
+            100% {
+              filter: brightness(1);
+            }
+            50% {
+              filter: brightness(1.6);
+            }
+          }
+          @keyframes ns-gatepulse {
+            0%,
+            100% {
+              transform: scale(1);
+              filter: brightness(1);
+            }
+            50% {
+              transform: scale(1.14);
+              filter: brightness(1.45);
+            }
+          }
+          @keyframes ns-risein {
+            0% {
+              opacity: 0;
+              transform: translateY(7px);
+            }
+            100% {
+              opacity: 1;
+              transform: none;
+            }
+          }
+          @keyframes ns-slam {
+            0% {
+              opacity: 0;
+              transform: translateY(-18px) scale(1.05);
+            }
+            60% {
+              transform: translateY(2px) scale(1);
+            }
+            100% {
+              opacity: 1;
+              transform: none;
+            }
+          }
+          /* ---- sharp edges + neon CTAs ---- */
+          #ns-root [style*='border-radius']:not([style*='50%']),
+          #ns-root button,
+          #ns-root header,
+          #ns-root .ns-sheen::after {
+            border-radius: 0 !important;
+          }
+          /* inverted CTAs — outlined accent at rest, terracotta fill on hover */
+          #ns-root button {
+            background: rgba(217, 119, 87, 0.08) !important;
+            color: var(--terra-400) !important;
+            border: 1px solid var(--terra-500) !important;
+            box-shadow:
+              0 0 16px rgba(217, 119, 87, 0.42),
+              0 0 38px rgba(217, 119, 87, 0.18) !important;
+            transition:
+              box-shadow 0.28s var(--ease-out),
+              transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+              background 0.2s,
+              color 0.2s,
+              border-color 0.2s !important;
+          }
+          #ns-root button:hover {
+            background: var(--terra-500) !important;
+            color: #f5f3ef !important;
+            border-color: var(--terra-400) !important;
+            box-shadow:
+              0 0 22px rgba(217, 119, 87, 0.55),
+              4px 4px 0 0 rgba(217, 119, 87, 0.5),
+              8px 8px 0 0 rgba(217, 119, 87, 0.28),
+              12px 12px 0 0 rgba(217, 119, 87, 0.14) !important;
+          }
+          #ns-root button:active {
+            background: var(--terra-600) !important;
+            color: #f5f3ef !important;
+          }
+
+          /* ---- glass nav + footer ---- */
+          #ns-root header {
+            background: linear-gradient(
+              180deg,
+              rgba(13, 13, 24, 0.78),
+              rgba(13, 13, 24, 0.5)
+            ) !important;
+            backdrop-filter: blur(20px) saturate(1.35) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(1.35) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transition:
+              max-width 0.55s var(--ease-out),
+              border-radius 0.55s var(--ease-out),
+              top 0.55s var(--ease-out),
+              margin 0.55s var(--ease-out),
+              background 0.4s,
+              box-shadow 0.4s,
+              border-color 0.4s;
+          }
+          #ns-root header.ns-float {
+            top: 14px !important;
+            max-width: min(940px, calc(100% - 48px));
+            margin: 0 auto;
+            border-radius: 999px;
+            background: linear-gradient(
+              180deg,
+              rgba(13, 13, 24, 0.6),
+              rgba(13, 13, 24, 0.42)
+            ) !important;
+            border: 1px solid rgba(255, 255, 255, 0.13) !important;
+            backdrop-filter: blur(26px) saturate(1.5) !important;
+            -webkit-backdrop-filter: blur(26px) saturate(1.5) !important;
+            box-shadow:
+              0 18px 48px -18px rgba(0, 0, 0, 0.75),
+              0 0 0 1px rgba(217, 119, 87, 0.07),
+              inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          }
+          #ns-root footer {
+            background: linear-gradient(
+              180deg,
+              rgba(8, 8, 15, 0.5),
+              rgba(8, 8, 15, 0.78)
+            ) !important;
+            backdrop-filter: blur(20px) saturate(1.3);
+            -webkit-backdrop-filter: blur(20px) saturate(1.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+          }
+          #ns-root footer a,
+          #ns-root footer li {
+            display: block;
+            height: auto !important;
+            min-height: 0 !important;
+            line-height: 1.6 !important;
+            white-space: normal;
+          }
+
+          /* ---- premium layer ---- */
+          ::selection {
+            background: rgba(217, 119, 87, 0.45);
+            color: #fff;
+          }
+          html {
+            scroll-behavior: smooth;
+          }
+          #ns-root {
+            font-feature-settings:
+              'liga' 1,
+              'calt' 1,
+              'cv05' 1,
+              'cv11' 1;
+            font-kerning: normal;
+          }
+          #ns-root h1,
+          #ns-root h2,
+          #ns-root h3 {
+            text-wrap: balance;
+          }
+          #ns-root p {
+            text-wrap: pretty;
+          }
+          .ns-sheen {
+            position: relative;
+          }
+          .ns-sheen::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-lg);
+            background: radial-gradient(
+              460px circle at var(--mx, 50%) var(--my, 50%),
+              rgba(245, 243, 239, 0.07),
+              transparent 46%
+            );
+            opacity: 0;
+            transition: opacity 0.35s var(--ease-out);
+            pointer-events: none;
+          }
+          .ns-sheen:hover::after {
+            opacity: 1;
+          }
+          #ns-term-wrap {
+            transform-style: preserve-3d;
+            transition: transform 0.45s var(--ease-out);
+            will-change: transform;
+          }
+
+          /* ---- editorial layer ---- */
+          #ns-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            width: 0;
+            background: linear-gradient(
+              90deg,
+              var(--terra-600),
+              var(--terra-400)
+            );
+            box-shadow: 0 0 12px rgba(217, 119, 87, 0.55);
+            z-index: 10000;
+          }
+          @keyframes ns-marquee {
+            0% {
+              transform: translateX(0);
+            }
+            100% {
+              transform: translateX(-50%);
+            }
+          }
+          .ns-marquee {
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+            background: var(--surface-terminal);
+            border-top: 1px solid var(--border-default);
+          }
+          .ns-marquee-track {
+            display: flex;
+            width: max-content;
+            animation: ns-marquee 34s linear infinite;
+          }
+          .ns-marquee:hover .ns-marquee-track {
+            animation-play-state: paused;
+          }
+          .ns-ghost {
+            position: absolute;
+            pointer-events: none;
+            user-select: none;
+            font-family: var(--font-sans);
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+            color: rgba(245, 243, 239, 0.035);
+            z-index: 0;
+          }
+          .ns-stagger > * {
+            opacity: 0;
+            transform: translateY(22px);
+            transition:
+              opacity 0.65s var(--ease-out),
+              transform 0.65s var(--ease-out);
+          }
+          .is-in .ns-stagger > * {
+            opacity: 1;
+            transform: none;
+          }
+          .is-in .ns-stagger > *:nth-child(2) {
+            transition-delay: 0.08s;
+          }
+          .is-in .ns-stagger > *:nth-child(3) {
+            transition-delay: 0.16s;
+          }
+          .is-in .ns-stagger > *:nth-child(4) {
+            transition-delay: 0.24s;
+          }
+          .is-in .ns-stagger > *:nth-child(5) {
+            transition-delay: 0.32s;
+          }
+          .is-in .ns-stagger > *:nth-child(6) {
+            transition-delay: 0.4s;
+          }
+          .is-in .ns-stagger > *:nth-child(7) {
+            transition-delay: 0.48s;
+          }
+          .is-in .ns-stagger > *:nth-child(8) {
+            transition-delay: 0.56s;
+          }
+          .is-in .ns-stagger > *:nth-child(9) {
+            transition-delay: 0.64s;
+          }
+          .is-in .ns-stagger > *:nth-child(10) {
+            transition-delay: 0.72s;
+          }
+          .is-in .ns-stagger > *:nth-child(11) {
+            transition-delay: 0.8s;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .ns-meteor,
+            .ns-moon {
+              animation: none !important;
+              display: none !important;
+            }
+            .ns-layer,
+            #ns-moons,
+            #ns-cursor,
+            .ns-lift {
+              transition: none !important;
+            }
+            .ns-reveal {
+              opacity: 1 !important;
+              filter: none !important;
+              transform: none !important;
+              transition: none !important;
+            }
+            #ns-root h1 a {
+              animation: none !important;
+            }
+            .ns-marquee-track {
+              animation: none !important;
+            }
+            .ns-stagger > * {
+              opacity: 1 !important;
+              transform: none !important;
+              transition: none !important;
+            }
+            .ns-sheen::after {
+              display: none !important;
+            }
+            #ns-term-wrap {
+              transition: none !important;
+            }
+            html {
+              scroll-behavior: auto;
+            }
+            #ns-root header {
+              transition: none !important;
+            }
+          }
+        </style>
+        <template id="__bundler_thumbnail"
+          ><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <rect width="100" height="100" fill="#0d0d18" />
+            <path
+              d="M62 30a22 22 0 1 0 8 24 17 17 0 1 1-8-24z"
+              fill="#d97757"
+            />
+            <circle cx="70" cy="30" r="2.5" fill="#f5f3ef" />
+            <circle cx="78" cy="42" r="1.8" fill="#8b9cf7" /></svg
+        ></template>
+      </helmet>
+
+      <div id="ns-root" style="background: transparent; min-height: 100vh">
+        <x-import
+          component-from-global-scope="NightshiftDesignSystem_983007.NavBar"
+          dc-props="{{ navProps }}"
+          hint-size="100%,64px"
+        ></x-import>
+
+        <!-- ===== 1 · HERO ===== -->
+        <section
+          id="top"
+          data-screen-label="Hero"
+          style="position: relative; overflow: hidden; padding: 92px 28px 76px"
+        >
+          <div class="ns-stars"></div>
+          <div
+            style="
+              position: relative;
+              z-index: 1;
+              max-width: 1200px;
+              margin: 0 auto;
+              display: grid;
+              grid-template-columns: 1fr 1.12fr;
+              gap: 48px;
+              align-items: center;
+            "
+          >
+            <div class="ns-stagger">
+              <span
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  margin-bottom: 22px;
+                "
+              >
+                <x-import
+                  component-from-global-scope="NightshiftDesignSystem_983007.Badge"
+                  tone="accent"
+                  dot="{{ true }}"
+                  hint-size="auto,22px"
+                  >v0.4.0 · MIT</x-import
+                >
+                <x-import
+                  component-from-global-scope="NightshiftDesignSystem_983007.Badge"
+                  tone="neutral"
+                  hint-size="auto,22px"
+                  >a Claude Code plugin</x-import
+                >
+              </span>
+              <h1
+                style="
+                  font-family: var(--font-sans);
+                  font-size: clamp(46px, 5.6vw, 68px);
+                  line-height: 1.04;
+                  letter-spacing: -0.025em;
+                  font-weight: 800;
+                  color: var(--moon-100);
+                  margin: 0 0 20px;
+                "
+              >
+                Your AI software team that ships
+                <a href="#workflow" style="color: var(--accent)"
+                  >while you sleep</a
+                >
+              </h1>
+              <p
+                style="
+                  font-size: 20px;
+                  line-height: 1.6;
+                  color: var(--text-muted);
+                  max-width: 500px;
+                  margin: 0 0 16px;
+                "
+              >
+                A Claude Code plugin that turns one terminal into a full
+                delivery team — product manager, architect, tech lead,
+                engineers, and QA. It reads a Jira ticket and ships the spec,
+                plan, code, and review.
+              </p>
+              <p
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 16px;
+                  color: var(--text-dim);
+                  margin: 0 0 28px;
+                "
+              >
+                Jira ticket <span style="color: var(--indigo-400)">→</span> spec
+                <span style="color: var(--indigo-400)">→</span> plan
+                <span style="color: var(--indigo-400)">→</span> implementation
+                <span style="color: var(--indigo-400)">→</span> review
+                <span style="color: var(--indigo-400)">→</span> PR
+              </p>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                  max-width: 520px;
+                "
+              >
+                <span
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 13px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: var(--text-dim);
+                  "
+                  >Install in 60 seconds</span
+                >
+                <x-import
+                  component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
+                  command="/plugin marketplace add whimzyLive/nightshift-ai"
+                  prompt="$"
+                  hint-size="100%,50px"
+                ></x-import>
+                <x-import
+                  component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
+                  command="/plugin install sdlc@nightshift"
+                  prompt="$"
+                  hint-size="100%,50px"
+                ></x-import>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 22px">
+                <x-import
+                  component-from-global-scope="NightshiftDesignSystem_983007.Button"
+                  variant="secondary"
+                  size="lg"
+                  onClick="{{ starOnGitHub }}"
+                  hint-size="auto,48px"
+                  >★ Star nightshift on GitHub</x-import
+                >
+              </div>
+            </div>
+            <div id="ns-term-wrap" style="position: relative">
+              <div class="ns-glow" style="top: -70px; left: -50px"></div>
+              <x-import
+                component-from-global-scope="NightshiftDesignSystem_983007.Terminal"
+                dc-props="{{ termProps }}"
+                hint-size="100%,392px"
+              ></x-import>
+            </div>
+          </div>
+        </section>
+
+        <!-- ticker of signature phrases -->
+        <div class="ns-marquee" aria-hidden="true">
+          <div class="ns-marquee-track">
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 13px;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                padding: 12px 0;
+                white-space: pre;
+              "
+              >you sleep, it ships&#160;&#160;✦&#160;&#160;spec before
+              plan&#160;&#160;✦&#160;&#160;plan before
+              code&#160;&#160;✦&#160;&#160;review before
+              merge&#160;&#160;✦&#160;&#160;tests as the
+              gate&#160;&#160;✦&#160;&#160;a team, not a
+              megaprompt&#160;&#160;✦&#160;&#160;generic agents, per-repo
+              config&#160;&#160;✦&#160;&#160;</span
+            >
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 13px;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                padding: 12px 0;
+                white-space: pre;
+              "
+              >you sleep, it ships&#160;&#160;✦&#160;&#160;spec before
+              plan&#160;&#160;✦&#160;&#160;plan before
+              code&#160;&#160;✦&#160;&#160;review before
+              merge&#160;&#160;✦&#160;&#160;tests as the
+              gate&#160;&#160;✦&#160;&#160;a team, not a
+              megaprompt&#160;&#160;✦&#160;&#160;generic agents, per-repo
+              config&#160;&#160;✦&#160;&#160;</span
+            >
+          </div>
+        </div>
+
+        <!-- ===== 2 · PROOF BAR ===== -->
+        <section
+          id="proof"
+          data-screen-label="Proof bar"
+          style="
+            background: var(--surface-card);
+            border-top: 1px solid var(--border-default);
+            border-bottom: 1px solid var(--border-default);
+          "
+        >
+          <div
+            style="
+              max-width: 1000px;
+              margin: 0 auto;
+              padding: 22px 28px;
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: center;
+              align-items: center;
+              gap: 14px 28px;
+            "
+          >
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 17px;
+                color: var(--moon-100);
+                white-space: nowrap;
+              "
+              ><span id="ns-n1" style="color: var(--accent)">11</span>
+              specialized agents</span
+            >
+            <span style="color: var(--moon-500)">·</span>
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 17px;
+                color: var(--moon-100);
+                white-space: nowrap;
+              "
+              ><span id="ns-n2" style="color: var(--accent)">10</span> slash
+              commands</span
+            >
+            <span style="color: var(--moon-500)">·</span>
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 17px;
+                color: var(--moon-100);
+                white-space: nowrap;
+              "
+              >install in
+              <span style="color: var(--accent)"
+                ><span id="ns-n3">60</span> seconds</span
+              ></span
+            >
+            <span style="color: var(--moon-500)">·</span>
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 17px;
+                color: var(--moon-100);
+                white-space: nowrap;
+              "
+              >free · MIT</span
+            >
+          </div>
+        </section>
+
+        <!-- ===== 3 · PROBLEM ===== -->
+        <section
+          id="problem"
+          data-screen-label="Problem"
+          style="padding: 80px 28px; position: relative; overflow: hidden"
+        >
+          <div
+            class="ns-ghost"
+            style="
+              top: -36px;
+              left: 50%;
+              transform: translateX(-50%);
+              font-size: clamp(180px, 26vw, 340px);
+              letter-spacing: -0.04em;
+            "
+          >
+            80%
+          </div>
+          <div
+            style="
+              position: relative;
+              z-index: 1;
+              max-width: 900px;
+              margin: 0 auto;
+              text-align: center;
+            "
+          >
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 13px;
+                font-weight: 500;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--accent);
+              "
+              >// 01 · the other 80%</span
+            >
+            <h2
+              style="
+                font-size: clamp(32px, 4vw, 46px);
+                line-height: 1.12;
+                letter-spacing: -0.02em;
+                color: var(--moon-100);
+                margin: 18px 0 18px;
+              "
+            >
+              You don't lose time
+              <span
+                style="
+                  color: var(--text-dim);
+                  text-decoration: line-through;
+                  text-decoration-color: var(--moon-500);
+                "
+                >writing code</span
+              >. You lose it
+              <span style="color: var(--accent)">around the code</span>.
+            </h2>
+            <p
+              style="
+                font-size: 19px;
+                line-height: 1.65;
+                color: var(--text-muted);
+                max-width: 700px;
+                margin: 0 auto 12px;
+              "
+            >
+              The AI already writes the code. What still eats the sprint is the
+              connective tissue: turning a vague ticket into a real spec, a spec
+              into a plan, keeping the plan honest while you implement, then
+              reviewing the result without rubber-stamping your own work.
+            </p>
+            <p
+              style="
+                font-size: 19px;
+                line-height: 1.65;
+                color: var(--text-muted);
+                max-width: 700px;
+                margin: 0 auto;
+              "
+            >
+              Coding assistants handle the middle 20%. The other 80% — the
+              <strong style="color: var(--moon-100)">process</strong> — stays
+              manual, or gets skipped on vibes and shipped unreviewed.
+            </p>
+          </div>
+          <div
+            class="ns-stagger"
+            style="
+              position: relative;
+              z-index: 1;
+              max-width: 960px;
+              margin: 44px auto 0;
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 16px;
+            "
+          >
+            <div
+              style="
+                background: var(--surface-card);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-lg);
+                padding: 22px;
+              "
+            >
+              <h3
+                style="font-size: 18px; color: var(--moon-100); margin: 0 0 8px"
+              >
+                Vague ticket, no spec
+              </h3>
+              <p
+                style="
+                  font-size: 16px;
+                  line-height: 1.55;
+                  color: var(--text-muted);
+                  margin: 0;
+                "
+              >
+                "Add auth" becomes whatever you remember at 4pm.
+              </p>
+            </div>
+            <div
+              style="
+                background: var(--surface-card);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-lg);
+                padding: 22px;
+              "
+            >
+              <h3
+                style="font-size: 18px; color: var(--moon-100); margin: 0 0 8px"
+              >
+                No enforced lifecycle
+              </h3>
+              <p
+                style="
+                  font-size: 16px;
+                  line-height: 1.55;
+                  color: var(--text-muted);
+                  margin: 0;
+                "
+              >
+                Runbooks exist. Nobody follows them without enforcement.
+              </p>
+            </div>
+            <div
+              style="
+                background: var(--surface-card);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-lg);
+                padding: 22px;
+              "
+            >
+              <h3
+                style="font-size: 18px; color: var(--moon-100); margin: 0 0 8px"
+              >
+                Self-review is a rubber stamp
+              </h3>
+              <p
+                style="
+                  font-size: 16px;
+                  line-height: 1.55;
+                  color: var(--text-muted);
+                  margin: 0;
+                "
+              >
+                Reviewing your own AI output isn't review.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 4 · HOW IT WORKS ===== -->
+        <section
+          id="how-it-works"
+          data-screen-label="How it works"
+          style="
+            padding: 80px 28px;
+            background: var(--bg-void);
+            border-top: 1px solid var(--border-default);
+          "
+        >
+          <div style="max-width: 1000px; margin: 0 auto">
+            <div style="text-align: center; margin-bottom: 40px">
+              <span
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  font-weight: 500;
+                  letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  color: var(--accent);
+                "
+                >// 02 · how it works</span
+              >
+              <h2
+                style="
+                  font-size: clamp(32px, 4vw, 46px);
+                  letter-spacing: -0.02em;
+                  color: var(--moon-100);
+                  margin: 14px 0 14px;
+                "
+              >
+                One command runs the whole lifecycle
+              </h2>
+              <p
+                style="
+                  font-size: 18px;
+                  line-height: 1.6;
+                  color: var(--text-muted);
+                  max-width: 640px;
+                  margin: 0 auto;
+                "
+              >
+                Point it at a ticket. It triages the work, then runs each stage
+                in order and closes the loop back to your tracker — spec before
+                plan, plan before code, review before merge, tests as the gate.
+              </p>
+            </div>
+
+            <div style="margin-bottom: 36px">
+              <x-import
+                component-from-global-scope="NightshiftDesignSystem_983007.Pipeline"
+                stages="{{ pipelineStages }}"
+                hint-size="100%,88px"
+              ></x-import>
+            </div>
+
+            <div style="max-width: 520px; margin: 0 auto 22px">
+              <x-import
+                component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
+                command="/auto PROJ-142"
+                prompt="$"
+                hint-size="100%,50px"
+              ></x-import>
+            </div>
+
+            <div
+              style="
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-lg);
+                overflow: hidden;
+                background: var(--surface-card);
+              "
+            >
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 56px 1.1fr 1.6fr;
+                  background: rgba(255, 255, 255, 0.03);
+                  border-bottom: 1px solid var(--border-default);
+                  font-family: var(--font-mono);
+                  font-size: 12px;
+                  letter-spacing: 0.1em;
+                  text-transform: uppercase;
+                  color: var(--text-dim);
+                "
+              >
+                <span style="padding: 12px 14px">Step</span
+                ><span style="padding: 12px 14px">What runs</span
+                ><span style="padding: 12px 14px">What you get</span>
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 56px 1.1fr 1.6fr;
+                  border-bottom: 1px solid var(--border-soft);
+                  align-items: baseline;
+                "
+              >
+                <span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-weight: 700;
+                    color: var(--accent);
+                  "
+                  >1</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-size: 14px;
+                    color: var(--moon-100);
+                  "
+                  >PRD + spec</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-size: 16px;
+                    color: var(--text-body);
+                  "
+                  >The ticket becomes a written spec</span
+                >
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 56px 1.1fr 1.6fr;
+                  border-bottom: 1px solid var(--border-soft);
+                  align-items: baseline;
+                "
+              >
+                <span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-weight: 700;
+                    color: var(--accent);
+                  "
+                  >2</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-size: 14px;
+                    color: var(--moon-100);
+                  "
+                  >Plan</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-size: 16px;
+                    color: var(--text-body);
+                  "
+                  >An implementation plan, reviewed before code</span
+                >
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 56px 1.1fr 1.6fr;
+                  border-bottom: 1px solid var(--border-soft);
+                  align-items: baseline;
+                "
+              >
+                <span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-weight: 700;
+                    color: var(--accent);
+                  "
+                  >3</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-size: 14px;
+                    color: var(--moon-100);
+                  "
+                  >Implementation</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-size: 16px;
+                    color: var(--text-body);
+                  "
+                  >Code written to the plan, on its own branch</span
+                >
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 56px 1.1fr 1.6fr;
+                  border-bottom: 1px solid var(--border-soft);
+                  align-items: baseline;
+                "
+              >
+                <span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-weight: 700;
+                    color: var(--accent);
+                  "
+                  >4</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-size: 14px;
+                    color: var(--moon-100);
+                  "
+                  >QA review</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-size: 16px;
+                    color: var(--text-body);
+                  "
+                  >Independent review by a different agent than the author</span
+                >
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 56px 1.1fr 1.6fr;
+                  align-items: baseline;
+                "
+              >
+                <span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-weight: 700;
+                    color: var(--accent);
+                  "
+                  >5</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-family: var(--font-mono);
+                    font-size: 14px;
+                    color: var(--moon-100);
+                  "
+                  >PR + ticket comment</span
+                ><span
+                  style="
+                    padding: 14px;
+                    font-size: 16px;
+                    color: var(--text-body);
+                  "
+                  >A reviewed PR, with the paper trail linked back to the
+                  ticket</span
+                >
+              </div>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                margin-top: 22px;
+              "
+            >
+              <p
+                style="
+                  flex: 1;
+                  min-width: 260px;
+                  font-size: 14px;
+                  line-height: 1.55;
+                  color: var(--text-muted);
+                  margin: 0;
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-soft);
+                  border-radius: var(--radius-md);
+                  padding: 14px 16px;
+                "
+              >
+                <span style="color: var(--moon-100); font-weight: 600"
+                  >Drive a stage yourself.</span
+                >
+                Every stage has its own verb:
+                <code style="color: var(--terra-400)">/spec</code>
+                <code style="color: var(--terra-400)">/plan</code>
+                <code style="color: var(--terra-400)">/impl</code>
+                <code style="color: var(--terra-400)">/review</code>.
+              </p>
+            </div>
+            <div style="text-align: center; margin-top: 24px">
+              <a
+                href="https://github.com/whimzyLive/nightshift-ai"
+                target="_blank"
+                rel="noopener"
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 14px;
+                  color: var(--link);
+                "
+                >See the commands on GitHub →</a
+              >
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 5 · REVIEW BY DAY, SHIP BY NIGHT ===== -->
+        <section
+          id="workflow"
+          data-screen-label="Day/night workflow"
+          style="
+            padding: 84px 28px;
+            border-top: 1px solid var(--border-default);
+            position: relative;
+            overflow: hidden;
+          "
+        >
+          <div
+            class="ns-glow"
+            style="
+              top: -140px;
+              right: -90px;
+              background: radial-gradient(
+                circle,
+                rgba(124, 147, 240, 0.18),
+                transparent 62%
+              );
+            "
+          ></div>
+          <div
+            style="
+              position: relative;
+              z-index: 1;
+              max-width: 1000px;
+              margin: 0 auto;
+            "
+          >
+            <div style="text-align: center; margin-bottom: 16px">
+              <span
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  font-weight: 500;
+                  letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  color: var(--accent);
+                "
+                >// 03 · your day, split in two</span
+              >
+              <h2
+                style="
+                  font-size: clamp(32px, 4vw, 46px);
+                  letter-spacing: -0.02em;
+                  color: var(--moon-100);
+                  margin: 14px 0 14px;
+                "
+              >
+                Review by day. Ship by night.
+              </h2>
+              <p
+                style="
+                  font-size: 18px;
+                  line-height: 1.6;
+                  color: var(--text-muted);
+                  max-width: 620px;
+                  margin: 0 auto;
+                "
+              >
+                "Ships while you sleep" is a workflow, not a slogan. The split
+                is simple: your day is for decisions, the night is for
+                execution.
+              </p>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                max-width: 760px;
+                margin: 36px auto 20px;
+                font-family: var(--font-mono);
+                font-size: 13px;
+                letter-spacing: 0.1em;
+              "
+            >
+              <span style="color: var(--indigo-400); white-space: nowrap"
+                >☀ 09:00</span
+              >
+              <div
+                style="
+                  flex: 1;
+                  height: 1px;
+                  background: linear-gradient(
+                    90deg,
+                    rgba(139, 156, 247, 0.55),
+                    rgba(217, 119, 87, 0.75)
+                  );
+                "
+              ></div>
+              <span style="color: var(--accent); white-space: nowrap"
+                >🌙 23:00</span
+              >
+              <div
+                style="
+                  flex: 1;
+                  height: 1px;
+                  background: linear-gradient(
+                    90deg,
+                    rgba(217, 119, 87, 0.75),
+                    rgba(139, 156, 247, 0.55)
+                  );
+                "
+              ></div>
+              <span style="color: var(--indigo-400); white-space: nowrap"
+                >↑ 07:00</span
+              >
+            </div>
+            <div
+              class="ns-stagger"
+              style="
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 16px;
+              "
+            >
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-lg);
+                  padding: 24px;
+                "
+              >
+                <span
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 13px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: var(--indigo-400);
+                  "
+                  >☀ Day</span
+                >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 12px 0 10px;
+                  "
+                >
+                  You refine
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  Every story gets pre-refined with clear acceptance criteria,
+                  and the complicated ones get a full spec. You read the refined
+                  stories and specs, decide what's ready, and approve them. You
+                  make the calls. You don't write the implementation.
+                </p>
+              </div>
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-accent);
+                  border-radius: var(--radius-lg);
+                  padding: 24px;
+                  box-shadow: var(--glow-accent);
+                "
+              >
+                <span
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 13px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: var(--accent);
+                  "
+                  >🌙 Night</span
+                >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 12px 0 10px;
+                  "
+                >
+                  The plugin implements
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  <code style="color: var(--terra-400)">/auto</code> picks up
+                  the tickets and specs you already approved, triages each one,
+                  and routes it to the right approach — following the practices
+                  your domain agents enforce for that repo (from its
+                  <code style="color: var(--terra-400)">project-context.md</code
+                  >). Nothing runs on work you haven't signed off.
+                </p>
+              </div>
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-lg);
+                  padding: 24px;
+                "
+              >
+                <span
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 13px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: var(--indigo-400);
+                  "
+                  >↑ Morning</span
+                >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 12px 0 10px;
+                  "
+                >
+                  You review
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  You wake up to PRs ready for review. Each one addresses
+                  acceptance criteria you already agreed to, or a spec you
+                  already approved. You're reading a result you set up, not a
+                  surprise.
+                </p>
+              </div>
+            </div>
+            <p
+              style="
+                text-align: center;
+                font-size: 17px;
+                line-height: 1.6;
+                color: var(--text-muted);
+                max-width: 680px;
+                margin: 28px auto 0;
+              "
+            >
+              You kept every decision. The plugin did the execution. Prefer to
+              drive a stage yourself? Each one has a verb:
+              <code style="color: var(--terra-400)">/refine-issue</code>
+              <code style="color: var(--terra-400)">/spec</code>
+              <code style="color: var(--terra-400)">/impl</code>
+              <code style="color: var(--terra-400)">/review</code>.
+            </p>
+          </div>
+        </section>
+
+        <!-- ===== 6 · THE TEAM ===== -->
+        <section
+          id="agents"
+          data-screen-label="The team"
+          style="
+            padding: 80px 28px;
+            background: var(--bg-void);
+            border-top: 1px solid var(--border-default);
+          "
+        >
+          <div style="max-width: 1200px; margin: 0 auto">
+            <div style="text-align: center; margin-bottom: 40px">
+              <span
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  font-weight: 500;
+                  letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  color: var(--accent);
+                "
+                >// 04 · the team</span
+              >
+              <h2
+                style="
+                  font-size: clamp(32px, 4vw, 46px);
+                  letter-spacing: -0.02em;
+                  color: var(--moon-100);
+                  margin: 14px 0 14px;
+                "
+              >
+                A team, not a megaprompt
+              </h2>
+              <p
+                style="
+                  font-size: 18px;
+                  line-height: 1.6;
+                  color: var(--text-muted);
+                  max-width: 680px;
+                  margin: 0 auto;
+                "
+              >
+                "Do everything" agents hallucinate across roles and leave no
+                trail. nightshift splits the work across 11 agents, each with a
+                tight charter, its own prompt and tools, and a clean handoff to
+                the next. Narrow charters mean fewer hallucinations and an
+                auditable artifact at every stage.
+              </p>
+            </div>
+            <div
+              id="ns-org"
+              style="
+                display: grid;
+                grid-template-columns: 1fr 350px;
+                gap: 26px;
+                max-width: 1120px;
+                margin: 36px auto 0;
+                align-items: start;
+              "
+              onMouseLeave="{{ clearAgent }}"
+            >
+              <div
+                style="
+                  background: var(--surface-terminal);
+                  border: 1px solid var(--border-default);
+                  padding: 24px 28px;
+                  overflow-x: auto;
+                "
+              >
+                <div
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 13px;
+                    color: var(--text-dim);
+                    margin-bottom: 16px;
+                  "
+                >
+                  <span style="color: var(--green-400)">$</span> nightshift
+                  --team --tree
+                </div>
+                <sc-for
+                  list="{{ treeRows }}"
+                  as="r"
+                  hint-placeholder-count="18"
+                >
+                  <div
+                    style="display:flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:14.5px;line-height:2.15;cursor:pointer;opacity:{{ r.o }};transition:opacity .2s;white-space:nowrap;"
+                    onMouseEnter="{{ r.enter }}"
+                  >
+                    <span
+                      style="color: rgba(217, 119, 87, 0.45); white-space: pre"
+                      >{{ r.prefix }}</span
+                    >
+                    <sc-if
+                      value="{{ r.gate }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <span
+                        title="hard gate — control returns to you"
+                        style="color: var(--accent); flex: none"
+                        >⊘</span
+                      >
+                    </sc-if>
+                    <sc-if
+                      value="{{ r.star }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <span
+                        style="width:{{ r.dotSize }}px;height:{{ r.dotSize }}px;border-radius:50%;background:{{ r.dotBg }};box-shadow:{{ r.dotGlow }};flex:none;transition:background .2s,box-shadow .2s;animation:ns-twinkle 3.4s ease-in-out infinite;animation-delay:{{ r.delay }};"
+                      ></span>
+                    </sc-if>
+                    <span style="color:{{ r.color }};transition:color .2s;"
+                      >{{ r.label }}</span
+                    >
+                    <sc-if
+                      value="{{ r.cmds }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <span style="color: var(--terra-400); opacity: 0.85"
+                        >{{ r.cmds }}</span
+                      >
+                    </sc-if>
+                    <sc-if
+                      value="{{ r.note }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <span style="color: var(--text-dim)">{{ r.note }}</span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <div
+                style="
+                  position: sticky;
+                  top: 110px;
+                  background: rgba(13, 13, 24, 0.85);
+                  backdrop-filter: blur(12px);
+                  -webkit-backdrop-filter: blur(12px);
+                  border: 1px solid var(--border-default);
+                  padding: 24px;
+                  min-height: 300px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <div
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 12px;
+                    letter-spacing: 0.16em;
+                    text-transform: uppercase;
+                    color: var(--accent);
+                  "
+                >
+                  {{ orgPanel.eyebrow }}
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <sc-if
+                    value="{{ orgPanel.ini }}"
+                    hint-placeholder-val="{{ false }}"
+                  >
+                    <span
+                      style="
+                        font-family: var(--font-mono);
+                        font-size: 13px;
+                        color: var(--accent);
+                        border: 1px solid var(--border-accent);
+                        padding: 2px 8px;
+                      "
+                      >{{ orgPanel.ini }}</span
+                    >
+                  </sc-if>
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 16px;
+                      color: var(--moon-100);
+                    "
+                    >{{ orgPanel.name }}</span
+                  >
+                  <sc-if
+                    value="{{ orgPanel.standby }}"
+                    hint-placeholder-val="{{ false }}"
+                  >
+                    <span
+                      style="
+                        font-family: var(--font-mono);
+                        font-size: 10px;
+                        letter-spacing: 0.12em;
+                        color: var(--text-dim);
+                      "
+                      >STANDBY</span
+                    >
+                  </sc-if>
+                </div>
+                <p
+                  style="
+                    font-size: 15px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  {{ orgPanel.body }}
+                </p>
+                <sc-if
+                  value="{{ orgPanel.cmds }}"
+                  hint-placeholder-val="{{ false }}"
+                >
+                  <p
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 13px;
+                      color: var(--terra-400);
+                      margin: 0;
+                    "
+                  >
+                    {{ orgPanel.cmds }}
+                  </p>
+                </sc-if>
+                <sc-if
+                  value="{{ orgPanel.artifact }}"
+                  hint-placeholder-val="{{ false }}"
+                >
+                  <p
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 13px;
+                      color: var(--text-dim);
+                      margin: 0;
+                    "
+                  >
+                    artifact →
+                    <span style="color: var(--cyan-400)"
+                      >{{ orgPanel.artifact }}</span
+                    >
+                  </p>
+                </sc-if>
+                <a
+                  href="{{ orgPanel.ref }}"
+                  target="_blank"
+                  rel="noopener"
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 12.5px;
+                    color: var(--link);
+                    margin-top: auto;
+                  "
+                  >{{ orgPanel.refLabel }} ↗</a
+                >
+              </div>
+            </div>
+            <p
+              style="
+                text-align: center;
+                font-family: var(--font-mono);
+                font-size: 13px;
+                color: var(--text-dim);
+                margin: 16px 0 0;
+              "
+            >
+              ⊘ every phase ends at a hard gate — control returns to you before
+              the next one runs · hover a row for its charter
+            </p>
+            <p style="text-align: center; margin: 22px 0 0">
+              <a
+                href="team.dc.html"
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 15px;
+                  color: var(--link);
+                "
+                >Meet the whole team — charters, handoffs, org chart →</a
+              >
+            </p>
+          </div>
+        </section>
+
+        <!-- ===== 7 · WHY IT'S DIFFERENT ===== -->
+        <section
+          data-screen-label="Why different"
+          style="
+            padding: 80px 28px;
+            border-top: 1px solid var(--border-default);
+          "
+        >
+          <div style="max-width: 1000px; margin: 0 auto">
+            <div style="text-align: center; margin-bottom: 40px">
+              <span
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  font-weight: 500;
+                  letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  color: var(--accent);
+                "
+                >// 05 · why different</span
+              >
+              <h2
+                style="
+                  font-size: clamp(32px, 4vw, 46px);
+                  letter-spacing: -0.02em;
+                  color: var(--moon-100);
+                  margin: 14px 0 0;
+                "
+              >
+                Why builders choose it
+              </h2>
+            </div>
+            <div
+              class="ns-stagger"
+              style="
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+              "
+            >
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-lg);
+                  padding: 26px;
+                  transition: border-color var(--dur-base) var(--ease-out);
+                "
+                style-hover="border-color:var(--border-accent);"
+              >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 0 0 10px;
+                  "
+                >
+                  The lifecycle is the product
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  Spec → plan → implement → review, enforced by the commands and
+                  the handoff protocol. Tests are the merge gate. Review is done
+                  by a different agent than the one who wrote the code.
+                </p>
+              </div>
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-lg);
+                  padding: 26px;
+                  transition: border-color var(--dur-base) var(--ease-out);
+                "
+                style-hover="border-color:var(--border-accent);"
+              >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 0 0 10px;
+                  "
+                >
+                  Generic agents, per-repo config
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  No hardcoding. Every project fact lives in one
+                  <code style="color: var(--terra-400)">project-context.md</code
+                  >. The same plugin runs a Node monorepo, a Python service, or
+                  a mobile app.
+                </p>
+              </div>
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-lg);
+                  padding: 26px;
+                  transition: border-color var(--dur-base) var(--ease-out);
+                "
+                style-hover="border-color:var(--border-accent);"
+              >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 0 0 10px;
+                  "
+                >
+                  Issue-tracker native
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  It reads the ticket, derives the branch, plan, and PR, and
+                  comments the result back to Jira and GitHub.
+                </p>
+              </div>
+              <div
+                style="
+                  background: var(--surface-card);
+                  border: 1px solid var(--border-default);
+                  border-radius: var(--radius-lg);
+                  padding: 26px;
+                  transition: border-color var(--dur-base) var(--ease-out);
+                "
+                style-hover="border-color:var(--border-accent);"
+              >
+                <h3
+                  style="
+                    font-size: 20px;
+                    color: var(--moon-100);
+                    margin: 0 0 10px;
+                  "
+                >
+                  Free, open, yours to fork
+                </h3>
+                <p
+                  style="
+                    font-size: 16px;
+                    line-height: 1.6;
+                    color: var(--text-muted);
+                    margin: 0;
+                  "
+                >
+                  Built on open Claude Code primitives, MIT-licensed. Fork it,
+                  extend it, swap a role. No lock-in, no paid tier gate.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 8 · YOU STAY IN CONTROL (bridge) ===== -->
+        <section
+          data-screen-label="Control bridge"
+          style="
+            padding: 72px 28px;
+            background: var(--bg-void);
+            border-top: 1px solid var(--border-default);
+          "
+        >
+          <div style="max-width: 760px; margin: 0 auto; text-align: center">
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 13px;
+                font-weight: 500;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--accent);
+              "
+              >// 06 · control</span
+            >
+            <h2
+              style="
+                font-size: clamp(30px, 3.8vw, 40px);
+                letter-spacing: -0.02em;
+                color: var(--moon-100);
+                margin: 14px 0 16px;
+              "
+            >
+              You decide how it gets built
+            </h2>
+            <p
+              style="
+                font-size: 18px;
+                line-height: 1.65;
+                color: var(--text-muted);
+                margin: 0 0 20px;
+              "
+            >
+              Most AI dev tools abstract the process away until you can't see
+              what you're getting — you only find out once the output lands,
+              then negotiate your way back to what you meant. nightshift runs
+              the opposite way: it keeps the software development lifecycle in
+              front of you, with a hard gate at every phase that returns control
+              before the next step runs.
+            </p>
+            <div
+              style="
+                margin: 30px 0 0;
+                border: 1px solid var(--border-default);
+                background: var(--surface-card);
+                padding: 24px 26px;
+                text-align: left;
+              "
+            >
+              <div
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 12px;
+                  letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  color: var(--accent);
+                  margin-bottom: 18px;
+                "
+              >
+                // triage — every ticket takes the right-sized path
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 290px 1fr;
+                  gap: 24px;
+                  align-items: start;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <div
+                    style="
+                      background: var(--surface-terminal);
+                      border: 1px solid var(--border-accent);
+                      padding: 14px 16px;
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        gap: 10px;
+                        margin-bottom: 12px;
+                      "
+                    >
+                      <span
+                        style="
+                          font-family: var(--font-mono);
+                          font-size: 13px;
+                          color: var(--moon-100);
+                        "
+                        >PROJ-142</span
+                      >
+                      <div style="display: flex; gap: 6px">
+                        <button
+                          onClick="{{ setTypeStory }}"
+                          style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;cursor:pointer;opacity:{{ storyBtnO }};"
+                        >
+                          story
+                        </button>
+                        <button
+                          onClick="{{ setTypeBug }}"
+                          style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;cursor:pointer;opacity:{{ bugBtnO }};"
+                        >
+                          bug
+                        </button>
+                      </div>
+                    </div>
+                    <sc-if
+                      value="{{ isStory }}"
+                      hint-placeholder-val="{{ true }}"
+                    >
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          align-items: baseline;
+                          margin-bottom: 6px;
+                        "
+                      >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            color: var(--text-dim);
+                          "
+                          >estimate</span
+                        >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 13px;
+                            color: var(--terra-400);
+                          "
+                          >{{ storyPts }} pts</span
+                        >
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="13"
+                        step="1"
+                        value="{{ storyPts }}"
+                        onChange="{{ setStoryPts }}"
+                        style="
+                          width: 100%;
+                          accent-color: var(--terra-500);
+                          cursor: pointer;
+                        "
+                      />
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-family: var(--font-mono);
+                          font-size: 10px;
+                          color: var(--text-dim);
+                        "
+                      >
+                        <span>1</span><span>drag the estimate</span
+                        ><span>13</span>
+                      </div>
+                    </sc-if>
+                    <sc-if
+                      value="{{ isBug }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <div
+                        style="
+                          font-family: var(--font-mono);
+                          font-size: 11px;
+                          letter-spacing: 0.1em;
+                          color: var(--red-400);
+                        "
+                      >
+                        DEFECT — no estimate, no spec, no plan
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div
+                    style="
+                      background: var(--surface-terminal);
+                      border: 1px solid var(--border-default);
+                      padding: 14px 16px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-family: var(--font-mono);
+                        font-size: 11px;
+                        color: var(--text-dim);
+                        margin-bottom: 8px;
+                      "
+                    >
+                      # .claude/project/project-context.md
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        font-family: var(--font-mono);
+                        font-size: 13px;
+                        color: var(--moon-200);
+                      "
+                    >
+                      lightweight_threshold:
+                      <button
+                        onClick="{{ decThreshold }}"
+                        style="
+                          width: 26px;
+                          height: 26px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-family: var(--font-mono);
+                          font-size: 14px;
+                          cursor: pointer;
+                          padding: 0;
+                        "
+                      >
+                        −
+                      </button>
+                      <span
+                        style="
+                          color: var(--terra-400);
+                          min-width: 16px;
+                          text-align: center;
+                        "
+                        >{{ threshold }}</span
+                      >
+                      <button
+                        onClick="{{ incThreshold }}"
+                        style="
+                          width: 26px;
+                          height: 26px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-family: var(--font-mono);
+                          font-size: 14px;
+                          cursor: pointer;
+                          padding: 0;
+                        "
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        font-family: var(--font-mono);
+                        font-size: 13px;
+                        color: var(--moon-200);
+                        margin-top: 10px;
+                        flex-wrap: wrap;
+                      "
+                    >
+                      approval_mode:
+                      <button
+                        onClick="{{ cycleMode }}"
+                        title="click to cycle: assisted → auto → full-auto"
+                        style="
+                          font-family: var(--font-mono);
+                          font-size: 12px;
+                          padding: 3px 12px;
+                          cursor: pointer;
+                        "
+                      >
+                        {{ approvalMode }} ⟳
+                      </button>
+                    </div>
+                    <div
+                      style="
+                        font-family: var(--font-mono);
+                        font-size: 10.5px;
+                        color: var(--text-dim);
+                        margin-top: 6px;
+                      "
+                    >
+                      {{ approvalModeHint }}
+                    </div>
+                  </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <sc-for
+                    list="{{ triageLanes }}"
+                    as="L"
+                    hint-placeholder-count="3"
+                  >
+                    <div
+                      style="border:1px solid {{ L.border }};background:{{ L.bg }};padding:14px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;transition:border-color .3s,background .3s;"
+                    >
+                      <div style="width: 150px; flex: none">
+                        <div
+                          style="font-family:var(--font-mono);font-size:13px;color:{{ L.titleColor }};transition:color .3s;"
+                        >
+                          {{ L.title }}
+                        </div>
+                        <div
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 10.5px;
+                            color: var(--text-dim);
+                            margin-top: 3px;
+                          "
+                        >
+                          {{ L.note }}
+                        </div>
+                      </div>
+                      <span
+                        style="
+                          font-family: var(--font-mono);
+                          font-size: 13px;
+                          color: var(--moon-300);
+                        "
+                        >{{ L.path }}</span
+                      >
+                      <div style="margin-left: auto; display: flex; gap: 8px">
+                        <sc-for
+                          list="{{ L.tickets }}"
+                          as="t"
+                          hint-placeholder-count="1"
+                        >
+                          <span
+                            style="font-family:var(--font-mono);font-size:12px;color:{{ t.color }};border:1px solid {{ t.border }};background:{{ t.bg }};padding:4px 10px;animation:ns-risein .35s var(--ease-out) both;white-space:nowrap;"
+                            >{{ t.label }}</span
+                          >
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <div
+                    style="
+                      background: var(--surface-terminal);
+                      border: 1px solid var(--border-soft);
+                      padding: 12px 16px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: var(--font-mono);
+                        font-size: 12.5px;
+                        color: var(--moon-300);
+                      "
+                      >{{ triageMsg }}</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              style="
+                font-family: var(--font-mono);
+                font-size: 11px;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                margin: 34px 0 4px;
+              "
+            >
+              // feel a gate — approve each phase yourself
+            </div>
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                justify-content: center;
+                margin: 6px auto 22px;
+              "
+            >
+              <sc-for list="{{ ctrlGates }}" as="g" hint-placeholder-count="5">
+                <div style="display: flex; align-items: flex-start">
+                  <sc-if
+                    value="{{ g.conn }}"
+                    hint-placeholder-val="{{ false }}"
+                  >
+                    <div
+                      style="width:30px;height:1px;background:{{ g.connBg }};margin-top:17px;transition:background .4s;"
+                    ></div>
+                  </sc-if>
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 0 14px;
+                    "
+                  >
+                    <span
+                      style="width:34px;height:34px;border-radius:50%;border:1px solid {{ g.border }};background:{{ g.bg }};display:flex;align-items:center;justify-content:center;color:{{ g.color }};font-family:var(--font-mono);font-size:16px;box-shadow:{{ g.glow }};animation:{{ g.anim }};transition:background .4s,border-color .4s,color .4s,box-shadow .4s;"
+                      >{{ g.glyph }}</span
+                    >
+                    <span
+                      style="font-family:var(--font-mono);font-size:13px;color:{{ g.labelColor }};transition:color .4s;"
+                      >{{ g.label }}</span
+                    >
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div
+              style="
+                font-family: var(--font-mono);
+                font-size: 11px;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                margin: 40px 0 14px;
+              "
+            >
+              // the same ticket, both ways — routed by the config above
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 18px;
+                max-width: 1120px;
+                margin: 0 auto 26px;
+                text-align: left;
+              "
+            >
+              <div
+                style="
+                  background: var(--surface-terminal);
+                  border: 1px solid var(--border-default);
+                  padding: 24px 26px;
+                  min-height: 480px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                  align-items: stretch;
+                "
+              >
+                <div
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 11.5px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: var(--text-dim);
+                    border-bottom: 1px solid var(--border-soft);
+                    padding-bottom: 10px;
+                    margin-bottom: 2px;
+                  "
+                >
+                  one-shot AI
+                </div>
+                <sc-for list="{{ raceLeft }}" as="r" hint-placeholder-count="2">
+                  <div style="animation: ns-risein 0.4s var(--ease-out) both">
+                    <sc-if
+                      value="{{ r.blob }}"
+                      hint-placeholder-val="{{ false }}"
+                    >
+                      <div
+                        style="
+                          animation: ns-slam 0.5s var(--ease-out) both;
+                          background: rgba(255, 255, 255, 0.03);
+                          border: 1px solid var(--border-soft);
+                          padding: 10px 12px;
+                          display: flex;
+                          flex-direction: column;
+                          gap: 5px;
+                        "
+                      >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            color: var(--text-dim);
+                          "
+                          >db29f1c · feat: PROJ-142 · 1 commit · 96 files</span
+                        >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            letter-spacing: -1px;
+                          "
+                          ><span style="color: rgba(110, 196, 138, 0.55)"
+                            >+██████████████████▌</span
+                          >
+                          <span style="color: rgba(224, 101, 111, 0.5)"
+                            >−████████▌</span
+                          ></span
+                        >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            letter-spacing: -1px;
+                          "
+                          ><span style="color: rgba(110, 196, 138, 0.55)"
+                            >+███████████▌</span
+                          >
+                          <span style="color: rgba(224, 101, 111, 0.5)"
+                            >−██████████████▌</span
+                          ></span
+                        >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            letter-spacing: -1px;
+                          "
+                          ><span style="color: rgba(110, 196, 138, 0.55)"
+                            >+████████████████████████▌</span
+                          >
+                          <span style="color: rgba(224, 101, 111, 0.5)"
+                            >−██▌</span
+                          ></span
+                        >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            letter-spacing: -1px;
+                          "
+                          ><span style="color: rgba(110, 196, 138, 0.55)"
+                            >+█████████▌</span
+                          >
+                          <span style="color: rgba(224, 101, 111, 0.5)"
+                            >−███████████▌</span
+                          ></span
+                        >
+                        <span
+                          style="
+                            font-family: var(--font-mono);
+                            font-size: 11px;
+                            letter-spacing: -1px;
+                          "
+                          ><span style="color: rgba(110, 196, 138, 0.55)"
+                            >+███████████████▌</span
+                          >
+                          <span style="color: rgba(224, 101, 111, 0.5)"
+                            >−█████▌</span
+                          ></span
+                        >
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.t }}" hint-placeholder-val="{{ false }}">
+                      <span
+                        style="font-family:var(--font-mono);font-size:14.5px;line-height:1.75;color:{{ r.color }};display:block;"
+                        >{{ r.t }}</span
+                      >
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <div
+                style="
+                  background: var(--surface-terminal);
+                  border: 1px solid var(--border-accent);
+                  box-shadow: 0 0 22px rgba(217, 119, 87, 0.12);
+                  padding: 24px 26px;
+                  min-height: 480px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                  align-items: stretch;
+                "
+              >
+                <div
+                  style="
+                    font-family: var(--font-mono);
+                    font-size: 11.5px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: var(--accent);
+                    border-bottom: 1px solid var(--border-soft);
+                    padding-bottom: 10px;
+                    margin-bottom: 2px;
+                  "
+                >
+                  🌙 nightshift · {{ raceRoute }}
+                </div>
+                <sc-for
+                  list="{{ raceRight }}"
+                  as="r"
+                  hint-placeholder-count="2"
+                >
+                  <div style="animation: ns-risein 0.4s var(--ease-out) both">
+                    <span
+                      style="font-family:var(--font-mono);font-size:14.5px;line-height:1.75;color:{{ r.color }};display:block;"
+                      >{{ r.t }}</span
+                    >
+                  </div>
+                </sc-for>
+                <sc-if
+                  value="{{ ctrlAwaiting }}"
+                  hint-placeholder-val="{{ false }}"
+                >
+                  <div
+                    style="
+                      margin-top: auto;
+                      display: flex;
+                      justify-content: flex-end;
+                      padding-top: 10px;
+                    "
+                  >
+                    <x-import
+                      component-from-global-scope="NightshiftDesignSystem_983007.Button"
+                      variant="primary"
+                      size="sm"
+                      onClick="{{ approveGate }}"
+                      hint-size="auto,34px"
+                      >approve ✓</x-import
+                    >
+                  </div>
+                </sc-if>
+                <sc-if
+                  value="{{ ctrlWorking }}"
+                  hint-placeholder-val="{{ false }}"
+                >
+                  <div
+                    style="
+                      margin-top: auto;
+                      display: flex;
+                      justify-content: flex-end;
+                      padding-top: 10px;
+                    "
+                  >
+                    <span
+                      style="
+                        font-family: var(--font-mono);
+                        font-size: 12px;
+                        color: var(--text-dim);
+                        animation: ns-twinkle 1.2s ease-in-out infinite;
+                      "
+                      >▌ working</span
+                    >
+                  </div>
+                </sc-if>
+                <sc-if
+                  value="{{ ctrlDone }}"
+                  hint-placeholder-val="{{ false }}"
+                >
+                  <div
+                    style="
+                      margin-top: auto;
+                      display: flex;
+                      justify-content: flex-end;
+                      padding-top: 10px;
+                    "
+                  >
+                    <x-import
+                      component-from-global-scope="NightshiftDesignSystem_983007.Button"
+                      variant="secondary"
+                      size="sm"
+                      onClick="{{ resetGates }}"
+                      hint-size="auto,34px"
+                      >run it again ↺</x-import
+                    >
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+            <a
+              href="why-sdlc.dc.html"
+              style="
+                font-family: var(--font-mono);
+                font-size: 16px;
+                color: var(--link);
+              "
+              >Why an SDLC beats one-shot AI →</a
+            >
+          </div>
+        </section>
+
+        <!-- ===== 9 · FAQ ===== -->
+        <section
+          id="faq"
+          data-screen-label="FAQ"
+          style="
+            padding: 80px 28px;
+            border-top: 1px solid var(--border-default);
+          "
+        >
+          <div style="max-width: 800px; margin: 0 auto">
+            <div style="text-align: center; margin-bottom: 36px">
+              <span
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 13px;
+                  font-weight: 500;
+                  letter-spacing: 0.16em;
+                  text-transform: uppercase;
+                  color: var(--accent);
+                "
+                >// 07 · questions</span
+              >
+              <h2
+                style="
+                  font-size: clamp(32px, 4vw, 46px);
+                  letter-spacing: -0.02em;
+                  color: var(--moon-100);
+                  margin: 14px 0 0;
+                "
+              >
+                Questions builders ask first
+              </h2>
+            </div>
+            <div
+              style="
+                background: var(--surface-card);
+                border: 1px solid var(--border-default);
+                padding: 6px 30px;
+                box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.7);
+              "
+            >
+              <div style="border-bottom: 1px solid var(--border-soft)">
+                <div
+                  onClick="{{ faqT0 }}"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 22px 0;
+                    cursor: pointer;
+                  "
+                  style-hover="opacity:.85;"
+                >
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 14px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >Q.01</span
+                  >
+                  <h3
+                    style="
+                      font-size: 18px;
+                      color: var(--moon-100);
+                      margin: 0;
+                      flex: 1;
+                    "
+                  >
+                    Isn't this just another AI code-writer wrapper?
+                  </h3>
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 20px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >{{ faqG0 }}</span
+                  >
+                </div>
+                <div
+                  style="overflow:hidden;max-height:{{ faqM0 }};opacity:{{ faqO0 }};transition:max-height .4s var(--ease-out),opacity .3s;"
+                >
+                  <p
+                    style="
+                      font-size: 17px;
+                      line-height: 1.65;
+                      color: var(--text-body);
+                      margin: 0;
+                      padding: 0 40px 22px 44px;
+                    "
+                  >
+                    No. It's a process engine. The wedge is the SDLC, not the
+                    code. Assistants do the middle 20%; nightshift runs the
+                    other 80% — spec, plan, review, and the handoffs between
+                    them.
+                  </p>
+                </div>
+              </div>
+              <div style="border-bottom: 1px solid var(--border-soft)">
+                <div
+                  onClick="{{ faqT1 }}"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 22px 0;
+                    cursor: pointer;
+                  "
+                  style-hover="opacity:.85;"
+                >
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 14px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >Q.02</span
+                  >
+                  <h3
+                    style="
+                      font-size: 18px;
+                      color: var(--moon-100);
+                      margin: 0;
+                      flex: 1;
+                    "
+                  >
+                    Full ceremony is overkill for a one-line fix.
+                  </h3>
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 20px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >{{ faqG1 }}</span
+                  >
+                </div>
+                <div
+                  style="overflow:hidden;max-height:{{ faqM1 }};opacity:{{ faqO1 }};transition:max-height .4s var(--ease-out),opacity .3s;"
+                >
+                  <p
+                    style="
+                      font-size: 17px;
+                      line-height: 1.65;
+                      color: var(--text-body);
+                      margin: 0;
+                      padding: 0 40px 22px 44px;
+                    "
+                  >
+                    <code style="color: var(--terra-400)">/auto</code> triages
+                    by size. Stories at or under the lightweight threshold
+                    (default ≤3 points) skip the spec and plan and go straight
+                    to implementation.
+                  </p>
+                </div>
+              </div>
+              <div style="border-bottom: 1px solid var(--border-soft)">
+                <div
+                  onClick="{{ faqT2 }}"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 22px 0;
+                    cursor: pointer;
+                  "
+                  style-hover="opacity:.85;"
+                >
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 14px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >Q.03</span
+                  >
+                  <h3
+                    style="
+                      font-size: 18px;
+                      color: var(--moon-100);
+                      margin: 0;
+                      flex: 1;
+                    "
+                  >
+                    Will it work in my repo and stack?
+                  </h3>
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 20px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >{{ faqG2 }}</span
+                  >
+                </div>
+                <div
+                  style="overflow:hidden;max-height:{{ faqM2 }};opacity:{{ faqO2 }};transition:max-height .4s var(--ease-out),opacity .3s;"
+                >
+                  <p
+                    style="
+                      font-size: 17px;
+                      line-height: 1.65;
+                      color: var(--text-body);
+                      margin: 0;
+                      padding: 0 40px 22px 44px;
+                    "
+                  >
+                    The agents are fully generic. Every project-specific fact
+                    lives in one
+                    <code style="color: var(--terra-400)"
+                      >project-context.md</code
+                    >
+                    file. The same plugin runs across a Node monorepo, a Python
+                    service, or a mobile app — you configure it once per repo.
+                  </p>
+                </div>
+              </div>
+              <div style="border-bottom: 1px solid var(--border-soft)">
+                <div
+                  onClick="{{ faqT4 }}"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 22px 0;
+                    cursor: pointer;
+                  "
+                  style-hover="opacity:.85;"
+                >
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 14px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >Q.04</span
+                  >
+                  <h3
+                    style="
+                      font-size: 18px;
+                      color: var(--moon-100);
+                      margin: 0;
+                      flex: 1;
+                    "
+                  >
+                    How do I trust agent output?
+                  </h3>
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 20px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >{{ faqG4 }}</span
+                  >
+                </div>
+                <div
+                  style="overflow:hidden;max-height:{{ faqM4 }};opacity:{{ faqO4 }};transition:max-height .4s var(--ease-out),opacity .3s;"
+                >
+                  <p
+                    style="
+                      font-size: 17px;
+                      line-height: 1.65;
+                      color: var(--text-body);
+                      margin: 0;
+                      padding: 0 40px 22px 44px;
+                    "
+                  >
+                    Review is done by a different agent than the author, tests
+                    are the merge gate, and every stage leaves an artifact you
+                    can read — PRD, spec, plan, review. Nothing merges on vibes.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <div
+                  onClick="{{ faqT5 }}"
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 22px 0;
+                    cursor: pointer;
+                  "
+                  style-hover="opacity:.85;"
+                >
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 14px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >Q.05</span
+                  >
+                  <h3
+                    style="
+                      font-size: 18px;
+                      color: var(--moon-100);
+                      margin: 0;
+                      flex: 1;
+                    "
+                  >
+                    What does it cost?
+                  </h3>
+                  <span
+                    style="
+                      font-family: var(--font-mono);
+                      font-size: 20px;
+                      color: var(--accent);
+                      flex: none;
+                    "
+                    >{{ faqG5 }}</span
+                  >
+                </div>
+                <div
+                  style="overflow:hidden;max-height:{{ faqM5 }};opacity:{{ faqO5 }};transition:max-height .4s var(--ease-out),opacity .3s;"
+                >
+                  <p
+                    style="
+                      font-size: 17px;
+                      line-height: 1.65;
+                      color: var(--text-body);
+                      margin: 0;
+                      padding: 0 40px 22px 44px;
+                    "
+                  >
+                    Nothing. It's free and MIT-licensed. Adoption is the only
+                    metric we track.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p style="text-align: center; margin: 24px 0 0">
+              <a
+                href="faq.dc.html"
+                style="
+                  font-family: var(--font-mono);
+                  font-size: 15px;
+                  color: var(--link);
+                "
+                >Browse the full FAQ — workflow, setup, trust, licensing →</a
+              >
+            </p>
+          </div>
+        </section>
+
+        <!-- ===== 10 · FINAL CTA ===== -->
+        <section
+          id="install"
+          data-screen-label="Final CTA"
+          style="
+            padding: 88px 28px;
+            background: var(--bg-void);
+            border-top: 1px solid var(--border-default);
+            position: relative;
+            overflow: hidden;
+          "
+        >
+          <div
+            class="ns-glow"
+            style="bottom: -160px; left: 50%; transform: translateX(-50%)"
+          ></div>
+          <div
+            class="ns-ghost"
+            style="
+              bottom: 18px;
+              left: 50%;
+              transform: translateX(-50%);
+              font-size: clamp(64px, 9.5vw, 140px);
+              letter-spacing: -0.03em;
+            "
+          >
+            you sleep, it ships
+          </div>
+          <div
+            style="
+              position: relative;
+              z-index: 1;
+              max-width: 720px;
+              margin: 0 auto;
+              text-align: center;
+            "
+          >
+            <span
+              style="
+                font-family: var(--font-mono);
+                font-size: 13px;
+                font-weight: 500;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: var(--accent);
+              "
+              >// 08 · install in 60 seconds</span
+            >
+            <h2
+              style="
+                font-size: clamp(30px, 3.8vw, 42px);
+                line-height: 1.14;
+                letter-spacing: -0.02em;
+                color: var(--moon-100);
+                margin: 14px 0 14px;
+              "
+            >
+              Put a ticket in tonight. Read a reviewed PR in the morning.
+            </h2>
+            <p
+              style="
+                font-size: 18px;
+                line-height: 1.6;
+                color: var(--text-muted);
+                max-width: 560px;
+                margin: 0 auto 28px;
+              "
+            >
+              Install takes about a minute. Point it at a ticket and watch the
+              spec, plan, code, and review land — with the paper trail linked
+              back where your team already works.
+            </p>
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                text-align: left;
+                max-width: 560px;
+                margin: 0 auto 24px;
+              "
+            >
+              <x-import
+                component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
+                command="/plugin marketplace add whimzyLive/nightshift-ai"
+                prompt="$"
+                hint-size="100%,50px"
+              ></x-import>
+              <x-import
+                component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
+                command="/plugin install sdlc@nightshift"
+                prompt="$"
+                hint-size="100%,50px"
+              ></x-import>
+            </div>
+            <div style="display: flex; justify-content: center">
+              <x-import
+                component-from-global-scope="NightshiftDesignSystem_983007.Button"
+                variant="secondary"
+                size="lg"
+                onClick="{{ starOnGitHub }}"
+                hint-size="auto,48px"
+                >★ Star nightshift on GitHub</x-import
+              >
+            </div>
+          </div>
+        </section>
+
+        <x-import
+          component-from-global-scope="NightshiftDesignSystem_983007.Footer"
+          dc-props="{{ footerProps }}"
+          hint-size="100%,240px"
+        ></x-import>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1200,"height":900},"animateTerminal":{"editor":"boolean","default":true,"tsType":"boolean","section":"Behavior"},"showStarCount":{"editor":"boolean","default":true,"tsType":"boolean","section":"Behavior"},"starCount":{"editor":"text","default":"4","tsType":"string","section":"Behavior"}}'
+    >
+      class Component extends DCLogic {
+        state = { count: 0, hoverAgent: null, gI: 0, gS: 'working', gDone: false, raceStep: 0, storyPts: 8, thresh: 3, ticketType: 'story', approvalMode: 'assisted', faqOpen: 0 };
+
+        CTRL_MAP = {
+          refine:    { label: 'refine',    cmd: '/refine-issue', agent: 'scrum-master',        working: 'refining PROJ-142 — story shape, binary acceptance criteria …', ready: 'story well-formed',  approved: '⊘ story refined' },
+          spec:      { label: 'spec',      cmd: '/spec',         agent: 'solutions-architect', working: 'writing docs/superpowers/specs/PROJ-142.md …',                  ready: 'spec ready',         approved: '⊘ specs/PROJ-142.md' },
+          plan:      { label: 'plan',      cmd: '/plan',         agent: 'tech-lead',           working: 'writing docs/superpowers/plans/PROJ-142.md …',                  ready: 'plan ready',         approved: '⊘ plans/PROJ-142.md' },
+          implement: { label: 'implement', cmd: '/impl',         agent: 'principal-engineer',  working: 'dispatching domain agents in dependency order …',               ready: 'code + tests green', approved: '⊘ code + tests green' },
+          review:    { label: 'review',    cmd: '/review',       agent: 'qa-engineer',         working: 'independent review — quality gate, AC verification …',          ready: 'review clean',       approved: '⊘ independent review' },
+        };
+
+        _advanceGate() {
+          if (this.state.gI >= this._route().length - 1) {
+            clearTimeout(this._gT);
+            this.setState({ gDone: true });
+            if (this.state.approvalMode === 'full-auto') this._gT = setTimeout(() => this._startGate(0), 3200);
+          } else {
+            this._startGate(this.state.gI + 1);
+          }
+        }
+
+        _gateAuto(i) {
+          const m = this.state.approvalMode;
+          if (m === 'full-auto') return true;
+          if (m !== 'auto') return false;
+          const k = this._route()[i];
+          return k !== 'spec' && k !== 'review';
+        }
+
+        _route() {
+          if (this.state.ticketType === 'bug') return ['implement', 'review'];
+          return this.state.storyPts <= this.state.thresh
+            ? ['refine', 'implement', 'review']
+            : ['refine', 'spec', 'plan', 'implement', 'review'];
+        }
+
+        _startGate(i) {
+          clearTimeout(this._gT);
+          this.setState({ gI: i, gS: 'working', gDone: false });
+          this._gT = setTimeout(() => {
+            this.setState({ gS: 'awaiting' });
+            if (this._gateAuto(i)) this._gT = setTimeout(() => this._advanceGate(), 700);
+          }, this._reduced ? 400 : 1700);
+        }
+
+        CONST_DEFS = [
+          { name: 'product-manager',        ini: 'PM', x: 7,  y: 32, owns: 'Vague idea → PRD with binary acceptance criteria', artifact: 'PRD.md' },
+          { name: 'scrum-master',           ini: 'SM', x: 15, y: 72, owns: 'Story slicing, mapping, splitting', artifact: 'stories' },
+          { name: 'solutions-architect',    ini: 'SA', x: 25, y: 16, owns: 'PRD → technical design / spec', artifact: 'spec.md' },
+          { name: 'tech-lead',              ini: 'TL', x: 35, y: 54, owns: 'Spec → ordered, verifiable implementation plan', artifact: 'plan.md' },
+          { name: 'principal-engineer',     ini: 'PE', x: 49, y: 28, owns: 'Orchestrates the build, dispatches domain agents in dependency order', artifact: 'branch + dispatch' },
+          { name: 'platform-engineer',      ini: 'PE', x: 63, y: 10, owns: 'Backend / infrastructure / serverless', artifact: 'code + tests' },
+          { name: 'web-engineer',           ini: 'WE', x: 67, y: 40, owns: 'Web UI', artifact: 'code + tests' },
+          { name: 'mobile-engineer',        ini: 'ME', x: 66, y: 68, owns: 'Mobile apps', artifact: 'code + tests' },
+          { name: 'database-administrator', ini: 'DA', x: 55, y: 88, owns: 'Schema, migrations, data', artifact: 'migrations' },
+          { name: 'sync-engineer',          ini: 'SE', x: 78, y: 84, owns: 'Offline / sync layer', artifact: 'code + tests' },
+          { name: 'qa-engineer',            ini: 'QE', x: 89, y: 44, owns: 'Always-on review → quality gate → AC verification → PR', artifact: 'review → PR' },
+        ];
+
+        ORG_LEVELS = [
+          { num: 'L0', phase: 'you (human)', gate: '◉', human: true,
+            commands: ['review · approve'],
+            contract: 'The only non-agent in the org. You refine by day, approve what is ready, and review the PRs in the morning — nothing advances past a gate without your sign-off.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai',
+            refLabel: 'whimzyLive/nightshift-ai',
+            agentNames: ['you'] },
+          { num: 'L1', phase: 'refine feature', gate: '⊘',
+            commands: ['/refine-feature', '/prd'],
+            contract: 'Raw idea → Jira Epic → PRD with 5–10 binary acceptance criteria, committed to docs/features/ on its own branch.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/product-manager.md',
+            refLabel: 'agents/product-manager.md',
+            agentNames: ['product-manager'] },
+          { num: 'L2', phase: 'refine story', gate: '⊘',
+            commands: ['/refine-issue', '/stories'],
+            contract: 'Epic → story map → well-formed, dependency-ordered stories in Jira; rough stakeholder tickets triaged in place.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/scrum-master.md',
+            refLabel: 'agents/scrum-master.md',
+            agentNames: ['scrum-master'] },
+          { num: 'L3', phase: 'spec', gate: '⊘',
+            commands: ['/spec'],
+            contract: 'Story → docs/superpowers/specs/<KEY>.md — data model, API surface, per-workspace implementation guide — raised as its own PR.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/solutions-architect.md',
+            refLabel: 'agents/solutions-architect.md',
+            agentNames: ['solutions-architect'] },
+          { num: 'L4', phase: 'plan', gate: '⊘',
+            commands: ['/plan'],
+            contract: 'Spec → docs/superpowers/plans/<KEY>.md — ordered, agent-tagged phases, each ending in a verification step.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/tech-lead.md',
+            refLabel: 'agents/tech-lead.md',
+            agentNames: ['tech-lead'] },
+          { num: 'L5', phase: 'implement', gate: '⊘',
+            commands: ['/impl'],
+            contract: 'Plan → code + tests on an impl branch. principal-engineer dispatches one domain agent at a time, in dependency order — schema first, then backend, sync, web, mobile.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/principal-engineer.md',
+            refLabel: 'agents/principal-engineer.md',
+            agentNames: ['principal-engineer', 'database-administrator', 'platform-engineer', 'sync-engineer', 'web-engineer', 'mobile-engineer'],
+            seqs: { 'principal-engineer': 'orchestrates', 'database-administrator': 'phase 1', 'platform-engineer': 'phase 2', 'sync-engineer': 'phase 3', 'web-engineer': 'phase 4', 'mobile-engineer': 'phase 5' } },
+          { num: 'L6', phase: 'qa / review', gate: '⊘',
+            commands: ['/review', '/review-fix'],
+            contract: 'Independent review by a different agent than the author → quality gate → AC verification → reviewed PR, commented back to the ticket.',
+            ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/qa-engineer.md',
+            refLabel: 'agents/qa-engineer.md',
+            agentNames: ['qa-engineer'] },
+        ];
+
+        LINES = [
+          { prompt: '$', text: '/auto PROJ-142' },
+          { text: '' },
+          { text: 'Reading ticket PROJ-142 from Jira…', tone: 'muted' },
+          { agent: 'product-manager', text: '→ wrote PRD · 4 acceptance criteria', tone: 'accent' },
+          { agent: 'solutions-architect', text: '→ technical spec · 2 new endpoints', tone: 'accent' },
+          { agent: 'tech-lead', text: '→ ordered plan · 7 verifiable steps', tone: 'accent' },
+          { agent: 'principal-engineer', text: '→ dispatching domain engineers…', tone: 'accent' },
+          { text: 'platform-engineer  ✓ implemented, 142 tests green', tone: 'muted', indent: 1 },
+          { text: 'web-engineer       ✓ UI wired, a11y pass', tone: 'muted', indent: 1 },
+          { agent: 'qa-engineer', text: '→ quality gate passed · ACs verified', tone: 'success' },
+          { text: '→ opened PR #318 · commented on PROJ-142', tone: 'success' },
+          { prompt: '$', text: '▌', tone: 'accent' },
+        ];
+
+        componentDidMount() {
+          if (this.props.animateTerminal === false) {
+            this.setState({ count: this.LINES.length });
+          } else {
+            this._advance();
+          }
+          this._fxCleanup = [];
+          this._reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          this._startGate(0);
+          if (this._reduced) {
+            this.setState({ raceStep: 12 });
+          } else {
+            this._raceI = setInterval(() => {
+              const n = this.state.raceStep + 1;
+              if (n >= 12) clearInterval(this._raceI);
+              this.setState({ raceStep: Math.min(n, 12) });
+            }, 1000);
+          }
+          // children (x-imports) mount async — set up FX after they settle, retry a few times
+          let tries = 0;
+          const boot = () => {
+            const root = document.getElementById('ns-root');
+            if (root) { this._setupFX(root); }
+            if (++tries < 4) this._bootT = setTimeout(boot, 350);
+          };
+          this._bootT = setTimeout(boot, 60);
+        }
+
+        componentWillUnmount() {
+          clearTimeout(this._t);
+          clearTimeout(this._bootT);
+          clearTimeout(this._gT);
+          clearInterval(this._raceI);
+          clearInterval(this._meteorT);
+          if (this._raf) cancelAnimationFrame(this._raf);
+          (this._fxCleanup || []).forEach((fn) => fn());
+        }
+
+        _setupFX(root) {
+          if (!this._skyBuilt) {
+            this._skyBuilt = true;
+
+            // --- night sky (parallax layers + moons + meteors) ---
+            const sky = document.createElement('div');
+            sky.id = 'ns-sky';
+            const layerBg = (dots) => dots.map((d) =>
+              `radial-gradient(${d.s}px ${d.s}px at ${d.x}% ${d.y}%, ${d.c} 0, ${d.c} 42%, transparent 78%)`).join(',');
+            const rand = (n) => Math.floor(Math.random() * n);
+            const mk = (count, size, color) => Array.from({ length: count }, () =>
+              ({ x: rand(100), y: rand(100), s: size, c: color }));
+            const layers = [
+              { depth: 8,  css: layerBg(mk(40, 1.8, 'rgba(245,243,239,.8)')) },
+              { depth: 22, css: layerBg([...mk(24, 2.6, 'rgba(245,243,239,1)'), ...mk(7, 2.6, 'rgba(139,156,247,1)')]) },
+              { depth: 44, css: layerBg([...mk(12, 3.8, 'rgba(255,255,255,1)'), ...mk(4, 3.8, 'rgba(98,196,211,1)')]) },
+            ];
+            this._layers = layers.map((l) => {
+              const el = document.createElement('div');
+              el.className = 'ns-layer';
+              el.style.backgroundImage = l.css;
+              el.style.backgroundSize = '520px 520px';
+              el.dataset.depth = l.depth;
+              sky.appendChild(el);
+              return el;
+            });
+
+            const moons = document.createElement('div');
+            moons.id = 'ns-moons';
+            moons.dataset.depth = 14;
+            // faint colored halos
+            const haloDefs = [
+              { x: '78%', y: '10%', d: 260, c: 'rgba(217,119,87,.20)' },
+              { x: '8%',  y: '34%', d: 150, c: 'rgba(139,156,247,.18)' },
+              { x: '64%', y: '70%', d: 110, c: 'rgba(98,196,211,.12)' },
+            ];
+            haloDefs.forEach((m, i) => {
+              const el = document.createElement('div');
+              el.className = 'ns-moon';
+              el.style.cssText = `left:${m.x};top:${m.y};width:${m.d}px;height:${m.d}px;background:radial-gradient(circle at 40% 40%,${m.c},transparent 70%);animation-delay:${i * -5}s`;
+              moons.appendChild(el);
+            });
+            // one clearly-readable crescent moon, top-right
+            const moon = document.createElement('div');
+            moon.className = 'ns-moon';
+            moon.style.cssText = 'left:84%;top:118px;width:110px;height:110px;background:radial-gradient(circle at 40% 38%,#fffaf2,#efe8db 55%,#d3cabb 100%);box-shadow:0 0 52px 12px rgba(245,243,239,.42),inset -30px -8px 0 -8px rgba(13,13,24,.9),inset -20px 4px 26px -10px rgba(139,156,247,.45);animation-delay:-2s';
+            moons.appendChild(moon);
+            sky.appendChild(moons);
+            this._moons = moons;
+            root.insertBefore(sky, root.firstChild);
+            // lift real content above the sky (sky is z-index:0)
+            Array.from(root.children).forEach((c) => {
+              if (c === sky) return;
+              if (getComputedStyle(c).position === 'static') c.style.position = 'relative';
+              if (!c.style.zIndex) c.style.zIndex = '1';
+            });
+
+            // frost the solid sections so the starfield blurs softly through the seams
+            root.querySelectorAll('[style*="--bg-void"]').forEach((el) => el.classList.add('ns-frost'));
+
+            // blurred parallax reveal as sections scroll into view
+            if ('IntersectionObserver' in window && !this._reduced) {
+              const secs = Array.from(root.children).filter((c) => c.tagName === 'SECTION');
+              const io = new IntersectionObserver((ents) => {
+                ents.forEach((e) => {
+                  if (e.isIntersecting) {
+                    e.target.classList.add('is-in');
+                    io.unobserve(e.target);
+                    // drop the filter layer once the reveal finishes so text rasterizes crisply
+                    setTimeout(() => e.target.classList.add('fx-done'), 950);
+                  }
+                });
+              }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' });
+              secs.forEach((s) => {
+                if (s.getBoundingClientRect().top < window.innerHeight * 0.9) {
+                  s.classList.add('ns-reveal', 'is-in', 'fx-done');
+                } else {
+                  s.classList.add('ns-reveal');
+                  io.observe(s);
+                }
+              });
+              this._fxCleanup.push(() => io.disconnect());
+            }
+
+            // click-to-shoot — a meteor falls from clicks on empty areas
+            const onSkyClick = (ev) => {
+              if (this._reduced) return;
+              const t = ev.target;
+              if (t && t.closest && t.closest('a,button,[role="button"],input,textarea,select,header,footer,code,pre,.ns-lift,#ns-term-wrap')) return;
+              const m = document.createElement('div');
+              m.className = 'ns-meteor';
+              m.style.left = (ev.clientX - 115) + 'px';
+              m.style.top = (ev.clientY - 48) + 'px';
+              m.style.animation = 'ns-shoot-click 1.4s ease-in forwards';
+              sky.appendChild(m);
+              setTimeout(() => m.remove(), 1500);
+              const p = document.createElement('div');
+              p.className = 'ns-click-pop';
+              p.style.left = ev.clientX + 'px';
+              p.style.top = ev.clientY + 'px';
+              sky.appendChild(p);
+              setTimeout(() => p.remove(), 700);
+            };
+            document.addEventListener('click', onSkyClick);
+            this._fxCleanup.push(() => document.removeEventListener('click', onSkyClick));
+
+            // scroll progress bar
+            const prog = document.createElement('div');
+            prog.id = 'ns-progress';
+            root.appendChild(prog);
+            const onProg = () => {
+              const h = document.documentElement.scrollHeight - window.innerHeight;
+              prog.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+            };
+            window.addEventListener('scroll', onProg, { passive: true });
+            onProg();
+            this._fxCleanup.push(() => window.removeEventListener('scroll', onProg));
+
+            // proof-bar count-up (numbers as proof, counted live)
+            const proof = document.getElementById('proof');
+            if (proof && 'IntersectionObserver' in window && !this._reduced) {
+              const counters = [['ns-n1', 11], ['ns-n2', 10], ['ns-n3', 60]];
+              const cio = new IntersectionObserver((ents) => {
+                if (!ents.some((e) => e.isIntersecting)) return;
+                cio.disconnect();
+                const t0 = performance.now();
+                const tick = (now) => {
+                  const p = Math.min(1, (now - t0) / 900);
+                  const ease = 1 - Math.pow(1 - p, 3);
+                  counters.forEach(([id, v]) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = Math.round(v * ease);
+                  });
+                  if (p < 1) requestAnimationFrame(tick);
+                };
+                requestAnimationFrame(tick);
+              }, { threshold: 0.4 });
+              cio.observe(proof);
+              this._fxCleanup.push(() => cio.disconnect());
+            }
+
+            // meteors on an interval
+            if (!this._reduced) {
+              const shoot = () => {
+                const m = document.createElement('div');
+                m.className = 'ns-meteor';
+                m.style.left = (rand(55) - 5) + '%';
+                m.style.top = rand(38) + '%';
+                const dur = 1.9 + Math.random() * 0.7;
+                m.style.animation = `ns-shoot ${dur}s ease-in forwards`;
+                sky.appendChild(m);
+                setTimeout(() => m.remove(), dur * 1000 + 100);
+              };
+              this._meteorT = setInterval(() => { if (Math.random() > 0.25) shoot(); }, 3200);
+              setTimeout(shoot, 900);
+            }
+
+            // --- cursor glow ---
+            const hasFinePointer = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+            if (hasFinePointer) {
+              const ring = document.createElement('div'); ring.id = 'ns-cursor';
+              const dot = document.createElement('div'); dot.id = 'ns-cursor-dot';
+              root.appendChild(ring); root.appendChild(dot);
+              this._ring = ring; this._dot = dot;
+              let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, shown = false;
+              let scrollOff = 0;
+              const applyPar = () => {
+                const nx = (mx / innerWidth - 0.5), ny = (my / innerHeight - 0.5);
+                const sOff = Math.min(scrollOff * 0.05, 70);
+                this._layers.forEach((el) => {
+                  const d = +el.dataset.depth;
+                  el.style.transform = `translate(${nx * d}px,${ny * d - sOff * (d / 44)}px)`;
+                });
+                if (this._moons) {
+                  const d = +this._moons.dataset.depth;
+                  this._moons.style.transform = `translate(${nx * d}px,${ny * d - sOff * (d / 44)}px)`;
+                }
+                // hero terminal — ambient magnetic drift (paused while hovered, where the tilt takes over)
+                const tw = document.getElementById('ns-term-wrap');
+                if (tw && !tw.dataset.hover) tw.style.transform = `translate(${nx * 16}px,${ny * 12}px)`;
+              };
+              const onMove = (e) => {
+                mx = e.clientX; my = e.clientY;
+                if (!shown) { shown = true; ring.style.opacity = 1; dot.style.opacity = 1; }
+                dot.style.transform = `translate(${mx}px,${my}px)`;
+                applyPar();
+              };
+              const onScroll = () => { scrollOff = window.scrollY || 0; applyPar(); };
+              const onLeave = () => { ring.style.opacity = 0; dot.style.opacity = 0; shown = false; };
+              window.addEventListener('mousemove', onMove);
+              window.addEventListener('scroll', onScroll, { passive: true });
+              document.addEventListener('mouseleave', onLeave);
+              this._fxCleanup.push(() => window.removeEventListener('mousemove', onMove));
+              this._fxCleanup.push(() => window.removeEventListener('scroll', onScroll));
+              this._fxCleanup.push(() => document.removeEventListener('mouseleave', onLeave));
+              const loop = () => {
+                rx += (mx - rx) * 0.16; ry += (my - ry) * 0.16;
+                ring.style.transform = `translate(${rx}px,${ry}px)`;
+                this._raf = requestAnimationFrame(loop);
+              };
+              this._raf = requestAnimationFrame(loop);
+              this._activate = (on) => ring.classList.toggle('is-active', on);
+            }
+          }
+
+          // --- hover micro-interactions (re-scannable as children mount) ---
+          this._bindMicro(root);
+        }
+
+        _bindMicro(root) {
+          // cards: any element whose inline style references a card surface / large radius
+          const cards = root.querySelectorAll('[style*="surface-card"],[style*="radius-lg"]');
+          cards.forEach((el) => {
+            if (el.dataset.nsLift || el.id === 'ns-sky') return;
+            if (el.closest('#ns-sky') || el.closest('#ns-term-wrap')) return;
+            el.dataset.nsLift = '1';
+            el.classList.add('ns-lift', 'ns-sheen');
+            el.addEventListener('mouseenter', () => el.classList.add('is-hover'));
+            // 3D tilt toward the cursor + specular sheen tracking
+            el.addEventListener('mousemove', (ev) => {
+              if (this._reduced) return;
+              const r = el.getBoundingClientRect();
+              const px = (ev.clientX - r.left) / r.width;
+              const py = (ev.clientY - r.top) / r.height;
+              el.style.setProperty('--mx', (px * 100) + '%');
+              el.style.setProperty('--my', (py * 100) + '%');
+              const rx = (0.5 - py) * 5.5, ry = (px - 0.5) * 5.5;
+              el.style.transform = `perspective(760px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px)`;
+            });
+            el.addEventListener('mouseleave', () => {
+              el.classList.remove('is-hover');
+              el.style.transform = '';
+            });
+          });
+
+          // cursor grows over interactive targets
+          if (this._activate) {
+            const targets = root.querySelectorAll('a,button,[role="button"],.ns-lift');
+            targets.forEach((el) => {
+              if (el.dataset.nsCur) return;
+              el.dataset.nsCur = '1';
+              el.addEventListener('mouseenter', () => this._activate(true));
+              el.addEventListener('mouseleave', () => this._activate(false));
+            });
+          }
+
+          // floating glass nav — detaches into a pill once past the hero
+          const hdr = root.querySelector('header');
+          if (hdr && !hdr.dataset.nsFloat) {
+            hdr.dataset.nsFloat = '1';
+            const hero = document.getElementById('top');
+            const onNav = () => {
+              const limit = hero ? hero.offsetHeight * 0.65 : 380;
+              hdr.classList.toggle('ns-float', window.scrollY > limit);
+            };
+            window.addEventListener('scroll', onNav, { passive: true });
+            onNav();
+            this._fxCleanup.push(() => window.removeEventListener('scroll', onNav));
+          }
+
+          // terminal — magnetic 3D tilt toward the cursor, like the cards (no glow)
+          const twp = document.getElementById('ns-term-wrap');
+          if (twp && !twp.dataset.nsTilt) {
+            twp.dataset.nsTilt = '1';
+            twp.addEventListener('mousemove', (ev) => {
+              if (this._reduced) return;
+              const r = twp.getBoundingClientRect();
+              const px = (ev.clientX - r.left) / r.width;
+              const py = (ev.clientY - r.top) / r.height;
+              twp.dataset.hover = '1';
+              twp.style.transform = `perspective(900px) rotateX(${(0.5 - py) * 4}deg) rotateY(${(px - 0.5) * 4}deg) translateY(-3px)`;
+            });
+            twp.addEventListener('mouseleave', () => {
+              delete twp.dataset.hover;
+              twp.style.transform = '';
+            });
+          }
+
+          // magnetic buttons — drift toward the cursor, spring back on leave
+          root.querySelectorAll('button').forEach((b) => {
+            if (b.dataset.nsMag) return;
+            b.dataset.nsMag = '1';
+            const t = 'transform .3s cubic-bezier(.22,.61,.36,1)';
+            b.style.transition = b.style.transition ? b.style.transition + ',' + t : t;
+            b.addEventListener('mousemove', (ev) => {
+              if (this._reduced) return;
+              const r = b.getBoundingClientRect();
+              const dx = ev.clientX - (r.left + r.width / 2);
+              const dy = ev.clientY - (r.top + r.height / 2);
+              b.style.transform = `translate(${dx * 0.22}px,${dy * 0.3}px)`;
+            });
+            b.addEventListener('mouseleave', () => { b.style.transform = ''; });
+          });
+        }
+
+        _advance() {
+          const c = this.state.count;
+          if (c >= this.LINES.length) {
+            this._t = setTimeout(() => { this.setState({ count: 0 }); this._advance(); }, 4200);
+            return;
+          }
+          const speed = this.LINES[c] && this.LINES[c].text === '' ? 120 : 520;
+          this._t = setTimeout(() => { this.setState((s) => ({ count: s.count + 1 })); this._advance(); }, speed);
+        }
+
+        renderVals() {
+          const showStars = this.props.showStarCount === true;
+          const starLabel = showStars ? String(this.props.starCount ?? '4') : 'Star';
+
+          // ---- gated org chart ----
+          const hov = this.state.hoverAgent;
+          const byName = {
+            you: { name: 'you', ini: 'YOU', human: true,
+              owns: 'Refines by day, approves what is ready, reviews the PRs in the morning. Every gate hands control back here.',
+              artifact: 'decisions' },
+          };
+          this.CONST_DEFS.forEach((d) => { byName[d.name] = d; });
+          const agentLevel = {};
+          this.ORG_LEVELS.forEach((L) => L.agentNames.forEach((nm) => { agentLevel[nm] = L.num; }));
+          const mkEnter = (key) => () => { if (this.state.hoverAgent !== key) this.setState({ hoverAgent: key }); };
+          const rowLit = (key, levelKey) => !hov || hov === key || hov === levelKey ||
+            (agentLevel[hov] && agentLevel[hov] === key);
+          const dot = (nm, human) => {
+            const d = byName[nm];
+            const isHov = hov === nm;
+            return {
+              dotSize: human ? 15 : 11,
+              dotBg: isHov ? 'var(--terra-400)' : (d.standby ? 'rgba(169,167,189,.55)' : '#f5f3ef'),
+              dotGlow: isHov
+                ? '0 0 10px rgba(217,119,87,.9), 0 0 26px rgba(217,119,87,.55)'
+                : (human ? '0 0 14px rgba(245,243,239,.65)' : '0 0 7px rgba(245,243,239,.5)'),
+              color: isHov ? 'var(--terra-400)' : (d.standby ? 'var(--text-dim)' : (human ? 'var(--moon-100)' : 'var(--moon-200)')),
+            };
+          };
+          const treeRows = [];
+          treeRows.push({
+            key: 'you', star: true, prefix: '', label: 'you (human)', note: '— every gate returns here',
+            ...dot('you', true), delay: '0s',
+            o: rowLit('you', 'L0') ? 1 : 0.45, enter: mkEnter('you'),
+          });
+          const phaseLevels = this.ORG_LEVELS.slice(1);
+          phaseLevels.forEach((L, idx) => {
+            const last = idx === phaseLevels.length - 1;
+            treeRows.push({
+              key: L.num, gate: true,
+              prefix: last ? '└──' : '├──',
+              label: L.phase, cmds: L.commands.join(' · '),
+              color: hov === L.num ? 'var(--terra-400)' : 'var(--moon-100)',
+              o: rowLit(L.num, L.num) ? 1 : 0.45, enter: mkEnter(L.num),
+            });
+            const cont = last ? '    ' : '│   ';
+            if (L.num === 'L5') {
+              treeRows.push({
+                key: 'principal-engineer', star: true, prefix: cont + '└──',
+                label: 'principal-engineer', note: '— orchestrates, one agent at a time',
+                ...dot('principal-engineer'), delay: `${(idx * -1.1).toFixed(1)}s`,
+                o: rowLit('principal-engineer', 'L5') ? 1 : 0.45, enter: mkEnter('principal-engineer'),
+              });
+              const domains = L.agentNames.slice(1);
+              domains.forEach((nm, i) => {
+                const dl = i === domains.length - 1;
+                treeRows.push({
+                  key: nm, star: true, prefix: cont + '    ' + (dl ? '└──' : '├──'),
+                  label: nm, note: '— ' + L.seqs[nm],
+                  ...dot(nm), delay: `${((idx + i) * -0.7).toFixed(1)}s`,
+                  o: rowLit(nm, 'L5') ? 1 : 0.45, enter: mkEnter(nm),
+                });
+              });
+            } else {
+              L.agentNames.forEach((nm, i) => {
+                treeRows.push({
+                  key: nm, star: true, prefix: cont + '└──',
+                  label: nm, note: '— ' + byName[nm].artifact,
+                  ...dot(nm), delay: `${((idx + i) * -0.9).toFixed(1)}s`,
+                  o: rowLit(nm, L.num) ? 1 : 0.45, enter: mkEnter(nm),
+                });
+              });
+            }
+          });
+          let orgPanel;
+          if (hov && byName[hov]) {
+            const d = byName[hov];
+            orgPanel = {
+              eyebrow: '// agent charter', ini: d.ini, name: d.name, standby: !!d.standby,
+              body: d.owns, artifact: d.artifact, cmds: null,
+              ref: d.human ? 'https://github.com/whimzyLive/nightshift-ai'
+                : 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/' + d.name + '.md',
+              refLabel: d.human ? 'whimzyLive/nightshift-ai' : 'agents/' + d.name + '.md',
+            };
+          } else if (hov) {
+            const L = this.ORG_LEVELS.find((l) => l.num === hov);
+            orgPanel = {
+              eyebrow: '// phase contract', ini: null, name: L.num + ' · ' + L.phase, standby: false,
+              body: L.contract, artifact: null, cmds: L.commands.join('   '),
+              ref: L.ref, refLabel: L.refLabel,
+            };
+          } else {
+            orgPanel = {
+              eyebrow: '// the org, as a tree', ini: null, name: '1 human · 11 agents', standby: false,
+              body: '⊘ marks a hard gate — each phase ends there and control returns to you. Every ✶ is an agent with a tight charter. Hover any row to read its charter, contract, and source.',
+              artifact: null, cmds: null,
+              ref: 'https://github.com/whimzyLive/nightshift-ai',
+              refLabel: 'whimzyLive/nightshift-ai',
+            };
+          }
+
+          // ---- triage router ----
+          const pts = this.state.storyPts;
+          const thr = this.state.thresh;
+          const isBugT = this.state.ticketType === 'bug';
+          const lightStory = !isBugT && pts <= thr;
+          const ticketChip = isBugT
+            ? { label: 'PROJ-142 · bug', color: 'var(--red-400)', border: 'rgba(224,101,111,.45)', bg: 'rgba(224,101,111,.1)' }
+            : { label: 'PROJ-142 · ' + pts + ' pts', color: 'var(--terra-400)', border: 'var(--border-accent)', bg: 'rgba(217,119,87,.12)' };
+          const mkLane = (title, note, path, tickets) => ({
+            title, note, path, tickets,
+            border: tickets.length ? 'var(--border-accent)' : 'var(--border-soft)',
+            bg: tickets.length ? 'rgba(217,119,87,.05)' : 'transparent',
+            titleColor: tickets.length ? 'var(--moon-100)' : 'var(--text-dim)',
+          });
+          const triageLanes = [
+            mkLane('full ceremony', 'story > threshold', '/spec → /plan → /impl → /review', !isBugT && !lightStory ? [ticketChip] : []),
+            mkLane('lightweight', 'story ≤ threshold — skips spec + plan', '/impl → /review', lightStory ? [ticketChip] : []),
+            mkLane('defect', 'bugs never spec or plan', '/impl → /review', isBugT ? [ticketChip] : []),
+          ];
+
+          // ---- control gate walkthrough (route-aware) ----
+          const { gI, gS, gDone } = this.state;
+          const route = this._route();
+          const routeName = isBugT ? 'defect route' : (lightStory ? 'lightweight route' : 'full ceremony');
+          const ctrlGates = route.map((k, i) => {
+            const p = this.CTRL_MAP[k];
+            const done = gDone || i < gI;
+            const current = !gDone && i === gI;
+            const awaiting = current && gS === 'awaiting';
+            return {
+              label: p.label,
+              conn: i > 0,
+              connBg: (done || (current && i > 0)) ? 'rgba(217,119,87,.55)' : 'var(--border-strong)',
+              glyph: done ? '✓' : '⊘',
+              border: done || current ? 'var(--border-accent)' : 'var(--border-default)',
+              bg: done ? 'rgba(217,119,87,.28)' : (current ? 'rgba(217,119,87,.1)' : 'transparent'),
+              color: done || current ? 'var(--terra-400)' : 'var(--text-dim)',
+              glow: awaiting ? '0 0 18px rgba(217,119,87,.6)' : (done ? '0 0 8px rgba(217,119,87,.25)' : 'none'),
+              anim: awaiting ? 'ns-gatepulse 1.3s ease-in-out infinite' : 'none',
+              labelColor: done || current ? 'var(--moon-100)' : 'var(--text-dim)',
+            };
+          });
+          const cp = this.CTRL_MAP[route[Math.min(gI, route.length - 1)]];
+
+          // ---- option 2: one-shot vs nightshift race ----
+          const S = this.state.raceStep;
+          const raceLeft = [{ t: '> build PROJ-142', color: 'var(--moon-200)' }];
+          if (S >= 1 && S < 7) raceLeft.push({ t: 'thinking … (no spec, no plan, no questions asked)', color: 'var(--text-dim)' });
+          if (S >= 3 && S < 7) raceLeft.push({ t: 'still building … you have no idea what', color: 'var(--text-dim)' });
+          if (S >= 7) raceLeft.push({ blob: true });
+          if (S >= 8) raceLeft.push({ t: '4,213 lines changed · one commit · no paper trail', color: 'var(--amber-400)' });
+          if (S >= 9) raceLeft.push({ t: '✗ reinvented your auth — ignored the existing session middleware', color: 'var(--red-400)' });
+          if (S >= 10) raceLeft.push({ t: '✗ acceptance criteria met: 2 of 7', color: 'var(--red-400)' });
+          if (S >= 11) raceLeft.push({ t: '❓ built the wrong thing. read all 4,213 lines to find out where.', color: 'var(--red-400)' });
+          const mode = this.state.approvalMode;
+          const curAuto = this._gateAuto(gI);
+          const raceRight = [];
+          if (mode === 'assisted') {
+            raceRight.push({ t: '# route: ' + routeName + ' — one verb per phase, per project-context.md', color: 'var(--cyan-400)' });
+          } else {
+            raceRight.push({ t: '> /auto PROJ-142', color: 'var(--moon-200)' });
+            raceRight.push({
+              t: isBugT
+                ? '⊘ triage: issuetype=bug → defects skip spec/plan → /impl'
+                : (lightStory
+                  ? '⊘ triage: ' + pts + ' pts ≤ threshold ' + thr + ' → lightweight — spec + plan skipped'
+                  : '⊘ triage: ' + pts + ' pts > threshold ' + thr + ' → full ceremony'),
+              color: 'var(--cyan-400)',
+            });
+          }
+          route.forEach((k, i) => {
+            const started = gDone || i <= gI;
+            if (mode === 'assisted' && started) {
+              raceRight.push({ t: '> ' + this.CTRL_MAP[k].cmd + ' PROJ-142', color: 'var(--moon-100)' });
+            }
+            if (gDone || i < gI) raceRight.push({
+              t: this.CTRL_MAP[k].approved + (this._gateAuto(i) ? ' — auto-approved by config' : ' — you approved'),
+              color: 'var(--moon-200)',
+            });
+          });
+          if (!gDone) {
+            if (gS === 'working') raceRight.push({ t: cp.agent + ' → ' + cp.working, color: 'var(--moon-300)' });
+            else raceRight.push({ t: '⊘ gate: ' + cp.ready + (curAuto ? ' — auto-approving (approval_mode: ' + mode + ')' : ' — awaiting your approval'), color: 'var(--terra-400)' });
+          } else {
+            raceRight.push({
+              t: '→ PR #318 · ' + routeName + (mode === 'assisted' ? ' · every phase ran on your approval' : (mode === 'auto' ? ' · auto-ran — you approved spec + review' : ' · gates auto-approved by your config')),
+              color: 'var(--green-400)',
+            });
+          }
+
+          // ---- FAQ accordion ----
+          const faqVals = {};
+          for (let i = 0; i < 6; i++) {
+            const open = this.state.faqOpen === i;
+            faqVals['faqT' + i] = () => this.setState((s) => ({ faqOpen: s.faqOpen === i ? -1 : i }));
+            faqVals['faqG' + i] = open ? '−' : '+';
+            faqVals['faqM' + i] = open ? '220px' : '0px';
+            faqVals['faqO' + i] = open ? 1 : 0;
+          }
+
+          return {
+            ...faqVals,
+            storyPts: pts,
+            threshold: thr,
+            triageLanes,
+            triageMsg: isBugT
+              ? 'PROJ-142 issuetype=bug → defects skip spec/plan → /impl'
+              : (lightStory
+                ? 'PROJ-142 story · ' + pts + ' pts ≤ ' + thr + ' → lightweight — tasks derived inline, straight to /impl'
+                : 'PROJ-142 story · ' + pts + ' pts > ' + thr + ' → full ceremony — spec before plan, plan before code'),
+            setStoryPts: (e) => { this.setState({ storyPts: Number(e.target.value) }); this._startGate(0); },
+            decThreshold: () => { this.setState((s) => ({ thresh: Math.max(1, s.thresh - 1) })); this._startGate(0); },
+            incThreshold: () => { this.setState((s) => ({ thresh: Math.min(8, s.thresh + 1) })); this._startGate(0); },
+            setTypeStory: () => { this.setState({ ticketType: 'story' }); this._startGate(0); },
+            setTypeBug: () => { this.setState({ ticketType: 'bug' }); this._startGate(0); },
+            isStory: !isBugT,
+            isBug: isBugT,
+            storyBtnO: isBugT ? 0.45 : 1,
+            bugBtnO: isBugT ? 1 : 0.45,
+            raceRoute: routeName,
+            raceLeft,
+            raceRight,
+            ctrlGates,
+            ctrlAwaiting: !gDone && gS === 'awaiting' && !curAuto,
+            ctrlWorking: !gDone && (gS === 'working' || (gS === 'awaiting' && curAuto)),
+            ctrlDone: gDone && mode !== 'full-auto',
+            approvalMode: mode,
+            approvalModeHint: mode === 'assisted'
+              ? 'assisted — every gate waits for your approval'
+              : (mode === 'auto'
+                ? 'auto — you approve spec and review; the rest flows through'
+                : 'full-auto — every gate auto-approves; runs on a loop'),
+            cycleMode: () => {
+              const order = ['assisted', 'auto', 'full-auto'];
+              const next = order[(order.indexOf(this.state.approvalMode) + 1) % order.length];
+              this.setState({ approvalMode: next });
+              this._startGate(0);
+            },
+            approveGate: () => {
+              if (this.state.gS !== 'awaiting' || this.state.gDone) return;
+              this._advanceGate();
+            },
+            resetGates: () => this._startGate(0),
+            treeRows,
+            orgPanel,
+            clearAgent: () => this.setState({ hoverAgent: null }),
+            starOnGitHub: () => window.open('https://github.com/whimzyLive/nightshift-ai', '_blank'),
+
+            navProps: {
+              logoSrc: new URL('assets/logomark.svg', location.href).href,
+              brand: 'nightshift',
+              active: 'How it works',
+              stars: starLabel,
+              ctaLabel: 'Install the plugin',
+              onCta: () => { window.location.hash = 'install'; },
+              links: [
+                { label: 'How it works', href: '#how-it-works' },
+                { label: 'Why SDLC', href: 'why-sdlc.dc.html' },
+                { label: 'The team', href: 'team.dc.html' },
+                { label: 'FAQ', href: 'faq.dc.html' },
+              ],
+            },
+
+            termProps: {
+              title: 'zsh — acme-api · claude code',
+              minHeight: 420,
+              lines: this.LINES.slice(0, this.state.count),
+            },
+
+            pipelineStages: [
+              { command: '/spec', label: 'Technical spec', agent: 'solutions-architect', status: 'done' },
+              { command: '/plan', label: 'Ordered plan', agent: 'tech-lead', status: 'done' },
+              { command: '/impl', label: 'Implementation', agent: 'principal-engineer', status: 'active' },
+              { command: '/review', label: 'Quality gate', agent: 'qa-engineer', status: 'idle' },
+              { command: 'PR', label: 'Ship it', agent: 'auto', status: 'idle' },
+            ],
+
+            agents: [
+              { name: 'product-manager', owns: 'Vague idea → PRD with binary acceptance criteria', tone: 'accent' },
+              { name: 'solutions-architect', owns: 'PRD → technical design / spec', tone: 'accent' },
+              { name: 'scrum-master', owns: 'Story slicing, mapping, splitting', tone: 'info' },
+              { name: 'tech-lead', owns: 'Spec → ordered, verifiable implementation plan', tone: 'info' },
+              { name: 'principal-engineer', owns: 'Orchestrates the build, dispatches domain agents in dependency order', tone: 'accent' },
+              { name: 'platform-engineer', owns: 'Backend / infrastructure / serverless', tone: 'cyan' },
+              { name: 'web-engineer', owns: 'Web UI', tone: 'cyan' },
+              { name: 'mobile-engineer', owns: 'Mobile apps', tone: 'cyan', standby: true },
+              { name: 'database-administrator', owns: 'Schema, migrations, data', tone: 'cyan' },
+              { name: 'sync-engineer', owns: 'Offline / sync layer', tone: 'cyan', standby: true },
+              { name: 'qa-engineer', owns: 'Always-on review → quality gate → AC verification → PR', tone: 'green' },
+            ],
+
+            footerProps: {
+              logoSrc: new URL('assets/logomark.svg', location.href).href,
+              columns: [
+                { title: 'Plugin', items: ['How it works', 'Ship-while-you-sleep workflow', 'Why SDLC', 'The team', 'FAQ', 'Docs (soon)'] },
+                { title: 'Project', items: ['GitHub', 'Changelog (soon)', 'MIT License', 'Issues'] },
+                { title: 'Company', items: ['whimzyLive'] },
+              ],
+            },
+          };
+        }
+      }
+    </script>
+  </body>
+</html>
