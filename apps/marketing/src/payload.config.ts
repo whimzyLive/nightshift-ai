@@ -6,8 +6,10 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { buildConfig } from 'payload';
 import sharp from 'sharp';
 
+import { Faq } from './collections/Faq';
 import { Media } from './collections/Media';
 import { Users } from './collections/Users';
+import { WhySdlc } from './globals/WhySdlc';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -19,7 +21,8 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Media, Users],
+  collections: [Faq, Media, Users],
+  globals: [WhySdlc],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   db: postgresAdapter({

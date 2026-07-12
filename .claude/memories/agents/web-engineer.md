@@ -6,6 +6,110 @@
 > removed from this file (see git history); the framework/tooling learnings below
 > (GSAP, Payload, Jest, worktrees) remain valid.
 
+## 2026-07-12 — Story NA-31 — CMS FAQ collection + whySdlc global, content-only (no rendering)
+
+**Learnings:**
+
+- **`payload run <script>` exits before an unawaited async body finishes —
+  use top-level `await`, not a fire-and-forget IIFE.** The CLI (`payload/dist/bin/index.js`,
+  `run` branch) does `await import(scriptPath)` then immediately calls
+  `process.exit(0)`. Dynamic `import()` only waits for a module's _top-level_
+  `await` chain; a `(async () => { ... })().catch(...)` body at the top of the
+  script is fire-and-forget from the module's perspective, so `import()`
+  resolves as soon as that promise is _scheduled_, not settled — the CLI then
+  kills the process before even the first `await getPayload(...)` inside it
+  resolves (confirmed with a `process.exit` wrapper + stack trace: the trace
+  pointed at `bin()` in payload's CLI, not at anything in the script).
+  Symptom: the script silently produces zero rows/updates and exits 0 with no
+  error, no matter what logging you add inside the unawaited function — because
+  none of that code ever gets a turn on the event loop. Fix: write the seed
+  body as bare top-level statements (`const payload = await getPayload(...)`
+  followed by `await` calls, no wrapping function) so the module's own
+  evaluation — which `import()` genuinely waits on — doesn't finish until the
+  DB work is done.
+- `getPayload({ config })` triggers Payload's Postgres **dev schema push**
+  (`pushDevSchema` in `@payloadcms/drizzle`) whenever
+  `NODE_ENV !== 'production'` and `PAYLOAD_MIGRATING !== 'true'`, _even after_
+  `payload migrate` already applied a matching schema — it diffs and applies
+  again every `getPayload()` call in dev mode. If Drizzle's diff produces
+  `warnings` (rare once schema is settled, but possible on first push) it
+  calls the `prompts()` library, which in a non-interactive shell (no TTY)
+  fires `onCancel` immediately and calls `process.exit(0)` — another silent,
+  zero-output early exit, this time from inside `pushDevSchema.js` itself, not
+  the CLI wrapper. Running the script with `NODE_ENV=production` skips this
+  branch entirely (relies purely on applied migrations, no push, no prompts) —
+  useful for scripted/CI seed runs even though the app's real prod deploy
+  target is Vercel, not this local flow.
+- No live Postgres was reachable in this sandbox — `docker info`/`docker ps`
+  hung/timed out even with `dangerouslyDisableSandbox: true` and even though
+  `ps` showed Docker Desktop's backend processes running (VM likely wedged,
+  not a permissions issue). Homebrew's `postgresql@14` binaries
+  (`/opt/homebrew/bin/{initdb,pg_ctl,psql}`) were available as a fallback:
+  `initdb -D <scratch>/pgdata -U postgresql --auth=trust`, then
+  `pg_ctl ... -o "-p 5433 -h 127.0.0.1 -c unix_socket_directories=''" start`
+  — the `unix_socket_directories=''` flag is required because Postgres's
+  Unix-socket path has a ~103-byte OS limit and this project's scratchpad
+  path is longer than that; disabling the socket and forcing TCP
+  (`-h 127.0.0.1`) sidesteps it entirely. Pointed `apps/marketing/.env`'s
+  `DATABASE_URL` at the scratch instance only for the verification session,
+  restored the committed placeholder value afterward (`.env` is gitignored,
+  so this never touched a tracked file) — this is how `payload generate:types`,
+  `migrate:create`, `migrate`, and the seed idempotency check (AC ti-3) all
+  got real red→green evidence in an environment with no reachable
+  docker-compose/Neon DB.
+- Mixing one array element typed as the broad `Field` union (e.g. a
+  `const groupField: Field = {...}` extracted per the payload skill's own
+  "annotate extracted constants" guidance) with the other elements left as
+  inline object literals in the same `fields: [...]` array **degrades
+  TypeScript's contextual typing for the other elements' `validate`
+  callbacks** — `(value, { siblingData }) => ...` on a sibling `type:
+'number'` field literal came back "Parameter 'value' implicitly has an 'any'
+  type" at `next build`'s typecheck step, even though that field itself was a
+  plain inline literal. Root cause isn't the skill's guidance being wrong per
+  se — it's that a _mixed_ array (one broadly-typed element + literals) seems
+  to break per-element discriminated-union narrowing for the literals too.
+  Fix: don't extract `validate`-bearing fields as loosely-typed constants at
+  all; either keep every field a fully inline literal, or (more robust, and
+  what actually fixed it here) type the `validate` function itself against
+  Payload's specific exported validation type (`NumberFieldSingleValidation`,
+  `TextFieldSingleValidation`, etc., all exported from `'payload'` — see
+  `payload/dist/fields/validations.d.ts`) as a factory: `const
+requiredWhenFlagged = (flagField): NumberFieldSingleValidation => (value, {
+siblingData }) => {...}`. That sidesteps contextual-typing entirely and is
+  reusable across the two symmetric order fields.
+- `payload generate:types`, `migrate:create`, and `migrate` all worked
+  correctly against a fresh/empty DB with **zero prior migrations** in this
+  app — a prior story (NA-22) had committed globals + a migration, but a
+  later reset commit (`feat(marketing)!: reset app to empty Payload +
+Next.js shell`, ancestor of current `develop`) deleted them, so NA-31's
+  generated migration is again a from-scratch baseline (creates `faq`,
+  `media`, `users`, `users_sessions`, `payload_migrations`, etc. — not just
+  the two new tables). Expected, not a mistake — check `git log --oneline -- <path>`
+  history before assuming a resurfaced file/table pattern is stale
+  duplication.
+
+**Patterns:**
+
+- Verifying a Payload seed's idempotency contract (AC-style "second run
+  never duplicates") end-to-end without a project-provided test harness:
+  run the seed once (`pnpm exec payload run src/seed/seed.ts`, or via the
+  npm `seed` script), assert row/child count via a direct `psql` query, run
+  it again, assert the same count plus that every doc's `updatedAt`-affecting
+  fields changed to "updated" not "created" in the log output. For a Payload
+  **array** field on a global (e.g. `whySdlc.arguments`), Payload stores rows
+  in a `<slug>_<arrayFieldName>` child table (`why_sdlc_arguments`) — count
+  and order-check that table directly (`array_agg(col ORDER BY _order)`)
+  rather than trying to introspect the parent `jsonb` (arrays aren't stored
+  as jsonb on Postgres, only `richText`/`group` fields are).
+- Building one-paragraph Lexical `richText` seed values by hand without a
+  helper library: a single `{ root: { type:'root', children:[{ type:
+'paragraph', children: [...textNodes], direction:'ltr', format:'', indent:0,
+version:1 }], direction:'ltr', format:'', indent:0, version:1 } }` shape is
+  sufficient for plain-prose CMS copy; inline `code` marks (e.g. `/auto`)
+  are just another text node in the same paragraph with `format: 16` (Lexical's
+  `IS_CODE` bit) instead of `format: 0` — no need for the full
+  `@payloadcms/richtext-lexical` node-builder API for straightforward seed data.
+
 ## 2026-07-10 — Story NA-16 — interactive 3D hero landing page
 
 **Learnings:**
