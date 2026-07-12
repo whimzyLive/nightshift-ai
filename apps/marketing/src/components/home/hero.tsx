@@ -112,7 +112,7 @@ export function Hero() {
               padding: 'clamp(0.6875rem, 1.6vh, 0.9375rem) 1.125rem',
               fontSize: 'clamp(0.6875rem, 1.5vh, 0.8125rem)',
               color: 'var(--btn-neon-hover-text)',
-              background: 'var(--btn-neon-hover-bg)',
+              background: 'rgba(217,119,87,0.75)',
               boxShadow: 'var(--glow-neon-hover)',
             }}
           >
