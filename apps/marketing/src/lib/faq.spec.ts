@@ -1,6 +1,6 @@
 import { getPayload } from 'payload';
 
-import { getHomeFaqs } from './faq';
+import { getFaqPageGroups, getHomeFaqs } from './faq';
 
 import type { Faq } from '../payload-types';
 
@@ -92,5 +92,89 @@ describe('getHomeFaqs', () => {
     await expect(getHomeFaqs()).resolves.toEqual([]);
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('getFaqPageGroups', () => {
+  beforeEach(() => {
+    mockFind.mockReset();
+    mockGetPayload.mockReset().mockResolvedValue({ find: mockFind });
+  });
+
+  it('queries all faq docs sorted by faqOrder (no where filter, limit 100, depth 0)', async () => {
+    mockFind.mockResolvedValue({ docs: [] });
+    await getFaqPageGroups();
+    expect(mockFind).toHaveBeenCalledWith({
+      collection: 'faq',
+      sort: 'faqOrder',
+      limit: 100,
+      depth: 0,
+    });
+  });
+
+  it('partitions into groups in first-appearance order with mapped eyebrow labels', async () => {
+    mockFind.mockResolvedValue({
+      docs: [
+        makeFaqDoc({
+          id: 1,
+          group: 'positioning',
+          faqOrder: 1,
+          question: 'Q1',
+        }),
+        makeFaqDoc({
+          id: 2,
+          group: 'positioning',
+          faqOrder: 2,
+          question: 'Q2',
+        }),
+        makeFaqDoc({
+          id: 3,
+          group: 'workflow-control',
+          faqOrder: 3,
+          question: 'Q3',
+        }),
+      ],
+    });
+    const groups = await getFaqPageGroups();
+    expect(groups.map((g) => g.key)).toEqual([
+      'positioning',
+      'workflow-control',
+    ]);
+    expect(groups[0].eyebrow).toBe('// positioning');
+    expect(groups[1].eyebrow).toBe('// workflow & control');
+  });
+
+  it('sets item.number equal to faqOrder (continuous across group boundaries)', async () => {
+    mockFind.mockResolvedValue({
+      docs: [
+        makeFaqDoc({ id: 1, group: 'positioning', faqOrder: 1 }),
+        makeFaqDoc({ id: 3, group: 'workflow-control', faqOrder: 3 }),
+      ],
+    });
+    const groups = await getFaqPageGroups();
+    expect(groups[0].items[0].number).toBe(1);
+    expect(groups[1].items[0].number).toBe(3);
+  });
+
+  it('uses the full answer field, not homeAnswer', async () => {
+    const answer = makeFaqDoc({}).answer;
+    mockFind.mockResolvedValue({
+      docs: [
+        makeFaqDoc({
+          id: 1,
+          group: 'positioning',
+          faqOrder: 1,
+          answer,
+          homeAnswer: null,
+        }),
+      ],
+    });
+    const groups = await getFaqPageGroups();
+    expect(groups[0].items[0].answer).toBe(answer);
+  });
+
+  it('returns [] on any Payload/DB failure', async () => {
+    mockFind.mockRejectedValue(new Error('db down'));
+    await expect(getFaqPageGroups()).resolves.toEqual([]);
   });
 });
