@@ -1,5 +1,7 @@
-import { Badge, InstallSnippet, Terminal } from '@nightshift-ai/ui';
+import { Badge, CtaButton, InstallSnippet, Terminal } from '@nightshift-ai/ui';
 import type { TerminalLine } from '@nightshift-ai/ui';
+
+const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L725-738,
 // LINES) — the scripted /auto PROJ-142 run the Terminal loops through.
@@ -122,6 +124,15 @@ export function Hero() {
             </span>
             <InstallSnippet command="/plugin marketplace add whimzyLive/nightshift-ai" />
             <InstallSnippet command="/plugin install sdlc@nightshift" />
+            <CtaButton
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener"
+              variant="secondary"
+              className="mt-1 self-start"
+            >
+              ★ Star nightshift on GitHub
+            </CtaButton>
           </div>
         </div>
         <div className="relative">
