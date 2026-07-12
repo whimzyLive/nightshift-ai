@@ -10,6 +10,21 @@ import { ProofBar } from '../../components/home/proof-bar';
 import { TeamPreview } from '../../components/home/team-preview';
 import { WhyDifferent } from '../../components/home/why-different';
 import { getHomeFaqs } from '../../lib/faq';
+import { JsonLd } from '../../lib/seo/json-ld';
+import {
+  buildFaqPageNode,
+  howToNode,
+  organizationNode,
+  softwareApplicationNode,
+} from '../../lib/seo/jsonld';
+import { homeMetadata } from '../../lib/seo/metadata';
+
+import type { FaqSchemaInput } from '../../lib/seo/jsonld';
+import type { Metadata } from 'next';
+
+// All Home meta/OG/Twitter values are static brief copy with no
+// request/CMS dependency — a plain const export, no generateMetadata.
+export const metadata: Metadata = homeMetadata;
 
 // Payload's Local API call below (getHomeFaqs) would otherwise make this
 // route attempt static prerendering at `next build` time, which requires a
@@ -24,8 +39,30 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const faqs = await getHomeFaqs();
 
+  // Same already-resolved `answer` the page renders via FaqPreview below —
+  // guarantees JSON-LD text can't drift from visible copy (AC4).
+  const faqInputs: FaqSchemaInput[] = faqs.map((faq) => ({
+    question: faq.question,
+    answer: faq.answer,
+  }));
+  const faqNode = buildFaqPageNode(
+    'https://github.com/whimzyLive/nightshift-ai#faq',
+    faqInputs,
+  );
+
   return (
     <>
+      <JsonLd
+        graph={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            softwareApplicationNode,
+            organizationNode,
+            howToNode,
+            ...(faqNode ? [faqNode] : []),
+          ],
+        }}
+      />
       <Hero />
       <PhraseMarquee />
       <ProofBar />
