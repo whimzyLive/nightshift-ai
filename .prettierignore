@@ -4,3 +4,5 @@
 /.nx/cache
 /.nx/workspace-data
 pnpm-lock.yaml
+# Committed design handoff must stay byte-faithful to the approved export — never reformat
+docs/design/marketing-site-handoff/

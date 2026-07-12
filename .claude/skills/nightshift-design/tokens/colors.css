@@ -5,29 +5,29 @@
  */
 :root {
   /* ---- Base values: night-sky background layers (deepest → raised) ---- */
-  --night-900: #08080f;   /* page void — deepest */
-  --night-800: #0d0d18;   /* default page background */
-  --night-700: #12121f;   /* sunken / code well */
-  --night-600: #1a1a2e;   /* primary surface (cards, terminal body) */
-  --night-500: #22223a;   /* raised surface (hover, popovers) */
-  --night-400: #2c2c47;   /* overlay / active surface */
+  --night-900: #08080f; /* page void — deepest */
+  --night-800: #0d0d18; /* default page background */
+  --night-700: #12121f; /* sunken / code well */
+  --night-600: #1a1a2e; /* primary surface (cards, terminal body) */
+  --night-500: #22223a; /* raised surface (hover, popovers) */
+  --night-400: #2c2c47; /* overlay / active surface */
 
   /* ---- Hairlines & dividers ---- */
   --line-soft: rgba(255, 255, 255, 0.06);
-  --line:      rgba(255, 255, 255, 0.10);
+  --line: rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.16);
 
   /* ---- Moonlight text ---- */
-  --moon-100: #f5f3ef;   /* primary text — warm off-white */
-  --moon-200: #d8d6e0;   /* secondary text */
-  --moon-300: #a9a7bd;   /* muted / supporting */
-  --moon-400: #74738c;   /* dim / captions, code comments */
-  --moon-500: #4d4c63;   /* faintest / disabled */
+  --moon-100: #f5f3ef; /* primary text — warm off-white */
+  --moon-200: #d8d6e0; /* secondary text */
+  --moon-300: #a9a7bd; /* muted / supporting */
+  --moon-400: #74738c; /* dim / captions, code comments */
+  --moon-500: #4d4c63; /* faintest / disabled */
 
   /* ---- Terracotta accent (warm, Anthropic-aligned) ---- */
   --terra-300: #f0a488;
   --terra-400: #e58b6f;
-  --terra-500: #d97757;   /* brand accent */
+  --terra-500: #d97757; /* brand accent */
   --terra-600: #c2624a;
   --terra-700: #9d4d3a;
   --terra-glow: rgba(217, 119, 87, 0.28);
@@ -44,11 +44,11 @@
   --cyan-500: #4fb3c4;
 
   /* ---- Semantic (terminal-true) ---- */
-  --green-400: #6ec48a;   /* success / added / passing */
+  --green-400: #6ec48a; /* success / added / passing */
   --green-tint: rgba(110, 196, 138, 0.14);
-  --amber-400: #e0a458;   /* warning / pending */
+  --amber-400: #e0a458; /* warning / pending */
   --amber-tint: rgba(224, 164, 88, 0.14);
-  --red-400: #e0656f;     /* error / removed / failing */
+  --red-400: #e0656f; /* error / removed / failing */
   --red-tint: rgba(224, 101, 111, 0.14);
 
   /* ============ SEMANTIC ALIASES — use these in components ============ */
@@ -75,7 +75,9 @@
   --text-muted: var(--moon-300);
   --text-dim: var(--moon-400);
   --text-disabled: var(--moon-500);
-  --text-on-accent: #1a0f0a;
+  /* SITE OVERRIDE: filled-terracotta CTAs use moonlight text on the shipped
+   * site (was #1a0f0a dark-on-accent). */
+  --text-on-accent: #f5f3ef;
 
   /* Accent */
   --accent: var(--terra-500);
@@ -103,4 +105,34 @@
   --code-num: var(--cyan-400);
   --code-punct: var(--moon-300);
   --code-prompt: var(--terra-500);
+
+  /* ============ SITE ADDITIONS (source of truth: the shipped site) ============ */
+  /* Night-sky scene — parallax starfield, halos, meteors */
+  --star-white: rgba(245, 243, 239, 0.85); /* near-layer stars */
+  --star-bright: rgba(255, 255, 255, 1); /* foreground stars */
+  --star-indigo: rgba(139, 156, 247, 0.95);
+  --star-cyan: rgba(98, 196, 211, 0.95);
+  --halo-terra: rgba(217, 119, 87, 0.2); /* soft sky halos behind heroes */
+  --halo-indigo: rgba(139, 156, 247, 0.18);
+  --halo-cyan: rgba(98, 196, 211, 0.12);
+  --meteor: var(--terra-400); /* meteor head + tail base */
+  --sky-opacity-home: 1; /* full scene on home */
+  --sky-opacity-subpage: 0.75; /* calmer on editorial pages */
+
+  /* Neon CTA (inverted button) */
+  --btn-neon-bg: rgba(217, 119, 87, 0.08);
+  --btn-neon-text: var(--terra-400);
+  --btn-neon-border: var(--terra-500);
+  --btn-neon-hover-bg: var(--terra-500);
+  --btn-neon-hover-text: #f5f3ef;
+  --btn-neon-press-bg: var(--terra-600);
+
+  /* Cursor glow */
+  --cursor-glow: rgba(217, 119, 87, 0.35);
+  --cursor-glow-active: rgba(217, 119, 87, 0.42);
+
+  /* Model-tier badges (team page: agent frontmatter tiers) */
+  --tier-opus: var(--terra-400);
+  --tier-sonnet: var(--indigo-400);
+  --tier-human: var(--green-400);
 }

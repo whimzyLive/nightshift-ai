@@ -1,703 +1,269 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="./support.js"></script>
-  </head>
-  <body>
-    <x-dc>
-      <helmet>
-        <link
-          rel="stylesheet"
-          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/fonts.css"
-        />
-        <link
-          rel="stylesheet"
-          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/colors.css"
-        />
-        <link
-          rel="stylesheet"
-          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/typography.css"
-        />
-        <link
-          rel="stylesheet"
-          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/spacing.css"
-        />
-        <link
-          rel="stylesheet"
-          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/base.css"
-        />
-        <link
-          rel="stylesheet"
-          href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/styles.css"
-        />
-        <script src="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/_ds_bundle.js"></script>
-        <style>
-          html,
-          body {
-            margin: 0;
-            background: #0d0d18;
-          }
-          a {
-            color: var(--link);
-            text-decoration: none;
-          }
-          a:hover {
-            color: var(--link-hover);
-          }
-          #why-sky {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0.75;
-            background-image:
-              radial-gradient(
-                1.6px 1.6px at 11% 16%,
-                rgba(245, 243, 239, 0.5) 0,
-                rgba(245, 243, 239, 0.5) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                1.4px 1.4px at 68% 9%,
-                rgba(245, 243, 239, 0.4) 0,
-                rgba(245, 243, 239, 0.4) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                1.8px 1.8px at 87% 28%,
-                rgba(139, 156, 247, 0.4) 0,
-                rgba(139, 156, 247, 0.4) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                1.3px 1.3px at 31% 44%,
-                rgba(245, 243, 239, 0.3) 0,
-                rgba(245, 243, 239, 0.3) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                1.6px 1.6px at 52% 71%,
-                rgba(245, 243, 239, 0.3) 0,
-                rgba(245, 243, 239, 0.3) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                1.3px 1.3px at 8% 82%,
-                rgba(98, 196, 211, 0.35) 0,
-                rgba(98, 196, 211, 0.35) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                1.5px 1.5px at 93% 62%,
-                rgba(245, 243, 239, 0.3) 0,
-                rgba(245, 243, 239, 0.3) 40%,
-                transparent 78%
-              ),
-              radial-gradient(
-                420px 420px at 86% 5%,
-                rgba(217, 119, 87, 0.09),
-                transparent 65%
-              ),
-              radial-gradient(
-                360px 360px at 5% 40%,
-                rgba(124, 147, 240, 0.07),
-                transparent 65%
-              );
-          }
-          #why-root [style*='border-radius']:not([style*='50%']),
-          #why-root button,
-          #why-root header {
-            border-radius: 0 !important;
-          }
-          #why-root button {
-            background: rgba(217, 119, 87, 0.08) !important;
-            color: var(--terra-400) !important;
-            border: 1px solid var(--terra-500) !important;
-            box-shadow:
-              0 0 16px rgba(217, 119, 87, 0.42),
-              0 0 38px rgba(217, 119, 87, 0.18) !important;
-            transition:
-              box-shadow 0.28s var(--ease-out),
-              background 0.2s,
-              color 0.2s,
-              border-color 0.2s !important;
-          }
-          #why-root button:hover {
-            background: var(--terra-500) !important;
-            color: #f5f3ef !important;
-            border-color: var(--terra-400) !important;
-            box-shadow:
-              0 0 22px rgba(217, 119, 87, 0.55),
-              4px 4px 0 0 rgba(217, 119, 87, 0.5),
-              8px 8px 0 0 rgba(217, 119, 87, 0.28),
-              12px 12px 0 0 rgba(217, 119, 87, 0.14) !important;
-          }
-          #why-root button:active {
-            background: var(--terra-600) !important;
-            color: #f5f3ef !important;
-          }
-          #why-root header {
-            background: linear-gradient(
-              180deg,
-              rgba(13, 13, 24, 0.78),
-              rgba(13, 13, 24, 0.5)
-            ) !important;
-            backdrop-filter: blur(20px) saturate(1.35) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(1.35) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-            transition:
-              max-width 0.55s var(--ease-out),
-              border-radius 0.55s var(--ease-out),
-              top 0.55s var(--ease-out),
-              margin 0.55s var(--ease-out),
-              background 0.4s,
-              box-shadow 0.4s,
-              border-color 0.4s;
-          }
-          #why-root header.ns-float {
-            top: 14px !important;
-            max-width: min(940px, calc(100% - 48px));
-            margin: 0 auto;
-            border-radius: 0 !important;
-            background: linear-gradient(
-              180deg,
-              rgba(13, 13, 24, 0.6),
-              rgba(13, 13, 24, 0.42)
-            ) !important;
-            border: 1px solid rgba(255, 255, 255, 0.13) !important;
-            backdrop-filter: blur(26px) saturate(1.5) !important;
-            -webkit-backdrop-filter: blur(26px) saturate(1.5) !important;
-            box-shadow:
-              0 18px 48px -18px rgba(0, 0, 0, 0.75),
-              0 0 0 1px rgba(217, 119, 87, 0.07),
-              inset 0 1px 0 rgba(255, 255, 255, 0.08);
-          }
-          #why-root footer {
-            background: linear-gradient(
-              180deg,
-              rgba(8, 8, 15, 0.5),
-              rgba(8, 8, 15, 0.78)
-            ) !important;
-            backdrop-filter: blur(20px) saturate(1.3);
-            -webkit-backdrop-filter: blur(20px) saturate(1.3);
-            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-          }
-          #why-root footer a,
-          #why-root footer li {
-            display: block;
-            height: auto !important;
-            min-height: 0 !important;
-            line-height: 1.6 !important;
-            white-space: normal;
-          }
-          #why-root h1,
-          #why-root h2 {
-            text-shadow:
-              0 0 28px rgba(245, 243, 239, 0.15),
-              0 0 64px rgba(124, 147, 240, 0.13);
-          }
-          #why-root p {
-            text-shadow: 0 1px 2px rgba(8, 8, 15, 0.5);
-          }
-          #ns-cursor {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 28px;
-            height: 28px;
-            margin: -14px 0 0 -14px;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            background: radial-gradient(
-              circle,
-              rgba(217, 119, 87, 0.35),
-              transparent 70%
-            );
-            mix-blend-mode: screen;
-            transition:
-              width 0.25s,
-              height 0.25s,
-              margin 0.25s,
-              background 0.25s;
-          }
-          #ns-cursor.is-active {
-            width: 84px;
-            height: 84px;
-            margin: -42px 0 0 -42px;
-            background: radial-gradient(
-              circle,
-              rgba(217, 119, 87, 0.42),
-              rgba(124, 147, 240, 0.16) 58%,
-              transparent 72%
-            );
-          }
-          .faq-row {
-            cursor: pointer;
-          }
-          .faq-row:hover {
-            opacity: 0.85;
-          }
-          @media (prefers-reduced-motion: reduce) {
-            #why-root header {
-              transition: none !important;
-            }
-            #ns-cursor {
-              display: none;
-            }
-          }
-        </style>
-        <template id="__bundler_thumbnail"
-          ><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-            <rect width="100" height="100" fill="#0d0d18" />
-            <path
-              d="M62 30a22 22 0 1 0 8 24 17 17 0 1 1-8-24z"
-              fill="#d97757"
-            />
-            <text
-              x="50"
-              y="62"
-              font-size="30"
-              fill="#f5f3ef"
-              text-anchor="middle"
-              font-family="monospace"
-            >
-              ?
-            </text>
-          </svg></template
-        >
-      </helmet>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/tokens/base.css">
+  <link rel="stylesheet" href="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/styles.css">
+  <script src="_ds/nightshift-design-system-98300772-62ab-42de-8f8e-0efacdc8f7ba/_ds_bundle.js"></script>
+  <style>
+    html,body{margin:0;background:#0d0d18;}
+    a{color:var(--link);text-decoration:none;}
+    a:hover{color:var(--link-hover);}
+    #why-sky{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.75;background-image:
+      radial-gradient(1.6px 1.6px at 11% 16%,rgba(245,243,239,.5) 0,rgba(245,243,239,.5) 40%,transparent 78%),
+      radial-gradient(1.4px 1.4px at 68% 9%,rgba(245,243,239,.4) 0,rgba(245,243,239,.4) 40%,transparent 78%),
+      radial-gradient(1.8px 1.8px at 87% 28%,rgba(139,156,247,.4) 0,rgba(139,156,247,.4) 40%,transparent 78%),
+      radial-gradient(1.3px 1.3px at 31% 44%,rgba(245,243,239,.3) 0,rgba(245,243,239,.3) 40%,transparent 78%),
+      radial-gradient(1.6px 1.6px at 52% 71%,rgba(245,243,239,.3) 0,rgba(245,243,239,.3) 40%,transparent 78%),
+      radial-gradient(1.3px 1.3px at 8% 82%,rgba(98,196,211,.35) 0,rgba(98,196,211,.35) 40%,transparent 78%),
+      radial-gradient(1.5px 1.5px at 93% 62%,rgba(245,243,239,.3) 0,rgba(245,243,239,.3) 40%,transparent 78%),
+      radial-gradient(420px 420px at 86% 5%,rgba(217,119,87,.09),transparent 65%),
+      radial-gradient(360px 360px at 5% 40%,rgba(124,147,240,.07),transparent 65%);}
+    #why-root [style*="border-radius"]:not([style*="50%"]),
+    #why-root button,
+    #why-root header{border-radius:0!important;}
+    #why-root button{
+      background:rgba(217,119,87,.08)!important;color:var(--terra-400)!important;border:1px solid var(--terra-500)!important;
+      box-shadow:0 0 16px rgba(217,119,87,.42),0 0 38px rgba(217,119,87,.18)!important;
+      transition:box-shadow .28s var(--ease-out),background .2s,color .2s,border-color .2s!important;
+    }
+    #why-root button:hover{
+      background:var(--terra-500)!important;color:#f5f3ef!important;border-color:var(--terra-400)!important;
+      box-shadow:0 0 22px rgba(217,119,87,.55),4px 4px 0 0 rgba(217,119,87,.5),8px 8px 0 0 rgba(217,119,87,.28),12px 12px 0 0 rgba(217,119,87,.14)!important;
+    }
+    #why-root button:active{background:var(--terra-600)!important;color:#f5f3ef!important;}
+    #why-root header{
+      background:linear-gradient(180deg,rgba(13,13,24,.78),rgba(13,13,24,.5))!important;
+      backdrop-filter:blur(20px) saturate(1.35)!important;-webkit-backdrop-filter:blur(20px) saturate(1.35)!important;
+      border-bottom:1px solid rgba(255,255,255,.08)!important;
+      transition:max-width .55s var(--ease-out),border-radius .55s var(--ease-out),top .55s var(--ease-out),margin .55s var(--ease-out),background .4s,box-shadow .4s,border-color .4s;
+    }
+    #why-root header.ns-float{
+      top:14px!important;max-width:min(940px,calc(100% - 48px));margin:0 auto;border-radius:0!important;
+      background:linear-gradient(180deg,rgba(13,13,24,.6),rgba(13,13,24,.42))!important;
+      border:1px solid rgba(255,255,255,.13)!important;
+      backdrop-filter:blur(26px) saturate(1.5)!important;-webkit-backdrop-filter:blur(26px) saturate(1.5)!important;
+      box-shadow:0 18px 48px -18px rgba(0,0,0,.75),0 0 0 1px rgba(217,119,87,.07),inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    #why-root footer{
+      background:linear-gradient(180deg,rgba(8,8,15,.5),rgba(8,8,15,.78))!important;
+      backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);
+      border-top:1px solid rgba(255,255,255,.1)!important;
+    }
+    #why-root footer a,#why-root footer li{display:block;height:auto!important;min-height:0!important;line-height:1.6!important;white-space:normal;}
+    #why-root h1,#why-root h2{text-shadow:0 0 28px rgba(245,243,239,.15),0 0 64px rgba(124,147,240,.13);}
+    #why-root p{text-shadow:0 1px 2px rgba(8,8,15,.5);}
+    #ns-cursor{position:fixed;left:0;top:0;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;pointer-events:none;z-index:9999;background:radial-gradient(circle,rgba(217,119,87,.35),transparent 70%);mix-blend-mode:screen;transition:width .25s,height .25s,margin .25s,background .25s;}
+    #ns-cursor.is-active{width:84px;height:84px;margin:-42px 0 0 -42px;background:radial-gradient(circle,rgba(217,119,87,.42),rgba(124,147,240,.16) 58%,transparent 72%);}
+    .faq-row{cursor:pointer;}
+    .faq-row:hover{opacity:.85;}
+    @media (prefers-reduced-motion: reduce){
+      #why-root header{transition:none!important}
+      #ns-cursor{display:none}
+    }
+  </style>
+  <template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0d0d18"/><path d="M62 30a22 22 0 1 0 8 24 17 17 0 1 1-8-24z" fill="#d97757"/><text x="50" y="62" font-size="30" fill="#f5f3ef" text-anchor="middle" font-family="monospace">?</text></svg></template>
+</helmet>
 
-      <div id="why-root" style="background: var(--bg-page); min-height: 100vh">
-        <div id="why-sky"></div>
-        <div style="position: relative; z-index: 1">
-          <x-import
-            component-from-global-scope="NightshiftDesignSystem_983007.NavBar"
-            dc-props="{{ navProps }}"
-            hint-size="100%,64px"
-          ></x-import>
+<div id="why-root" style="background:var(--bg-page);min-height:100vh;">
+  <div id="why-sky"></div>
+  <div style="position:relative;z-index:1;">
 
-          <!-- HERO -->
-          <section
-            data-screen-label="FAQ hero"
-            style="
-              position: relative;
-              overflow: hidden;
-              padding: 72px 28px 48px;
-              border-bottom: 1px solid var(--border-default);
-            "
-          >
-            <div
-              style="
-                position: absolute;
-                width: 420px;
-                height: 420px;
-                border-radius: 50%;
-                pointer-events: none;
-                filter: blur(10px);
-                background: radial-gradient(
-                  circle,
-                  var(--terra-glow),
-                  transparent 62%
-                );
-                top: -120px;
-                right: -60px;
-              "
-            ></div>
-            <div
-              style="
-                position: relative;
-                z-index: 1;
-                max-width: 860px;
-                margin: 0 auto;
-              "
-            >
-              <nav
-                style="
-                  font-family: var(--font-mono);
-                  font-size: 13px;
-                  color: var(--text-dim);
-                  margin-bottom: 24px;
-                "
-              >
-                <a
-                  href="nightshift Landing.dc.html"
-                  style="color: var(--text-muted)"
-                  >Home</a
-                >
-                <span style="color: var(--moon-500)">/</span>
-                <span style="color: var(--moon-300)">FAQ</span>
-              </nav>
-              <span
-                style="
-                  font-family: var(--font-mono);
-                  font-size: 13px;
-                  font-weight: 500;
-                  letter-spacing: 0.16em;
-                  text-transform: uppercase;
-                  color: var(--accent);
-                "
-                >// questions</span
-              >
-              <h1
-                style="
-                  font-family: var(--font-sans);
-                  font-size: clamp(34px, 4.6vw, 54px);
-                  line-height: 1.06;
-                  letter-spacing: -0.025em;
-                  font-weight: 800;
-                  color: var(--moon-100);
-                  margin: 16px 0 16px;
-                "
-              >
-                Everything builders ask
-              </h1>
-              <p
-                style="
-                  font-size: 18px;
-                  line-height: 1.65;
-                  color: var(--text-muted);
-                  max-width: 620px;
-                  margin: 0;
-                "
-              >
-                The full set, grouped by topic. Click any question — one answer
-                open at a time.
-              </p>
-            </div>
-          </section>
+  <x-import component-from-global-scope="NightshiftDesignSystem_983007.NavBar" dc-props="{{ navProps }}" hint-size="100%,64px"></x-import>
 
-          <!-- FAQ GROUPS -->
-          <section
-            data-screen-label="FAQ groups"
-            style="padding: 56px 28px 72px"
-          >
-            <div
-              style="
-                max-width: 860px;
-                margin: 0 auto;
-                display: flex;
-                flex-direction: column;
-                gap: 40px;
-              "
-            >
-              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
-                <div>
-                  <div
-                    style="
-                      font-family: var(--font-mono);
-                      font-size: 12px;
-                      letter-spacing: 0.16em;
-                      text-transform: uppercase;
-                      color: var(--accent);
-                      margin-bottom: 14px;
-                    "
-                  >
-                    {{ g.eyebrow }}
-                  </div>
-                  <div
-                    style="
-                      background: var(--surface-card);
-                      border: 1px solid var(--border-default);
-                      padding: 4px 28px;
-                      box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.7);
-                    "
-                  >
-                    <sc-for
-                      list="{{ g.items }}"
-                      as="q"
-                      hint-placeholder-count="2"
-                    >
-                      <div style="border-bottom:1px solid {{ q.divider }};">
-                        <div
-                          class="faq-row"
-                          onClick="{{ q.toggle }}"
-                          style="
-                            display: flex;
-                            align-items: center;
-                            gap: 14px;
-                            padding: 20px 0;
-                          "
-                        >
-                          <span
-                            style="
-                              font-family: var(--font-mono);
-                              font-size: 13.5px;
-                              color: var(--accent);
-                              flex: none;
-                            "
-                            >{{ q.num }}</span
-                          >
-                          <h3
-                            style="font-size:17px;color:{{ q.qColor }};margin:0;flex:1;transition:color .25s;"
-                          >
-                            {{ q.q }}
-                          </h3>
-                          <span
-                            style="
-                              font-family: var(--font-mono);
-                              font-size: 19px;
-                              color: var(--accent);
-                              flex: none;
-                            "
-                            >{{ q.glyph }}</span
-                          >
-                        </div>
-                        <div
-                          style="overflow:hidden;max-height:{{ q.m }};opacity:{{ q.o }};transition:max-height .4s var(--ease-out),opacity .3s;"
-                        >
-                          <p
-                            style="
-                              font-size: 16px;
-                              line-height: 1.7;
-                              color: var(--text-body);
-                              margin: 0;
-                              padding: 0 36px 20px 40px;
-                            "
-                          >
-                            {{ q.a }}
-                          </p>
-                        </div>
-                      </div>
-                    </sc-for>
-                  </div>
+  <!-- HERO -->
+  <section data-screen-label="FAQ hero" style="position:relative;overflow:hidden;padding:72px 28px 48px;border-bottom:1px solid var(--border-default);">
+    <div style="position:absolute;width:420px;height:420px;border-radius:50%;pointer-events:none;filter:blur(10px);background:radial-gradient(circle,var(--terra-glow),transparent 62%);top:-120px;right:-60px;"></div>
+    <div style="position:relative;z-index:1;max-width:860px;margin:0 auto;">
+      <nav style="font-family:var(--font-mono);font-size:13px;color:var(--text-dim);margin-bottom:24px;">
+        <a href="nightshift Landing.dc.html" style="color:var(--text-muted);">Home</a> <span style="color:var(--moon-500);">/</span> <span style="color:var(--moon-300);">FAQ</span>
+      </nav>
+      <span style="font-family:var(--font-mono);font-size:13px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);">// questions</span>
+      <h1 style="font-family:var(--font-sans);font-size:clamp(34px,4.6vw,54px);line-height:1.06;letter-spacing:-0.025em;font-weight:800;color:var(--moon-100);margin:16px 0 16px;">Everything builders ask</h1>
+      <p style="font-size:18px;line-height:1.65;color:var(--text-muted);max-width:620px;margin:0;">The full set, grouped by topic. Click any question — one answer open at a time.</p>
+    </div>
+  </section>
+
+  <!-- FAQ GROUPS -->
+  <section data-screen-label="FAQ groups" style="padding:56px 28px 72px;">
+    <div style="max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:40px;">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;">{{ g.eyebrow }}</div>
+          <div style="background:var(--surface-card);border:1px solid var(--border-default);padding:4px 28px;box-shadow:0 24px 60px -30px rgba(0,0,0,.7);">
+            <sc-for list="{{ g.items }}" as="q" hint-placeholder-count="2">
+              <div style="border-bottom:1px solid {{ q.divider }};">
+                <div class="faq-row" onClick="{{ q.toggle }}" style="display:flex;align-items:center;gap:14px;padding:20px 0;">
+                  <span style="font-family:var(--font-mono);font-size:13.5px;color:var(--accent);flex:none;">{{ q.num }}</span>
+                  <h3 style="font-size:17px;color:{{ q.qColor }};margin:0;flex:1;transition:color .25s;">{{ q.q }}</h3>
+                  <span style="font-family:var(--font-mono);font-size:19px;color:var(--accent);flex:none;">{{ q.glyph }}</span>
                 </div>
-              </sc-for>
-            </div>
-          </section>
-
-          <!-- CTA -->
-          <section
-            data-screen-label="FAQ CTA"
-            style="
-              padding: 72px 28px;
-              border-top: 1px solid var(--border-default);
-              text-align: center;
-              position: relative;
-              overflow: hidden;
-            "
-          >
-            <div
-              style="
-                position: absolute;
-                width: 420px;
-                height: 420px;
-                border-radius: 50%;
-                pointer-events: none;
-                filter: blur(10px);
-                background: radial-gradient(
-                  circle,
-                  var(--terra-glow),
-                  transparent 62%
-                );
-                bottom: -160px;
-                left: 50%;
-                transform: translateX(-50%);
-              "
-            ></div>
-            <div
-              style="
-                position: relative;
-                z-index: 1;
-                max-width: 640px;
-                margin: 0 auto;
-              "
-            >
-              <h2
-                style="
-                  font-size: clamp(26px, 3.2vw, 36px);
-                  letter-spacing: -0.02em;
-                  color: var(--moon-100);
-                  margin: 0 0 14px;
-                "
-              >
-                Question answered? Put a ticket in tonight.
-              </h2>
-              <div
-                style="
-                  display: flex;
-                  flex-direction: column;
-                  gap: 10px;
-                  text-align: left;
-                  max-width: 560px;
-                  margin: 0 auto 20px;
-                "
-              >
-                <x-import
-                  component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
-                  command="/plugin marketplace add whimzyLive/nightshift-ai"
-                  prompt="$"
-                  hint-size="100%,50px"
-                ></x-import>
-                <x-import
-                  component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet"
-                  command="/plugin install sdlc@nightshift"
-                  prompt="$"
-                  hint-size="100%,50px"
-                ></x-import>
+                <div style="overflow:hidden;max-height:{{ q.m }};opacity:{{ q.o }};transition:max-height .4s var(--ease-out),opacity .3s;">
+                  <p style="font-size:16px;line-height:1.7;color:var(--text-body);margin:0;padding:0 36px 20px 40px;">{{ q.a }}</p>
+                </div>
               </div>
-              <x-import
-                component-from-global-scope="NightshiftDesignSystem_983007.Button"
-                variant="secondary"
-                size="lg"
-                onClick="{{ starOnGitHub }}"
-                hint-size="auto,48px"
-                >★ Star nightshift on GitHub</x-import
-              >
-              <p style="margin: 22px 0 0">
-                <a
-                  href="nightshift Landing.dc.html"
-                  style="
-                    font-family: var(--font-mono);
-                    font-size: 13.5px;
-                    color: var(--link);
-                  "
-                  >← Back to overview</a
-                >
-              </p>
-            </div>
-          </section>
-
-          <x-import
-            component-from-global-scope="NightshiftDesignSystem_983007.Footer"
-            dc-props="{{ footerProps }}"
-            hint-size="100%,240px"
-          ></x-import>
+            </sc-for>
+          </div>
         </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section data-screen-label="FAQ CTA" style="padding:72px 28px;border-top:1px solid var(--border-default);text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;width:420px;height:420px;border-radius:50%;pointer-events:none;filter:blur(10px);background:radial-gradient(circle,var(--terra-glow),transparent 62%);bottom:-160px;left:50%;transform:translateX(-50%);"></div>
+    <div style="position:relative;z-index:1;max-width:640px;margin:0 auto;">
+      <h2 style="font-size:clamp(26px,3.2vw,36px);letter-spacing:-0.02em;color:var(--moon-100);margin:0 0 14px;">Question answered? Put a ticket in tonight.</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;text-align:left;max-width:560px;margin:0 auto 20px;">
+        <x-import component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet" command="/plugin marketplace add whimzyLive/nightshift-ai" prompt="$" hint-size="100%,50px"></x-import>
+        <x-import component-from-global-scope="NightshiftDesignSystem_983007.InstallSnippet" command="/plugin install sdlc@nightshift" prompt="$" hint-size="100%,50px"></x-import>
       </div>
-    </x-dc>
-    <script
-      type="text/x-dc"
-      data-dc-script
-      data-props='{"$preview":{"width":1200,"height":900}}'
-    >
-      class Component extends DCLogic {
-        state = { open: 'p0' };
+      <x-import component-from-global-scope="NightshiftDesignSystem_983007.Button" variant="secondary" size="lg" onClick="{{ starOnGitHub }}" hint-size="auto,48px">★ Star nightshift on GitHub</x-import>
+      <p style="margin:22px 0 0;"><a href="nightshift Landing.dc.html" style="font-family:var(--font-mono);font-size:13.5px;color:var(--link);">← Back to overview</a></p>
+    </div>
+  </section>
 
-        GROUPS = [
-          { eyebrow: '// positioning', key: 'p', items: [
-            { q: "Isn't this just another AI code-writer wrapper?",
-              a: "No. It's a process engine. The wedge is the SDLC, not the code. Assistants do the middle 20%; nightshift runs the other 80% — spec, plan, review, and the handoffs between them." },
-            { q: "Isn't this just another guardrail tool?",
-              a: "Guardrail tools constrain the output at the edges. nightshift changes the process: each phase ends at a hard gate that returns control to you, so you approve the direction before code is written, not after." },
-          ]},
-          { eyebrow: '// workflow & control', key: 'w', items: [
-            { q: 'Do I have to approve every step?',
-              a: 'Only where you configure it. approval_mode is per-repo: assisted waits for you at every gate, auto waits only at spec and review, full-auto runs the whole pipeline on your standing config. The gates exist for you — not the other way around.' },
-            { q: 'Full ceremony is overkill for a one-line fix.',
-              a: '/auto triages by type and size. Bugs never get a spec or plan — straight to implementation. Stories at or under the lightweight threshold (default ≤3 points) skip the ceremony the same way. Only larger stories earn the full spec → plan → review path.' },
-            { q: 'What actually happens overnight?',
-              a: 'Only work you already approved. You refine and sign off stories by day; /auto picks them up, routes each by your config, and implements on its own branch. You wake up to PRs that answer acceptance criteria you agreed to — a result you set up, not a surprise.' },
-            { q: "Doesn't a full lifecycle slow me down?",
-              a: 'Small stories skip the ceremony entirely, and the gates exist so you catch a wrong turn before it is built — which is faster than redoing it. No tokens spent building code you would have thrown away.' },
-          ]},
-          { eyebrow: '// setup & stack', key: 's', items: [
-            { q: 'Will it work in my repo and stack?',
-              a: 'The agents are fully generic. Every project-specific fact lives in one project-context.md file, plus optional per-agent override files. The same plugin runs across a Node monorepo, a Python service, or a mobile app — you configure it once per repo.' },
-            { q: 'Do I need Jira?',
-              a: "It's issue-tracker native: stories are read from Jira (via acli) and results are commented back to the ticket and the GitHub PR (via gh). Your tracker stays the source of truth — the paper trail lands where your team already works." },
-          ]},
-          { eyebrow: '// trust & quality', key: 't', items: [
-            { q: 'How do I trust agent output?',
-              a: 'Review is done by a different agent than the author, tests are the merge gate, and every stage leaves an artifact you can read — PRD, spec, plan, review. Nothing merges on vibes.' },
-            { q: 'What does the paper trail look like?',
-              a: 'One readable document per phase: a PRD in docs/features/, a spec and plan in docs/superpowers/, review learnings in team memory, and a PR linked back to the ticket. Every decision is diffable.' },
-          ]},
-          { eyebrow: '// cost & license', key: 'c', items: [
-            { q: 'What does it cost?',
-              a: "Nothing. It's free and MIT-licensed. Adoption is the only metric we track." },
-            { q: 'What about tool lock-in?',
-              a: "It's built on open Claude Code primitives and MIT-licensed. Fork it, extend it, or swap out a role. There's no proprietary runtime to get stuck in." },
-          ]},
-        ];
+  <x-import component-from-global-scope="NightshiftDesignSystem_983007.Footer" dc-props="{{ footerProps }}" hint-size="100%,240px"></x-import>
 
-        componentDidMount() {
-          this._reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          this._cleanup = [];
-          let tries = 0;
-          const boot = () => {
-            const root = document.getElementById('why-root');
-            if (root) {
-              const hdr = root.querySelector('header');
-              if (hdr && !hdr.dataset.float) {
-                hdr.dataset.float = '1';
-                const onScroll = () => hdr.classList.toggle('ns-float', window.scrollY > 320);
-                window.addEventListener('scroll', onScroll, { passive: true });
-                onScroll();
-                this._cleanup.push(() => window.removeEventListener('scroll', onScroll));
-              }
-              if (!document.getElementById('ns-cursor') && !this._reduced && window.matchMedia('(pointer:fine)').matches) {
-                const cur = document.createElement('div');
-                cur.id = 'ns-cursor';
-                document.body.appendChild(cur);
-                const mv = (e) => {
-                  cur.style.left = e.clientX + 'px';
-                  cur.style.top = e.clientY + 'px';
-                  const t = e.target;
-                  cur.classList.toggle('is-active', !!(t && t.closest && t.closest('a,button,[role="button"],.faq-row')));
-                };
-                window.addEventListener('mousemove', mv, { passive: true });
-                this._cleanup.push(() => { window.removeEventListener('mousemove', mv); cur.remove(); });
-              }
-            }
-            if (++tries < 4) this._bt = setTimeout(boot, 350);
-          };
-          this._bt = setTimeout(boot, 60);
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { open: 'p0' };
+
+  GROUPS = [
+    { eyebrow: '// positioning', key: 'p', items: [
+      { q: "Isn't this just another AI code-writer wrapper?",
+        a: "No. It's a process engine. The wedge is the SDLC, not the code. Assistants do the middle 20%; nightshift runs the other 80% — spec, plan, review, and the handoffs between them." },
+      { q: "Isn't this just another guardrail tool?",
+        a: "Guardrail tools constrain the output at the edges. nightshift changes the process: each phase ends at a hard gate that returns control to you, so you approve the direction before code is written, not after." },
+    ]},
+    { eyebrow: '// workflow & control', key: 'w', items: [
+      { q: 'Do I have to approve every step?',
+        a: 'Only where you configure it. approval_mode is per-repo: assisted waits for you at every gate, auto waits only at spec and review, full-auto runs the whole pipeline on your standing config. The gates exist for you — not the other way around.' },
+      { q: 'Full ceremony is overkill for a one-line fix.',
+        a: '/auto triages by type and size. Bugs never get a spec or plan — straight to implementation. Stories at or under the lightweight threshold (default ≤3 points) skip the ceremony the same way. Only larger stories earn the full spec → plan → review path.' },
+      { q: 'What actually happens overnight?',
+        a: 'Only work you already approved. You refine and sign off stories by day; /auto picks them up, routes each by your config, and implements on its own branch. You wake up to PRs that answer acceptance criteria you agreed to — a result you set up, not a surprise.' },
+      { q: "Doesn't a full lifecycle slow me down?",
+        a: 'Small stories skip the ceremony entirely, and the gates exist so you catch a wrong turn before it is built — which is faster than redoing it. No tokens spent building code you would have thrown away.' },
+    ]},
+    { eyebrow: '// setup & stack', key: 's', items: [
+      { q: 'Will it work in my repo and stack?',
+        a: 'The agents are fully generic. Every project-specific fact lives in one project-context.md file, plus optional per-agent override files. The same plugin runs across a Node monorepo, a Python service, or a mobile app — you configure it once per repo.' },
+      { q: 'Do I need Jira?',
+        a: "It's issue-tracker native: stories are read from Jira (via acli) and results are commented back to the ticket and the GitHub PR (via gh). Your tracker stays the source of truth — the paper trail lands where your team already works." },
+    ]},
+    { eyebrow: '// trust & quality', key: 't', items: [
+      { q: 'How do I trust agent output?',
+        a: 'Review is done by a different agent than the author, tests are the merge gate, and every stage leaves an artifact you can read — PRD, spec, plan, review. Nothing merges on vibes.' },
+      { q: 'What does the paper trail look like?',
+        a: 'One readable document per phase: a PRD in docs/features/, a spec and plan in docs/superpowers/, review learnings in team memory, and a PR linked back to the ticket. Every decision is diffable.' },
+    ]},
+    { eyebrow: '// cost & license', key: 'c', items: [
+      { q: 'What does it cost?',
+        a: "Nothing. It's free and MIT-licensed. Adoption is the only metric we track." },
+      { q: 'What about tool lock-in?',
+        a: "It's built on open Claude Code primitives and MIT-licensed. Fork it, extend it, or swap out a role. There's no proprietary runtime to get stuck in." },
+    ]},
+  ];
+
+  componentDidMount() {
+    this._reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this._cleanup = [];
+    let tries = 0;
+    const boot = () => {
+      const root = document.getElementById('why-root');
+      if (root) {
+        const hdr = root.querySelector('header');
+        if (hdr && !hdr.dataset.float) {
+          hdr.dataset.float = '1';
+          const onScroll = () => hdr.classList.toggle('ns-float', window.scrollY > 320);
+          window.addEventListener('scroll', onScroll, { passive: true });
+          onScroll();
+          this._cleanup.push(() => window.removeEventListener('scroll', onScroll));
         }
-
-        componentWillUnmount() {
-          clearTimeout(this._bt);
-          (this._cleanup || []).forEach((fn) => fn());
-        }
-
-        renderVals() {
-          let n = 0;
-          const groups = this.GROUPS.map((g) => ({
-            eyebrow: g.eyebrow,
-            items: g.items.map((it, i) => {
-              const key = g.key + i;
-              const open = this.state.open === key;
-              n += 1;
-              return {
-                q: it.q, a: it.a,
-                num: 'Q.' + String(n).padStart(2, '0'),
-                glyph: open ? '−' : '+',
-                m: open ? '260px' : '0px',
-                o: open ? 1 : 0,
-                qColor: open ? 'var(--terra-400)' : 'var(--moon-100)',
-                divider: i === g.items.length - 1 ? 'transparent' : 'var(--border-soft)',
-                toggle: () => this.setState((s) => ({ open: s.open === key ? null : key })),
-              };
-            }),
-          }));
-          return {
-            groups,
-            starOnGitHub: () => window.open('https://github.com/whimzyLive/nightshift-ai', '_blank'),
-            navProps: {
-              logoSrc: new URL('assets/logomark.svg', location.href).href,
-              brand: 'nightshift', active: 'FAQ', stars: 'Star',
-              ctaLabel: 'Install the plugin',
-              onCta: () => { window.open('https://github.com/whimzyLive/nightshift-ai', '_blank'); },
-              links: [
-                { label: 'How it works', href: 'nightshift Landing.dc.html#how-it-works' },
-                { label: 'Why SDLC', href: 'why-sdlc.dc.html' },
-                { label: 'The team', href: 'team.dc.html' },
-                { label: 'FAQ', href: 'faq.dc.html' },
-              ],
-            },
-            footerProps: {
-              logoSrc: new URL('assets/logomark.svg', location.href).href,
-              columns: [
-                { title: 'Plugin', items: ['How it works', 'Ship-while-you-sleep workflow', 'Why SDLC', 'The team', 'FAQ', 'Docs (soon)'] },
-                { title: 'Project', items: ['GitHub', 'Changelog (soon)', 'MIT License', 'Issues'] },
-                { title: 'Company', items: ['whimzyLive'] },
-              ],
-            },
+        if (!document.getElementById('ns-cursor') && !this._reduced && window.matchMedia('(pointer:fine)').matches) {
+          const cur = document.createElement('div');
+          cur.id = 'ns-cursor';
+          document.body.appendChild(cur);
+          const mv = (e) => {
+            cur.style.left = e.clientX + 'px';
+            cur.style.top = e.clientY + 'px';
+            const t = e.target;
+            cur.classList.toggle('is-active', !!(t && t.closest && t.closest('a,button,[role="button"],.faq-row')));
           };
+          window.addEventListener('mousemove', mv, { passive: true });
+          this._cleanup.push(() => { window.removeEventListener('mousemove', mv); cur.remove(); });
         }
       }
-    </script>
-  </body>
+      if (++tries < 4) this._bt = setTimeout(boot, 350);
+    };
+    this._bt = setTimeout(boot, 60);
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this._bt);
+    (this._cleanup || []).forEach((fn) => fn());
+  }
+
+  renderVals() {
+    let n = 0;
+    const groups = this.GROUPS.map((g) => ({
+      eyebrow: g.eyebrow,
+      items: g.items.map((it, i) => {
+        const key = g.key + i;
+        const open = this.state.open === key;
+        n += 1;
+        return {
+          q: it.q, a: it.a,
+          num: 'Q.' + String(n).padStart(2, '0'),
+          glyph: open ? '−' : '+',
+          m: open ? '260px' : '0px',
+          o: open ? 1 : 0,
+          qColor: open ? 'var(--terra-400)' : 'var(--moon-100)',
+          divider: i === g.items.length - 1 ? 'transparent' : 'var(--border-soft)',
+          toggle: () => this.setState((s) => ({ open: s.open === key ? null : key })),
+        };
+      }),
+    }));
+    return {
+      groups,
+      starOnGitHub: () => window.open('https://github.com/whimzyLive/nightshift-ai', '_blank'),
+      navProps: {
+        logoSrc: new URL('assets/logomark.svg', location.href).href,
+        brand: 'nightshift', active: 'FAQ', stars: 'Star',
+        ctaLabel: 'Install the plugin',
+        onCta: () => { window.open('https://github.com/whimzyLive/nightshift-ai', '_blank'); },
+        links: [
+          { label: 'How it works', href: 'nightshift Landing.dc.html#how-it-works' },
+          { label: 'Why SDLC', href: 'why-sdlc.dc.html' },
+          { label: 'The team', href: 'team.dc.html' },
+          { label: 'FAQ', href: 'faq.dc.html' },
+        ],
+      },
+      footerProps: {
+        logoSrc: new URL('assets/logomark.svg', location.href).href,
+        columns: [
+          { title: 'Plugin', items: ['How it works', 'Ship-while-you-sleep workflow', 'Why SDLC', 'The team', 'FAQ', 'Docs (soon)'] },
+          { title: 'Project', items: ['GitHub', 'Changelog (soon)', 'MIT License', 'Issues'] },
+          { title: 'Company', items: ['whimzyLive'] },
+        ],
+      },
+    };
+  }
+}
+</script>
+</body>
 </html>

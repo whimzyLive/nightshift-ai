@@ -1,15 +1,15 @@
 # web-engineer memory
 
+> **Design source of truth (2026-07-12):** for any marketing-site work, follow
+> `docs/features/2026-07-12-nightshift-marketing-site-design-handoff.md` (→
+> `docs/design/marketing-site-handoff/`). Pre-NA-29 design-direction entries were
+> removed from this file (see git history); the framework/tooling learnings below
+> (GSAP, Payload, Jest, worktrees) remain valid.
+
 ## 2026-07-10 — Story NA-16 — interactive 3D hero landing page
 
 **Learnings:**
 
-- `apps/marketing` is still the unmodified Nx/Next.js starter scaffold (NX
-  logo, generic feature cards, no nightshift branding) — a separate GTM
-  effort (`feat/gtm-site-refine-sections`, per prior memory/observations) is
-  doing the full site rebuild. Stories scoped to a single section (like
-  NA-16's hero) should touch only that section and leave the rest of the
-  starter page alone rather than trying to "fix" the mismatch.
 - Payload global content (`payload.findGlobal`) returns each field's
   `defaultValue` even before any document row exists in the DB — this is
   the correct way to satisfy "renders without manual CMS entry" without a
@@ -74,21 +74,6 @@
 
 **Patterns:**
 
-- Hero-local brand tokens: rather than importing the nightshift-design
-  skill's `styles.css` (meant for static mock/prototype output, not a
-  production app bundle) or editing the site-wide `global.css` for a
-  single-section story, declare the exact hex values as CSS custom
-  properties scoped to the component's own root class in its CSS module,
-  with a comment noting they mirror `.claude/skills/nightshift-design/tokens/*.css`.
-  Keeps brand-on-the-hero without leaking a site-wide theme change that's
-  out of scope.
-- Layered CSS 3D parallax without a 3D library: `perspective` on a static
-  wrapper, `transform-style: preserve-3d` on an inner "scene" div that GSAP
-  rotates (`rotationX`/`rotationY` via `gsap.quickTo`, driven by
-  `pointermove`), and each visual layer inside it at a different
-  `translateZ`. Avoids the three.js/`@react-three/fiber` bundle cost for a
-  hero-only decorative effect — reasonable when the story explicitly allows
-  choosing the lighter implementation.
 - `gsap.matchMedia({ reduceMotion: '(prefers-reduced-motion: reduce)' }, ...)`
   is the single place to branch: skip the entrance timeline, skip the
   pointermove listener, skip the ScrollTrigger creation, and `gsap.set(...)`

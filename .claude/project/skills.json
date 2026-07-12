@@ -42,6 +42,12 @@
       "source": "custom",
       "addedBy": "user",
       "note": "managed by the skills CLI (npx skills add 199-biotechnologies/motion-dev-animations-skill) — content at .agents/skills/motion-dev-animations/, pinned in skills-lock.json; .claude/skills/motion-dev-animations is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
+    },
+    {
+      "name": "nightshift-design",
+      "source": "custom",
+      "addedBy": "user",
+      "note": "repo-local design-system + brand skill living directly at .claude/skills/nightshift-design/ (real directory, not a symlink; not CLI-managed). tokens/*.css + _ds_manifest.json kept in sync with docs/design/marketing-site-handoff/ (the NA-29 design source). Mandated as skill #1 in .claude/project/agents/web-engineer.md; carries its own validate gate (npm run validate: token-drift + WCAG-AA contrast + oxlint)."
     }
   ]
 }

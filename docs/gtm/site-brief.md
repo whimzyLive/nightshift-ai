@@ -615,7 +615,7 @@ _(The `/why-sdlc` link is domain-dependent — same canonical caveat as open dec
 
 ## 6. Brand tokens (applied from `brand/BRAND_KIT.md`)
 
-Source of truth: `.claude/skills/nightshift-design/` — tokens in `tokens/*.css`, assets in `assets/`, UI kit in `components/`, voice in `references/voice-and-content.md`. Use semantic aliases in components, not raw scale values. Run `npm run validate` in the design-system directory before shipping.
+Source of truth: `docs/features/2026-07-12-nightshift-marketing-site-design-handoff.md` (the NA-29 PRD), which delegates design detail — tokens, layout, copy, interactions — to `docs/design/marketing-site-handoff/` (`tokens/*.css`, `designs/`, `screenshots/`). The values below are a snapshot of that chain; on any conflict, the PRD + handoff win. (`.claude/skills/nightshift-design/` mirrors the same tokens for non-site brand assets; voice lives in its `references/voice-and-content.md`.) Use semantic aliases in components, not raw scale values.
 
 ### Identity
 

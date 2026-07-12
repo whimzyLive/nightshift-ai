@@ -16,14 +16,20 @@
   --space-24: 96px;
   --space-32: 128px;
 
-  /* ---- Radius ---- */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-2xl: 28px;
-  --radius-pill: 999px;
+  /* ---- Radius — SITE OVERRIDE (source of truth: the shipped nightshift site) ----
+   * The site is sharp-edged: every rectangle (cards, buttons, badges, terminal
+   * frames, the floating nav bar) renders with square corners. Only true circles
+   * (star dots, gate rings, traffic lights, avatars' status dots) stay round —
+   * use --radius-round for those.
+   * Previous scale (retired): xs 4 / sm 6 / md 10 / lg 14 / xl 20 / 2xl 28 / pill 999. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-pill: 0;
+  --radius-round: 50%; /* circles only */
 
   /* ---- Elevation: shadows are deep & soft against the night bg.
    * Pair with a 1px hairline border — the shadow alone won't read on dark. ---- */
@@ -34,9 +40,57 @@
   --elev-4: 0 24px 64px rgba(0, 0, 0, 0.55);
 
   /* ---- Glows: the "subtle light in the dark" — for accents & focus ---- */
-  --glow-accent: 0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
-  --glow-cool: 0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
+  --glow-accent:
+    0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
+  --glow-cool:
+    0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
   --glow-focus: 0 0 0 3px rgba(124, 147, 240, 0.45);
+
+  /* ---- SITE ADDITIONS — neon CTA + heading/text treatment ----
+   * CTAs are inverted-neon: tinted fill + terracotta border + --glow-neon at
+   * rest; solid terracotta + --shadow-pop (3-layer offset stack) on hover. */
+  --glow-neon:
+    0 0 16px rgba(217, 119, 87, 0.42), 0 0 38px rgba(217, 119, 87, 0.18);
+  --glow-neon-hover: 0 0 22px rgba(217, 119, 87, 0.55);
+  --shadow-pop:
+    4px 4px 0 0 rgba(217, 119, 87, 0.5), 8px 8px 0 0 rgba(217, 119, 87, 0.28),
+    12px 12px 0 0 rgba(217, 119, 87, 0.14);
+  /* headings carry a wide halo only — never a tight blur on glyph edges */
+  --glow-heading:
+    0 0 28px rgba(245, 243, 239, 0.15), 0 0 64px rgba(124, 147, 240, 0.13);
+  --shadow-text: 0 1px 2px rgba(8, 8, 15, 0.5); /* body copy over the starfield */
+  --glow-card-hover:
+    0 0 22px rgba(217, 119, 87, 0.14), 0 24px 50px -28px rgba(0, 0, 0, 0.8);
+  --lift-card: translateY(-3px);
+
+  /* ---- SITE ADDITIONS — glass chrome (nav + footer) ---- */
+  --glass-blur: blur(20px) saturate(1.35);
+  --glass-blur-strong: blur(26px) saturate(1.5); /* floating nav bar */
+  --glass-nav-bg: linear-gradient(
+    180deg,
+    rgba(13, 13, 24, 0.78),
+    rgba(13, 13, 24, 0.5)
+  );
+  --glass-nav-float-bg: linear-gradient(
+    180deg,
+    rgba(13, 13, 24, 0.6),
+    rgba(13, 13, 24, 0.42)
+  );
+  --glass-footer-bg: linear-gradient(
+    180deg,
+    rgba(8, 8, 15, 0.5),
+    rgba(8, 8, 15, 0.78)
+  );
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --nav-float-top: 14px;
+  --nav-float-max: min(940px, calc(100% - 48px));
+  --nav-float-shadow:
+    0 18px 48px -18px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(217, 119, 87, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* ---- SITE ADDITIONS — cursor glow ---- */
+  --cursor-size: 28px;
+  --cursor-size-active: 84px; /* 3× over links, buttons, interactive cards */
 
   /* ---- Motion ---- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* @kind other */
@@ -44,6 +98,15 @@
   --dur-fast: 120ms; /* @kind other */
   --dur-base: 200ms; /* @kind other */
   --dur-slow: 360ms; /* @kind other */
+
+  /* ---- SITE ADDITIONS — ambient/interactive motion ----
+   * All ambient motion is disabled under prefers-reduced-motion. */
+  --dur-rise: 400ms; /* content rise-in (ns-risein) */
+  --dur-accordion: 400ms; /* FAQ open/close (max-height + opacity) */
+  --dur-gate-pulse: 1.4s; /* awaiting-gate pulse (1.3–1.6s in use) */
+  --dur-twinkle: 3.4s; /* star / status-dot twinkle */
+  --dur-terminal-line: 520ms; /* streaming terminal line cadence */
+  --dur-marquee: 34s; /* signature-phrase ticker loop */
 
   /* ---- Layout ---- */
   --container-max: 1200px;
