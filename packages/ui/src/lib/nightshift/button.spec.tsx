@@ -53,4 +53,19 @@ describe('CtaButton', () => {
     expect(el.getAttribute('size')).toBeNull();
     expect(el.getAttribute('variant')).toBeNull();
   });
+
+  it('renders the secondary lg variant (design handoff Final CTA star button)', () => {
+    render(
+      <CtaButton
+        variant="secondary"
+        size="lg"
+        href="https://github.com/whimzyLive/nightshift-ai"
+      >
+        ★ Star nightshift on GitHub
+      </CtaButton>,
+    );
+    const el = screen.getByRole('link', { name: /star nightshift on github/i });
+    expect(el.className).toContain('h-12');
+    expect(el.className).toContain('bg-transparent');
+  });
 });

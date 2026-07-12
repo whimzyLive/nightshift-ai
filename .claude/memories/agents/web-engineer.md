@@ -727,3 +727,91 @@ revalidatePath: jest.fn(), revalidateTag: jest.fn() }))` at the top of the
   assertions go RED for the exact reason described in the review finding,
   then restore the fix. Gives real red→green evidence even when the fix
   was written before the test in the session's actual edit order.
+
+## 2026-07-12 — Story NA-35 — home FAQ preview + Final CTA (first Home CMS fetch)
+
+**Learnings:**
+
+- This is the first Home section that actually reads from Payload (every
+  prior Home section — NA-30 through NA-34 — was static). Established the
+  pattern: keep the Payload fetch at the **page's own top-level async
+  boundary** (`(frontend)/page.tsx` itself becomes `async function
+HomePage()`), with a small `lib/faq.ts` data-access function
+  (`getHomeFaqs()`) doing the actual `payload.find()` + try/catch fallback
+  to `[]`. Every section below — `FaqPreview`, `FaqAccordion` — stays a
+  plain synchronous server/client component receiving already-resolved
+  props. This directly follows the NA-16 memory's "don't nest a second
+  async Server Component inside another render for RTL" rule, applied for
+  the first time in this story rather than just documented.
+- `payload.find({ collection: 'faq', where: { showOnHome: { equals: true
+} }, sort: 'homeOrder', limit: 5, depth: 0 })` is all AC1's "top-5 FAQ"
+  needs — the seed data (`seed/data.ts`) already carries a dedicated
+  `homeOrder`/`showOnHome`/`homeAnswer` triple per doc distinct from the
+  full-FAQ-page fields (`whySdlcOrder`, plain `answer`), so no client-side
+  slicing/sorting was needed.
+- `@payloadcms/richtext-lexical/react`'s exported `RichText` component
+  carries **no** `'use client'` directive — confirmed by reading its
+  compiled `dist/.../Component/index.js` before assuming otherwise. It's
+  safe to call directly inside a plain server component
+  (`<RichText data={faq.answer} disableContainer />`), so converting each
+  FAQ answer's Lexical JSON to JSX happens server-side; only the
+  open/close toggle state (`useState` in `FaqAccordion`) ships to the
+  client. `disableContainer` avoids its default `<div
+className="payload-richtext">` wrapper; style the inner `<p>`/`<code>`
+  via a Tailwind arbitrary descendant selector (`[&_p]:text-[17px]
+[&_code]:text-[var(--terra-400)]`) on your own wrapper div instead.
+- `@payloadcms/richtext-lexical` (and by extension its `/react` subpath)
+  ships plain ESM with no CJS build — importing it un-mocked in a Jest
+  spec throws `SyntaxError: Unexpected token 'export'` (Jest's default
+  `transformIgnorePatterns` skips all of `node_modules`). Rather than
+  touching the shared `jest.config.cts`'s `transformIgnorePatterns` (a
+  repo-wide risk for one component), `jest.mock('@payloadcms/richtext-lexical/react',
+() => ({ RichText: fakeThatExtractsPlainTextFromTheSameLexicalShape }))`
+  in every spec that renders `FaqPreview` (directly, or transitively via
+  `HomePage`) sidesteps it — the real converter is third-party/well-tested,
+  not something this story needs to verify.
+- Extending `CtaButton` (`packages/ui`) with a third `size="lg"` (48px
+  height, matching the nightshift-design skill's own `Button` `lg` spec:
+  `padding:'0 24px', height:48, fontSize:15`) for the Final CTA's star
+  button followed the exact same `SIZE_CLASSES` record-extension pattern
+  as the NA-34 entry below — one more size key, no `BASE_CLASSES`/variant
+  changes needed, every existing call site unaffected.
+- An accordion row whose default-open state is driven by a `useState`
+  default (`openIndex = 0`) and whose max-height comes from a
+  client-effect-measured `scrollHeight` has a real bug if you don't
+  special-case the pre-effect render: the initially-open row would be
+  clipped to `max-height: 0` (SSR output + first client render, before
+  `useEffect` fires) even though `opacity: 1` — content invisible until
+  hydration completes. Fix: track the measured height as `number | null`
+  (not defaulting to `0`) and fall back to `max-height: 'none'` whenever
+  `isOpen && measuredHeight === null` — `'none'` shows full content with
+  no clipping on the SSR/pre-hydration render, then swaps to the real
+  pixel value post-mount with no visible jump (both values fully reveal
+  the same content). Caught this by reasoning through the render timeline
+  before shipping, not from a failing test — jsdom's `render()` flushes
+  effects synchronously via `act()`, so a naive RTL test wouldn't have
+  caught the bug (the "before-effect" frame isn't observable there); the
+  actual risk is the real browser's paint-before-first-effect frame.
+- `payload.find`'s generic return type comes entirely from the
+  `declare module 'payload' { interface GeneratedTypes extends Config {}
+}` augmentation at the bottom of `payload-types.ts` — no manual
+  `<Faq>` type parameter needed on the call itself; `docs` and
+  `doc.homeAnswer`/`doc.answer` are already fully typed from
+  `collection: 'faq'` alone.
+
+**Patterns:**
+
+- Mocking `getPayload` from `'payload'` without hitting the
+  babel/SWC-jest-hoist TDZ trap (documented in the NA-16 memory for
+  `mock`-prefixed closure vars): when the factory would otherwise need to
+  reference an outer `const`, don't — `jest.mock('payload', () => ({
+getPayload: jest.fn() }))` with an **inline, self-contained** factory,
+  then retrieve the same mock function back via `import { getPayload }
+from 'payload'; const mockGetPayload = getPayload as jest.Mock;` in the
+  test body. Configure its resolved value in `beforeEach`. Zero TDZ risk
+  since the factory never closes over anything outside itself.
+- A design mock's raw `faqOpen: 0` initial state (one entry open by
+  default) is worth preserving literally rather than "improving" to
+  all-closed — matches the handoff's own interaction spec and gives the
+  animated max-height something to visibly demonstrate without user
+  interaction.

@@ -5,7 +5,7 @@ import type {
   ReactNode,
 } from 'react';
 
-export type CtaButtonSize = 'sm' | 'md';
+export type CtaButtonSize = 'sm' | 'md' | 'lg';
 export type CtaButtonVariant = 'primary' | 'secondary';
 
 interface CtaButtonSharedProps {
@@ -41,6 +41,8 @@ const SIZE_CLASSES: Record<CtaButtonSize, string> = {
   md: 'px-6 py-2.5 text-sm',
   // ~34px height (design's in-terminal `approve ✓` / `run it again ↺` controls).
   sm: 'h-[34px] px-4 text-xs',
+  // 48px height (design's Final CTA star button — nightshift-design Button's own lg spec).
+  lg: 'h-12 px-6 text-[15px]',
 };
 
 // The neon-inverted CTA treatment (primary, unchanged) and the design's
