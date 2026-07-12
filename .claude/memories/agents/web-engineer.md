@@ -1,3 +1,86 @@
+## 2026-07-12 — refactor/motion-gsap-animations follow-up — visual-fidelity pass against the design handoff HTML
+
+**Learnings:**
+
+- A user-attached "standalone" HTML export (`nightshift Landing (standalone).html`)
+  looked like plain static markup at a glance but was actually a JS-bundler
+  artifact — the real HTML lived escaped inside a giant JS string literal
+  (`\"...\"`, `/` for `/`). Two lines in the file were 549K/173K chars.
+  `grep -o 'id="..."'` against the raw file found nothing; extracting the
+  quoted string span (find the opening `"` before `<!DOCTYPE`, scan forward
+  respecting `\`-escapes to the matching closing `"`, then `json.loads()` it
+  to unescape) turned it into normal readable HTML. Confirmed by its own
+  `id="..."` markers (`top`, `proof`, `problem`, `how-it-works`, `workflow`,
+  `agents`, `faq`, `install`, plus two un-id'd `data-screen-label="Why
+different"`/`"Control bridge"` sections) that it covers **only the home/
+  landing page** — not `/faq`, `/team`, or `/why-sdlc` — despite a request
+  phrased as "all pages."
+- Systematically diffing every home `<section>` root's inline `style`
+  (background/border/padding) against the reference caught two classes of
+  real, pre-existing drift that had survived multiple "verbatim from the
+  design handoff" component builds:
+  1. `phrase-marquee.tsx` used `--surface-terminal` background + `--text-dim`
+     text — the reference's `.ns-marquee` is a **solid `--terra-500` band**
+     with `!important`-forced `#f5f3ef` text (= `--text-on-accent`, the
+     correct semantic token for text-on-accent-background) and asymmetric
+     `--terra-400`/`--terra-600` top/bottom borders, plus a
+     `.ns-marquee:hover .ns-marquee-track{animation-play-state:paused}`
+     interaction with no equivalent in the migrated code at all.
+  2. Three non-full-bleed sections (`day-night-workflow.tsx`,
+     `why-different.tsx`, `faq-preview.tsx`) each carried their own literal
+     `28px` horizontal padding **in addition to** `<main>`'s
+     `className="... px-7"` (28px) in `(frontend)/layout.tsx` — double
+     padding (56px vs the reference's 28px). `hero.tsx` is the one section
+     that gets this right already (explicit `0` horizontal, deferring to
+     `<main>`'s `px-7`) — it's the template to match, not an outlier. The
+     tell: every OTHER home section either (a) uses the `left-1/2 right-1/2
+-mx-[50vw] w-screen` full-bleed escape and therefore correctly needs
+     its own 28px (it's opted out of `<main>`'s padding), or (b) stays
+     contained and must therefore use `0` horizontal padding. Grepping for
+     files with a literal `28px` padding value but _no_ `-mx-[50vw]` class
+     found exactly the 3 buggy ones (plus 2 false-positive `margin: 28px`
+     hits that weren't the padding shorthand — verified each match's
+     context, not just presence).
+- Discovered mid-task that **a concurrent process using the identical
+  Claude-Session ID was independently working the same branch** (`git log`
+  showed `e165158`/`d9649a4`, already pushed to `origin/refactor/motion-gsap-animations`,
+  with the exact scope of this dispatch — marquee/team-preview/control-section
+  — plus an out-of-scope-for-this-dispatch why-sdlc + faq-row Motion pass
+  and a `global.css` `ns-*` keyframe cleanup). `git diff HEAD` against my
+  own already-written `control-section.tsx`/`team-preview.tsx` came back
+  **empty** — the concurrent commit's content was byte-identical to what I'd
+  independently produced from the same brief, so nothing was lost, just
+  already captured. That process had also already opened PR #97 for this
+  branch — checked `gh pr list --head <branch>` before creating a new PR to
+  avoid a duplicate.
+- `pnpm nx build`/`test` regenerate three unrelated tracked files as a side
+  effect: `apps/marketing/next-env.d.ts` (Next.js flips
+  `.next/dev/types/routes.d.ts` vs `.next/types/routes.d.ts` depending on
+  dev-vs-build mode — the file's own header says "should not be edited"),
+  `(payload)/admin/importMap.js`, and `payload-types.ts` (Payload
+  admin-panel/type codegen, non-deterministic plugin-discovery ordering).
+  None of these are related to any actual code change — `git checkout --
+<file>` them back to HEAD before every commit in this repo, every time,
+  regardless of which task is running; don't let build-tool churn ride
+  along in a commit's diff.
+
+**Patterns:**
+
+- When asked to verify "visual appearance ... as per attached html" and the
+  attachment turns out to be an opaque bundle, don't give up at "can't
+  parse it" — extract the escaped-string payload with a small `python3`
+  heredoc (`json.loads` on the located quoted span) rather than treating it
+  as unparseable; the reference author almost certainly exported this from
+  a real browser DOM, so the escaped payload is complete, well-formed HTML.
+- A user's direct mid-turn message is real authorization that supersedes an
+  earlier agent-issued dispatch constraint (e.g. "do not commit or push")
+  for the _scope of what the user just asked_ — per this role's own system
+  prompt, only agent messages are barred from granting that kind of
+  permission; the actual human's message is not. Still worth pausing to
+  check `gh pr list` for an existing PR on the branch before opening a new
+  one, especially in a multi-agent pipeline where another process may have
+  already acted on the same branch.
+
 ## 2026-07-12 — Story NA-39 — wire SEO meta, JSON-LD, and llms.txt (non-visual)
 
 **Learnings:**
