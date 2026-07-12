@@ -117,6 +117,11 @@ const HALOS: { style: CSSProperties }[] = [
   },
 ];
 
+// Clicks on (or inside) these never spawn a meteor — meteors are for the
+// empty sky only.
+const INTERACTIVE_SELECTOR =
+  'a,button,[role="button"],input,textarea,select,summary,label';
+
 const MAX_METEORS = 6;
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
 
@@ -170,6 +175,9 @@ export function NightSky({
     }
 
     function onTap(e: PointerEvent) {
+      // Only fire on empty sky — never when clicking an interactive element.
+      const target = e.target as Element | null;
+      if (target?.closest?.(INTERACTIVE_SELECTOR)) return;
       setMeteors((cur) => {
         if (cur.length >= MAX_METEORS) return cur;
         const id = nextId.current++;
