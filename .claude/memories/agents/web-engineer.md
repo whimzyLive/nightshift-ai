@@ -6,6 +6,127 @@
 > removed from this file (see git history); the framework/tooling learnings below
 > (GSAP, Payload, Jest, worktrees) remain valid.
 
+## 2026-07-12 — Story NA-32 — review-fix: full-bleed bands + classic scrollbar gutter
+
+**Learnings:**
+
+- The `relative left-1/2 right-1/2 -mx-[50vw] w-screen` full-bleed-band
+  trick (used by `ProofBar`/`PhraseMarquee`/`ProblemSection` to break out
+  of the shared `max-w-[var(--container-max)]` `<main>`) is built on
+  `100vw`, which **includes the vertical scrollbar gutter** on classic
+  (non-overlay) scrollbar platforms — Windows/Linux Chrome, not macOS's
+  overlay scrollbars. Because neither `body`/`html` nor `<main>` set
+  `overflow-x` anywhere in this codebase, that ~15-17px overshoot became a
+  real page-wide horizontal scrollbar, invisible in a macOS-rendered
+  screenshot QA pass (the usual visual-parity gate) but a genuine
+  regression on the more common desktop-Chrome scrollbar style. Any
+  future `-mx-[50vw] w-screen` full-bleed band inherits this same risk —
+  it's a property of the pattern, not this specific section.
+- Fix is a single `overflow-x: clip` on `body` (not `overflow-x: hidden`)
+  — `clip` suppresses the resulting scroll without disabling
+  `position: sticky` on any descendant (a real risk with `hidden`, which
+  also clips scroll containers, whereas `clip` only clips paint/scroll on
+  the box it's set on and doesn't establish a new scroll container the
+  way `overflow: hidden`/`auto`/`scroll` do). One-line, no `@theme`/token
+  changes needed, and doesn't require touching any of the three full-bleed
+  components themselves.
+
+## 2026-07-12 — Story NA-32 — home hero, proof bar, problem section (3 new ui primitives)
+
+**Learnings:**
+
+- **jsdom (this repo's `testEnvironment: 'jsdom'`, jsdom@26) implements
+  neither `window.matchMedia`, `window.IntersectionObserver`, nor
+  `window.requestAnimationFrame` by default** — confirmed by instantiating
+  `JSDOM` directly and checking `typeof`. Any client component that calls
+  these unconditionally (the established pattern in this codebase —
+  `cursor-glow.tsx` calls `window.matchMedia` with no defensive guard,
+  relying on every consuming test to mock it) will throw in a test that
+  doesn't mock them first. This matters beyond the component's own spec
+  file: a **page-level test that renders the component indirectly** (e.g.
+  `page.spec.tsx` rendering `HomePage` → `Hero` → `Terminal`) inherits the
+  same requirement and needs the same `window.matchMedia = jest.fn()...`
+  mock added, or it breaks with no obvious connection to the actual change
+  (the page test file itself never touches `Terminal`). Grep for which
+  primitives a page composes before assuming an existing page spec still
+  passes unmodified.
+- Because `IntersectionObserver` is unsupported in jsdom by default, a
+  `CountUp`-style "animate on first viewport entry, unsupported → render
+  final value" component's **"unsupported" degrade path fires automatically
+  in every test that doesn't explicitly install a fake
+  `window.IntersectionObserver`** — useful for one branch (asserting the
+  final value renders immediately) but means the "renders `0` initially"
+  branch needs its own test that installs a no-op fake class (`observe`/
+  `disconnect` as `jest.fn()`, never invoking the stored callback) so the
+  component takes the `rAF`-driven path instead and never reaches 0→final
+  in the test's synchronous window.
+- `@testing-library`'s `getByText` uses `getNodeText(node)` under the hood,
+  which is **not** `node.textContent` — it only concatenates a node's
+  _direct_ text-node children, deliberately excluding text inside child
+  elements. A composed line like
+  `<span><CountUp>11</CountUp> specialized agents</span>` therefore has
+  **no single node** whose own text equals `"11 specialized agents"` — the
+  number lives in `CountUp`'s own `<span>`, the label is a separate text
+  node on the parent. `getByText(/11 specialized agents/i)` fails with
+  "text is broken up by multiple elements" even though the rendered page
+  visually reads that way. Fix for page-composition-level assertions:
+  check `container.textContent` (which _does_ recurse) instead of
+  `getByText` when the text you're asserting spans a primitive boundary.
+- Reduced-motion self-guards only need to check `matchMedia` **once, in an
+  effect, before the first line of listener-wiring code** — they do not
+  need a defensive `typeof window.matchMedia === 'function'` check in this
+  codebase's convention (every consumer test mocks it), but effects that
+  additionally call `requestAnimationFrame` (ambient idle-drift, not
+  covered by the `matchMedia` check because it only gates _whether_ the
+  effect's `if` bails, not whether `rAF` itself exists) DO need a
+  `typeof window.requestAnimationFrame !== 'function'` guard — otherwise a
+  non-reduced-motion test (which is the common case, `matchMedia` mocked
+  to `matches: false`) throws immediately on mount in jsdom, since `rAF` is
+  unconditionally absent there regardless of the reduced-motion mock.
+- `next build` (Turbopack, Next.js 16) on the plain `/` route with zero
+  Payload/DB calls in the new page tree statically prerenders successfully
+  with **no `DATABASE_URL`/DB at all** — confirms static composition
+  sections (no `findGlobal`/`find` calls) don't inherit the "needs a
+  migrated Postgres schema at build time" constraint documented in the
+  NA-16 entry below (that constraint is specific to pages that actually
+  call Payload's Local API). Good fast way to get real `tsc`-equivalent
+  type-checking signal for a story with no repo `typecheck` target — `next
+build` runs the full TypeScript pass before prerendering.
+- No `gsap` or `motion`/`framer-motion` package is installed anywhere in
+  this workspace (`grep` across every `package.json` came back empty),
+  despite both being listed as required override skills for this story.
+  Adding either would touch the lockfile, which is out of scope without
+  explicit instruction. The existing codebase's convention for every
+  interactive/ambient effect (`cursor-glow.tsx`, `night-sky.tsx`,
+  `nav-bar.tsx`) is vanilla React + direct DOM style mutation +
+  `matchMedia`/`requestAnimationFrame`, with **no** animation library
+  dependency — followed that same convention for `Terminal`'s magnetic
+  tilt + idle drift (manual `perspective()/rotateX/rotateY` transform
+  strings via `el.style.transform`, no GSAP `quickTo`/matchMedia helper)
+  rather than introducing a new dependency the skill's own docs would
+  otherwise suggest.
+
+**Patterns:**
+
+- Faux-terminal "reveal N of M scripted lines on a cadence, then loop"
+  primitive: a single piece of state (`visibleCount`, starting at `1` for
+  a deterministic SSR/hydration frame) plus one `setInterval` that does
+  `setVisibleCount(c => c >= lines.length ? 1 : c + 1)` is sufficient for
+  both the reveal and the loop-restart — no separate "loop" branch needed.
+  Reduced motion swaps this for one synchronous `setVisibleCount(lines.length)`
+  and returns before the interval is ever created (assert via
+  `jest.spyOn(window, 'setInterval')` + `expect(...).not.toHaveBeenCalled()`
+  in the reduced-motion test).
+- Full-bleed band inside a `max-w-[var(--container-max)]` centered `<main>`:
+  `relative left-1/2 right-1/2 -mx-[50vw] w-screen` on the section itself
+  (breaks out to true viewport width regardless of `<main>`'s max-width),
+  then a plain `mx-auto` inner wrapper with its own `max-width` + padding
+  re-centers the content — no portal, no restructuring of the shared
+  layout shell required. Reused for both the Proof bar (needs a tinted
+  background band) and the Problem section (needs the oversized ghost
+  `80%` glyph to be able to clip at true viewport width, even though the
+  section itself has no background tint).
+
 ## 2026-07-12 — Story NA-31 — CMS FAQ collection + whySdlc global, content-only (no rendering)
 
 **Learnings:**
