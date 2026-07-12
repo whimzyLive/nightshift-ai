@@ -1,3 +1,64 @@
+## 2026-07-12 — Story NA-37 — /team org-chart page (static roster, no CMS)
+
+**Learnings:**
+
+- RTL's default text queries (`getByText`) resolve via `@testing-library/dom`'s
+  `getNodeText(node)`, which concatenates **only direct child TEXT_NODE
+  children** of a given element — it does **not** recurse into nested child
+  _elements_' text. Any JSX like `<span>hello <span style={...}>world</span></span>`
+  makes the outer span's own matchable text just `"hello "` (missing
+  "world"), and the inner span's own text is only `"world"` — no single node
+  in that tree has the full "hello world" string as its own match target,
+  so `screen.getByText(/hello world/)` fails with "text is broken up by
+  multiple elements" even though the rendered page visually reads correctly.
+  Confirmed by reading `@testing-library/dom/dist/get-node-text.js` directly
+  in `node_modules/.pnpm` rather than guessing. When a plan's fixed literal
+  test asserts a getByText match against a full copy string that the design
+  mock would normally split into differently-colored inline `<span>`s (e.g.
+  team.dc.html's `<span style="color:accent">11</span> agents on staff`),
+  render that string as **flat, unstyled text** in one element instead of
+  reproducing the mock's inline color spans — this is a second, more general
+  form of the "plan's literal test resolves the mock's ambiguity" pattern
+  already logged for NA-34/NA-36: prefer a passing flat implementation over
+  visual-parity fidelity to the raw mock's per-token coloring, and leave any
+  such deviation to the QA phase's screenshot-diff pass (AC6 is explicitly
+  QA-owned per the NA-37 spec, not this build phase).
+- The inverse also matters: an `<li>{index + 1}. {step}</li>` with two
+  expression children and one literal `". "` text child renders as **three
+  sibling Text nodes**, all direct children of the `<li>` (no wrapping
+  `<span>`s) — `getNodeText` concatenates all of them, so the `<li>` itself
+  matches a `getByText` query against the full "1. step text" string. Use
+  this shape (bare `{expr}`/literal-text siblings, no nested elements) any
+  time a test needs `selector: 'li'` (or any specific element type) to match
+  full composed text.
+- `pnpm nx typecheck marketing` doesn't exist as a target (confirmed via
+  `nx show project marketing --json` → targets are `build, dev, start,
+serve-static, build-deps, watch-deps, lint, test, seed, local-start,
+local-stop`) — matches project-context's "Typecheck: none configured";
+  `pnpm nx build marketing` (which runs Next's own `tsc` pass internally,
+  visible as "Running TypeScript ..." in its output) is the real typecheck
+  gate for this app, not a separate nx target.
+- `pnpm nx build marketing` with zero CMS reads on `/team` (no `lib/*.ts`
+  reader, no `dynamic` export) correctly emits `○ /team` (Static) in the
+  route summary, confirmed side-by-side against `/why-sdlc` and `/faq`'s
+  `ƒ` (Dynamic) rows in the same build output — a clean, directly
+  comparable confirmation of the static-vs-dynamic split this story's spec
+  required (no `export const dynamic = 'force-dynamic'` on this page).
+
+**Patterns:**
+
+- All 12 `plugins/sdlc/agents/*.md` charter filenames were verified against
+  the roster data by literal `ls plugins/sdlc/agents/*.md | xargs -n1
+basename` before writing `roster-data.ts`'s `file` fields — cheap,
+  deterministic guard against a future 404'd `charter ↗` link; worth doing
+  before typing any static roster/link table by hand rather than after.
+- A static server-page composing five section components with zero props
+  and zero data fetch (`TeamPage`) needs no `Promise.all` top-level-async
+  boundary pattern at all (contrast `/why-sdlc`'s `WhySdlcPage`) — when a
+  page has no CMS/DB read, the simplest synchronous default export is both
+  correct and sufficient; don't reach for the async-boundary pattern
+  reflexively just because sibling pages in the same app use it.
+
 ## 2026-07-12 — Story NA-36 — /why-sdlc editorial page (gate rail + sticky crossfade pane)
 
 **Learnings:**
