@@ -3,13 +3,12 @@
 ## Project skills (invoke in order via the Skill tool)
 
 1. `payload` — Payload CMS 3 development (collections, fields, hooks, access control, queries, Local/REST API). Invoke before any work under apps/marketing/src/payload.config.ts, src/collections/, src/hooks/, or the (payload) route group.
-2. `nightshift-design` — nightshift brand design system (night-sky dark theme, terracotta accent, tokens, UI-kit components, brand voice, adherence gate). Invoke for any nightshift-branded interface, marketing page, or brand asset work.
-3. `tailwind-design-system` — Tailwind CSS v4 design systems (design tokens, component libraries, responsive patterns). Invoke when setting up or extending Tailwind, mapping nightshift-design tokens into `@theme`, or standardizing UI patterns in apps/marketing or packages/ui.
-4. `vercel-react-best-practices` — React/Next.js performance patterns from Vercel Engineering. Invoke when writing, reviewing, or refactoring React/Next.js code.
-5. `vercel-composition-patterns` — React composition patterns (compound components, render props, context providers, React 19 APIs). Invoke when designing reusable component APIs or refactoring boolean-prop proliferation.
-6. `atomic-design` — repo-authored atomic design methodology (atoms → molecules → organisms → templates → pages; hierarchy, naming, composition decisions). Invoke when structuring or decomposing UI into reusable components in apps/marketing or packages/ui.
-7. `motion-dev-animations` — Motion.dev (Framer Motion successor) React/Next.js animations: entrances, gestures, scroll reveals, layout transitions, spring physics, prefers-reduced-motion. Invoke for React component animations and micro-interactions in apps/marketing.
-8. `gsap-core` — official GSAP core API (tweens, easing, stagger, matchMedia responsive/reduced-motion). Invoke for timeline- or scroll-driven and SVG/DOM animation where Motion.dev doesn't fit.
+2. `tailwind-design-system` — Tailwind CSS v4 design systems (design tokens, component libraries, responsive patterns). Invoke when setting up or extending Tailwind, mapping nightshift-design tokens into `@theme`, or standardizing UI patterns in apps/marketing or packages/ui.
+3. `vercel-react-best-practices` — React/Next.js performance patterns from Vercel Engineering. Invoke when writing, reviewing, or refactoring React/Next.js code.
+4. `vercel-composition-patterns` — React composition patterns (compound components, render props, context providers, React 19 APIs). Invoke when designing reusable component APIs or refactoring boolean-prop proliferation.
+5. `atomic-design` — repo-authored atomic design methodology (atoms → molecules → organisms → templates → pages; hierarchy, naming, composition decisions). Invoke when structuring or decomposing UI into reusable components in apps/marketing or packages/ui.
+6. `motion-dev-animations` — Motion.dev (Framer Motion successor) React/Next.js animations: entrances, gestures, scroll reveals, layout transitions, spring physics, prefers-reduced-motion. Invoke for React component animations and micro-interactions in apps/marketing.
+7. `gsap-core` — official GSAP core API (tweens, easing, stagger, matchMedia responsive/reduced-motion). Invoke for timeline- or scroll-driven and SVG/DOM animation where Motion.dev doesn't fit.
 
 ## Directory guides (read before coding)
 

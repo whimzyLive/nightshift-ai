@@ -26,12 +26,6 @@
       "note": "managed by the skills CLI (npx skills add vercel-labs/agent-skills -s vercel-composition-patterns) — content at .agents/skills/, pinned in skills-lock.json; .claude/skills/ symlink for discovery. Update via the skills CLI, not by hand."
     },
     {
-      "name": "nightshift-design",
-      "source": "custom",
-      "addedBy": "user",
-      "note": "hand-authored local skill at .claude/skills/nightshift-design/ (real directory, not CLI-managed) — brand design system + adherence gate; also invoked by gtm:site."
-    },
-    {
       "name": "atomic-design",
       "source": "custom",
       "addedBy": "user",
