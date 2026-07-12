@@ -104,8 +104,7 @@ export function Hero() {
             reads a Jira ticket and ships the spec, plan, code, and review.
           </p>
           {/* Lifecycle line styled as the neon button's hover state — the
-              `--shadow-pop` stacked terracotta layers + `--glow-neon-hover`
-              glow, lifting on hover exactly like ★ Star on GitHub. */}
+              `--glow-neon-hover` glow, lifting on hover like ★ Star on GitHub. */}
           <p
             className="relative inline-block font-mono whitespace-nowrap transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transition-none"
             style={{
@@ -114,7 +113,7 @@ export function Hero() {
               fontSize: 'clamp(0.6875rem, 1.5vh, 0.8125rem)',
               color: 'var(--btn-neon-hover-text)',
               background: 'var(--btn-neon-hover-bg)',
-              boxShadow: 'var(--glow-neon-hover), var(--shadow-pop)',
+              boxShadow: 'var(--glow-neon-hover)',
             }}
           >
             Ticket <span style={{ color: 'rgba(245,243,239,0.7)' }}>→</span>{' '}
