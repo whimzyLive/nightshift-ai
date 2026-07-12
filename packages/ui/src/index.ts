@@ -21,3 +21,16 @@ export { CursorGlow } from './lib/nightshift/cursor-glow';
 export { NavBar } from './lib/nightshift/nav-bar';
 
 export { Footer } from './lib/nightshift/footer';
+
+export { InstallSnippet } from './lib/nightshift/install-snippet';
+export type { InstallSnippetProps } from './lib/nightshift/install-snippet';
+
+export { Terminal } from './lib/nightshift/terminal';
+export type {
+  TerminalProps,
+  TerminalLine,
+  TerminalLineTone,
+} from './lib/nightshift/terminal';
+
+export { CountUp } from './lib/nightshift/count-up';
+export type { CountUpProps } from './lib/nightshift/count-up';
