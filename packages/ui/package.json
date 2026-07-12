@@ -15,5 +15,10 @@
     "tags": [
       "scope:shared"
     ]
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "gsap": "^3.15.0",
+    "motion": "^12.42.2"
   }
 }

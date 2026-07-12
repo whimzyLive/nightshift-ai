@@ -314,6 +314,24 @@
   }
 }
 
+/* Shooting-star streak spawned on tap by NightSky. Angle/travel come from
+ * per-meteor CSS vars. Frozen by the global reduced-motion guard below, and
+ * NightSky additionally skips spawning meteors under reduced motion. */
+@keyframes ns-meteor {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--ns-meteor-angle, 148deg)) translateX(0);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--ns-meteor-angle, 148deg))
+      translateX(var(--ns-meteor-travel, 320px));
+  }
+}
+
 /* Duplicated-track phrase ticker (PhraseMarquee) — loops seamlessly because
  * the track renders the phrase set twice and only translates by -50%. */
 @keyframes ns-marquee {

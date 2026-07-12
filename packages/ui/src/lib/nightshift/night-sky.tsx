@@ -1,14 +1,16 @@
 'use client';
 
+import { useRef } from 'react';
 import type { CSSProperties } from 'react';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 export interface NightSkyProps {
   /**
-   * `subpage` (default) is the calmer baseline shipped by this story
-   * (`--sky-opacity-subpage`). `home` reserves the seam for the heavier
-   * home-only scene (crescent moon, meteor showers, mouse parallax) added
-   * in a later story — for now it only raises the opacity to
-   * `--sky-opacity-home`; no extra motifs render yet.
+   * `subpage` (default) is the calmer baseline (`--sky-opacity-subpage`);
+   * `home` raises the starfield opacity to `--sky-opacity-home`. Both
+   * variants get GSAP depth-parallax on mouse move and a tap-to-meteor
+   * shower — both skipped under `prefers-reduced-motion`.
    */
   variant?: 'subpage' | 'home';
   className?: string;
@@ -21,42 +23,54 @@ interface StarDot {
   c: string;
 }
 
-// Fixed (not Math.random()) dot layouts — deterministic so server-rendered
-// and hydrated client markup match exactly (this is a client component,
-// but the starfield itself doesn't need randomness at runtime).
-const NEAR_DOTS: StarDot[] = [
-  { x: 6, y: 12, s: 1.6, c: 'var(--star-white)' },
-  { x: 18, y: 42, s: 1.8, c: 'var(--star-white)' },
-  { x: 32, y: 8, s: 1.4, c: 'var(--star-white)' },
-  { x: 47, y: 28, s: 1.7, c: 'var(--star-white)' },
-  { x: 61, y: 15, s: 1.5, c: 'var(--star-white)' },
-  { x: 74, y: 46, s: 1.9, c: 'var(--star-white)' },
-  { x: 88, y: 22, s: 1.4, c: 'var(--star-white)' },
-  { x: 12, y: 68, s: 1.6, c: 'var(--star-white)' },
-  { x: 41, y: 78, s: 1.5, c: 'var(--star-white)' },
-  { x: 69, y: 82, s: 1.8, c: 'var(--star-white)' },
-  { x: 93, y: 64, s: 1.4, c: 'var(--star-white)' },
-  { x: 25, y: 92, s: 1.6, c: 'var(--star-white)' },
-];
+// Deterministic PRNG (constant seed) so the generated starfield is identical
+// server-side and after hydration — no Math.random() at render time.
+function mulberry32(seed: number): () => number {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
-const MID_DOTS: StarDot[] = [
-  { x: 9, y: 30, s: 2.4, c: 'var(--star-white)' },
-  { x: 28, y: 58, s: 2.6, c: 'var(--star-indigo)' },
-  { x: 44, y: 14, s: 2.3, c: 'var(--star-white)' },
-  { x: 58, y: 66, s: 2.5, c: 'var(--star-white)' },
-  { x: 77, y: 34, s: 2.6, c: 'var(--star-indigo)' },
-  { x: 90, y: 84, s: 2.4, c: 'var(--star-white)' },
-  { x: 15, y: 88, s: 2.5, c: 'var(--star-white)' },
-  { x: 63, y: 92, s: 2.3, c: 'var(--star-indigo)' },
-];
+function makeDots(
+  count: number,
+  seed: number,
+  min: number,
+  max: number,
+  colors: string[],
+): StarDot[] {
+  const rnd = mulberry32(seed);
+  const dots: StarDot[] = [];
+  for (let i = 0; i < count; i++) {
+    dots.push({
+      x: Number((rnd() * 100).toFixed(2)),
+      y: Number((rnd() * 100).toFixed(2)),
+      s: Number((min + rnd() * (max - min)).toFixed(2)),
+      c: colors[Math.floor(rnd() * colors.length)],
+    });
+  }
+  return dots;
+}
 
-const FAR_DOTS: StarDot[] = [
-  { x: 20, y: 22, s: 3.6, c: 'var(--star-bright)' },
-  { x: 52, y: 48, s: 3.4, c: 'var(--star-cyan)' },
-  { x: 82, y: 12, s: 3.8, c: 'var(--star-bright)' },
-  { x: 35, y: 74, s: 3.5, c: 'var(--star-bright)' },
-  { x: 95, y: 56, s: 3.3, c: 'var(--star-cyan)' },
-];
+const WHITE = 'var(--star-white)';
+const INDIGO = 'var(--star-indigo)';
+const BRIGHT = 'var(--star-bright)';
+const CYAN = 'var(--star-cyan)';
+
+// Dense deterministic layers (~4× the original count) tiled at 360px.
+const NEAR_DOTS = makeDots(54, 1337, 1.2, 2.0, [WHITE, WHITE, WHITE, INDIGO]);
+const MID_DOTS = makeDots(30, 7331, 2.0, 2.8, [WHITE, WHITE, INDIGO]);
+const FAR_DOTS = makeDots(16, 9157, 3.0, 3.9, [BRIGHT, CYAN, BRIGHT]);
+
+const TILE = '360px 360px';
+
+// Parallax depth per layer (px of travel at the screen edge). Foreground
+// (near) shifts most; the far bright layer barely moves.
+const NEAR_DEPTH = 34;
+const MID_DEPTH = 20;
+const FAR_DEPTH = 10;
 
 function layerBackground(dots: StarDot[]): string {
   return dots
@@ -98,12 +112,14 @@ const HALOS: { style: CSSProperties }[] = [
   },
 ];
 
+const MAX_METEORS = 6;
+
 /**
- * Shared starfield primitive — fixed full-viewport background behind all
- * page content. Static baseline + a slow ambient drift/twinkle (disabled
- * under `prefers-reduced-motion` by the global guard in `global.css`).
- * Home-only heavy motifs (moon, meteors, mouse parallax) are out of scope
- * here (see spec NA-30) — `variant="home"` only raises opacity for now.
+ * Shared starfield primitive — a fixed full-viewport background behind all
+ * page content: a dense starfield with GSAP ambient drift/twinkle, mouse
+ * depth-parallax (`quickTo` per layer), and a tap-spawned meteor shower
+ * (`gsap.timeline`). All motion is set up inside `gsap.matchMedia` so it is
+ * fully disabled — and reverted — under `prefers-reduced-motion`.
  */
 export function NightSky({
   variant = 'subpage',
@@ -114,43 +130,167 @@ export function NightSky({
       ? 'opacity-[var(--sky-opacity-home)]'
       : 'opacity-[var(--sky-opacity-subpage)]';
 
+  const nearRef = useRef<HTMLDivElement>(null);
+  const midRef = useRef<HTMLDivElement>(null);
+  const farRef = useRef<HTMLDivElement>(null);
+  const nearInnerRef = useRef<HTMLDivElement>(null);
+  const midInnerRef = useRef<HTMLDivElement>(null);
+  const farInnerRef = useRef<HTMLDivElement>(null);
+  const meteorLayerRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        // Ambient drift on the near layer's inner element (transform is free
+        // on the inner; the outer wrapper owns the parallax transform).
+        gsap.to(nearInnerRef.current, {
+          x: -40,
+          y: -40,
+          duration: 120,
+          ease: 'none',
+          repeat: -1,
+        });
+
+        // Twinkle on the mid + far layers.
+        gsap.to([midInnerRef.current, farInnerRef.current], {
+          filter: 'brightness(1.6)',
+          opacity: 1,
+          duration: 1.7,
+          ease: 'sine.inOut',
+          repeat: -1,
+          yoyo: true,
+          stagger: 0.85,
+        });
+
+        // Depth parallax — one smoothed quickTo per axis per layer, driven by
+        // mouse move. Foreground shifts most; far layer barely moves.
+        const q = (el: HTMLDivElement | null, prop: 'x' | 'y') =>
+          gsap.quickTo(el, prop, { duration: 0.6, ease: 'power3' });
+        const setters: [ReturnType<typeof q>, ReturnType<typeof q>, number][] =
+          [
+            [q(nearRef.current, 'x'), q(nearRef.current, 'y'), NEAR_DEPTH],
+            [q(midRef.current, 'x'), q(midRef.current, 'y'), MID_DEPTH],
+            [q(farRef.current, 'x'), q(farRef.current, 'y'), FAR_DEPTH],
+          ];
+
+        function onMove(e: MouseEvent) {
+          const dx = e.clientX / window.innerWidth - 0.5;
+          const dy = e.clientY / window.innerHeight - 0.5;
+          for (const [qx, qy, depth] of setters) {
+            qx(-dx * depth);
+            qy(-dy * depth);
+          }
+        }
+
+        function onTap(e: PointerEvent) {
+          const layer = meteorLayerRef.current;
+          if (!layer || layer.childElementCount >= MAX_METEORS) return;
+
+          const el = document.createElement('span');
+          el.setAttribute('aria-hidden', 'true');
+          Object.assign(el.style, {
+            position: 'absolute',
+            left: `${e.clientX}px`,
+            top: `${e.clientY}px`,
+            width: '160px',
+            height: '2px',
+            transformOrigin: '0 50%',
+            pointerEvents: 'none',
+            background:
+              'linear-gradient(90deg, transparent, var(--star-white) 78%, var(--star-bright))',
+            filter: 'drop-shadow(0 0 4px var(--star-bright))',
+          } satisfies Partial<CSSStyleDeclaration>);
+          layer.appendChild(el);
+
+          const angle = 140 + Math.random() * 24; // 140–164° → down-left
+          const travel = 300 + Math.random() * 160;
+          const rad = (angle * Math.PI) / 180;
+
+          gsap.set(el, { rotation: angle, autoAlpha: 0 });
+          gsap
+            .timeline({ onComplete: () => el.remove() })
+            .to(el, { autoAlpha: 1, duration: 0.08 })
+            .to(
+              el,
+              {
+                x: Math.cos(rad) * travel,
+                y: Math.sin(rad) * travel,
+                duration: 0.72,
+                ease: 'power2.in',
+              },
+              0,
+            )
+            .to(el, { autoAlpha: 0, duration: 0.3 }, '-=0.32');
+        }
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('pointerdown', onTap);
+
+        return () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('pointerdown', onTap);
+          if (meteorLayerRef.current) meteorLayerRef.current.replaceChildren();
+        };
+      });
+    },
+    { dependencies: [] },
+  );
+
   return (
-    <div
-      aria-hidden="true"
-      className={`pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[var(--bg-void)] ${opacityClass} ${className}`}
-    >
+    <>
       <div
-        className="absolute -inset-[12%] animate-[ns-drift_120s_linear_infinite]"
-        style={{
-          backgroundImage: layerBackground(NEAR_DOTS),
-          backgroundRepeat: 'repeat',
-          backgroundSize: '520px 520px',
-        }}
-      />
+        aria-hidden="true"
+        className={`pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[var(--bg-void)] ${opacityClass} ${className}`}
+      >
+        <div ref={nearRef} className="absolute inset-0 will-change-transform">
+          <div
+            ref={nearInnerRef}
+            className="absolute -inset-[12%]"
+            style={{
+              backgroundImage: layerBackground(NEAR_DOTS),
+              backgroundRepeat: 'repeat',
+              backgroundSize: TILE,
+            }}
+          />
+        </div>
+        <div ref={midRef} className="absolute inset-0 will-change-transform">
+          <div
+            ref={midInnerRef}
+            className="absolute -inset-[12%]"
+            style={{
+              backgroundImage: layerBackground(MID_DOTS),
+              backgroundRepeat: 'repeat',
+              backgroundSize: TILE,
+            }}
+          />
+        </div>
+        <div ref={farRef} className="absolute inset-0 will-change-transform">
+          <div
+            ref={farInnerRef}
+            className="absolute -inset-[12%]"
+            style={{
+              backgroundImage: layerBackground(FAR_DOTS),
+              backgroundRepeat: 'repeat',
+              backgroundSize: TILE,
+            }}
+          />
+        </div>
+        {HALOS.map((halo, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full blur-[10px]"
+            style={halo.style}
+          />
+        ))}
+      </div>
+
       <div
-        className="absolute -inset-[12%] animate-[ns-twinkle_var(--dur-twinkle)_ease-in-out_infinite]"
-        style={{
-          backgroundImage: layerBackground(MID_DOTS),
-          backgroundRepeat: 'repeat',
-          backgroundSize: '520px 520px',
-        }}
+        ref={meteorLayerRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
       />
-      <div
-        className="absolute -inset-[12%] animate-[ns-twinkle_var(--dur-twinkle)_ease-in-out_infinite]"
-        style={{
-          backgroundImage: layerBackground(FAR_DOTS),
-          backgroundRepeat: 'repeat',
-          backgroundSize: '520px 520px',
-          animationDelay: '-1.7s',
-        }}
-      />
-      {HALOS.map((halo, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full blur-[10px]"
-          style={halo.style}
-        />
-      ))}
-    </div>
+    </>
   );
 }
