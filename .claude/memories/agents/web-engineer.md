@@ -1084,3 +1084,107 @@ from 'payload'; const mockGetPayload = getPayload as jest.Mock;` in the
   all-closed — matches the handoff's own interaction spec and gives the
   animated max-height something to visibly demonstrate without user
   interaction.
+
+## 2026-07-12 — Motion migration of home/ hand-rolled CSS animations (no ticket, dispatched off `refactor/motion-gsap-animations`)
+
+**Learnings:**
+
+- Grepping `animate-\[ns-\|animation:\|motion-safe:animate` across
+  `home/*.tsx` first, before opening every file, immediately narrowed a
+  12-file dispatch down to the 3 that actually had hand-rolled CSS
+  animation to migrate: `phrase-marquee.tsx` (`ns-marquee`
+  loop), `team-preview.tsx` (`ns-twinkle` star dot), and
+  `control-section.tsx` (`ns-risein`/`ns-slam`/`ns-gatepulse`/`ns-twinkle`,
+  6 call sites). The other 9 files (hero, proof-bar, problem-section,
+  how-it-works, day-night-workflow, why-different, faq-preview,
+  faq-accordion, final-cta) have zero animation of their own — don't
+  touch them just because they're in the dispatch's file list; plain CSS
+  `transition: 'x .3s'` property changes (hover dim, hairline color
+  fades in control-section/team-preview) are NOT in scope for a
+  `@keyframes`→Motion migration and were left alone.
+- `faq-accordion.tsx` (home/) has no animation code at all — the actual
+  expand/collapse max-height/opacity transition lives in the shared
+  `../faq/faq-row.tsx` (extracted in NA-38 so home preview + the full
+  `/faq` page accordion can't drift), which is **outside** `home/` and
+  therefore outside a `home/`-scoped dispatch's ownership even though the
+  task brief describes the accordion as if the animation were local to
+  `faq-accordion.tsx`. Read the actual delegation before assuming the
+  brief's file-purpose description is accurate — don't duplicate
+  shared-component logic into a wrapper just to satisfy a brief's framing.
+- `jest.setup.dom.js` (repo root) already polyfills `matchMedia` (always
+  `matches:false` unless a test overrides it), `IntersectionObserver`,
+  `ResizeObserver`, `scrollTo` globally for every Nx project — confirmed
+  by reading it directly rather than assuming. Existing Motion specs
+  (`terminal.spec.tsx`, `count-up.spec.tsx`) never advance real animation
+  frames or depend on `requestAnimationFrame` actually ticking in jsdom;
+  they only assert the pre-animation-complete state (initial
+  deterministic frame, or the reduced-motion jump-to-final state).
+  Followed the same testing shape for the home migrations — never
+  asserted mid-animation values, only initial/gated state.
+- Motion's `animate` prop computes styles synchronously even during SSR
+  (no flash-of-unstyled-content), which means a **direct**
+  `prefersReducedMotion()` call in a component's render body (not inside
+  `useEffect`) would produce different JSX between the server render
+  (`window` undefined → always `false`) and the client's first hydration
+  render (`window` defined → real user preference) — a hydration
+  mismatch. Every reduced-motion gate in this migration follows the
+  Terminal/CountUp precedent instead: `useState(false)` +
+  `useEffect(() => setReducedMotion(prefersReducedMotion()), [])`, so the
+  deterministic first frame always matches SSR, and the real preference
+  only applies post-mount (one JS tick of unavoidable non-reduced motion
+  on a true reduced-motion user's very first paint — accepted tradeoff,
+  already baked into this codebase's Terminal/CountUp precedent, not
+  something this migration introduced).
+
+**Pitfalls:**
+
+- `team-preview.spec.tsx` had one test that asserted a Tailwind class
+  marker (`row.querySelector('[class*="motion-safe:animate"]')`) as its
+  only way to verify the twinkle animation was reduced-motion-gated —
+  once the dot moves to Motion's JS `animate` prop there's no className
+  to grep for anymore. Fixed by adding an explicit `data-testid="team-dot"`
+  - `data-twinkle="on"|"off"` attribute pair purely for test observability
+    (harmless, `aria-hidden` decorative element) rather than trying to
+    infer gating from Motion's internal style application — cleaner and
+    actually verifies the _behavioral_ gate (mocks `matchMedia` true/false,
+    asserts the attribute flips) instead of a static-markup proxy.
+- `control-section.tsx`'s `CtrlGate.anim: string` field (`'ns-gatepulse …'
+| 'none'`) baked the CSS animation shorthand directly into the derived
+  view-model returned by `buildCtrlGates`. Migrating cleanly required
+  changing that field to `awaiting: boolean` and letting the _rendering_
+  component (`GateStrip`) decide the Motion `animate`/`transition` props
+  from it — don't carry a target-technology-specific string (a CSS
+  animation shorthand) through a pure derivation function when the
+  renderer can trivially compute the same branch from a boolean.
+
+**Patterns:**
+
+- Continuous decorative loop (`ns-twinkle`, `ns-marquee`, `ns-gatepulse`)
+  → a shared constant `{ opacity: [...], filter: [...] }` (or `x`/`scale`)
+  object passed to `animate`, paired with a `transition={{ duration,
+ease, repeat: Infinity }}`, both swapped to `undefined` under
+  `reducedMotion` (Motion treats `animate={undefined}` as "render the
+  current/initial state, do nothing" — simplest possible reduced-motion
+  off-switch for a loop, no separate `if` branch needed at the JSX call
+  site itself).
+- One-shot entrance (`ns-risein`, `ns-slam`) → `initial={reducedMotion ?
+false : {...}}` + `animate={{...}}` + `transition={{ duration:
+reducedMotion ? 0 : N, ease: EASE_OUT }}`. `initial={false}` is Motion's
+  own idiom for "skip the enter animation, render directly in the
+  `animate` end-state" — cleaner than conditionally omitting the
+  `initial` prop. For a 3-keyframe entrance (`ns-slam`: overshoot then
+  settle), keyframe arrays (`y: [-18, 2, 0]`, `scale: [1.05, 1, 1]`) plus
+  `transition.times: [0, 0.6, 1]` reproduce the CSS `@keyframes`
+  percentage stops directly — no need for a multi-stage `animate()`
+  sequence call.
+- Repeated multi-call-site entrance props (`ns-risein` used 3x across
+  `control-section.tsx`'s race terminals) — factor into a small
+  prop-spread helper (`riseInProps(reducedMotion, durationS = 0.4)`
+  returning `{ initial, animate, transition }`) and spread it
+  (`{...riseInProps(reducedMotion)}`) rather than repeating the same
+  three props at every call site.
+- `--ease-out: cubic-bezier(.22,1,.36,1)` (nightshift-design token) is
+  the exact numeric equivalent of the `motion-dev-animations` skill's own
+  "Pattern 1" easing curve (`[0.22, 1, 0.36, 1]`) — no translation needed
+  between the design system's token and Motion's array-tuple easing
+  format when porting a design-authored `var(--ease-out)` CSS animation.
