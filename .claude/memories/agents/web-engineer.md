@@ -1,3 +1,77 @@
+## 2026-07-12 — Story NA-38 — /faq full page (5 topic-grouped solid-card accordions, single-open-across-page)
+
+**Learnings:**
+
+- The plan's Task 2 extraction note ("the current row derives its Q.NN label
+  from `index`. Keep that — home passes row index+1; the full page will pass
+  `item.number`") and Task 3's literal test (`Q.01`/`Q.03` continuous across
+  a group boundary) are only mutually consistent if `FaqRow`'s internal
+  label formula changes from `` `Q.${index + 1}` `` to plain `` `Q.${index}` ``
+  during the extraction — i.e. the `index` prop becomes the already-1-based
+  display number, not a 0-based array index. Passing `item.number` straight
+  through (as Task 3's illustrative code does) only produces `Q.01`/`Q.03`
+  if `FaqRow` no longer adds its own `+1`. Made this change during Task 2
+  (not Task 3) and updated `home/faq-accordion.tsx`'s caller to pass
+  `index + 1` instead of bare `index` — confirmed behavior-preserving via
+  the unmodified home accordion/preview specs staying green (same rendered
+  `Q.01`/`Q.02`/`Q.03` either way for a 3-item list). Another instance of
+  "the plan's literal Task N+1 test resolves an ambiguity left open in Task
+  N's prose" (see the NA-34/NA-36/NA-37 entries below) — trust the test,
+  adjust the earlier task's code to make both tasks' literal snippets true
+  simultaneously, rather than picking one task's snippet over the other.
+- `@testing-library/jest-dom` is **still** not installed in this workspace
+  (re-confirmed via `grep -rln "toBeInTheDocument\|toHaveAttribute"
+apps/marketing/src` returning only the plan's own not-yet-adapted spec
+  text) — the NA-16 finding holds many stories later. The plan's Task 3
+  literal test code uses `toBeInTheDocument()`/`toHaveAttribute(...)`
+  verbatim; adapted every instance to `.toBeTruthy()` /
+  `.getAttribute(...) === ...` (same assertions, no new dependency) before
+  running RED, per the established convention — don't install the
+  dependency for one story's test file.
+- The plan's file-structure list didn't call out modifying the existing
+  placeholder `app/(frontend)/faq/page.spec.tsx` (it only listed
+  `page.tsx` as "Modify"), but that placeholder spec renders `<FaqPage />`
+  synchronously — the moment `page.tsx` becomes `async`, that spec throws
+  (same NA-16 "can't render a Promise via JSX" trap). Rewrote it following
+  the `why-sdlc/page.spec.tsx` pattern (`render(await FaqPage())`,
+  `jest.mock('../../../lib/faq', ...)` + the `RichText` ESM-mock) as part
+  of Task 7's own TDD cycle (write the async-aware spec first, watch it
+  fail against the still-placeholder `page.tsx`, then implement) — when a
+  plan converts an existing page to `async` but only lists the page file
+  itself as "Modify," check for and update any pre-existing spec for that
+  same page too; it's an implicit dependency of the task, not out of scope.
+- `getFaqPageGroups()`'s grouping loop (`Map<FaqGroup, FaqPageGroup>` keyed
+  by `doc.group`, pushing to an array on first sight) needs zero special
+  handling to satisfy "first-appearance order" — `payload.find({ sort:
+'faqOrder' })` already returns docs in the order that makes first-appearance
+  == topic-block order (seed data's `faqOrder` is contiguous per group,
+  per the spec's own Data Model table), so a plain `Map` insertion-order
+  iteration reproduces the handoff's 5-group order with no extra sort step.
+
+**Patterns:**
+
+- Reused three established patterns verbatim rather than re-deriving them:
+  the `getHomeFaqs`/`getWhySdlcFaqs` try/catch-log-return-empty-sentinel
+  shape for `getFaqPageGroups` (only the query shape and return type
+  differ — no `where`, `limit: 100`, grouped output); the
+  `(frontend)/<route>/page.tsx` single-top-level-async-boundary pattern
+  (`await getFaqPageGroups()` is the only await in `FaqPage`, mirroring
+  `WhySdlcPage`); and `why-sdlc/hero.tsx`'s breadcrumb + terra-glow +
+  `Eyebrow` + clamp-heading structure for `FaqHero` (only the glow's
+  `top/right` anchor and copy differ — handoff `faq.dc.html` anchors the
+  hero glow top-right vs why-sdlc's top-left).
+- A 5-group nested accordion where only ONE row across the ENTIRE tree can
+  be open needs just one `useState<Id | null>` at the top-level client
+  component (`FullFaqAccordion`), passed down as `isOpen={openId ===
+item.id}` to every row regardless of which group card it's in — no
+  per-group state, no context/provider needed, since there's only one
+  reader (the component itself) and one writer (each row's `onToggle`).
+  Contrast with the home preview accordion, which is intentionally scoped
+  to `openIndex` local to its single card — the two components share the
+  row visual (`FaqRow`) but deliberately do NOT share the open-state
+  container, per the spec's explicit "do not give each group card its own
+  independent open state" instruction.
+
 ## 2026-07-12 — Story NA-37 — /team org-chart page (static roster, no CMS)
 
 **Learnings:**
