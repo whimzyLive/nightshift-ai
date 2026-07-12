@@ -13,7 +13,7 @@ const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 export function PageCta() {
   return (
     <section
-      className="relative border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
       style={{ padding: '84px 28px', borderColor: 'var(--border-default)' }}
     >
       <div

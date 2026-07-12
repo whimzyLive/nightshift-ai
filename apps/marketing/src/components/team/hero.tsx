@@ -8,7 +8,7 @@ import { Eyebrow } from '@nightshift-ai/ui';
 export function TeamHero() {
   return (
     <section
-      className="relative border-b"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-b"
       style={{
         padding: '72px 28px 56px',
         borderColor: 'var(--border-default)',
