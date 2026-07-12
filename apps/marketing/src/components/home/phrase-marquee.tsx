@@ -21,7 +21,8 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Decorative looping mono ticker dividing Hero from the Proof bar. Purely
+ * Decorative looping mono ticker band — rendered twice on the home page,
+ * once right under the header and once above the footer. Purely
  * illustrative — hidden from assistive tech. Solid terracotta band (`.ns-marquee`
  * in the design handoff) with near-white text (`--text-on-accent`) — the one
  * fully-saturated-accent band on the page. A single Motion `animate()` loop

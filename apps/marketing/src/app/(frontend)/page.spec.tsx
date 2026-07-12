@@ -96,10 +96,10 @@ describe('HomePage', () => {
 
   it('renders the four above-the-fold sections in order', async () => {
     const { container } = render(await HomePage());
-    // Hero and FinalCta each render their own GitHub star link.
+    // FinalCta renders the GitHub star link (the hero no longer does).
     expect(
       screen.getAllByRole('link', { name: /star nightshift on github/i }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     // Numbers + labels are split across CountUp's own <span> and the
     // surrounding static text, so assert on the flattened text content
     // rather than a single-node text match.

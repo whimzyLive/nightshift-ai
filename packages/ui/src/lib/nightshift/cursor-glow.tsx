@@ -6,14 +6,20 @@ import { motion, useMotionValue, useSpring } from 'motion/react';
 const INTERACTIVE_SELECTOR =
   'a,button,[role="button"],input,textarea,select,summary';
 
+// Connector springs off the raw cursor with lag, so it trails behind the
+// lead dot instead of tracking it exactly.
+const TRAIL = { stiffness: 260, damping: 26, mass: 0.6 } as const;
+// The large spotlight follows more tightly than the trail dot.
 const FOLLOW = { stiffness: 500, damping: 40, mass: 0.5 } as const;
 
 /**
- * 28px radial terracotta glow tracking the pointer, growing to ~84px over
- * interactive elements. Renders nothing on coarse pointers (touch) or
- * under `prefers-reduced-motion` — both checked before any listener
- * attaches, so there's no dead DOM node left behind either way. Follow is a
- * spring-smoothed Motion value.
+ * Pointer trail + focus spotlight. A tiny solid lead dot pinned to the true
+ * cursor, one spring-following connector dot trailing behind it, and a large
+ * radial spotlight that spring-follows the pointer — small at rest, growing
+ * to a bright focus glow over any clickable element (link, button, input,
+ * …). Renders nothing on coarse pointers (touch) or under
+ * `prefers-reduced-motion` — both checked before any listener attaches, so
+ * there's no dead DOM node left behind either way.
  */
 export function CursorGlow() {
   const [enabled, setEnabled] = useState(false);
@@ -21,6 +27,8 @@ export function CursorGlow() {
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
+  const tx = useSpring(x, TRAIL);
+  const ty = useSpring(y, TRAIL);
   const sx = useSpring(x, FOLLOW);
   const sy = useSpring(y, FOLLOW);
 
@@ -60,24 +68,60 @@ export function CursorGlow() {
     : 'radial-gradient(circle, var(--cursor-glow), transparent 70%)';
 
   return (
-    <motion.div
-      aria-hidden="true"
-      className="pointer-events-none fixed top-0 left-0 z-[9998] rounded-full transition-[width,height,background] duration-200 ease-out motion-reduce:transition-none"
-      style={{
-        x: sx,
-        y: sy,
-        width: size,
-        height: size,
-        marginTop: active
-          ? 'calc(var(--cursor-size-active) / -2)'
-          : 'calc(var(--cursor-size) / -2)',
-        marginLeft: active
-          ? 'calc(var(--cursor-size-active) / -2)'
-          : 'calc(var(--cursor-size) / -2)',
-        background,
-        mixBlendMode: 'screen',
-        willChange: 'transform',
-      }}
-    />
+    <>
+      {/* Large focus spotlight — grows + brightens over clickable elements. */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none fixed top-0 left-0 z-[9997] rounded-full transition-[width,height,background] duration-200 ease-out motion-reduce:transition-none"
+        style={{
+          x: sx,
+          y: sy,
+          width: size,
+          height: size,
+          marginTop: active
+            ? 'calc(var(--cursor-size-active) / -2)'
+            : 'calc(var(--cursor-size) / -2)',
+          marginLeft: active
+            ? 'calc(var(--cursor-size-active) / -2)'
+            : 'calc(var(--cursor-size) / -2)',
+          background,
+          mixBlendMode: 'screen',
+          willChange: 'transform',
+        }}
+      />
+      {/* Connector dot — trails behind the cursor. */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none fixed top-0 left-0 z-[9998] rounded-full"
+        style={{
+          x: tx,
+          y: ty,
+          width: 6,
+          height: 6,
+          marginTop: -3,
+          marginLeft: -3,
+          background: 'var(--accent)',
+          opacity: 0.5,
+          mixBlendMode: 'screen',
+          willChange: 'transform',
+        }}
+      />
+      {/* Tiny lead dot pinned to the true cursor. */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none fixed top-0 left-0 z-[9999] rounded-full"
+        style={{
+          x,
+          y,
+          width: 5,
+          height: 5,
+          marginTop: -2.5,
+          marginLeft: -2.5,
+          background: 'var(--accent)',
+          boxShadow: '0 0 6px var(--cursor-glow)',
+          willChange: 'transform',
+        }}
+      />
+    </>
   );
 }

@@ -71,9 +71,8 @@ export function InstallSnippet({
         onClick={handleCopy}
         aria-label={`Copy: ${command}`}
         whileTap={{ scale: 0.94 }}
-        className="flex-none overflow-hidden rounded-none border px-2.5 py-1 font-mono text-xs font-medium tracking-[0.02em] uppercase transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
+        className="flex-none overflow-hidden rounded-none border border-[var(--border-default)] px-2.5 py-1 font-mono text-xs font-medium tracking-[0.02em] uppercase transition-[color,border-color,box-shadow] duration-150 ease-out hover:border-[var(--link)] hover:shadow-[var(--glow-cool)] focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
         style={{
-          borderColor: 'var(--border-default)',
           color: copied ? 'var(--success)' : 'var(--text-muted)',
         }}
       >

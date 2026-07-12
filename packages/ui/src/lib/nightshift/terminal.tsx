@@ -30,8 +30,11 @@ export interface TerminalProps {
   title: string;
   /** The scripted lines, revealed in order. */
   lines: readonly TerminalLine[];
-  /** Min height of the body in px (reserve space to avoid layout shift). */
-  minHeight?: number;
+  /**
+   * Min height of the body — a px number, or any CSS length (e.g. a
+   * `clamp(...)` string) to reserve space / scale with the viewport.
+   */
+  minHeight?: number | string;
   className?: string;
 }
 

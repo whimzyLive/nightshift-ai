@@ -63,8 +63,8 @@ export default async function HomePage() {
           ],
         }}
       />
-      <Hero />
       <PhraseMarquee />
+      <Hero />
       <ProofBar />
       <ProblemSection />
       <HowItWorks />
@@ -74,6 +74,7 @@ export default async function HomePage() {
       <ControlSection />
       <FaqPreview faqs={faqs} />
       <FinalCta />
+      <PhraseMarquee />
     </>
   );
 }

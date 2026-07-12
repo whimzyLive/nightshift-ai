@@ -49,7 +49,8 @@ describe('CtaButton', () => {
     );
     const el = screen.getByRole('button', { name: 'run it again ↺' });
     expect(el.className).toContain('h-[34px]');
-    expect(el.className).toContain('border-[var(--border-strong)]');
+    expect(el.className).toContain('border-[var(--border-default)]');
+    expect(el.className).toContain('hover:shadow-[var(--glow-cool)]');
     expect(el.getAttribute('size')).toBeNull();
     expect(el.getAttribute('variant')).toBeNull();
   });

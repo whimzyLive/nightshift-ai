@@ -27,10 +27,55 @@ const STEPS: { step: string; runs: string; get: string }[] = [
   },
 ];
 
-// Open-Question default 1: a static, non-interactive stage strip stands in
-// for the design's animated Pipeline component, which belongs to the
-// out-of-scope interactive control section.
-const STAGES = ['/spec', '/plan', '/impl', '/review', 'PR'];
+// The spec→plan→impl→review→PR pipeline, verbatim from the design handoff
+// (nightshift Landing.dc.html `pipelineStages`). Each stage carries its
+// command, human label, owning agent, and lifecycle status.
+type StageStatus = 'done' | 'active' | 'idle';
+const PIPELINE: {
+  command: string;
+  label: string;
+  agent: string;
+  status: StageStatus;
+}[] = [
+  {
+    command: '/spec',
+    label: 'Technical spec',
+    agent: 'solutions-architect',
+    status: 'done',
+  },
+  {
+    command: '/plan',
+    label: 'Ordered plan',
+    agent: 'tech-lead',
+    status: 'done',
+  },
+  {
+    command: '/impl',
+    label: 'Implementation',
+    agent: 'principal-engineer',
+    status: 'active',
+  },
+  {
+    command: '/review',
+    label: 'Quality gate',
+    agent: 'qa-engineer',
+    status: 'idle',
+  },
+  { command: 'PR', label: 'Ship it', agent: 'auto', status: 'idle' },
+];
+
+const STAGE_STYLE: Record<
+  StageStatus,
+  { border: string; cmd: string; glow?: string }
+> = {
+  done: { border: 'rgba(110,196,138,0.35)', cmd: 'var(--success)' },
+  active: {
+    border: 'var(--border-accent)',
+    cmd: 'var(--terra-400)',
+    glow: 'var(--glow-accent)',
+  },
+  idle: { border: 'var(--border-default)', cmd: 'var(--text-muted)' },
+};
 
 /**
  * How-it-works: eyebrow/header, static 5-stage strip, the reused
@@ -78,29 +123,58 @@ export function HowItWorks() {
           </p>
         </div>
 
-        <div
-          className="mb-9 flex flex-wrap items-center justify-center gap-3 font-mono"
-          style={{ fontSize: 14, color: 'var(--text-dim)' }}
-        >
-          {STAGES.map((stage, i) => (
-            <span key={stage} className="flex items-center gap-3">
-              <span
-                className="border px-3 py-1.5"
-                style={{
-                  borderColor: 'var(--border-default)',
-                  color: 'var(--moon-100)',
-                  background: 'var(--surface-card)',
-                }}
-              >
-                {stage}
-              </span>
-              {i < STAGES.length - 1 && (
-                <span aria-hidden="true" style={{ color: 'var(--indigo-400)' }}>
-                  →
-                </span>
-              )}
-            </span>
-          ))}
+        <div className="mb-9 flex flex-wrap items-stretch justify-center">
+          {PIPELINE.map((stage, i) => {
+            const s = STAGE_STYLE[stage.status];
+            return (
+              <div key={stage.command} className="flex items-stretch">
+                <div
+                  className="flex flex-col gap-1.5"
+                  style={{
+                    minWidth: 148,
+                    padding: '14px 16px',
+                    background: 'var(--surface-card)',
+                    border: '1px solid',
+                    borderColor: s.border,
+                    boxShadow: s.glow,
+                  }}
+                >
+                  <span
+                    className="font-mono font-medium"
+                    style={{ fontSize: 13, color: s.cmd }}
+                  >
+                    {stage.status === 'done' ? '✓ ' : ''}
+                    {stage.command}
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--text-strong)' }}>
+                    {stage.label}
+                  </span>
+                  <span
+                    className="font-mono"
+                    style={{ fontSize: 11, color: 'var(--text-dim)' }}
+                  >
+                    {stage.agent}
+                  </span>
+                </div>
+                {i < PIPELINE.length - 1 && (
+                  <span
+                    aria-hidden="true"
+                    className="flex items-center font-mono"
+                    style={{
+                      padding: '0 6px',
+                      fontSize: 14,
+                      color:
+                        stage.status === 'done'
+                          ? 'var(--success)'
+                          : 'var(--moon-500)',
+                    }}
+                  >
+                    →
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="mx-auto mb-[22px]" style={{ maxWidth: 520 }}>

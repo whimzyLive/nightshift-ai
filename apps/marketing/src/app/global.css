@@ -232,6 +232,7 @@
   --glow-cool:
     0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
   --glow-focus: 0 0 0 3px rgba(124, 147, 240, 0.45);
+  --glow-cool: 0 0 22px rgba(124, 147, 240, 0.5);
 
   --glow-neon:
     0 0 16px rgba(217, 119, 87, 0.42), 0 0 38px rgba(217, 119, 87, 0.18);
@@ -265,7 +266,7 @@
   );
   --glass-border: rgba(255, 255, 255, 0.13);
   --nav-float-top: 14px;
-  --nav-float-max: min(940px, calc(100% - 48px));
+  --nav-float-max: min(1120px, calc(100% - 48px));
   --nav-float-shadow:
     0 18px 48px -18px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(217, 119, 87, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);

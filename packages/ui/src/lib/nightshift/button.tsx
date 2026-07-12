@@ -56,11 +56,13 @@ const VARIANT_CLASSES: Record<CtaButtonVariant, string> = {
     'hover:bg-[var(--btn-neon-hover-bg)] hover:text-[var(--btn-neon-hover-text)] ' +
     'hover:border-[var(--btn-neon-hover-bg)] hover:shadow-[var(--glow-neon-hover),var(--shadow-pop)] ' +
     'active:bg-[var(--btn-neon-press-bg)] active:text-[var(--btn-neon-hover-text)] active:shadow-none',
+  // The cool (indigo) secondary: bordered, transparent fill, warming to the
+  // indigo link colour with a soft `--glow-cool` halo on hover. Shared by
+  // every secondary CTA (★ Star buttons, GitHub chip, reset controls).
   secondary:
-    'bg-transparent text-[var(--text-body)] border-[var(--border-strong)] shadow-none ' +
-    'hover:bg-[var(--surface-raised)] hover:text-[var(--text-strong)] hover:border-[var(--border-strong)] ' +
-    'hover:shadow-[var(--elev-1)] ' +
-    'active:bg-[var(--surface-overlay)] active:shadow-none',
+    'bg-transparent text-[var(--moon-100)] border-[var(--border-default)] shadow-none ' +
+    'hover:text-[var(--text-strong)] hover:border-[var(--link)] hover:shadow-[var(--glow-cool)] ' +
+    'active:shadow-none',
 };
 
 function isExternalHref(href: string): boolean {

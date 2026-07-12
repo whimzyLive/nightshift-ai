@@ -179,8 +179,8 @@ export function NightSky({
             id,
             x: e.clientX,
             y: e.clientY,
-            angle: 140 + ((id * 23) % 24), // 140–163° → down-left
-            travel: 300 + ((id * 53) % 160), // 300–460px
+            angle: 28 + ((id * 5) % 10), // 28–37° → smooth down-right diagonal
+            travel: 360 + ((id * 47) % 120), // 360–480px
           },
         ];
       });
@@ -268,26 +268,27 @@ export function NightSky({
             return (
               <motion.span
                 key={m.id}
-                className="absolute h-[2px] w-[160px]"
+                className="absolute h-[2px] w-[230px] rounded-[2px]"
                 style={{
                   left: m.x,
                   top: m.y,
                   transformOrigin: '0 50%',
                   rotate: m.angle,
                   background:
-                    'linear-gradient(90deg, transparent, var(--star-white) 78%, var(--star-bright))',
-                  filter: 'drop-shadow(0 0 4px var(--star-bright))',
+                    'linear-gradient(90deg, transparent, rgba(217,119,87,0.55) 58%, #ffffff)',
+                  filter:
+                    'drop-shadow(0 0 9px rgba(245,243,239,0.9)) drop-shadow(0 0 4px rgba(217,119,87,0.8))',
                 }}
                 initial={{ opacity: 0, x: 0, y: 0 }}
                 animate={{
-                  opacity: [0, 1, 0],
+                  opacity: [0, 1, 1, 0],
                   x: Math.cos(rad) * m.travel,
                   y: Math.sin(rad) * m.travel,
                 }}
                 transition={{
-                  duration: 0.76,
-                  ease: 'easeIn',
-                  times: [0, 0.14, 1],
+                  duration: 1.15,
+                  ease: 'linear',
+                  times: [0, 0.15, 0.7, 1],
                 }}
                 onAnimationComplete={() =>
                   setMeteors((cur) => cur.filter((x) => x.id !== m.id))
