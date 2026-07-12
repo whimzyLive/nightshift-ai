@@ -1,3 +1,61 @@
+## 2026-07-12 — Story NA-36 — /why-sdlc editorial page (gate rail + sticky crossfade pane)
+
+**Learnings:**
+
+- Jest was upgraded to v30 sometime after the NA-30/NA-31 entries below were
+  written: `--testPathPattern=<x>` (used throughout earlier memory examples)
+  now hard-fails with "was replaced by --testPathPatterns" — this repo's
+  `nx test <project> -- --testPathPatterns=<x>` is the current working
+  invocation. Update future single-file TDD loops to the plural flag.
+- The plan's own literal test example for the gate-rail glyph states
+  (`{ reached: 2, active: 1 }` → node 0 passed, node 1 pulsing current,
+  nodes ≥2 idle) is **not** reproducible from the raw design mock's own
+  `renderVals()` (why-sdlc.dc.html L365-377), which derives every glyph
+  from `state.reached` alone (`passed = i < r; current = !passed && i
+=== r`) and never reads `active` for gate styling at all — under that
+  formula `reached: 2` would mark nodes 0 **and** 1 both passed, not
+  current. The plan deliberately layers `active` in on top: `isCurrent =
+i === active; isPassed = !isCurrent && i < reached`. This is a second
+  documented case (after the NA-34 triage-card width entry) of a plan
+  resolving/simplifying an ambiguity in the raw design script — implement
+  the plan's literal resolution, not the mock's original state machine,
+  and don't try to reconcile the two.
+- Reused three established patterns verbatim rather than re-deriving them:
+  the `getHomeFaqs`/`faq.ts` try/catch-log-return-empty-sentinel shape for
+  both new `why-sdlc.ts` readers (only the collection/global/field names
+  differ); the `(frontend)/page.tsx` single-top-level-async-boundary +
+  `Promise.all` pattern for `WhySdlcPage`; and `control-section.tsx`'s
+  "co-locate static illustration/script data as typed consts inside the
+  one component that renders them" pattern for `argument-rail.tsx`'s five
+  mono illustrations (spec Open Question 2's suggested default).
+- `getWhySdlcContent()`'s return type comes entirely from `payload.findGlobal({
+slug: 'whySdlc', depth: 0 })`'s own generic inference (same as `find()`'s
+  `GeneratedTypes` augmentation, NA-35 memory) — no manual `<WhySdlc>` type
+  parameter needed on the call.
+- `pnpm nx build marketing` (Turbopack, Next 16, no live DB) succeeds with
+  `/why-sdlc` correctly listed as `ƒ` (dynamic) in the route summary once
+  `export const dynamic = 'force-dynamic'` is set (same NA-16 convention as
+  the home page) — confirms the build-time static-prerender trap doesn't
+  apply here either, no live Postgres needed for this story's verification.
+- `pnpm nx format:write --uncommitted` after a full build+lint+test pass
+  only touched `apps/marketing/next-env.d.ts` (the `./.next/dev/types/...`
+  vs `./.next/types/...` import-path churn documented in the NA-16
+  Copilot-review-fix entry below) — discarded via `git checkout --` rather
+  than committed, per that entry's guidance, leaving a fully clean tree
+  across all 6 task commits.
+
+**Patterns:**
+
+- A scroll-progress `{ reached, active }` pair split across two independently-
+  meaningful roles: `reached` is monotonic (`Math.max(prev.reached, next)`,
+  never decreases, drives the CTA kicker's one-way "all gates passed" flip)
+  while `active` is non-monotonic (tracks whichever section the user is
+  currently viewing, drives the sticky pane's crossfade/caption and which
+  single gate node pulses). Keeping both fields on one context object (one
+  `ScrollProgressProvider` wrapping the rail, the server-rendered FAQ as
+  `children`, and the CTA kicker) is what lets a gate-rail node and the CTA
+  copy agree without prop-drilling across three sibling files.
+
 ## 2026-07-12 — Story NA-34 — home you-decide-how-its-built control section (single state-machine island)
 
 **Learnings:**
