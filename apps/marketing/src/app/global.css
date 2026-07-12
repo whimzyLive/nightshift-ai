@@ -1,15 +1,431 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@import 'tailwindcss';
+@source '../../../../packages/ui/src';
+
+/*
+ * nightshift design tokens — ported verbatim from
+ * docs/design/marketing-site-handoff/tokens/{colors,typography,spacing}.css
+ * (the design handoff is the source of truth; do not re-derive or round
+ * values here). Only `--font-sans`/`--font-mono` and `--radius-*` are
+ * deliberately meant to also drive Tailwind-generated utilities
+ * (font-sans/font-mono, rounded-*); the rest are consumed as plain CSS
+ * custom properties (`var(--token)`) inside components, not via
+ * auto-generated Tailwind utility classes of the same name.
+ */
+@theme {
+  /* ================= COLORS (colors.css) ================= */
+  /* ---- Base values: night-sky background layers (deepest → raised) ---- */
+  --night-900: #08080f;
+  --night-800: #0d0d18;
+  --night-700: #12121f;
+  --night-600: #1a1a2e;
+  --night-500: #22223a;
+  --night-400: #2c2c47;
+
+  /* ---- Hairlines & dividers ---- */
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- Moonlight text ---- */
+  --moon-100: #f5f3ef;
+  --moon-200: #d8d6e0;
+  --moon-300: #a9a7bd;
+  --moon-400: #74738c;
+  --moon-500: #4d4c63;
+
+  /* ---- Terracotta accent ---- */
+  --terra-300: #f0a488;
+  --terra-400: #e58b6f;
+  --terra-500: #d97757;
+  --terra-600: #c2624a;
+  --terra-700: #9d4d3a;
+  --terra-glow: rgba(217, 119, 87, 0.28);
+  --terra-tint: rgba(217, 119, 87, 0.12);
+
+  /* ---- Cool secondary: moonlit indigo ---- */
+  --indigo-300: #a5b4fc;
+  --indigo-400: #8b9cf7;
+  --indigo-500: #7c93f0;
+  --indigo-tint: rgba(124, 147, 240, 0.14);
+
+  /* ---- Cyan ---- */
+  --cyan-400: #62c4d3;
+  --cyan-500: #4fb3c4;
+
+  /* ---- Semantic (terminal-true) ---- */
+  --green-400: #6ec48a;
+  --green-tint: rgba(110, 196, 138, 0.14);
+  --amber-400: #e0a458;
+  --amber-tint: rgba(224, 164, 88, 0.14);
+  --red-400: #e0656f;
+  --red-tint: rgba(224, 101, 111, 0.14);
+
+  /* ============ SEMANTIC ALIASES ============ */
+  --bg-page: var(--night-800);
+  --bg-void: var(--night-900);
+  --bg-sunken: var(--night-700);
+
+  --surface-card: var(--night-600);
+  --surface-raised: var(--night-500);
+  --surface-overlay: var(--night-400);
+  --surface-terminal: #0b0b14;
+
+  --border-soft: var(--line-soft);
+  --border-default: var(--line);
+  --border-strong: var(--line-strong);
+  --border-accent: rgba(217, 119, 87, 0.45);
+
+  --text-strong: var(--moon-100);
+  --text-body: var(--moon-200);
+  --text-muted: var(--moon-300);
+  --text-dim: var(--moon-400);
+  --text-disabled: var(--moon-500);
+  /* SITE OVERRIDE: filled-terracotta CTAs use moonlight text. */
+  --text-on-accent: #f5f3ef;
+
+  --accent: var(--terra-500);
+  --accent-hover: var(--terra-400);
+  --accent-press: var(--terra-600);
+  --accent-tint: var(--terra-tint);
+  --accent-glow: var(--terra-glow);
+
+  --link: var(--indigo-400);
+  --link-hover: var(--indigo-300);
+  --focus-ring: var(--indigo-500);
+
+  --success: var(--green-400);
+  --warning: var(--amber-400);
+  --danger: var(--red-400);
+  --info: var(--cyan-400);
+
+  --code-comment: var(--moon-400);
+  --code-keyword: var(--indigo-400);
+  --code-string: var(--green-400);
+  --code-fn: var(--terra-400);
+  --code-num: var(--cyan-400);
+  --code-punct: var(--moon-300);
+  --code-prompt: var(--terra-500);
+
+  /* ============ SITE ADDITIONS ============ */
+  --star-white: rgba(245, 243, 239, 0.85);
+  --star-bright: rgba(255, 255, 255, 1);
+  --star-indigo: rgba(139, 156, 247, 0.95);
+  --star-cyan: rgba(98, 196, 211, 0.95);
+  --halo-terra: rgba(217, 119, 87, 0.2);
+  --halo-indigo: rgba(139, 156, 247, 0.18);
+  --halo-cyan: rgba(98, 196, 211, 0.12);
+  --meteor: var(--terra-400);
+  --sky-opacity-home: 1;
+  --sky-opacity-subpage: 0.75;
+
+  --btn-neon-bg: rgba(217, 119, 87, 0.08);
+  --btn-neon-text: var(--terra-400);
+  --btn-neon-border: var(--terra-500);
+  --btn-neon-hover-bg: var(--terra-500);
+  --btn-neon-hover-text: #f5f3ef;
+  --btn-neon-press-bg: var(--terra-600);
+
+  --cursor-glow: rgba(217, 119, 87, 0.35);
+  --cursor-glow-active: rgba(217, 119, 87, 0.42);
+
+  --tier-opus: var(--terra-400);
+  --tier-sonnet: var(--indigo-400);
+  --tier-human: var(--green-400);
+
+  /* ================= TYPOGRAPHY (typography.css) ================= */
+  /* `--font-inter`/`--font-jetbrains-mono` are set by next/font (see
+   * apps/marketing/src/lib/fonts.ts) on the html element; these compose
+   * them with the token files' system fallback stacks. */
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), 'SFMono-Regular', ui-monospace, 'Cascadia Code',
+    Menlo, Consolas, monospace;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extra: 800;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 25px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 72px;
+  --text-6xl: 92px;
+
+  --leading-tight: 1.06;
+  --leading-snug: 1.22;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --leading-reading: 1.75;
+
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-eyebrow: 0.16em;
+
+  --display-font: var(--font-sans);
+  --display-weight: var(--fw-extra);
+  --display-tracking: var(--tracking-tight);
+
+  --heading-font: var(--font-sans);
+  --heading-weight: var(--fw-bold);
+
+  --body-font: var(--font-sans);
+  --body-weight: var(--fw-regular);
+
+  --eyebrow-font: var(--font-mono);
+  --eyebrow-weight: var(--fw-medium);
+  --eyebrow-tracking: var(--tracking-eyebrow);
+
+  --code-font: var(--font-mono);
+
+  --eyebrow-size: 13px;
+  --display-clamp-hero: clamp(46px, 5.6vw, 68px);
+  --display-clamp-page: clamp(34px, 4.6vw, 54px);
+
+  /* ================= SPACING / RADIUS / ELEVATION / MOTION (spacing.css) ================= */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* SITE OVERRIDE — sharp edges: every rectangle renders radius 0.
+   * Only --radius-round (circles) stays round. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-pill: 0;
+  --radius-round: 50%;
+
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --elev-4: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  --glow-accent:
+    0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
+  --glow-cool:
+    0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
+  --glow-focus: 0 0 0 3px rgba(124, 147, 240, 0.45);
+
+  --glow-neon:
+    0 0 16px rgba(217, 119, 87, 0.42), 0 0 38px rgba(217, 119, 87, 0.18);
+  --glow-neon-hover: 0 0 22px rgba(217, 119, 87, 0.55);
+  --shadow-pop:
+    4px 4px 0 0 rgba(217, 119, 87, 0.5), 8px 8px 0 0 rgba(217, 119, 87, 0.28),
+    12px 12px 0 0 rgba(217, 119, 87, 0.14);
+  --glow-heading:
+    0 0 28px rgba(245, 243, 239, 0.15), 0 0 64px rgba(124, 147, 240, 0.13);
+  --shadow-text: 0 1px 2px rgba(8, 8, 15, 0.5);
+  --glow-card-hover:
+    0 0 22px rgba(217, 119, 87, 0.14), 0 24px 50px -28px rgba(0, 0, 0, 0.8);
+  --lift-card: translateY(-3px);
+
+  --glass-blur: blur(20px) saturate(1.35);
+  --glass-blur-strong: blur(26px) saturate(1.5);
+  --glass-nav-bg: linear-gradient(
+    180deg,
+    rgba(13, 13, 24, 0.78),
+    rgba(13, 13, 24, 0.5)
+  );
+  --glass-nav-float-bg: linear-gradient(
+    180deg,
+    rgba(13, 13, 24, 0.6),
+    rgba(13, 13, 24, 0.42)
+  );
+  --glass-footer-bg: linear-gradient(
+    180deg,
+    rgba(8, 8, 15, 0.5),
+    rgba(8, 8, 15, 0.78)
+  );
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --nav-float-top: 14px;
+  --nav-float-max: min(940px, calc(100% - 48px));
+  --nav-float-shadow:
+    0 18px 48px -18px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(217, 119, 87, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  --cursor-size: 28px;
+  --cursor-size-active: 84px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+
+  --dur-rise: 400ms;
+  --dur-accordion: 400ms;
+  --dur-gate-pulse: 1.4s;
+  --dur-twinkle: 3.4s;
+  --dur-terminal-line: 520ms;
+  --dur-marquee: 34s;
+
+  --container-max: 1200px;
+  --container-prose: 720px;
+  --nav-height: 64px;
 }
 
-body {
-  margin: 0;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    sans-serif;
-  line-height: 1.5;
+/* Ambient sky motion — driven purely by CSS so `NightSky` needs no JS
+ * animation loop; the global `prefers-reduced-motion` guard above already
+ * freezes these to their start frame (animation-duration: 0.01ms). */
+@keyframes ns-twinkle {
+  0%,
+  100% {
+    filter: brightness(1);
+    opacity: 0.85;
+  }
+  50% {
+    filter: brightness(1.6);
+    opacity: 1;
+  }
+}
+@keyframes ns-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-40px, -40px, 0);
+  }
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-page);
+    color: var(--text-body);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    font-weight: var(--fw-regular);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 0;
+    color: var(--text-strong);
+    font-family: var(--heading-font);
+    font-weight: var(--fw-bold);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-snug);
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: var(--link);
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  a:hover {
+    color: var(--link-hover);
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+  }
+
+  ::selection {
+    background: var(--terra-tint);
+    color: var(--moon-100);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--glow-focus);
+    border-radius: var(--radius-xs);
+  }
+
+  /* Nocturnal scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--night-400) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--night-400);
+    border-radius: var(--radius-pill);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--night-500);
+    background-clip: content-box;
+  }
+
+  /* Mono eyebrow utility — the brand's signature label treatment. */
+  .ns-eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+}
+
+/* Single global reduced-motion guard — statically disables ambient/
+ * transition motion site-wide. Components that drive effects from JS
+ * (NavBar detach, CursorGlow, NightSky twinkle) additionally check
+ * `matchMedia('(prefers-reduced-motion: reduce)')` themselves so they can
+ * skip attaching listeners entirely, not just suppress the CSS transition. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

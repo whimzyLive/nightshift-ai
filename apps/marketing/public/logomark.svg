@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="nightshift moon mark">
+  <defs>
+    <radialGradient id="nsGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d97757" stop-opacity="0.45"></stop>
+      <stop offset="60%" stop-color="#d97757" stop-opacity="0.10"></stop>
+      <stop offset="100%" stop-color="#d97757" stop-opacity="0"></stop>
+    </radialGradient>
+    <mask id="nsCrescent">
+      <rect width="120" height="120" fill="black"></rect>
+      <circle cx="58" cy="60" r="34" fill="white"></circle>
+      <circle cx="74" cy="50" r="30" fill="black"></circle>
+    </mask>
+  </defs>
+  <circle cx="60" cy="60" r="56" fill="url(#nsGlow)"></circle>
+  <rect width="120" height="120" rx="34" fill="#d97757" mask="url(#nsCrescent)"></rect>
+  <circle cx="86" cy="34" r="2.6" fill="#f5f3ef"></circle>
+  <circle cx="96" cy="52" r="1.8" fill="#f5f3ef" opacity="0.8"></circle>
+  <circle cx="82" cy="22" r="1.4" fill="#7c93f0"></circle>
+</svg>

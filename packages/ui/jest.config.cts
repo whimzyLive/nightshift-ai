@@ -7,6 +7,6 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: 'test-output/jest/coverage',
-  // Empty shell — no tests yet.
+  testEnvironment: 'jsdom',
   passWithNoTests: true,
 };

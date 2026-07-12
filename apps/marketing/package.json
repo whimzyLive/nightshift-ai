@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@nightshift-ai/ui": "workspace:^",
     "@payloadcms/db-postgres": "3.85.2",
     "@payloadcms/next": "3.85.2",
     "@payloadcms/richtext-lexical": "3.85.2",
@@ -36,5 +37,10 @@
         "cache": false
       }
     }
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
+    "postcss": "^8.5.17",
+    "tailwindcss": "^4.3.2"
   }
 }
