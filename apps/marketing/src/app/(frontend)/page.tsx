@@ -1,3 +1,4 @@
+import { ControlSection } from '../../components/home/control-section';
 import { DayNightWorkflow } from '../../components/home/day-night-workflow';
 import { Hero } from '../../components/home/hero';
 import { HowItWorks } from '../../components/home/how-it-works';
@@ -18,6 +19,7 @@ export default function HomePage() {
       <DayNightWorkflow />
       <TeamPreview />
       <WhyDifferent />
+      <ControlSection />
     </>
   );
 }

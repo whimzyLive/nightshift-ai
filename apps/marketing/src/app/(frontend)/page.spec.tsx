@@ -39,7 +39,7 @@ describe('HomePage', () => {
     expect(container.textContent).toContain('the other 80%');
   });
 
-  it('composes how-it-works, day-night-workflow, team-preview, and why-different after ProblemSection, in order', () => {
+  it('composes how-it-works, day-night-workflow, team-preview, why-different, and control-section after ProblemSection, in order', () => {
     const { container } = render(<HomePage />);
     const html = container.innerHTML;
     const problemIdx = html.indexOf('the other 80%');
@@ -47,12 +47,14 @@ describe('HomePage', () => {
     const workflowIdx = html.indexOf('Review by day. Ship by night.');
     const teamIdx = html.indexOf('A team, not a megaprompt');
     const whyIdx = html.indexOf('Why builders choose it');
+    const controlIdx = html.indexOf('You decide how it gets built');
 
     expect(problemIdx).toBeGreaterThan(-1);
     expect(howIdx).toBeGreaterThan(problemIdx);
     expect(workflowIdx).toBeGreaterThan(howIdx);
     expect(teamIdx).toBeGreaterThan(workflowIdx);
     expect(whyIdx).toBeGreaterThan(teamIdx);
+    expect(controlIdx).toBeGreaterThan(whyIdx);
   });
 
   it('resolves the hero "while you sleep" #workflow deep-link to the day/night section (AC2)', () => {

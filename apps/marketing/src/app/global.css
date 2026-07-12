@@ -337,6 +337,44 @@
   }
 }
 
+/* Control section (home §8) — awaiting-gate pulse, content rise-in, and the
+ * one-shot terminal's diff-blob slam. Ported verbatim from the design
+ * handoff's inline <style> block (nightshift Landing.dc.html L62-64). */
+@keyframes ns-gatepulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.14);
+    filter: brightness(1.45);
+  }
+}
+@keyframes ns-risein {
+  0% {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ns-slam {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(1.05);
+  }
+  60% {
+    transform: translateY(2px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @layer base {
   *,
   *::before,

@@ -5,9 +5,16 @@ import type {
   ReactNode,
 } from 'react';
 
+export type CtaButtonSize = 'sm' | 'md';
+export type CtaButtonVariant = 'primary' | 'secondary';
+
 interface CtaButtonSharedProps {
   children: ReactNode;
   className?: string;
+  /** @default 'md' */
+  size?: CtaButtonSize;
+  /** @default 'primary' */
+  variant?: CtaButtonVariant;
 }
 
 type CtaButtonLinkProps = CtaButtonSharedProps &
@@ -22,21 +29,37 @@ type CtaButtonButtonProps = CtaButtonSharedProps &
 
 export type CtaButtonProps = CtaButtonLinkProps | CtaButtonButtonProps;
 
-// The neon-inverted CTA treatment — rest/hover/press states are pure CSS
-// (:hover/:active) so this stays server-renderable, no client JS needed.
-// Values are the `--btn-neon-*`/`--glow-neon*`/`--shadow-pop` tokens; see
-// docs/design/marketing-site-handoff/tokens/{colors,spacing}.css.
-const NEON_CLASSES =
-  'inline-flex items-center justify-center gap-2 rounded-none border px-6 py-2.5 ' +
-  'font-sans text-sm font-semibold no-underline whitespace-nowrap cursor-pointer ' +
-  'bg-[var(--btn-neon-bg)] text-[var(--btn-neon-text)] border-[var(--btn-neon-border)] ' +
-  'shadow-[var(--glow-neon)] ' +
+// Layout/transition/focus — shared by every size + variant combination.
+const BASE_CLASSES =
+  'inline-flex items-center justify-center gap-2 rounded-none border ' +
+  'font-sans font-semibold no-underline whitespace-nowrap cursor-pointer ' +
   'transition-[background-color,color,border-color,box-shadow] duration-200 ease-out ' +
-  'hover:bg-[var(--btn-neon-hover-bg)] hover:text-[var(--btn-neon-hover-text)] ' +
-  'hover:border-[var(--btn-neon-hover-bg)] hover:shadow-[var(--glow-neon-hover),var(--shadow-pop)] ' +
-  'active:bg-[var(--btn-neon-press-bg)] active:text-[var(--btn-neon-hover-text)] active:shadow-none ' +
   'focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] ' +
   'motion-reduce:transition-none';
+
+const SIZE_CLASSES: Record<CtaButtonSize, string> = {
+  md: 'px-6 py-2.5 text-sm',
+  // ~34px height (design's in-terminal `approve ✓` / `run it again ↺` controls).
+  sm: 'h-[34px] px-4 text-xs',
+};
+
+// The neon-inverted CTA treatment (primary, unchanged) and the design's
+// outline/muted secondary — rest/hover/press states are pure CSS (:hover/
+// :active) so both stay server-renderable, no client JS needed. Values are
+// token-backed only; see docs/design/marketing-site-handoff/tokens/colors.css.
+const VARIANT_CLASSES: Record<CtaButtonVariant, string> = {
+  primary:
+    'bg-[var(--btn-neon-bg)] text-[var(--btn-neon-text)] border-[var(--btn-neon-border)] ' +
+    'shadow-[var(--glow-neon)] ' +
+    'hover:bg-[var(--btn-neon-hover-bg)] hover:text-[var(--btn-neon-hover-text)] ' +
+    'hover:border-[var(--btn-neon-hover-bg)] hover:shadow-[var(--glow-neon-hover),var(--shadow-pop)] ' +
+    'active:bg-[var(--btn-neon-press-bg)] active:text-[var(--btn-neon-hover-text)] active:shadow-none',
+  secondary:
+    'bg-transparent text-[var(--text-body)] border-[var(--border-strong)] shadow-none ' +
+    'hover:bg-[var(--surface-raised)] hover:text-[var(--text-strong)] hover:border-[var(--border-strong)] ' +
+    'hover:shadow-[var(--elev-1)] ' +
+    'active:bg-[var(--surface-overlay)] active:shadow-none',
+};
 
 function isExternalHref(href: string): boolean {
   return (
@@ -52,8 +75,14 @@ function isExternalHref(href: string): boolean {
  * omit it to render a `<button>`.
  */
 export function CtaButton(props: CtaButtonProps) {
-  const { children, className = '', ...rest } = props;
-  const classes = `${NEON_CLASSES} ${className}`;
+  const {
+    children,
+    className = '',
+    size = 'md',
+    variant = 'primary',
+    ...rest
+  } = props;
+  const classes = `${BASE_CLASSES} ${SIZE_CLASSES[size]} ${VARIANT_CLASSES[variant]} ${className}`;
 
   if (props.href) {
     const { href, ...anchorRest } = rest as Omit<
