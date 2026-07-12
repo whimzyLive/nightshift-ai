@@ -103,21 +103,6 @@ export function Hero() {
             team — product manager, architect, tech lead, engineers, and QA. It
             reads a Jira ticket and ships the spec, plan, code, and review.
           </p>
-          {/* Plain mono lifecycle line. */}
-          <p
-            className="font-mono whitespace-nowrap"
-            style={{
-              margin: '0 0 clamp(1rem, 3vh, 2.75rem)',
-              fontSize: 'clamp(0.6875rem, 1.5vh, 0.8125rem)',
-              color: 'var(--text-dim)',
-            }}
-          >
-            Ticket <span style={{ color: 'var(--indigo-400)' }}>→</span> Specs{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> Plan{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> Implementation{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> Review{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> PR
-          </p>
           <div
             className="flex flex-col"
             style={{
