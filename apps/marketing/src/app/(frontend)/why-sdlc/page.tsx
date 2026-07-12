@@ -3,7 +3,19 @@ import { Hero } from '../../../components/why-sdlc/hero';
 import { PageCta } from '../../../components/why-sdlc/page-cta';
 import { PageFaq } from '../../../components/why-sdlc/page-faq';
 import { ScrollProgressProvider } from '../../../components/why-sdlc/scroll-progress';
+import { JsonLd } from '../../../lib/seo/json-ld';
+import {
+  buildFaqPageNode,
+  whySdlcBreadcrumbNode,
+  whySdlcWebPageNode,
+} from '../../../lib/seo/jsonld';
+import { whySdlcMetadata } from '../../../lib/seo/metadata';
 import { getWhySdlcContent, getWhySdlcFaqs } from '../../../lib/why-sdlc';
+
+import type { FaqSchemaInput } from '../../../lib/seo/jsonld';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = whySdlcMetadata;
 
 // Payload's Local API calls below would otherwise make this route attempt
 // static prerendering at `next build` time, which requires a migrated
@@ -21,8 +33,29 @@ export default async function WhySdlcPage() {
     getWhySdlcFaqs(),
   ]);
 
+  // Same already-resolved `answer` PageFaq renders below — text-identity
+  // guarantee (AC4).
+  const faqInputs: FaqSchemaInput[] = faqs.map((faq) => ({
+    question: faq.question,
+    answer: faq.answer,
+  }));
+  const faqNode = buildFaqPageNode(
+    'https://github.com/whimzyLive/nightshift-ai/why-sdlc#faq',
+    faqInputs,
+  );
+
   return (
     <>
+      <JsonLd
+        graph={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            whySdlcWebPageNode,
+            whySdlcBreadcrumbNode,
+            ...(faqNode ? [faqNode] : []),
+          ],
+        }}
+      />
       <Hero intro={content?.intro ?? null} />
       <ScrollProgressProvider>
         <ArgumentRail args={content?.arguments ?? []} />

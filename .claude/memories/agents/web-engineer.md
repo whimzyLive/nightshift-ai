@@ -1,3 +1,79 @@
+## 2026-07-12 — Story NA-39 — wire SEO meta, JSON-LD, and llms.txt (non-visual)
+
+**Learnings:**
+
+- `@payloadcms/richtext-lexical/plaintext` (the `convertLexicalToPlaintext`
+  export the spec explicitly names) ships plain ESM with no CJS build —
+  same failure mode as the already-documented `/react` subpath
+  (`SyntaxError: Unexpected token 'export'` under Jest). Same fix as the
+  established convention: `jest.mock('@payloadcms/richtext-lexical/plaintext',
+() => ({ convertLexicalToPlaintext: fakeThatFlattensLeafText }))`. Because
+  `faq-plaintext.ts` (which imports it) is itself imported transitively by
+  every route that renders `<JsonLd>` (via `lib/seo/jsonld.ts`'s
+  `buildFaqPageNode`), this mock had to be added not just to `jsonld.spec.ts`
+  but to **all three** existing page specs (`page.spec.tsx`,
+  `why-sdlc/page.spec.tsx`, `faq/page.spec.tsx`) alongside their existing
+  `/react` mock the moment those pages started importing `buildFaqPageNode`
+  — a page spec that passed before a JSON-LD-wiring task can start failing
+  for a reason invisible in that spec's own diff, purely from a new
+  transitive import chain. Check every consumer of a newly-wired module for
+  this class of "ESM import three hops away" breakage, not just the new
+  module's own spec.
+- `SerializedEditorState` (from `@payloadcms/richtext-lexical/lexical`, a
+  proxy re-export of the real `lexical` package's type) and the generated
+  `Faq['answer']`/`Faq['homeAnswer']`/`Faq['whySdlcAnswer']` shapes in
+  `payload-types.ts` are **structurally assignable with zero cast** —
+  confirmed by reading `lexical`'s own `SerializedElementNode`/
+  `SerializedLexicalNode` declaration files side-by-side with the generated
+  type before assuming a cast would be needed (the generated type's
+  `children: { type: any, version: number, [k: string]: unknown }[]` is a
+  strict structural subset of `SerializedLexicalNode[]`, and the field names/
+  literal unions for `direction`/`format`/`indent`/`version` match exactly).
+  `pnpm nx build` (full `tsc` pass) confirmed this holds in practice — no
+  `as unknown as SerializedEditorState` anywhere in the three route files or
+  `FaqSchemaInput` mapping.
+- `docs/gtm/site-brief.md` §3 only defines FAQPage `@id`s for the home page
+  (`.../nightshift-ai#faq`) and `/why-sdlc` (`.../why-sdlc#faq`) — the
+  standalone `/faq` page (built later, in NA-38, after the brief was
+  written) has no brief-specified JSON-LD `@id` at all. Resolved by
+  extrapolating the same established `<absolute-page-url>#faq` pattern
+  `/why-sdlc` already uses (`https://github.com/whimzyLive/nightshift-ai/faq#faq`)
+  rather than inventing new copy — this is a structural identifier, not
+  SEO copy, so it doesn't violate the "zero new SEO copy" constraint. Flag
+  any future brief gap like this the same way: extend an established
+  identifier _pattern_, never author new prose.
+- This is nightshift's first genuinely non-visual story — the spec itself
+  states the `nightshift-design` brand/adherence gate does not apply (no
+  rendered UI, no components, only `<head>` metadata + inert
+  `<script type="application/ld+json">` + two `public/*.txt` files).
+  Treated the override's skill list as scoped accordingly: invoked only
+  `vercel-react-best-practices` (still relevant — writing/refactoring
+  React/Next.js route files) and skipped `nightshift-design`,
+  `tailwind-design-system`, `payload` (no collections/hooks/`payload.config.ts`
+  touched, only a read-only Local API consumer already established in prior
+  stories), `vercel-composition-patterns`, `atomic-design`,
+  `motion-dev-animations`, `gsap-core` — none had applicable surface in this
+  story's actual diff. Confirms the "applicable" qualifier in the override
+  invocation instruction is meant literally, not "invoke all 8 regardless."
+- `next build`'s route table shows `/` and `/why-sdlc` as `ƒ` (Dynamic, from
+  the pre-existing `force-dynamic` exports) unaffected by adding `metadata`
+  as a static `const` export alongside the async default export and
+  `dynamic = 'force-dynamic'` — all three coexist with no `generateMetadata`
+  needed, confirming the spec's own stated default (static meta, no
+  request/CMS dependency) holds at the actual build level, not just in
+  theory.
+- No live Postgres/`curl` was available in this sandbox (`curl` itself is
+  blocked by a context-mode hook redirecting to `ctx_execute`/
+  `ctx_fetch_and_index`) — the plan's Task 10 "confirm `/llms.txt` and
+  `/robots.txt` serve as `text/plain` from `dev`/`start`" manual check
+  could only be partially discharged: `next build`'s successful static-page
+  generation pass confirms `public/*.txt` is picked up and copied into the
+  build output (Next's default static-file serving is a well-established,
+  untunable platform behavior for anything under `public/`), but no live
+  HTTP response/`content-type` header was actually observed this session.
+  Flag this gap explicitly in the handoff rather than asserting the
+  live-serving behavior as verified.
+
 ## 2026-07-12 — Story NA-38 — /faq full page (5 topic-grouped solid-card accordions, single-open-across-page)
 
 **Learnings:**
