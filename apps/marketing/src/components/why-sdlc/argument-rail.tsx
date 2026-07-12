@@ -3,11 +3,28 @@
 import { RichText } from '@payloadcms/richtext-lexical/react';
 import type { ReactNode } from 'react';
 
+import { AnimatePresence, motion } from 'motion/react';
+
 import { Eyebrow } from '@nightshift-ai/ui';
 
 import { useScrollProgress } from './scroll-progress';
 
 import type { WhySdlcArgument } from '../../lib/why-sdlc';
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+}
+
+// Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)).
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+// Matches the retired `ns-gatepulse` keyframes (1.6s, scale + brightness).
+const GATE_PULSE_ANIMATE = {
+  scale: [1, 1.14, 1],
+  filter: ['brightness(1)', 'brightness(1.45)', 'brightness(1)'],
+};
 
 // Verbatim captions from the design handoff (why-sdlc.dc.html L381-387,
 // `renderVals`'s `CAPTIONS`) — decorative UI copy, not editable CMS content
@@ -159,11 +176,20 @@ function GateNode({ index, reached, active }: GateNodeProps) {
       : state === 'passed'
         ? '0 0 8px rgba(217,119,87,.3)'
         : 'none';
+  const pulse = state === 'current' && !prefersReducedMotion();
 
   return (
-    <span
+    <motion.span
       data-gate-state={state}
-      className="font-mono flex items-center justify-center motion-reduce:animate-none"
+      className="font-mono flex items-center justify-center"
+      animate={
+        pulse ? GATE_PULSE_ANIMATE : { scale: 1, filter: 'brightness(1)' }
+      }
+      transition={
+        pulse
+          ? { duration: 1.6, ease: 'easeInOut', repeat: Infinity }
+          : { duration: 0.2 }
+      }
       style={{
         position: 'relative',
         zIndex: 1,
@@ -174,16 +200,12 @@ function GateNode({ index, reached, active }: GateNodeProps) {
         background,
         fontSize: 15,
         boxShadow: glow,
-        animation:
-          state === 'current'
-            ? 'ns-gatepulse 1.6s ease-in-out infinite'
-            : 'none',
         transition:
           'border-color .4s, color .4s, box-shadow .4s, background .4s',
       }}
     >
       {state === 'passed' ? '✓' : '⊘'}
-    </span>
+    </motion.span>
   );
 }
 
@@ -270,11 +292,21 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
             boxShadow: '0 0 26px rgba(217,119,87,.1)',
           }}
         >
-          <div
-            className="motion-safe:transition-opacity"
-            style={{ padding: '26px 28px' }}
-          >
-            {activeIllustration}
+          <div style={{ padding: '26px 28px' }}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={active}
+                initial={prefersReducedMotion() ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={prefersReducedMotion() ? undefined : { opacity: 0 }}
+                transition={{
+                  duration: prefersReducedMotion() ? 0 : 0.3,
+                  ease: EASE_OUT,
+                }}
+              >
+                {activeIllustration}
+              </motion.div>
+            </AnimatePresence>
           </div>
           <div
             className="absolute right-0 bottom-0 left-0"

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { ScrollProgressProvider, useScrollProgress } from './scroll-progress';
 
@@ -39,29 +39,23 @@ describe('ScrollProgressProvider / useScrollProgress', () => {
     expect(screen.getByText('reached:0 active:0')).toBeTruthy();
   });
 
-  it('initialises reached to 5 and skips listeners under prefers-reduced-motion', () => {
+  it('initialises reached to 5 under prefers-reduced-motion and never derives from scroll again', () => {
     mockMatchMedia(true);
-    const addSpy = jest.spyOn(window, 'addEventListener');
     render(
       <ScrollProgressProvider>
         <Probe />
       </ScrollProgressProvider>,
     );
     expect(screen.getByText('reached:5 active:0')).toBeTruthy();
-    expect(addSpy).not.toHaveBeenCalledWith(
-      'scroll',
-      expect.any(Function),
-      expect.anything(),
-    );
-    expect(addSpy).not.toHaveBeenCalledWith(
-      'resize',
-      expect.any(Function),
-      expect.anything(),
-    );
-    addSpy.mockRestore();
+    // A resize (which would otherwise re-derive from `[data-why-sec]`
+    // positions) must stay a no-op once reduced-motion has been latched.
+    fireEvent(window, new Event('resize'));
+    expect(screen.getByText('reached:5 active:0')).toBeTruthy();
   });
 
-  it('removes scroll/resize listeners on unmount', () => {
+  it('removes its resize listener on unmount', () => {
+    // Motion's `useScroll` owns the `scroll` listener internally — this
+    // provider only manages its own `resize` listener directly.
     const removeSpy = jest.spyOn(window, 'removeEventListener');
     const { unmount } = render(
       <ScrollProgressProvider>
@@ -69,7 +63,6 @@ describe('ScrollProgressProvider / useScrollProgress', () => {
       </ScrollProgressProvider>,
     );
     unmount();
-    expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
     expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
     removeSpy.mockRestore();
   });

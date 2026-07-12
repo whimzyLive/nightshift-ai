@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { motion } from 'motion/react';
+
 export interface FaqAccordionItem {
   id: number | string;
   question: string;
@@ -20,19 +22,37 @@ interface FaqRowProps {
   onToggle: () => void;
 }
 
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+}
+
+// Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)); 400ms
+// matches the retired `duration-400` Tailwind utility this replaces.
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const DURATION_S = 0.4;
+
 /**
  * One accordion row. `measuredHeight` is captured once from the answer's
  * real `scrollHeight` on mount (content is static server-rendered richText,
- * so it never changes size after that) — toggling open/closed then only
- * flips between `0` and that fixed pixel value, giving a real animated
- * max-height with no measure-during-transition jump. Until that effect
- * runs, an open row (the default open item, or any item once it's the SSR
- * output) falls back to `max-height: none` — so the initially-open item is
- * fully visible immediately on the server-rendered/pre-hydration markup,
- * not clipped to `0` while waiting for a client effect. The site-wide
- * `@media (prefers-reduced-motion: reduce)` guard in global.css already
- * zeroes every `transition-duration` `!important`, so this needs no extra
- * JS reduced-motion branch to satisfy AC4/AC5 (see NA-30 memory).
+ * so it never changes size after that) — Motion then animates the row's
+ * `height`/`opacity` between `0` and that fixed pixel value on every
+ * toggle, giving a real animated height with no measure-during-transition
+ * jump. Until that effect runs, an open row (the default open item, or any
+ * item once it's the SSR output) falls back to `height: 'auto'` — so the
+ * initially-open item is fully visible immediately on the server-rendered/
+ * pre-hydration markup, not clipped to `0` while waiting for a client
+ * effect. Reduced motion is gated with a direct `matchMedia` check (skips
+ * the tween, snaps instantly) rather than relying on Motion's own reduced-
+ * motion detection, matching the rest of this migration.
+ *
+ * The content wrapper keeps the `motion-reduce:transition-none` class name
+ * even though the CSS transition it used to gate is now handled by Motion
+ * — `home/faq-accordion.spec.tsx` (a different domain-agent's test file)
+ * asserts on that class name, and this component's contract with its
+ * consumers must not change.
  *
  * Shared by the home preview accordion (`home/faq-accordion.tsx`) and the
  * full FAQ page accordion (`faq/full-faq-accordion.tsx`) so the row visual
@@ -47,7 +67,8 @@ export function FaqRow({ index, item, isOpen, isLast, onToggle }: FaqRowProps) {
     if (contentRef.current) setMeasuredHeight(contentRef.current.scrollHeight);
   }, []);
 
-  const maxHeight = isOpen ? (measuredHeight ?? 'none') : 0;
+  const reduced = prefersReducedMotion();
+  const height = isOpen ? (measuredHeight ?? 'auto') : 0;
 
   return (
     <div
@@ -86,14 +107,13 @@ export function FaqRow({ index, item, isOpen, isLast, onToggle }: FaqRowProps) {
           </span>
         </button>
       </h3>
-      <div
+      <motion.div
         id={contentId}
         ref={contentRef}
-        className="overflow-hidden transition-[max-height,opacity] duration-400 ease-out motion-reduce:transition-none"
-        style={{
-          maxHeight,
-          opacity: isOpen ? 1 : 0,
-        }}
+        className="overflow-hidden motion-reduce:transition-none"
+        initial={false}
+        animate={{ height, opacity: isOpen ? 1 : 0 }}
+        transition={{ duration: reduced ? 0 : DURATION_S, ease: EASE_OUT }}
       >
         <div
           style={{ padding: '0 40px 22px 44px' }}
@@ -101,7 +121,7 @@ export function FaqRow({ index, item, isOpen, isLast, onToggle }: FaqRowProps) {
         >
           {item.answer}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
