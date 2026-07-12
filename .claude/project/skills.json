@@ -8,12 +8,6 @@
       "note": "managed by the skills CLI (npx skills add payloadcms/skills) — content at .agents/skills/payload/, pinned in skills-lock.json; .claude/skills/payload is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
     },
     {
-      "name": "hallmark",
-      "source": "custom",
-      "addedBy": "user",
-      "note": "managed by the skills CLI (npx skills add nutlope/hallmark) — content at .agents/skills/hallmark/, pinned in skills-lock.json; .claude/skills/hallmark is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
-    },
-    {
       "name": "tailwind-design-system",
       "source": "custom",
       "addedBy": "user",
