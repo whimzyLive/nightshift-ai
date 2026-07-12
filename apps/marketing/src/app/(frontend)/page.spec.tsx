@@ -38,4 +38,27 @@ describe('HomePage', () => {
     expect(container.textContent).toContain('specialized agents');
     expect(container.textContent).toContain('the other 80%');
   });
+
+  it('composes how-it-works, day-night-workflow, team-preview, and why-different after ProblemSection, in order', () => {
+    const { container } = render(<HomePage />);
+    const html = container.innerHTML;
+    const problemIdx = html.indexOf('the other 80%');
+    const howIdx = html.indexOf('One command runs the whole lifecycle');
+    const workflowIdx = html.indexOf('Review by day. Ship by night.');
+    const teamIdx = html.indexOf('A team, not a megaprompt');
+    const whyIdx = html.indexOf('Why builders choose it');
+
+    expect(problemIdx).toBeGreaterThan(-1);
+    expect(howIdx).toBeGreaterThan(problemIdx);
+    expect(workflowIdx).toBeGreaterThan(howIdx);
+    expect(teamIdx).toBeGreaterThan(workflowIdx);
+    expect(whyIdx).toBeGreaterThan(teamIdx);
+  });
+
+  it('resolves the hero "while you sleep" #workflow deep-link to the day/night section (AC2)', () => {
+    const { container } = render(<HomePage />);
+    const heroLink = screen.getByRole('link', { name: /while you sleep/i });
+    expect(heroLink.getAttribute('href')).toBe('#workflow');
+    expect(container.querySelectorAll('#workflow')).toHaveLength(1);
+  });
 });

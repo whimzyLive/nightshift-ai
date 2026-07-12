@@ -1,4 +1,81 @@
-# web-engineer memory
+## 2026-07-12 — Story NA-33 — home how-it-works + trust sections (4 static sections + TeamPreview client state)
+
+**Learnings:**
+
+- The design handoff's tree-derivation logic (`nightshift Landing.dc.html`
+  L1083-1182) references three overlapping-but-distinct agent data shapes:
+  `agents` (L1361-1373, `name/owns/tone/standby`), `CONST_DEFS` (L665-676,
+  `name/ini/x/y/owns/artifact` — used for a network-graph view out of this
+  story's scope), and `ORG_LEVELS[].seqs` (L716, per-agent sequence label
+  for the L5 fan-out only). A spec/plan that hands you one "exact type" for
+  the roster (here `TeamAgent` = name/owns/tone/standby only) is
+  deliberately narrower than the full design data — don't try to cram
+  `ini`/`artifact`/`seqs` into the exported type to "complete" it; keep
+  that derived/design-only data as a local `Record<string, ...>` lookup
+  inside the one client component that needs it (`team-preview.tsx`), and
+  extend the shared type with an _optional_ field only when the plan
+  explicitly calls out data that must live on the shared shape across
+  phases (here: `OrgPhase.seqs?: Record<string,string>` for the L5 case) —
+  optional-field addition doesn't violate "exact types" since the required
+  fields are still all present; TS excess-property checks only fire on
+  fields _not_ declared on the interface at all.
+- Tailwind v4 arbitrary-value animation classes
+  (`motion-safe:animate-[ns-twinkle_var(--dur-twinkle)_ease-in-out_infinite]`)
+  work fine referencing a `@keyframes` block already declared in
+  `global.css` for an unrelated component (`ns-twinkle` was defined for
+  `NightSky`'s starfield) — no new keyframes needed for a second consumer.
+  Confirmed this repo already carries a _separate_, page-wide
+  `@media (prefers-reduced-motion: reduce)` guard that zeroes all
+  `animation-duration`s globally — the plan's explicit "gate behind
+  `motion-safe`" instruction is therefore belt-and-suspenders on top of
+  that guard, not the only protection; still worth doing literally since
+  it's independently testable via `className` assertion (`[class*="motion-safe:animate"]`)
+  without needing a `matchMedia` mock in the component test.
+- React's inline-`style` prop serializes to the DOM's `style` attribute
+  with a space after each colon and a trailing semicolon per declaration
+  (`"opacity: 1; transition: opacity .2s;"`), **not** the no-space
+  `key:value` form you'd write by hand in a `<style>` block. Any RTL test
+  asserting `getAttribute('style')` content (the established pattern for
+  custom-property-valued styles, per the NA-30 memory entry below) must
+  match `'opacity: 1'`/`'opacity: 0.45'` with the space, or the assertion
+  fails even though the real rendered value is correct — confirmed by
+  running the test both ways and reading the actual serialized string.
+- `getByText(label).closest('div')` is a reliable way to grab "the row
+  container" for a hover-state test when the row is rendered as a flat
+  `<div onMouseEnter=...>` containing several sibling `<span>`s (prefix,
+  gate glyph, twinkle dot, label, note) and the label text itself sits in
+  its own `<span>{label}</span>` with no nested markup — `getByText` finds
+  that leaf span (single direct text-node child, matches the memory's
+  earlier `getNodeText` caveat), and `.closest('div')` walks up to the row
+  wrapper without needing `data-testid` anywhere in the component (this
+  codebase has zero prior `data-testid` usage — kept that convention).
+- `next build` (Turbopack, Next.js 16) with zero DB calls in the changed
+  route tree remains a reliable free `tsc`-equivalent signal for a
+  no-`typecheck`-target project (repeats the NA-32 finding) — caught
+  nothing new here, but is worth running every story that touches
+  `.tsx` even when `pnpm nx test`/`lint` are both green, since Jest's
+  `ts-jest`/`swc` transform and ESLint's type-aware rules don't
+  necessarily catch every type error a full `tsc` pass would.
+
+**Patterns:**
+
+- Deriving a box-drawing terminal tree (`├──`/`└──`/`│   ` continuation
+  glyphs) from a small ordered list of "phase" objects, each owning 1-N
+  "leaf" objects, with one phase (L5 here) needing extra nested fan-out:
+  build the flat row array **once at module scope** (not inside the
+  component, not in `useMemo`) from the static imported data — since the
+  input is 100% static, a plain top-level `const TREE_ROWS = buildTreeRows()`
+  is both simpler than a memoized hook and guarantees SSR/client markup
+  matches exactly (no hydration mismatch risk from date/random-driven
+  derivation, and no wasted per-render recomputation).
+- Simple "hover row → highlight it, dim the rest, show its detail in a
+  sticky side panel; leave the whole tree → reset" needs only one
+  `useState<string | null>` for the active key plus a **pure function**
+  `getSidePanel(active): SidePanel` that switches on whether `active` is
+  `null`, the special human key, a name found in the roster map, or a
+  phase `num` found in the levels array, returning one of a handful of
+  literal shapes — keeps all the "what do I show" branching out of JSX
+  entirely and trivially testable in isolation if a story needed it.
 
 > **Design source of truth (2026-07-12):** for any marketing-site work, follow
 > `docs/features/2026-07-12-nightshift-marketing-site-design-handoff.md` (→
