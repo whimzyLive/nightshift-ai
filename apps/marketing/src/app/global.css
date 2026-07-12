@@ -314,6 +314,29 @@
   }
 }
 
+/* Duplicated-track phrase ticker (PhraseMarquee) — loops seamlessly because
+ * the track renders the phrase set twice and only translates by -50%. */
+@keyframes ns-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Terminal final-line caret blink. */
+@keyframes ns-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 @layer base {
   *,
   *::before,
