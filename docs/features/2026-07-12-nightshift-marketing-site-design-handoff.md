@@ -162,6 +162,35 @@ Must exist before or alongside this build:
 - **nightshift design tokens** (`tokens/*.css` in the handoff, sourced from `.claude/skills/nightshift-design/`) — the token values to express as Tailwind v4 `@theme` CSS variables.
 - **GitHub repo** (`whimzyLive/nightshift-ai`) reachable as the star/CTA target.
 
+### Story Dependency Graph (NA-29 stories)
+
+Canonical build order for the stories under `NA-29`. Jira `Blocks` / `is blocked by` links are kept in sync with this graph.
+
+**Completion order:**
+
+- **L0 (parallel-safe):** NA-30 (site-wide chrome and design tokens), NA-31 (CMS FAQ and editorial why-copy content layer)
+- **L1 (parallel-safe once L0 is merged):** NA-32 (home hero/proof/problem), NA-33 (home how-it-works/trust sections), NA-34 (home control section), NA-35 (home FAQ preview + final CTA), NA-36 (Why SDLC page), NA-37 (team page), NA-38 (full FAQ page)
+- **L2:** NA-39 (SEO meta, JSON-LD, llms.txt)
+
+**Dependency edges:**
+
+| Blocker | Blocks | Rationale                                                                                                 |
+| ------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| NA-30   | NA-32  | Home hero/proof/problem renders inside the shared chrome shell and reuses its tokens/CTA/card primitives. |
+| NA-30   | NA-33  | Home how-it-works/trust sections reuse the shared chrome primitives (cards, tokens).                      |
+| NA-30   | NA-34  | The control section's route lanes/gate strip/terminals reuse the shared chrome primitives.                |
+| NA-30   | NA-35  | Home FAQ preview + final CTA reuse the shared chrome accordion/CTA primitives.                            |
+| NA-30   | NA-36  | Why SDLC page reuses the shared chrome shell, nav, and card primitives.                                   |
+| NA-30   | NA-37  | Team page reuses the shared chrome shell and card primitives.                                             |
+| NA-30   | NA-38  | Full FAQ page reuses the shared chrome accordion primitives.                                              |
+| NA-31   | NA-35  | Home FAQ preview renders its top-5 entries from the CMS FAQ collection.                                   |
+| NA-31   | NA-36  | Why SDLC page's 2-question FAQ renders from the CMS FAQ collection.                                       |
+| NA-31   | NA-38  | Full FAQ page renders all 12 entries from the CMS FAQ collection.                                         |
+| NA-31   | NA-39  | SEO JSON-LD FAQPage text-identity check needs the CMS content model to exist.                             |
+| NA-35   | NA-39  | SEO layer's FAQPage text-identity check needs Home's rendered FAQ copy to exist.                          |
+| NA-36   | NA-39  | SEO layer's Why SDLC FAQPage/WebPage JSON-LD needs the page's rendered content to exist.                  |
+| NA-38   | NA-39  | SEO layer's FAQPage text-identity check needs the full FAQ page's rendered copy to exist.                 |
+
 ## 11. Product checks
 
 - **Roles affected:** prospective adopter, skeptical engineer, content editor/maintainer, plus downstream SDLC phases (spec/plan/impl) that consume the committed handoff.
