@@ -6,6 +6,31 @@
 > removed from this file (see git history); the framework/tooling learnings below
 > (GSAP, Payload, Jest, worktrees) remain valid.
 
+## 2026-07-12 — Story NA-32 — review-fix: full-bleed bands + classic scrollbar gutter
+
+**Learnings:**
+
+- The `relative left-1/2 right-1/2 -mx-[50vw] w-screen` full-bleed-band
+  trick (used by `ProofBar`/`PhraseMarquee`/`ProblemSection` to break out
+  of the shared `max-w-[var(--container-max)]` `<main>`) is built on
+  `100vw`, which **includes the vertical scrollbar gutter** on classic
+  (non-overlay) scrollbar platforms — Windows/Linux Chrome, not macOS's
+  overlay scrollbars. Because neither `body`/`html` nor `<main>` set
+  `overflow-x` anywhere in this codebase, that ~15-17px overshoot became a
+  real page-wide horizontal scrollbar, invisible in a macOS-rendered
+  screenshot QA pass (the usual visual-parity gate) but a genuine
+  regression on the more common desktop-Chrome scrollbar style. Any
+  future `-mx-[50vw] w-screen` full-bleed band inherits this same risk —
+  it's a property of the pattern, not this specific section.
+- Fix is a single `overflow-x: clip` on `body` (not `overflow-x: hidden`)
+  — `clip` suppresses the resulting scroll without disabling
+  `position: sticky` on any descendant (a real risk with `hidden`, which
+  also clips scroll containers, whereas `clip` only clips paint/scroll on
+  the box it's set on and doesn't establish a new scroll container the
+  way `overflow: hidden`/`auto`/`scroll` do). One-line, no `@theme`/token
+  changes needed, and doesn't require touching any of the three full-bleed
+  components themselves.
+
 ## 2026-07-12 — Story NA-32 — home hero, proof bar, problem section (3 new ui primitives)
 
 **Learnings:**

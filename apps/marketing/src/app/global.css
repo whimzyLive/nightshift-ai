@@ -350,6 +350,13 @@
 
   body {
     margin: 0;
+    /* The full-bleed home bands (PhraseMarquee/ProofBar/ProblemSection)
+     * escape to true viewport width via `w-screen` + `-mx-[50vw]`, which
+     * is 100vw — including the scrollbar gutter on classic (non-overlay)
+     * scrollbar platforms. `clip` (not `hidden`) suppresses the resulting
+     * page-wide horizontal scroll without breaking `position: sticky`
+     * descendants. */
+    overflow-x: clip;
     background: var(--bg-page);
     color: var(--text-body);
     font-family: var(--font-sans);
