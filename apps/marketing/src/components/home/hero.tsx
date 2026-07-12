@@ -103,25 +103,20 @@ export function Hero() {
             team — product manager, architect, tech lead, engineers, and QA. It
             reads a Jira ticket and ships the spec, plan, code, and review.
           </p>
-          {/* Lifecycle line styled as the neon button's hover state — the
-              `--glow-neon-hover` glow, lifting on hover like ★ Star on GitHub. */}
+          {/* Plain mono lifecycle line. */}
           <p
-            className="relative inline-block font-mono whitespace-nowrap transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transition-none"
+            className="font-mono whitespace-nowrap"
             style={{
               margin: '0 0 clamp(1rem, 3vh, 2.75rem)',
-              padding: 'clamp(0.6875rem, 1.6vh, 0.9375rem) 1.125rem',
               fontSize: 'clamp(0.6875rem, 1.5vh, 0.8125rem)',
-              color: 'var(--btn-neon-hover-text)',
-              background: 'rgba(217,119,87,0.75)',
-              boxShadow: 'var(--glow-neon-hover)',
+              color: 'var(--text-dim)',
             }}
           >
-            Ticket <span style={{ color: 'rgba(245,243,239,0.7)' }}>→</span>{' '}
-            Specs <span style={{ color: 'rgba(245,243,239,0.7)' }}>→</span> Plan{' '}
-            <span style={{ color: 'rgba(245,243,239,0.7)' }}>→</span>{' '}
-            Implementation{' '}
-            <span style={{ color: 'rgba(245,243,239,0.7)' }}>→</span> Review{' '}
-            <span style={{ color: 'rgba(245,243,239,0.7)' }}>→</span> PR
+            Ticket <span style={{ color: 'var(--indigo-400)' }}>→</span> Specs{' '}
+            <span style={{ color: 'var(--indigo-400)' }}>→</span> Plan{' '}
+            <span style={{ color: 'var(--indigo-400)' }}>→</span> Implementation{' '}
+            <span style={{ color: 'var(--indigo-400)' }}>→</span> Review{' '}
+            <span style={{ color: 'var(--indigo-400)' }}>→</span> PR
           </p>
           <div
             className="flex flex-col"
