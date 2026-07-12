@@ -1,3 +1,5 @@
+import { NightSky } from '@nightshift-ai/ui';
+
 import { ControlSection } from '../../components/home/control-section';
 import { DayNightWorkflow } from '../../components/home/day-night-workflow';
 import { FaqPreview } from '../../components/home/faq-preview';
@@ -63,6 +65,7 @@ export default async function HomePage() {
           ],
         }}
       />
+      <NightSky />
       <PhraseMarquee />
       <Hero />
       <ProofBar />

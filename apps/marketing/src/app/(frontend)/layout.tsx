@@ -1,4 +1,4 @@
-import { CursorGlow, Footer, NavBar, NightSky } from '@nightshift-ai/ui';
+import { CursorGlow, Footer, NavBar } from '@nightshift-ai/ui';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
@@ -29,7 +29,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${interSans.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-[var(--bg-page)] text-[var(--text-body)] antialiased">
-        <NightSky />
         <CursorGlow />
         <NavBar />
         <main
