@@ -38,6 +38,14 @@
           "cwd": "apps/marketing"
         },
         "cache": false
+      },
+      "migrate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "payload migrate",
+          "cwd": "apps/marketing"
+        },
+        "cache": false
       }
     }
   },
