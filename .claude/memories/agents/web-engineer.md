@@ -84,6 +84,112 @@
   **CORRECTED 2026-07-10 (NA-16 code review, see below): this pattern is a
   CRITICAL bug** — see the entry below for why and the fix.
 
+## 2026-07-12 — Story NA-30 — site-wide night-sky chrome + Tailwind v4 token layer
+
+**Learnings:**
+
+- Standing up Tailwind v4 CSS-first from zero in this repo: `pnpm add -D
+tailwindcss @tailwindcss/postcss postcss --filter @nightshift-ai/marketing`
+  - a two-line `postcss.config.mjs` registering `@tailwindcss/postcss` is
+    the entire pipeline — no `tailwind.config.js`, no `content` array (that's
+    what `@source` inside the CSS is for).
+- Adding `@nightshift-ai/ui` as a real `workspace:^` dependency of
+  `apps/marketing` (previously it was an empty unused shell) makes Nx's
+  TS project-references sync go stale — `pnpm nx <any-target>` then fails
+  fast with "The workspace is out of sync" before running anything. Fix:
+  `pnpm nx sync` once (it silently patches `apps/marketing/tsconfig.json`
+  `references`); a second `nx sync` confirms "already up to date". Do this
+  right after the `pnpm add` for the workspace package, before any other
+  verification command.
+- `packages/ui` has no `node_modules` of its own and never needs `react`/
+  `next`/`@testing-library/*` added to its own `package.json` — it's a real
+  (non-symlinked) subdirectory of the repo root, so Node's directory-walk
+  module resolution reaches the root `node_modules` (where `react`/`next`
+  are hoisted as root `package.json` deps) on its own. Confirmed via
+  `tsc --build` + `next build` + `jest` all resolving `next/link`,
+  `next/navigation`, `react` from `packages/ui/src/**` with zero added
+  deps there.
+- `packages/ui`'s `tsconfig.lib.json`/`tsconfig.spec.json` only had
+  `"lib": ["es2022"]` (inherited from `tsconfig.base.json`, no DOM) and
+  `packages/ui/jest.config.cts` had no `testEnvironment` (defaults to
+  `node`) — because the package was an "empty shell" before this story.
+  Any `'use client'` component using `window`/`PointerEvent`/DOM methods
+  needs `"lib": ["es2022", "dom", "dom.iterable"]` added to **both**
+  `tsconfig.lib.json` and `tsconfig.spec.json` (typecheck runs each
+  separately — fixing only one still fails the other), plus
+  `testEnvironment: 'jsdom'` in `jest.config.cts` for RTL tests to run at
+  all.
+- next/font self-hosting + Tailwind v4 `@theme` compose cleanly by giving
+  the font loader a **private** CSS variable name (`variable:
+'--font-inter'`, not `'--font-sans'` directly), applying that class on
+  `<html>`, and then writing `--font-sans: var(--font-inter), <fallback
+stack>;` inside `@theme` yourself. Letting next/font own `--font-sans`
+  directly is fragile (cascade/specificity race between the font loader's
+  injected class and `@theme`'s `:root` rule); owning the final variable
+  in your own stylesheet is deterministic regardless of injection order.
+  Network access to Google Fonts was available at build time in this
+  sandbox (`next/font/google` fetches once at build and self-hosts the
+  result — no runtime Google Fonts request survives to the client either
+  way).
+- This design system's token file reuses the `--text-*` prefix for two
+  unrelated concerns: the Tailwind-recognized font-size scale
+  (`--text-2xs…6xl`, correctly drives `text-sm`/`text-lg`/etc utilities)
+  _and_ semantic text-color aliases (`--text-strong`, `--text-body`,
+  `--text-muted`, ...). Tailwind v4 only emits a utility for a theme key
+  when that literal class name is actually referenced in scanned source —
+  it does **not** eagerly generate one for every theme entry — so this
+  latent collision (a hypothetical `.text-strong{font-size:var(--moon-100)}`)
+  never materializes in the build as long as you never write
+  `className="text-strong"` and always reach color aliases via
+  `text-[var(--text-strong)]` bracket syntax instead. Confirmed by
+  grepping the built CSS chunk: no `.text-strong` rule exists even though
+  the token is declared in `@theme`.
+- jsdom's `CSSStyleDeclaration` (via the `cssstyle` package) validates
+  known numeric CSS properties strictly and silently rejects a `var(...)`
+  value for `opacity` specifically — `element.style.opacity` reads back as
+  the string `"NaN"` in tests even though the real browser (and the actual
+  rendered `style` attribute) is fine with `opacity: var(--token)`. Don't
+  assert `.style.<prop>` for custom-property-valued numeric CSS properties
+  in RTL/jsdom tests; either assert the raw `getAttribute('style')` string,
+  or (preferred, and more idiomatic Tailwind besides) express the value as
+  an arbitrary-value utility class (`opacity-[var(--token)]`) and assert
+  on `className` instead — sidesteps jsdom's CSSOM validation entirely.
+
+**Patterns:**
+
+- CSS-only rest/hover/press/focus-visible state components (the neon
+  `CtaButton`, the hover-lift `Card`) can stay **server components** with
+  zero client JS by expressing every state as a Tailwind pseudo-class
+  variant referencing the design token directly:
+  `bg-[var(--btn-neon-bg)] hover:bg-[var(--btn-neon-hover-bg)]
+active:bg-[var(--btn-neon-press-bg)] focus-visible:shadow-[var(--glow-focus)]`.
+  Multi-layer `box-shadow` values (comma-separated, itself containing
+  `var()` calls) work fine as a single Tailwind arbitrary value, e.g.
+  `hover:shadow-[var(--glow-neon-hover),var(--shadow-pop)]` — commas
+  don't need escaping in Tailwind's bracket syntax, only bare spaces do
+  (use `_` there). This avoids needing `'use client'` + `useState` hover
+  tracking that the design system's own throwaway `.jsx` prototypes use.
+- One global `@media (prefers-reduced-motion: reduce)` guard
+  (`*,*::before,*::after { animation-duration:.01ms!important;
+animation-iteration-count:1!important; transition-duration:.01ms!important; }`)
+  in the base stylesheet covers every CSS-only animated/transitioning
+  component for free (`NightSky`'s twinkle/drift keyframes, `CtaButton`'s
+  hover transition, `Card`'s hover transition) — no per-component reduced-
+  motion branching needed for those. JS-driven state (`CursorGlow`'s
+  pointer tracking, `NavBar`'s scroll-detach threshold) still needs an
+  explicit `matchMedia('(prefers-reduced-motion: reduce)')` check in the
+  component itself, since the CSS guard can't stop a `useEffect` from
+  attaching a listener or setting state in the first place.
+- Deterministic "starfield" dot layers for a `'use client'` background
+  component: hardcode the dot coordinate arrays as module-level constants
+  instead of `Math.random()` at render time. A client component still
+  renders once on the server for SSR — random values there would mismatch
+  the client's hydration pass and React would warn/reconcile incorrectly.
+  Layer the CSS as a single `background-image` of `radial-gradient(<s>px
+<s>px at <x>% <y>%, <color> 0, <color> 42%, transparent 78%)` calls
+  joined by commas, tiled via `background-repeat: repeat` +
+  `background-size: 520px 520px`.
+
 ## 2026-07-10 — Story NA-16 — code-review fix pass (matchMedia bug, DB fallback, tests)
 
 **Learnings:**
