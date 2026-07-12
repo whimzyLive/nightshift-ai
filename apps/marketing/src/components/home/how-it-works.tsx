@@ -1,0 +1,227 @@
+import { Eyebrow, InstallSnippet } from '@nightshift-ai/ui';
+
+const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
+
+// Verbatim from the design handoff (nightshift Landing.dc.html L236-280).
+const STEPS: { step: string; runs: string; get: string }[] = [
+  { step: '1', runs: 'PRD + spec', get: 'The ticket becomes a written spec' },
+  {
+    step: '2',
+    runs: 'Plan',
+    get: 'An implementation plan, reviewed before code',
+  },
+  {
+    step: '3',
+    runs: 'Implementation',
+    get: 'Code written to the plan, on its own branch',
+  },
+  {
+    step: '4',
+    runs: 'QA review',
+    get: 'Independent review by a different agent than the author',
+  },
+  {
+    step: '5',
+    runs: 'PR + ticket comment',
+    get: 'A reviewed PR, with the paper trail linked back to the ticket',
+  },
+];
+
+// Open-Question default 1: a static, non-interactive stage strip stands in
+// for the design's animated Pipeline component, which belongs to the
+// out-of-scope interactive control section.
+const STAGES = ['/spec', '/plan', '/impl', '/review', 'PR'];
+
+/**
+ * How-it-works: eyebrow/header, static 5-stage strip, the reused
+ * `/auto PROJ-142` install snippet, the 5-step lifecycle table, the
+ * lightweight-threshold fast-path note (AC1), and the "drive a stage
+ * yourself" note. Full-bleed `bg-void` band per the design's
+ * `id="how-it-works"` section.
+ */
+export function HowItWorks() {
+  return (
+    <section
+      id="how-it-works"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
+      style={{
+        padding: '80px 28px',
+        background: 'var(--bg-void)',
+        borderColor: 'var(--border-default)',
+      }}
+    >
+      <div className="mx-auto" style={{ maxWidth: 1000 }}>
+        <div className="mb-10 text-center">
+          <Eyebrow>02 · how it works</Eyebrow>
+          <h2
+            style={{
+              fontSize: 'clamp(32px, 4vw, 46px)',
+              letterSpacing: '-0.02em',
+              color: 'var(--moon-100)',
+              margin: '14px 0 14px',
+            }}
+          >
+            One command runs the whole lifecycle
+          </h2>
+          <p
+            className="mx-auto"
+            style={{
+              fontSize: 18,
+              lineHeight: 1.6,
+              color: 'var(--text-muted)',
+              maxWidth: 640,
+            }}
+          >
+            Point it at a ticket. It triages the work, then runs each stage in
+            order and closes the loop back to your tracker — spec before plan,
+            plan before code, review before merge, tests as the gate.
+          </p>
+        </div>
+
+        <div
+          className="mb-9 flex flex-wrap items-center justify-center gap-3 font-mono"
+          style={{ fontSize: 14, color: 'var(--text-dim)' }}
+        >
+          {STAGES.map((stage, i) => (
+            <span key={stage} className="flex items-center gap-3">
+              <span
+                className="border px-3 py-1.5"
+                style={{
+                  borderColor: 'var(--border-default)',
+                  color: 'var(--moon-100)',
+                  background: 'var(--surface-card)',
+                }}
+              >
+                {stage}
+              </span>
+              {i < STAGES.length - 1 && (
+                <span aria-hidden="true" style={{ color: 'var(--indigo-400)' }}>
+                  →
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+
+        <div className="mx-auto mb-[22px]" style={{ maxWidth: 520 }}>
+          <InstallSnippet command="/auto PROJ-142" />
+        </div>
+
+        <div
+          className="border"
+          style={{
+            borderColor: 'var(--border-default)',
+            background: 'var(--surface-card)',
+          }}
+        >
+          <div
+            className="grid font-mono uppercase"
+            style={{
+              gridTemplateColumns: '56px 1.1fr 1.6fr',
+              background: 'rgba(255,255,255,0.03)',
+              borderBottom: '1px solid var(--border-default)',
+              fontSize: 12,
+              letterSpacing: '0.1em',
+              color: 'var(--text-dim)',
+            }}
+          >
+            <span style={{ padding: '12px 14px' }}>Step</span>
+            <span style={{ padding: '12px 14px' }}>What runs</span>
+            <span style={{ padding: '12px 14px' }}>What you get</span>
+          </div>
+          {STEPS.map((row, i) => (
+            <div
+              key={row.step}
+              className="grid items-baseline"
+              style={{
+                gridTemplateColumns: '56px 1.1fr 1.6fr',
+                borderBottom:
+                  i < STEPS.length - 1
+                    ? '1px solid var(--border-soft)'
+                    : undefined,
+              }}
+            >
+              <span
+                className="font-mono font-bold"
+                style={{ padding: 14, color: 'var(--accent)' }}
+              >
+                {row.step}
+              </span>
+              <span
+                className="font-mono"
+                style={{ padding: 14, fontSize: 14, color: 'var(--moon-100)' }}
+              >
+                {row.runs}
+              </span>
+              <span
+                style={{ padding: 14, fontSize: 16, color: 'var(--text-body)' }}
+              >
+                {row.get}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-[22px] flex flex-wrap gap-3">
+          <p
+            className="flex-1"
+            style={{
+              minWidth: 260,
+              fontSize: 14,
+              lineHeight: 1.55,
+              color: 'var(--text-muted)',
+              margin: 0,
+              background: 'var(--surface-card)',
+              border: '1px solid var(--border-soft)',
+              padding: '14px 16px',
+            }}
+          >
+            <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
+              /auto
+            </span>{' '}
+            triages by size. Stories at or under the lightweight threshold
+            (default ≤3 points) skip the spec and plan and go straight to
+            implementation.
+          </p>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-3">
+          <p
+            className="flex-1"
+            style={{
+              minWidth: 260,
+              fontSize: 14,
+              lineHeight: 1.55,
+              color: 'var(--text-muted)',
+              margin: 0,
+              background: 'var(--surface-card)',
+              border: '1px solid var(--border-soft)',
+              padding: '14px 16px',
+            }}
+          >
+            <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
+              Drive a stage yourself.
+            </span>{' '}
+            Every stage has its own verb:{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/spec</code>{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/plan</code>{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/impl</code>{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/review</code>.
+          </p>
+        </div>
+
+        <div className="mt-6 text-center">
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener"
+            className="font-mono"
+            style={{ fontSize: 14, color: 'var(--link)' }}
+          >
+            See the commands on GitHub →
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
