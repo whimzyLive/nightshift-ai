@@ -71,9 +71,11 @@ export function InstallSnippet({
         onClick={handleCopy}
         aria-label={`Copy: ${command}`}
         whileTap={{ scale: 0.94 }}
-        className="flex-none overflow-hidden rounded-none border border-[var(--border-default)] px-2.5 py-1 font-mono text-xs font-medium tracking-[0.02em] uppercase transition-[color,border-color,box-shadow] duration-150 ease-out hover:border-[var(--link)] hover:shadow-[var(--glow-cool)] focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
+        className="flex-none overflow-hidden rounded-none border border-[var(--btn-neon-border)] bg-[var(--btn-neon-bg)] px-2.5 py-1 font-mono text-xs font-medium tracking-[0.02em] text-[var(--btn-neon-text)] uppercase shadow-[var(--glow-neon)] transition-[color,background-color,border-color,box-shadow] duration-150 ease-out hover:border-[var(--btn-neon-hover-bg)] hover:bg-[var(--btn-neon-hover-bg)] hover:text-[var(--btn-neon-hover-text)] hover:shadow-[var(--glow-neon-hover)] focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
         style={{
-          color: copied ? 'var(--success)' : 'var(--text-muted)',
+          // Only override during the transient "copied" confirmation; rest +
+          // hover colours come from the primary-neon classes above.
+          color: copied ? 'var(--success)' : undefined,
         }}
       >
         <AnimatePresence mode="wait" initial={false}>
