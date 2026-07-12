@@ -1,0 +1,45 @@
+# nightshift
+
+> A free, MIT-licensed Claude Code plugin that turns one terminal into a full
+> software-delivery team — product manager, architect, tech lead, engineers,
+> and QA. It reads a Jira ticket and ships the spec, plan, code, and review
+> automatically: Jira ticket → spec → plan → implementation → review → PR.
+
+## What it is
+
+- Category: AI SDLC automation / Claude Code plugin (multi-agent delivery workflow)
+- Flagship plugin: `sdlc`. Companion: `gtm`.
+- Price: free and open source, MIT-licensed. No paid tier.
+- Not a code-writing assistant — a process engine. Assistants do the middle 20%
+  (the code); nightshift runs the other 80% (the lifecycle around it).
+
+## Who it's for
+
+- Individual builders and small product teams already using Claude Code.
+- The senior dev, tech lead, or founding engineer who owns the workflow.
+
+## How it works
+
+- One command, `/auto <TICKET>`, runs the full lifecycle and comments the
+  resulting PR back to the ticket.
+- Stages are enforced: spec before plan, plan before code, review before merge,
+  tests as the merge gate. Review is done by a different agent than the author.
+- Small stories (default ≤3 points) skip straight to implementation.
+- Every phase ends at a hard gate that returns control to you (refine, spec,
+  plan, implement, review) — you approve each step before the next runs.
+- Day/night workflow: refine and approve stories during the day; /auto
+  implements the approved work overnight; you review the resulting PRs in the
+  morning. You keep every decision; the plugin does the execution.
+- 11 specialized agents, 10 slash commands. Configured per repo via one
+  `project-context.md` file — the agents themselves are generic.
+
+## Install
+
+/plugin marketplace add whimzyLive/nightshift-ai
+/plugin install sdlc@nightshift
+
+## Links
+
+- Repository: https://github.com/whimzyLive/nightshift-ai
+- License: MIT
+- Why an SDLC (control vs one-shot AI): https://github.com/whimzyLive/nightshift-ai/why-sdlc
