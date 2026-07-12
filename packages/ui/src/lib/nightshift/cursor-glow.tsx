@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 
 const INTERACTIVE_SELECTOR =
   'a,button,[role="button"],input,textarea,select,summary';
@@ -32,11 +33,17 @@ export function CursorGlow() {
 
   useEffect(() => {
     if (!enabled) return;
+    const el = dotRef.current;
+    if (!el) return;
+
+    // Smoothed quickTo follow (same pattern as night-sky.tsx's parallax) —
+    // far cheaper than a raw style write per pointermove.
+    const setX = gsap.quickTo(el, 'x', { duration: 0.12, ease: 'power3' });
+    const setY = gsap.quickTo(el, 'y', { duration: 0.12, ease: 'power3' });
 
     const onMove = (event: PointerEvent) => {
-      const el = dotRef.current;
-      if (!el) return;
-      el.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0)`;
+      setX(event.clientX);
+      setY(event.clientY);
 
       const target = event.target as Element | null;
       setActive(Boolean(target?.closest?.(INTERACTIVE_SELECTOR)));

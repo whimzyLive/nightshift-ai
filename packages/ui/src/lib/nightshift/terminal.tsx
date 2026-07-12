@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 export type TerminalLineTone = 'default' | 'muted' | 'accent' | 'success';
 
@@ -28,6 +30,8 @@ export interface TerminalProps {
 }
 
 const REVEAL_MS = 520; // --dur-terminal-line
+const REVEAL_S = REVEAL_MS / 1000;
+const CARET_BLINK_S = 0.5;
 const INDENT_STEP_PX = 16;
 
 const TONE_COLOR: Record<TerminalLineTone, string> = {
@@ -60,19 +64,70 @@ export function Terminal({
   const [visibleCount, setVisibleCount] = useState(1);
   const [hovering, setHovering] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const finalLineRef = useRef<HTMLSpanElement | null>(null);
   const driftFrame = useRef<number | null>(null);
 
-  // Reveal cadence + loop.
-  useEffect(() => {
-    if (prefersReducedMotion()) {
-      setVisibleCount(lines.length);
-      return;
-    }
-    const id = setInterval(() => {
-      setVisibleCount((count) => (count >= lines.length ? 1 : count + 1));
-    }, REVEAL_MS);
-    return () => clearInterval(id);
-  }, [lines.length]);
+  // Reveal cadence + loop, driven by a repeating GSAP timeline. Under
+  // reduced motion the whole run renders immediately and no timeline is
+  // ever created.
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) {
+        setVisibleCount(lines.length);
+        return;
+      }
+
+      const mm = gsap.matchMedia();
+
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        let caretTween: ReturnType<typeof gsap.to> | null = null;
+        const tl = gsap.timeline({ repeat: -1 });
+
+        lines.forEach((_, i) => {
+          tl.call(
+            () => setVisibleCount(i + 1),
+            undefined,
+            i === 0 ? 0 : `+=${REVEAL_S}`,
+          );
+        });
+
+        // Pause on the fully-revealed frame, blinking the last line as a
+        // caret, then reset back to line 1 for the next loop pass.
+        tl.call(
+          () => {
+            if (finalLineRef.current) {
+              caretTween = gsap.to(finalLineRef.current, {
+                autoAlpha: 0,
+                duration: CARET_BLINK_S,
+                repeat: -1,
+                yoyo: true,
+                ease: 'none',
+              });
+            }
+          },
+          undefined,
+          `+=${REVEAL_S}`,
+        );
+        tl.call(
+          () => {
+            caretTween?.kill();
+            caretTween = null;
+            if (finalLineRef.current)
+              gsap.set(finalLineRef.current, { autoAlpha: 1 });
+            setVisibleCount(1);
+          },
+          undefined,
+          `+=${REVEAL_S}`,
+        );
+
+        return () => {
+          caretTween?.kill();
+          tl.kill();
+        };
+      });
+    },
+    { dependencies: [lines.length] },
+  );
 
   // Magnetic tilt on hover — bail entirely under reduced motion (no
   // listeners wired at all, not just a suppressed CSS transition).
@@ -180,7 +235,6 @@ export function Terminal({
         style={{ minHeight }}
       >
         {visible.map((line, idx) => {
-          const isCaretLine = idx === finalIndex && visibleCount > finalIndex;
           const color = TONE_COLOR[line.tone ?? 'default'];
           return (
             <div
@@ -194,10 +248,8 @@ export function Terminal({
               )}
               {line.agent && <span style={{ color }}>{line.agent} </span>}
               <span
+                ref={idx === finalIndex ? finalLineRef : undefined}
                 style={{ color }}
-                className={
-                  isCaretLine ? 'animate-[ns-blink_1s_step-end_infinite]' : ''
-                }
               >
                 {line.text || ' '}
               </span>

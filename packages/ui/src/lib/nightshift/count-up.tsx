@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 
 export interface CountUpProps {
   /** Target integer to count to. */
@@ -57,18 +58,16 @@ export function CountUp({
       if (started.current) return;
       started.current = true;
 
-      if (typeof window.requestAnimationFrame !== 'function') {
-        setDisplay(value);
-        return;
-      }
-
-      const start = performance.now();
-      const step = (now: number) => {
-        const progress = Math.min(1, (now - start) / durationMs);
-        setDisplay(Math.round(progress * value));
-        if (progress < 1) window.requestAnimationFrame(step);
-      };
-      window.requestAnimationFrame(step);
+      // Tween a plain proxy object rather than the DOM directly — the
+      // rendered number is derived state (`display`), not a style/attribute
+      // GSAP can own.
+      const proxy = { v: 0 };
+      gsap.to(proxy, {
+        v: value,
+        duration: durationMs / 1000,
+        ease: 'power1.out',
+        onUpdate: () => setDisplay(Math.round(proxy.v)),
+      });
     };
 
     const observer = new window.IntersectionObserver(

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 
 export interface InstallSnippetProps {
   /** The exact command text — copied verbatim, never re-derived. */
@@ -65,18 +66,30 @@ export function InstallSnippet({
         </span>
         {command}
       </span>
-      <button
+      <motion.button
         type="button"
         onClick={handleCopy}
         aria-label={`Copy: ${command}`}
-        className="flex-none rounded-none border px-2.5 py-1 font-mono text-xs font-medium tracking-[0.02em] uppercase transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
+        whileTap={{ scale: 0.94 }}
+        className="flex-none overflow-hidden rounded-none border px-2.5 py-1 font-mono text-xs font-medium tracking-[0.02em] uppercase transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
         style={{
           borderColor: 'var(--border-default)',
           color: copied ? 'var(--success)' : 'var(--text-muted)',
         }}
       >
-        {copied ? 'copied' : 'copy'}
-      </button>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={copied ? 'copied' : 'copy'}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="block"
+          >
+            {copied ? 'copied' : 'copy'}
+          </motion.span>
+        </AnimatePresence>
+      </motion.button>
     </div>
   );
 }
