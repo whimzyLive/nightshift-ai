@@ -29,6 +29,23 @@ jest.mock('@payloadcms/richtext-lexical/react', () => ({
   },
 }));
 
+// `@payloadcms/richtext-lexical/plaintext` (pulled in transitively via
+// lib/seo/jsonld.ts's buildFaqPageNode, NA-39) ships plain ESM too — same
+// convention as the `/react` mock above.
+jest.mock('@payloadcms/richtext-lexical/plaintext', () => ({
+  convertLexicalToPlaintext: ({
+    data,
+  }: {
+    data: {
+      root: { children: Array<{ children?: Array<{ text?: string }> }> };
+    };
+  }) =>
+    data.root.children
+      .flatMap((node) => node.children ?? [])
+      .map((leaf) => leaf.text ?? '')
+      .join(''),
+}));
+
 function richText(text: string) {
   return {
     root: {
