@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import gsap from 'gsap';
+import { animate } from 'motion/react';
 
 export interface CountUpProps {
   /** Target integer to count to. */
@@ -25,10 +25,10 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Animates 0 → `value` once, the first time the element scrolls into view.
- * Deterministic server frame renders `0` so hydration matches. Degrades to
- * the final value immediately under reduced motion or when
- * IntersectionObserver is unsupported.
+ * Animates 0 → `value` once, the first time the element scrolls into view,
+ * using Motion's `animate`. Deterministic server frame renders `0` so
+ * hydration matches. Degrades to the final value immediately under reduced
+ * motion or when IntersectionObserver is unsupported.
  */
 export function CountUp({
   value,
@@ -54,33 +54,31 @@ export function CountUp({
     const el = ref.current;
     if (!el) return;
 
-    const animate = () => {
+    let controls: ReturnType<typeof animate> | null = null;
+    const run = () => {
       if (started.current) return;
       started.current = true;
-
-      // Tween a plain proxy object rather than the DOM directly — the
-      // rendered number is derived state (`display`), not a style/attribute
-      // GSAP can own.
-      const proxy = { v: 0 };
-      gsap.to(proxy, {
-        v: value,
+      controls = animate(0, value, {
         duration: durationMs / 1000,
-        ease: 'power1.out',
-        onUpdate: () => setDisplay(Math.round(proxy.v)),
+        ease: 'easeOut',
+        onUpdate: (v) => setDisplay(Math.round(v)),
       });
     };
 
     const observer = new window.IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
-          animate();
+          run();
           observer.disconnect();
         }
       },
       { threshold: 0.3 },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      controls?.stop();
+    };
   }, [value, durationMs]);
 
   return (

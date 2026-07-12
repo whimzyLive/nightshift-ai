@@ -1,15 +1,20 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from 'motion/react';
 
 export interface NightSkyProps {
   /**
    * `subpage` (default) is the calmer baseline (`--sky-opacity-subpage`);
    * `home` raises the starfield opacity to `--sky-opacity-home`. Both
-   * variants get GSAP depth-parallax on mouse move and a tap-to-meteor
+   * variants get Motion depth-parallax on mouse move and a tap-to-meteor
    * shower — both skipped under `prefers-reduced-motion`.
    */
   variant?: 'subpage' | 'home';
@@ -113,13 +118,21 @@ const HALOS: { style: CSSProperties }[] = [
 ];
 
 const MAX_METEORS = 6;
+const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
+
+interface Meteor {
+  id: number;
+  x: number;
+  y: number;
+  angle: number;
+  travel: number;
+}
 
 /**
  * Shared starfield primitive — a fixed full-viewport background behind all
- * page content: a dense starfield with GSAP ambient drift/twinkle, mouse
- * depth-parallax (`quickTo` per layer), and a tap-spawned meteor shower
- * (`gsap.timeline`). All motion is set up inside `gsap.matchMedia` so it is
- * fully disabled — and reverted — under `prefers-reduced-motion`.
+ * page content: a dense starfield with Motion ambient drift/twinkle, mouse
+ * depth-parallax (spring-smoothed motion values per layer), and a tap-spawned
+ * meteor shower. All motion is skipped under `prefers-reduced-motion`.
  */
 export function NightSky({
   variant = 'subpage',
@@ -130,113 +143,64 @@ export function NightSky({
       ? 'opacity-[var(--sky-opacity-home)]'
       : 'opacity-[var(--sky-opacity-subpage)]';
 
-  const nearRef = useRef<HTMLDivElement>(null);
-  const midRef = useRef<HTMLDivElement>(null);
-  const farRef = useRef<HTMLDivElement>(null);
-  const nearInnerRef = useRef<HTMLDivElement>(null);
-  const midInnerRef = useRef<HTMLDivElement>(null);
-  const farInnerRef = useRef<HTMLDivElement>(null);
-  const meteorLayerRef = useRef<HTMLDivElement>(null);
+  const prefersReduced = useReducedMotion();
+  const animate = !prefersReduced;
 
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia();
+  // Normalized pointer offset (-0.5..0.5), spring-smoothed, mapped per layer.
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const sx = useSpring(px, SPRING);
+  const sy = useSpring(py, SPRING);
+  const nearX = useTransform(sx, (v) => -v * NEAR_DEPTH);
+  const nearY = useTransform(sy, (v) => -v * NEAR_DEPTH);
+  const midX = useTransform(sx, (v) => -v * MID_DEPTH);
+  const midY = useTransform(sy, (v) => -v * MID_DEPTH);
+  const farX = useTransform(sx, (v) => -v * FAR_DEPTH);
+  const farY = useTransform(sy, (v) => -v * FAR_DEPTH);
 
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
-        // Ambient drift on the near layer's inner element (transform is free
-        // on the inner; the outer wrapper owns the parallax transform).
-        gsap.to(nearInnerRef.current, {
-          x: -40,
-          y: -40,
-          duration: 120,
-          ease: 'none',
-          repeat: -1,
-        });
+  const [meteors, setMeteors] = useState<Meteor[]>([]);
+  const nextId = useRef(0);
 
-        // Twinkle on the mid + far layers.
-        gsap.to([midInnerRef.current, farInnerRef.current], {
-          filter: 'brightness(1.6)',
-          opacity: 1,
-          duration: 1.7,
-          ease: 'sine.inOut',
-          repeat: -1,
-          yoyo: true,
-          stagger: 0.85,
-        });
+  useEffect(() => {
+    if (prefersReduced) return;
 
-        // Depth parallax — one smoothed quickTo per axis per layer, driven by
-        // mouse move. Foreground shifts most; far layer barely moves.
-        const q = (el: HTMLDivElement | null, prop: 'x' | 'y') =>
-          gsap.quickTo(el, prop, { duration: 0.6, ease: 'power3' });
-        const setters: [ReturnType<typeof q>, ReturnType<typeof q>, number][] =
-          [
-            [q(nearRef.current, 'x'), q(nearRef.current, 'y'), NEAR_DEPTH],
-            [q(midRef.current, 'x'), q(midRef.current, 'y'), MID_DEPTH],
-            [q(farRef.current, 'x'), q(farRef.current, 'y'), FAR_DEPTH],
-          ];
+    function onMove(e: MouseEvent) {
+      px.set(e.clientX / window.innerWidth - 0.5);
+      py.set(e.clientY / window.innerHeight - 0.5);
+    }
 
-        function onMove(e: MouseEvent) {
-          const dx = e.clientX / window.innerWidth - 0.5;
-          const dy = e.clientY / window.innerHeight - 0.5;
-          for (const [qx, qy, depth] of setters) {
-            qx(-dx * depth);
-            qy(-dy * depth);
-          }
-        }
-
-        function onTap(e: PointerEvent) {
-          const layer = meteorLayerRef.current;
-          if (!layer || layer.childElementCount >= MAX_METEORS) return;
-
-          const el = document.createElement('span');
-          el.setAttribute('aria-hidden', 'true');
-          Object.assign(el.style, {
-            position: 'absolute',
-            left: `${e.clientX}px`,
-            top: `${e.clientY}px`,
-            width: '160px',
-            height: '2px',
-            transformOrigin: '0 50%',
-            pointerEvents: 'none',
-            background:
-              'linear-gradient(90deg, transparent, var(--star-white) 78%, var(--star-bright))',
-            filter: 'drop-shadow(0 0 4px var(--star-bright))',
-          } satisfies Partial<CSSStyleDeclaration>);
-          layer.appendChild(el);
-
-          const angle = 140 + Math.random() * 24; // 140–164° → down-left
-          const travel = 300 + Math.random() * 160;
-          const rad = (angle * Math.PI) / 180;
-
-          gsap.set(el, { rotation: angle, autoAlpha: 0 });
-          gsap
-            .timeline({ onComplete: () => el.remove() })
-            .to(el, { autoAlpha: 1, duration: 0.08 })
-            .to(
-              el,
-              {
-                x: Math.cos(rad) * travel,
-                y: Math.sin(rad) * travel,
-                duration: 0.72,
-                ease: 'power2.in',
-              },
-              0,
-            )
-            .to(el, { autoAlpha: 0, duration: 0.3 }, '-=0.32');
-        }
-
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('pointerdown', onTap);
-
-        return () => {
-          window.removeEventListener('mousemove', onMove);
-          window.removeEventListener('pointerdown', onTap);
-          if (meteorLayerRef.current) meteorLayerRef.current.replaceChildren();
-        };
+    function onTap(e: PointerEvent) {
+      setMeteors((cur) => {
+        if (cur.length >= MAX_METEORS) return cur;
+        const id = nextId.current++;
+        return [
+          ...cur,
+          {
+            id,
+            x: e.clientX,
+            y: e.clientY,
+            angle: 140 + ((id * 23) % 24), // 140–163° → down-left
+            travel: 300 + ((id * 53) % 160), // 300–460px
+          },
+        ];
       });
-    },
-    { dependencies: [] },
-  );
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('pointerdown', onTap);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('pointerdown', onTap);
+    };
+  }, [prefersReduced, px, py]);
+
+  const drift = animate ? { x: [0, -40], y: [0, -40] } : undefined;
+  const twinkle = animate
+    ? {
+        opacity: [0.85, 1, 0.85],
+        filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'],
+      }
+    : undefined;
 
   return (
     <>
@@ -244,39 +208,47 @@ export function NightSky({
         aria-hidden="true"
         className={`pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[var(--bg-void)] ${opacityClass} ${className}`}
       >
-        <div ref={nearRef} className="absolute inset-0 will-change-transform">
-          <div
-            ref={nearInnerRef}
+        <motion.div className="absolute inset-0" style={{ x: nearX, y: nearY }}>
+          <motion.div
             className="absolute -inset-[12%]"
             style={{
               backgroundImage: layerBackground(NEAR_DOTS),
               backgroundRepeat: 'repeat',
               backgroundSize: TILE,
             }}
+            animate={drift}
+            transition={{ duration: 120, ease: 'linear', repeat: Infinity }}
           />
-        </div>
-        <div ref={midRef} className="absolute inset-0 will-change-transform">
-          <div
-            ref={midInnerRef}
+        </motion.div>
+        <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
+          <motion.div
             className="absolute -inset-[12%]"
             style={{
               backgroundImage: layerBackground(MID_DOTS),
               backgroundRepeat: 'repeat',
               backgroundSize: TILE,
             }}
+            animate={twinkle}
+            transition={{ duration: 3.4, ease: 'easeInOut', repeat: Infinity }}
           />
-        </div>
-        <div ref={farRef} className="absolute inset-0 will-change-transform">
-          <div
-            ref={farInnerRef}
+        </motion.div>
+        <motion.div className="absolute inset-0" style={{ x: farX, y: farY }}>
+          <motion.div
             className="absolute -inset-[12%]"
             style={{
               backgroundImage: layerBackground(FAR_DOTS),
               backgroundRepeat: 'repeat',
               backgroundSize: TILE,
             }}
+            animate={twinkle}
+            transition={{
+              duration: 3.4,
+              ease: 'easeInOut',
+              repeat: Infinity,
+              delay: 1.7,
+            }}
           />
-        </div>
+        </motion.div>
         {HALOS.map((halo, i) => (
           <div
             key={i}
@@ -286,11 +258,45 @@ export function NightSky({
         ))}
       </div>
 
-      <div
-        ref={meteorLayerRef}
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      />
+      {meteors.length > 0 && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+        >
+          {meteors.map((m) => {
+            const rad = (m.angle * Math.PI) / 180;
+            return (
+              <motion.span
+                key={m.id}
+                className="absolute h-[2px] w-[160px]"
+                style={{
+                  left: m.x,
+                  top: m.y,
+                  transformOrigin: '0 50%',
+                  rotate: m.angle,
+                  background:
+                    'linear-gradient(90deg, transparent, var(--star-white) 78%, var(--star-bright))',
+                  filter: 'drop-shadow(0 0 4px var(--star-bright))',
+                }}
+                initial={{ opacity: 0, x: 0, y: 0 }}
+                animate={{
+                  opacity: [0, 1, 0],
+                  x: Math.cos(rad) * m.travel,
+                  y: Math.sin(rad) * m.travel,
+                }}
+                transition={{
+                  duration: 0.76,
+                  ease: 'easeIn',
+                  times: [0, 0.14, 1],
+                }}
+                onAnimationComplete={() =>
+                  setMeteors((cur) => cur.filter((x) => x.id !== m.id))
+                }
+              />
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

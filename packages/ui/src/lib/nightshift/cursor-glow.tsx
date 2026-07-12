@@ -1,21 +1,28 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import gsap from 'gsap';
+import { useEffect, useState } from 'react';
+import { motion, useMotionValue, useSpring } from 'motion/react';
 
 const INTERACTIVE_SELECTOR =
   'a,button,[role="button"],input,textarea,select,summary';
+
+const FOLLOW = { stiffness: 500, damping: 40, mass: 0.5 } as const;
 
 /**
  * 28px radial terracotta glow tracking the pointer, growing to ~84px over
  * interactive elements. Renders nothing on coarse pointers (touch) or
  * under `prefers-reduced-motion` — both checked before any listener
- * attaches, so there's no dead DOM node left behind either way.
+ * attaches, so there's no dead DOM node left behind either way. Follow is a
+ * spring-smoothed Motion value.
  */
 export function CursorGlow() {
   const [enabled, setEnabled] = useState(false);
-  const dotRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
+
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, FOLLOW);
+  const sy = useSpring(y, FOLLOW);
 
   useEffect(() => {
     const fine = window.matchMedia('(pointer: fine)');
@@ -33,25 +40,17 @@ export function CursorGlow() {
 
   useEffect(() => {
     if (!enabled) return;
-    const el = dotRef.current;
-    if (!el) return;
-
-    // Smoothed quickTo follow (same pattern as night-sky.tsx's parallax) —
-    // far cheaper than a raw style write per pointermove.
-    const setX = gsap.quickTo(el, 'x', { duration: 0.12, ease: 'power3' });
-    const setY = gsap.quickTo(el, 'y', { duration: 0.12, ease: 'power3' });
 
     const onMove = (event: PointerEvent) => {
-      setX(event.clientX);
-      setY(event.clientY);
-
+      x.set(event.clientX);
+      y.set(event.clientY);
       const target = event.target as Element | null;
       setActive(Boolean(target?.closest?.(INTERACTIVE_SELECTOR)));
     };
 
     window.addEventListener('pointermove', onMove, { passive: true });
     return () => window.removeEventListener('pointermove', onMove);
-  }, [enabled]);
+  }, [enabled, x, y]);
 
   if (!enabled) return null;
 
@@ -61,11 +60,12 @@ export function CursorGlow() {
     : 'radial-gradient(circle, var(--cursor-glow), transparent 70%)';
 
   return (
-    <div
-      ref={dotRef}
+    <motion.div
       aria-hidden="true"
       className="pointer-events-none fixed top-0 left-0 z-[9998] rounded-full transition-[width,height,background] duration-200 ease-out motion-reduce:transition-none"
       style={{
+        x: sx,
+        y: sy,
         width: size,
         height: size,
         marginTop: active
