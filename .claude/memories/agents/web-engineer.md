@@ -1,3 +1,104 @@
+## 2026-07-12 — Story NA-34 — home you-decide-how-its-built control section (single state-machine island)
+
+**Learnings:**
+
+- The design's raw JSX markup (`nightshift Landing.dc.html` L404-532) nests
+  the ENTIRE section 8 body — triage card, gate strip, and the 1120px-wide
+  comparison grid — inside one `max-width:760px` wrapper, which is an
+  authoring inconsistency in the mock itself (a 1120px child cannot actually
+  render wider than its 760px parent in a browser). Followed the plan's own
+  explicit override text instead ("centered header column max-width: 760px,
+  comparison grid max-width: 1120px" — i.e. two separate width scopes), and
+  restructured as an outer div at max-width 1120 containing a nested
+  max-width-760 header block, mirroring `team-preview.tsx`'s own two-tier
+  width pattern. When a plan explicitly resolves an ambiguity/bug present in
+  the raw design markup, follow the plan's resolution, not the mock's literal
+  nesting.
+- `Eyebrow` (`packages/ui`) already prepends the mono `//` glyph itself
+  (`<span aria-hidden>{'//'}</span>{children}`) — every existing call site
+  (`team-preview.tsx`, `day-night-workflow.tsx`) passes the bare label with
+  no `//` prefix (`<Eyebrow>04 · the team</Eyebrow>`). A plan/spec that
+  writes the JSX literally as `<Eyebrow>// 06 · control</Eyebrow>` is
+  describing the rendered _result_, not the literal children to pass — doing
+  so verbatim would double the slashes. Always check the actual component
+  source before trusting a plan's inline JSX snippet for a wrapper that adds
+  its own chrome.
+- Extending a shared `packages/ui` primitive (`CtaButton`) with new
+  `size`/`variant` props for one story's needs: split the previously-monolithic
+  class string into `BASE_CLASSES` (layout/transition/focus, size- and
+  variant-independent) + `SIZE_CLASSES`/`VARIANT_CLASSES` records, destructure
+  `size`/`variant` out of props _before_ spreading `...rest` onto the DOM
+  element (otherwise they'd leak as invalid `size`/`variant` HTML attributes
+  on `<a>`/`<button>`), and keep both defaults (`size:'md'`, `variant:'primary'`)
+  matching the pre-existing single treatment exactly so every call site with
+  zero new props (`hero.tsx`, `day-night-workflow.tsx`, etc.) renders
+  byte-identical classes — confirmed via the full `ui` suite staying green
+  with no test changes needed for existing consumers.
+- A `useReducer` gate-machine driven by `useEffect`s keyed on the resulting
+  state (not imperative `setState`-inside-`setTimeout`-inside-`setState`
+  chains, which is what the design's own class-component source does with
+  instance fields) is the correct hooks translation: one effect keyed on
+  `[ticketType, storyPts, thresh, approvalMode]` dispatches a pure
+  `RESTART_GATE` (satisfies AC4 — every config setter this story exposes is
+  itself one of those four fields, so there's no separate "restart" call
+  needed anywhere else); a second effect keyed on `[gI, gS]` owns the
+  working→awaiting timer; a third keyed on the full gate-relevant tuple owns
+  the auto-advance timer; a fourth keyed on `[gDone, approvalMode]` owns the
+  full-auto re-loop. Each effect's cleanup (`clearTimeout`/`clearInterval`)
+  is what gives "restart cancels any pending timer" for free — no manual
+  ref-based `clearTimeout` bookkeeping needed outside the effects themselves
+  (contrast with `terminal.tsx`'s single self-contained effect — a 4-effect
+  split is the right call once a design's state machine has this many
+  interacting phases/timers, not overengineering).
+- The one exception needing a manual ref: the one-shot `raceStep` interval
+  must stop itself once it hits its ceiling (12) without ever restarting —
+  a plain `setInterval` effect on `[]` runs forever unless told otherwise, and
+  there's no state transition that should tear down and recreate this effect
+  (its deps never change after mount). Store the interval id in a `useRef`
+  and clear it from a _second_, separate effect keyed on `[raceStep]` once
+  the value reaches the ceiling. Splitting "create the interval" and "decide
+  when to kill it" into two effects avoids the antipattern of clearing/
+  recreating the interval every single tick (which a single combined effect
+  keyed on `[raceStep]` would do).
+- `getByText('spec')` / `getByText('1')` exact-string queries collide when
+  the same literal also appears as an isolated span elsewhere in the same
+  tree (e.g. the estimate slider's endpoint labels `<span>1</span>…<span>13</span>`
+  collide with a threshold-stepper value that later reads `1`/`8` after
+  clamping). Don't reach for `getByText` for a bare number/short token that
+  recurs — grab the specific DOM neighbor instead
+  (`decBtn.nextElementSibling?.textContent`), which is robust regardless of
+  what number happens to also appear elsewhere.
+- Deliberately mutated `storyPts <= thresh` to `storyPts < thresh` mid-session
+  to confirm the two boundary-sensitive spec tests (lightweight-routing +
+  AC4 re-sync) actually go red for that exact reason before restoring the
+  fix — both failed as expected (`spec`/`plan` gates reappeared because the
+  default 8-pts-vs-8-thresh case fell through to full ceremony), then passed
+  clean again after the revert. Real red→green evidence for a boundary
+  condition, not just "tests exist."
+- `pnpm nx run @nightshift-ai/marketing:build` (Turbopack, Next 16, no
+  `DATABASE_URL`/DB running in this session) again statically prerenders `/`
+  successfully with the new section added — reconfirms the NA-32/NA-33
+  finding that static composition sections with zero Payload calls don't
+  need a live DB at build time, even as the page keeps growing.
+
+**Patterns:**
+
+- A derived-value function set (`buildTriageLanes`, `buildTriageMsg`,
+  `buildCtrlGates`, `buildRaceLeft`, `buildRaceRight`, `buildApprovalModeHint`)
+  as plain module-scope pure functions of `(state, route, routeName)`,
+  called fresh every render inside the component body (never memoized,
+  never stored in state) is the concrete implementation of an AC4-style
+  "these N views can never desync" requirement — there is only one state
+  object, and every view is a deterministic projection of it recomputed on
+  every render pass.
+- Task 10 ("visual parity", explicitly plan-tagged "(QA phase)") was
+  deferred rather than attempted inline — the plan itself scopes it to a
+  later QA phase (Playwright vs `docs/design/marketing-site-handoff/screenshots/`),
+  and this session had no live dev server/DB. When a plan task is explicitly
+  phase-tagged for a different agent/phase than the one you were dispatched
+  as, don't force it into the current dispatch — flag the deferral in the
+  return summary instead.
+
 ## 2026-07-12 — Story NA-33 — home how-it-works + trust sections (4 static sections + TeamPreview client state)
 
 **Learnings:**

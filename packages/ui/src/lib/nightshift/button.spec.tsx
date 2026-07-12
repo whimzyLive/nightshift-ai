@@ -33,4 +33,24 @@ describe('CtaButton', () => {
     const el = screen.getByRole('link', { name: 'Install the plugin' });
     expect(el.getAttribute('href')).toBe('/#install');
   });
+
+  it('defaults to the primary variant at md size', () => {
+    render(<CtaButton>Install</CtaButton>);
+    const el = screen.getByRole('button', { name: 'Install' });
+    expect(el.className).toContain('px-6');
+    expect(el.className).toContain('bg-[var(--btn-neon-bg)]');
+  });
+
+  it('renders the secondary sm variant with token-backed classes, no size/variant DOM leakage', () => {
+    render(
+      <CtaButton variant="secondary" size="sm">
+        run it again ↺
+      </CtaButton>,
+    );
+    const el = screen.getByRole('button', { name: 'run it again ↺' });
+    expect(el.className).toContain('h-[34px]');
+    expect(el.className).toContain('border-[var(--border-strong)]');
+    expect(el.getAttribute('size')).toBeNull();
+    expect(el.getAttribute('variant')).toBeNull();
+  });
 });

@@ -5,7 +5,11 @@ export { Badge } from './lib/nightshift/badge';
 export type { BadgeProps, BadgeVariant } from './lib/nightshift/badge';
 
 export { CtaButton } from './lib/nightshift/button';
-export type { CtaButtonProps } from './lib/nightshift/button';
+export type {
+  CtaButtonProps,
+  CtaButtonSize,
+  CtaButtonVariant,
+} from './lib/nightshift/button';
 
 export { Card } from './lib/nightshift/card';
 export type { CardProps } from './lib/nightshift/card';
