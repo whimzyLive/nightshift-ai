@@ -15,7 +15,7 @@ export function Hero({ intro }: { intro: WhySdlcIntro | null }) {
 
   return (
     <section
-      className="relative overflow-hidden border-b"
+      className="relative border-b"
       style={{
         padding: '64px 28px 52px',
         borderColor: 'var(--border-default)',

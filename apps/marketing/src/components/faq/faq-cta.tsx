@@ -11,7 +11,7 @@ const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 export function FaqCta() {
   return (
     <section
-      className="relative overflow-hidden border-t text-center"
+      className="relative border-t text-center"
       style={{
         padding: '72px 28px',
         borderColor: 'var(--border-default)',

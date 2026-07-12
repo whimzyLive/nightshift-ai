@@ -9,7 +9,7 @@ import { Eyebrow } from '@nightshift-ai/ui';
 export function FaqHero() {
   return (
     <section
-      className="relative overflow-hidden border-b"
+      className="relative border-b"
       style={{
         padding: '72px 28px 48px',
         borderColor: 'var(--border-default)',

@@ -54,7 +54,7 @@ const TERMINAL_LINES: TerminalLine[] = [
 export function Hero() {
   return (
     <section
-      className="relative overflow-hidden"
+      className="relative"
       style={{
         padding: 'clamp(1.25rem, 4.5vh, 5.75rem) 0 clamp(1rem, 3.5vh, 4.75rem)',
       }}
