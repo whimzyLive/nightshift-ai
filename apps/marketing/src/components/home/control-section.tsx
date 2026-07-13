@@ -5,7 +5,7 @@ import type { ChangeEvent } from 'react';
 
 import { motion } from 'motion/react';
 
-import { CtaButton, Eyebrow } from '@nightshift-ai/ui';
+import { CtaButton, Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L404-532,
 // state/logic L620-663 + L1083-1340, `class Component`/`renderVals`).
@@ -609,9 +609,12 @@ export function ControlSection() {
         borderColor: 'var(--border-default)',
       }}
     >
-      <div className="mx-auto text-center" style={{ maxWidth: 760 }}>
-        <Eyebrow>06 · control</Eyebrow>
-        <h2
+      <RevealGroup className="mx-auto text-center" style={{ maxWidth: 760 }}>
+        <Reveal>
+          <Eyebrow>06 · control</Eyebrow>
+        </Reveal>
+        <Reveal
+          as="h2"
           style={{
             fontSize: 'clamp(30px, 3.8vw, 40px)',
             letterSpacing: '-0.02em',
@@ -620,8 +623,9 @@ export function ControlSection() {
           }}
         >
           You decide how it gets built
-        </h2>
-        <p
+        </Reveal>
+        <Reveal
+          as="p"
           style={{ fontSize: 18, lineHeight: 1.65, color: 'var(--text-muted)' }}
         >
           Most AI dev tools abstract the process away until you can&apos;t see
@@ -630,8 +634,8 @@ export function ControlSection() {
           opposite way: it keeps the software development lifecycle in front of
           you, with a hard gate at every phase that returns control before the
           next step runs.
-        </p>
-      </div>
+        </Reveal>
+      </RevealGroup>
 
       <div className="mx-auto" style={{ maxWidth: 1120 }}>
         <TriageCard

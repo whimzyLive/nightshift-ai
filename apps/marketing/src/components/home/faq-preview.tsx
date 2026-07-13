@@ -1,6 +1,6 @@
 import { RichText } from '@payloadcms/richtext-lexical/react';
 
-import { Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 import { FaqAccordion } from './faq-accordion';
 
@@ -32,9 +32,12 @@ export function FaqPreview({ faqs }: { faqs: HomeFaqItem[] }) {
       style={{ padding: '80px 28px', borderColor: 'var(--border-default)' }}
     >
       <div className="mx-auto" style={{ maxWidth: 800 }}>
-        <div className="mb-9 text-center">
-          <Eyebrow>07 · questions</Eyebrow>
-          <h2
+        <RevealGroup className="mb-9 text-center">
+          <Reveal>
+            <Eyebrow>07 · questions</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
             style={{
               fontSize: 'clamp(32px, 4vw, 46px)',
               letterSpacing: '-0.02em',
@@ -43,20 +46,24 @@ export function FaqPreview({ faqs }: { faqs: HomeFaqItem[] }) {
             }}
           >
             Questions builders ask first
-          </h2>
-        </div>
+          </Reveal>
+        </RevealGroup>
 
-        <FaqAccordion items={items} />
+        <RevealGroup>
+          <Reveal>
+            <FaqAccordion items={items} />
+          </Reveal>
 
-        <p className="mt-6 text-center">
-          <a
-            href="/faq"
-            className="font-mono"
-            style={{ fontSize: 15, color: 'var(--link)' }}
-          >
-            Browse the full FAQ — workflow, setup, trust, licensing →
-          </a>
-        </p>
+          <Reveal as="p" className="mt-6 text-center">
+            <a
+              href="/faq"
+              className="font-mono"
+              style={{ fontSize: 15, color: 'var(--link)' }}
+            >
+              Browse the full FAQ — workflow, setup, trust, licensing →
+            </a>
+          </Reveal>
+        </RevealGroup>
       </div>
     </section>
   );

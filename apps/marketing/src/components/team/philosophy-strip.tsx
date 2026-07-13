@@ -1,3 +1,5 @@
+import { Reveal, RevealGroup } from '@nightshift-ai/ui';
+
 import { PHILOSOPHY } from './roster-data';
 
 /**
@@ -15,18 +17,28 @@ export function PhilosophyStrip() {
       }}
     >
       <div className="mx-auto" style={{ maxWidth: 1120 }}>
-        <div
+        <RevealGroup
+          as="div"
           className="grid gap-4"
+          amount={0.2}
           style={{
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
           }}
         >
           {PHILOSOPHY.map((card) => (
-            <div
+            <Reveal
               key={card.title}
+              scale={0.97}
+              blur={8}
+              duration={0.6}
               style={{
-                background: 'var(--surface-card)',
-                border: '1px solid var(--border-default)',
+                background:
+                  'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(13,13,24,0.45))',
+                backdropFilter: 'var(--glass-blur)',
+                WebkitBackdropFilter: 'var(--glass-blur)',
+                border: '1px solid var(--glass-border)',
+                boxShadow:
+                  'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)',
                 padding: '22px 24px',
               }}
             >
@@ -51,9 +63,9 @@ export function PhilosophyStrip() {
               >
                 {card.body}
               </p>
-            </div>
+            </Reveal>
           ))}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   );

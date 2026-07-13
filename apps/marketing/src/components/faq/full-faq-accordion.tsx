@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { Reveal, RevealGroup } from '@nightshift-ai/ui';
+
 import { FaqRow, type FaqAccordionItem } from './faq-row';
 
 export interface FullFaqAccordionGroup {
@@ -28,8 +30,13 @@ export function FullFaqAccordion({
   return (
     <div className="flex flex-col" style={{ gap: 40 }}>
       {groups.map((group) => (
-        <div key={group.key}>
-          <p
+        // Each group reveals independently as it scrolls into view: the
+        // eyebrow then the solid card stagger in (plain fade-rise, NO
+        // scale/blur — the card keeps its `--surface-card` surface and the
+        // rows' own height/opacity toggle animation stays untouched).
+        <RevealGroup key={group.key} as="div" amount={0.2}>
+          <Reveal
+            as="p"
             className="font-mono uppercase"
             style={{
               fontSize: 12,
@@ -39,8 +46,8 @@ export function FullFaqAccordion({
             }}
           >
             {group.eyebrow}
-          </p>
-          <div
+          </Reveal>
+          <Reveal
             style={{
               background: 'var(--surface-card)',
               border: '1px solid var(--border-default)',
@@ -60,8 +67,8 @@ export function FullFaqAccordion({
                 }
               />
             ))}
-          </div>
-        </div>
+          </Reveal>
+        </RevealGroup>
       ))}
     </div>
   );

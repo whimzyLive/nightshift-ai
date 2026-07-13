@@ -1,4 +1,4 @@
-import { CountUp } from '@nightshift-ai/ui';
+import { CountUp, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 /**
  * Full-bleed `--surface-card` band with top/bottom hairlines. Breaks out of
@@ -16,26 +16,34 @@ export function ProofBar() {
         borderBottom: '1px solid var(--border-default)',
       }}
     >
-      <div
+      <RevealGroup
+        as="div"
         className="mx-auto flex flex-wrap items-center justify-center gap-x-[28px] gap-y-[14px]"
         style={{ maxWidth: 1000, padding: '22px 28px' }}
       >
-        <span
+        <Reveal
+          as="span"
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
           <CountUp value={11} className="text-[var(--accent)]" /> specialized
           agents
-        </span>
-        <span style={{ color: 'var(--moon-500)' }}>·</span>
-        <span
+        </Reveal>
+        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+          ·
+        </Reveal>
+        <Reveal
+          as="span"
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
           <CountUp value={10} className="text-[var(--accent)]" /> slash commands
-        </span>
-        <span style={{ color: 'var(--moon-500)' }}>·</span>
-        <span
+        </Reveal>
+        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+          ·
+        </Reveal>
+        <Reveal
+          as="span"
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
@@ -43,15 +51,18 @@ export function ProofBar() {
           <span style={{ color: 'var(--accent)' }}>
             <CountUp value={60} /> seconds
           </span>
-        </span>
-        <span style={{ color: 'var(--moon-500)' }}>·</span>
-        <span
+        </Reveal>
+        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+          ·
+        </Reveal>
+        <Reveal
+          as="span"
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
           free · MIT
-        </span>
-      </div>
+        </Reveal>
+      </RevealGroup>
     </section>
   );
 }

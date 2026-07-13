@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { motion } from 'motion/react';
 
-import { Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 import { agents, ORG_LEVELS } from './team-data';
 import type { AgentTone } from './team-data';
@@ -251,9 +251,12 @@ export function TeamPreview() {
       }}
     >
       <div className="mx-auto" style={{ maxWidth: 1200 }}>
-        <div className="mb-10 text-center">
-          <Eyebrow>04 · the team</Eyebrow>
-          <h2
+        <RevealGroup className="mb-10 text-center">
+          <Reveal>
+            <Eyebrow>04 · the team</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
             style={{
               fontSize: 'clamp(32px, 4vw, 46px)',
               letterSpacing: '-0.02em',
@@ -262,8 +265,9 @@ export function TeamPreview() {
             }}
           >
             A team, not a megaprompt
-          </h2>
-          <p
+          </Reveal>
+          <Reveal
+            as="p"
             className="mx-auto"
             style={{
               fontSize: 18,
@@ -277,8 +281,8 @@ export function TeamPreview() {
             tight charter, its own prompt and tools, and a clean handoff to the
             next. Narrow charters mean fewer hallucinations and an auditable
             artifact at every stage.
-          </p>
-        </div>
+          </Reveal>
+        </RevealGroup>
 
         <div
           id="ns-org"
