@@ -86,6 +86,38 @@ function CloseGlyph() {
 }
 
 /**
+ * Owns the dialog's Esc/scroll-lock/focus lifecycle. Rendered as a child
+ * INSIDE the AnimatePresence-managed dialog so its cleanup (unlock scroll,
+ * return focus) only runs once the dialog actually unmounts — i.e. after
+ * the exit animation finishes, not the instant `open` flips false.
+ */
+function OverlayLifecycle({
+  onClose,
+  focusRef,
+  returnFocusTo,
+}: {
+  onClose: () => void;
+  focusRef: React.RefObject<HTMLButtonElement | null>;
+  returnFocusTo: React.RefObject<HTMLButtonElement | null>;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    focusRef.current?.focus();
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+      returnFocusTo.current?.focus();
+    };
+  }, [onClose, focusRef, returnFocusTo]);
+
+  return null;
+}
+
+/**
  * Full-screen overlay menu shown below the `lg` breakpoint. Reuses NAV_LINKS
  * and the shared CtaButton so the mobile menu stays in lock-step with the
  * desktop bar. Owns its own a11y (dialog role, Esc, scroll-lock, focus
@@ -105,26 +137,11 @@ function MobileOverlay({
   const closeRef = useRef<HTMLButtonElement>(null);
   const reduce = prefersReducedMotion();
 
-  // Esc to close + body scroll-lock, active only while open.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    closeRef.current?.focus();
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
-      returnFocusTo.current?.focus();
-    };
-  }, [open, onClose, returnFocusTo]);
-
   return (
     <AnimatePresence>
       {open && (
         <motion.div
+          id="mobile-menu"
           role="dialog"
           aria-modal="true"
           aria-label="Site menu"
@@ -134,6 +151,11 @@ function MobileOverlay({
           exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
           transition={{ duration: reduce ? 0 : 0.2, ease: 'easeOut' }}
         >
+          <OverlayLifecycle
+            onClose={onClose}
+            focusRef={closeRef}
+            returnFocusTo={returnFocusTo}
+          />
           <div className="flex items-center justify-between">
             <Link
               href="/"
@@ -347,7 +369,7 @@ export function NavBar() {
         </button>
       </header>
 
-      <div id="mobile-menu" className="lg:hidden">
+      <div className="lg:hidden">
         <MobileOverlay
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
