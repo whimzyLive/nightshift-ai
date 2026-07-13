@@ -73,9 +73,16 @@ export function NavBar() {
       }`}
       style={{
         height: 'var(--nav-height)',
+        // Floating: hug the content (so nothing overflows the pill), centred,
+        // capped at the design max / viewport width. `right: auto` releases
+        // the base `inset-x-0` right:0 that would otherwise pin the width.
         left: floating ? '50%' : undefined,
+        right: floating ? 'auto' : undefined,
         transform: floating ? 'translateX(-50%)' : undefined,
-        maxWidth: floating ? 'var(--nav-float-max)' : undefined,
+        width: floating ? 'max-content' : undefined,
+        maxWidth: floating
+          ? 'min(var(--nav-float-max), calc(100vw - 48px))'
+          : undefined,
         background: floating
           ? 'var(--glass-nav-float-bg)'
           : 'var(--glass-nav-bg)',
