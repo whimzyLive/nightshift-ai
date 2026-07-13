@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
+
+import { motion } from 'motion/react';
 
 import { CtaButton, Eyebrow } from '@nightshift-ai/ui';
 
@@ -39,6 +41,19 @@ const WORKING_MS = 1700;
 const WORKING_MS_REDUCED = 400;
 const AUTO_ADVANCE_MS = 700;
 const FULL_AUTO_LOOP_MS = 3200;
+
+// Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)).
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+// Matches the retired `ns-twinkle` keyframes / `--dur-twinkle` token.
+const TWINKLE_ANIMATE = {
+  opacity: [0.85, 1, 0.85],
+  filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'],
+};
+// Matches the retired `ns-gatepulse` keyframes (1.3s, scale + brightness).
+const GATE_PULSE_ANIMATE = {
+  scale: [1, 1.14, 1],
+  filter: ['brightness(1)', 'brightness(1.45)', 'brightness(1)'],
+};
 
 const APPROVAL_MODES: ApprovalMode[] = ['assisted', 'auto', 'full-auto'];
 
@@ -222,7 +237,7 @@ interface CtrlGate {
   bg: string;
   color: string;
   glow: string;
-  anim: string;
+  awaiting: boolean;
   labelColor: string;
 }
 
@@ -259,7 +274,7 @@ function buildCtrlGates(
         : done
           ? '0 0 8px rgba(217,119,87,.25)'
           : 'none',
-      anim: awaiting ? 'ns-gatepulse 1.3s ease-in-out infinite' : 'none',
+      awaiting,
       labelColor: done || current ? 'var(--moon-100)' : 'var(--text-dim)',
     };
   });
@@ -473,6 +488,15 @@ function reducer(state: ControlState, action: Action): ControlState {
 export function ControlSection() {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const raceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  // Direct `matchMedia` check (not Motion's `useReducedMotion`) — checked
+  // once post-mount so the deterministic server/first-hydration frame
+  // matches, then gates every Motion entrance/loop in this section off for
+  // reduced-motion users.
+  useEffect(() => {
+    setReducedMotion(prefersReducedMotion());
+  }, []);
 
   const {
     ticketType,
@@ -621,6 +645,7 @@ export function ControlSection() {
           approvalModeHint={approvalModeHint}
           triageLanes={triageLanes}
           triageMsg={triageMsg}
+          reducedMotion={reducedMotion}
           setTypeStory={setTypeStory}
           setTypeBug={setTypeBug}
           setStoryPts={setStoryPts}
@@ -629,7 +654,7 @@ export function ControlSection() {
           cycleMode={cycleMode}
         />
 
-        <GateStrip gates={ctrlGates} />
+        <GateStrip gates={ctrlGates} reducedMotion={reducedMotion} />
 
         <ComparisonTerminals
           raceLeft={raceLeft}
@@ -638,6 +663,7 @@ export function ControlSection() {
           ctrlAwaiting={ctrlAwaiting}
           ctrlWorking={ctrlWorking}
           ctrlDone={ctrlDone}
+          reducedMotion={reducedMotion}
           approveGate={approveGate}
           resetGates={resetGates}
         />
@@ -659,6 +685,7 @@ interface TriageCardProps {
   approvalModeHint: string;
   triageLanes: TriageLane[];
   triageMsg: string;
+  reducedMotion: boolean;
   setTypeStory: () => void;
   setTypeBug: () => void;
   setStoryPts: (e: ChangeEvent<HTMLInputElement>) => void;
@@ -678,6 +705,7 @@ function TriageCard({
   approvalModeHint,
   triageLanes,
   triageMsg,
+  reducedMotion,
   setTypeStory,
   setTypeBug,
   setStoryPts,
@@ -915,9 +943,15 @@ function TriageCard({
               </span>
               <div className="ml-auto flex gap-2">
                 {lane.tickets.map((t) => (
-                  <span
+                  <motion.span
                     key={t.label}
-                    className="font-mono motion-safe:animate-[ns-risein_.35s_var(--ease-out)_both]"
+                    className="font-mono"
+                    initial={reducedMotion ? false : { opacity: 0, y: 7 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: reducedMotion ? 0 : 0.35,
+                      ease: EASE_OUT,
+                    }}
                     style={{
                       fontSize: 12,
                       color: t.color,
@@ -928,7 +962,7 @@ function TriageCard({
                     }}
                   >
                     {t.label}
-                  </span>
+                  </motion.span>
                 ))}
               </div>
             </div>
@@ -953,7 +987,13 @@ function TriageCard({
   );
 }
 
-function GateStrip({ gates }: { gates: CtrlGate[] }) {
+function GateStrip({
+  gates,
+  reducedMotion,
+}: {
+  gates: CtrlGate[];
+  reducedMotion: boolean;
+}) {
   return (
     <>
       <div
@@ -985,8 +1025,18 @@ function GateStrip({ gates }: { gates: CtrlGate[] }) {
               className="flex flex-col items-center gap-2"
               style={{ padding: '0 14px' }}
             >
-              <span
+              <motion.span
                 className="font-mono flex items-center justify-center"
+                animate={
+                  g.awaiting && !reducedMotion
+                    ? GATE_PULSE_ANIMATE
+                    : { scale: 1, filter: 'brightness(1)' }
+                }
+                transition={
+                  g.awaiting && !reducedMotion
+                    ? { duration: 1.3, ease: 'easeInOut', repeat: Infinity }
+                    : { duration: 0.2 }
+                }
                 style={{
                   width: 34,
                   height: 34,
@@ -996,13 +1046,12 @@ function GateStrip({ gates }: { gates: CtrlGate[] }) {
                   color: g.color,
                   fontSize: 16,
                   boxShadow: g.glow,
-                  animation: g.anim,
                   transition:
                     'background .4s, border-color .4s, color .4s, box-shadow .4s',
                 }}
               >
                 {g.glyph}
-              </span>
+              </motion.span>
               <span
                 className="font-mono"
                 style={{
@@ -1028,8 +1077,18 @@ interface ComparisonTerminalsProps {
   ctrlAwaiting: boolean;
   ctrlWorking: boolean;
   ctrlDone: boolean;
+  reducedMotion: boolean;
   approveGate: () => void;
   resetGates: () => void;
+}
+
+// Matches the retired `ns-risein` keyframes (.4s rise from y:7 + fade in).
+function riseInProps(reducedMotion: boolean, durationS = 0.4) {
+  return {
+    initial: reducedMotion ? false : { opacity: 0, y: 7 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: reducedMotion ? 0 : durationS, ease: EASE_OUT },
+  } as const;
 }
 
 function ComparisonTerminals({
@@ -1039,6 +1098,7 @@ function ComparisonTerminals({
   ctrlAwaiting,
   ctrlWorking,
   ctrlDone,
+  reducedMotion,
   approveGate,
   resetGates,
 }: ComparisonTerminalsProps) {
@@ -1083,9 +1143,18 @@ function ComparisonTerminals({
           </div>
           {raceLeft.map((r, idx) =>
             'blob' in r ? (
-              <div
+              <motion.div
                 key={idx}
-                className="flex flex-col gap-1.5 motion-safe:animate-[ns-slam_.5s_var(--ease-out)_both]"
+                className="flex flex-col gap-1.5"
+                initial={
+                  reducedMotion ? false : { opacity: 0, y: -18, scale: 1.05 }
+                }
+                animate={{ opacity: 1, y: [-18, 2, 0], scale: [1.05, 1, 1] }}
+                transition={{
+                  duration: reducedMotion ? 0 : 0.5,
+                  ease: EASE_OUT,
+                  times: [0, 0.6, 1],
+                }}
                 style={{
                   background: 'rgba(255,255,255,.03)',
                   border: '1px solid var(--border-soft)',
@@ -1118,19 +1187,16 @@ function ComparisonTerminals({
                     </span>
                   </span>
                 ))}
-              </div>
+              </motion.div>
             ) : (
-              <div
-                key={idx}
-                className="motion-safe:animate-[ns-risein_.4s_var(--ease-out)_both]"
-              >
+              <motion.div key={idx} {...riseInProps(reducedMotion)}>
                 <span
                   className="font-mono block"
                   style={{ fontSize: 14.5, lineHeight: 1.75, color: r.color }}
                 >
                   {r.t}
                 </span>
-              </div>
+              </motion.div>
             ),
           )}
         </div>
@@ -1159,17 +1225,14 @@ function ComparisonTerminals({
             🌙 nightshift · {routeName}
           </div>
           {raceRight.map((r, idx) => (
-            <div
-              key={idx}
-              className="motion-safe:animate-[ns-risein_.4s_var(--ease-out)_both]"
-            >
+            <motion.div key={idx} {...riseInProps(reducedMotion)}>
               <span
                 className="font-mono block"
                 style={{ fontSize: 14.5, lineHeight: 1.75, color: r.color }}
               >
                 {r.t}
               </span>
-            </div>
+            </motion.div>
           ))}
           {ctrlAwaiting && (
             <div className="mt-auto flex justify-end pt-2.5">
@@ -1180,12 +1243,18 @@ function ComparisonTerminals({
           )}
           {ctrlWorking && (
             <div className="mt-auto flex justify-end pt-2.5">
-              <span
-                className="font-mono motion-safe:animate-[ns-twinkle_1.2s_ease-in-out_infinite]"
+              <motion.span
+                className="font-mono"
+                animate={reducedMotion ? undefined : TWINKLE_ANIMATE}
+                transition={
+                  reducedMotion
+                    ? undefined
+                    : { duration: 1.2, ease: 'easeInOut', repeat: Infinity }
+                }
                 style={{ fontSize: 12, color: 'var(--text-dim)' }}
               >
                 ▌ working
-              </span>
+              </motion.span>
             </div>
           )}
           {ctrlDone && (

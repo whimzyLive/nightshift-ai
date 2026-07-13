@@ -1,4 +1,4 @@
-import { CursorGlow, Footer, NavBar, NightSky } from '@nightshift-ai/ui';
+import { CursorGlow, Footer, NavBar, ScrollProgress } from '@nightshift-ai/ui';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
@@ -12,8 +12,19 @@ import '../global.css';
 // override of their own (e.g. /team).
 export const metadata: Metadata = {
   metadataBase: new URL(seoSite.siteUrl),
-  title: 'nightshift — your AI software team that ships while you sleep',
+  title: {
+    default: 'nightshift — your AI software team that ships while you sleep',
+    template: '%s · nightshift',
+  },
   description: 'Your AI software team that ships while you sleep.',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [{ url: '/favicon.svg' }],
+  },
   openGraph: {
     siteName: seoSite.siteName,
   },
@@ -29,8 +40,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${interSans.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-[var(--bg-page)] text-[var(--text-body)] antialiased">
-        <NightSky />
         <CursorGlow />
+        <ScrollProgress />
         <NavBar />
         <main
           className="mx-auto max-w-[var(--container-max)] px-7"

@@ -9,7 +9,6 @@
 5. `vercel-composition-patterns` — React composition patterns (compound components, render props, context providers, React 19 APIs). Invoke when designing reusable component APIs or refactoring boolean-prop proliferation.
 6. `atomic-design` — repo-authored atomic design methodology (atoms → molecules → organisms → templates → pages; hierarchy, naming, composition decisions). Invoke when structuring or decomposing UI into reusable components in apps/marketing or packages/ui.
 7. `motion-dev-animations` — Motion.dev (Framer Motion successor) React/Next.js animations: entrances, gestures, scroll reveals, layout transitions, spring physics, prefers-reduced-motion. Invoke for React component animations and micro-interactions in apps/marketing.
-8. `gsap-core` — official GSAP core API (tweens, easing, stagger, matchMedia responsive/reduced-motion). Invoke for timeline- or scroll-driven and SVG/DOM animation where Motion.dev doesn't fit.
 
 ## Directory guides (read before coding)
 

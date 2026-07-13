@@ -28,7 +28,7 @@ export function FaqPreview({ faqs }: { faqs: HomeFaqItem[] }) {
 
   return (
     <section
-      className="border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t ns-cv"
       style={{ padding: '80px 28px', borderColor: 'var(--border-default)' }}
     >
       <div className="mx-auto" style={{ maxWidth: 800 }}>

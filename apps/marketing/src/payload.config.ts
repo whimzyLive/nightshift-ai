@@ -20,6 +20,24 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    components: {
+      graphics: {
+        Icon: '/components/admin/icon#Icon',
+        Logo: '/components/admin/logo#Logo',
+      },
+    },
+    meta: {
+      title: 'nightshift admin',
+      titleSuffix: ' — nightshift',
+      description:
+        'Content and configuration for the nightshift marketing site.',
+      icons: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+      openGraph: {
+        title: 'nightshift admin',
+        description:
+          'Content and configuration for the nightshift marketing site.',
+      },
+    },
   },
   collections: [Faq, Media, Users],
   globals: [WhySdlc],

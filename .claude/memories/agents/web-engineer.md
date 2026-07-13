@@ -1,3 +1,196 @@
+## 2026-07-13 — Brand the Payload admin (logo, icon, theme)
+
+**Learnings:**
+
+- `admin.components.graphics.Icon`/`.Logo` in `payload.config.ts` are real
+  fields (`payload/dist/config/types.d.ts` — `CustomComponent`), path format
+  `'/relative/to/importMap.baseDir/file#ExportName'`. `baseDir` here is `src/`,
+  so `apps/marketing/src/components/admin/icon.tsx` exporting `Icon` becomes
+  `'/components/admin/icon#Icon'` — filename kebab-case per this repo's
+  convention, export name PascalCase to match Payload's own graphics-slot
+  contract. `npx payload generate:importmap` (or `next build`, which calls it
+  internally) picks this up with zero extra config; its "No new imports found,
+  skipping writing import map" console line is stale/misleading — the file
+  updates anyway, always verify via `git diff` on `importMap.js`, not the CLI
+  text.
+- Payload's admin CSS theming surface is narrower than it looks: almost
+  everything (bg, text, input bg, borders, checked-state color, focus rings,
+  dropzone drag-border, auth "confirmed" border) derives from
+  `--theme-elevation-0..1000` plus `--color-success-500`/`--theme-success-500`
+  (verified by grepping the installed `@payloadcms/ui/dist/**/*.scss`, not the
+  project skill — the `payload` skill doc has no admin-theming reference at
+  all). There's no independent "brand/accent" custom property — repurposing
+  the success token for the terracotta accent is the only documented lever
+  that hits buttons/checked-inputs/focus without touching Payload's own SCSS.
+  Primary buttons read `--theme-elevation-800` for their bg, which is also
+  reused all over as a text/border color — overriding it to terracotta directly
+  would repaint far more than buttons and risks contrast breaks, so it's set to
+  a light moonlight tone instead (matches the brand's moonlight-on-night look)
+  rather than forcing every primary button terracotta.
+- This exact `custom.scss` (elevation scale + `--theme-bg/-text/-input-bg/-border-color`
+  aliases + success-token accent) had already been authored once before on an
+  unmerged `feat/NA-22` worktree branch (commit `8f15445`, refined in
+  `5a8dba7`) — found via `git log --all -- '.../custom.scss'`. Confirmed its
+  hex values still match the canonical `.claude/skills/nightshift-design/tokens/colors.css`
+  scale exactly before reusing it; dropped its `--font-body`/`--font-mono`
+  overrides since this dispatch's brand facts didn't ask for admin typography
+  and the `--font-inter`/`--font-jetbrains-mono` vars those overrides pointed
+  at aren't wired into `(payload)/layout.tsx` on this branch (that self-hosting
+  change lived only on the same unmerged branch).
+- `git log --all -- <path>` is a cheap way to check whether a "new" file this
+  dispatch is about to create was already built and abandoned/orphaned on some
+  other branch — worth doing before hand-authoring CSS/config from scratch
+  when a plausible prior attempt could exist.
+
+**Pitfalls:**
+
+- `apps/marketing/next-env.d.ts` churns on every `next build` (quote-style
+  only, `'...'` → `"..."`) — `git checkout --` it before staging, same
+  established finding as prior stories.
+
+**Patterns:**
+
+- New Payload admin custom components (graphics, custom views, etc.) belong
+  under `apps/marketing/src/components/admin/` — plain RSC, static string ids
+  instead of `useId` (no `'use client'` needed), geometry ported verbatim from
+  the canonical `packages/ui/src/lib/nightshift/logomark.tsx` source rather
+  than re-derived.
+
+## 2026-07-13 — PR #97 review-fix round — 8 small accepted findings across scroll-progress/terminal/nav-bar/jest.setup/cta-kicker/argument-rail
+
+**Learnings:**
+
+- The reduced-motion "latch in state via a post-mount effect" pattern (already
+  established for `terminal.tsx`/`phrase-marquee.tsx`) needed to be applied to
+  two more render-time `prefersReducedMotion()` call sites this round:
+  `cta-kicker.tsx` (one call) and `argument-rail.tsx` (four calls — one inside
+  `GateNode`, three inside `ArgumentRail`'s `AnimatePresence` crossfade).
+  Reading matchMedia during render (not inside `useEffect`) is an SSR/hydration
+  mismatch risk on every Motion `initial`/`animate` prop that branches on it —
+  worth grepping for this specific shape (`const reduced = prefersReducedMotion()`
+  as a bare top-of-body `const`, not inside `useEffect`) across a whole
+  component tree, not just the file a reviewer flagged, since the same author
+  pattern tends to repeat within one PR.
+- For a helper called from a child component (`GateNode`'s own `pulse` calc),
+  the fix is to latch the boolean once in the parent and thread it down as an
+  explicit prop (`reduced: boolean` added to `GateNodeProps`) rather than
+  duplicating the effect/state pair in the child — keeps `matchMedia` reads to
+  exactly one per component tree per mount.
+- `argument-rail.spec.tsx`/`cta-kicker.spec.tsx` needed **no changes** for this
+  fix — neither spec mocks `matchMedia` to the reduced-motion branch or asserts
+  render-time timing, so latching the read behind a `useEffect` (which fires
+  synchronously enough after the initial render in RTL's `render()` for the
+  assertions in these specs, which only check text/attribute content, not
+  animation props) left both suites green with zero spec edits. Don't assume a
+  hydration-mismatch fix always requires a test update — check what the
+  existing spec actually asserts first.
+- The non-breaking-space fix (`line.text || ' '` → `line.text || ' '` in
+  `terminal.tsx`) is invisible in a normal diff view/prompt text (NBSP and a
+  regular space render identically in most editors/terminals) — verified the
+  edit actually landed the `\xa0` byte (not a plain `0x20`) via a `python3`
+  `repr()`/`ord()` check on the file content before trusting the `Edit` tool's
+  success message. Worth this extra verification step any time a fix's
+  before/after snippets are visually indistinguishable.
+- `git status` at dispatch start already showed `apps/marketing/src/payload-types.ts`
+  modified (stale churn from a prior session's build, unrelated to this PR's
+  scope) — by the time this round's own `pnpm nx build marketing` finished, that
+  file no longer showed as modified (regenerated back to match committed
+  content), so nothing needed discarding there this round. `next-env.d.ts` did
+  churn as expected (established NA-32/NA-36 finding) — `git checkout --` it
+  before staging, same as always.
+
+**Patterns:**
+
+- Renaming a component identifier for brand casing (`GithubMark` →
+  `GitHubMark`) is a pure find-and-replace across its one declaration + one
+  JSX usage site in the same file — no export from the file, so no other
+  file in the repo needed touching. Confirmed via reading the whole file
+  first rather than grepping repo-wide for a name that turned out to be
+  file-local.
+
+## 2026-07-12 — refactor/motion-gsap-animations follow-up — visual-fidelity pass against the design handoff HTML
+
+**Learnings:**
+
+- A user-attached "standalone" HTML export (`nightshift Landing (standalone).html`)
+  looked like plain static markup at a glance but was actually a JS-bundler
+  artifact — the real HTML lived escaped inside a giant JS string literal
+  (`\"...\"`, `/` for `/`). Two lines in the file were 549K/173K chars.
+  `grep -o 'id="..."'` against the raw file found nothing; extracting the
+  quoted string span (find the opening `"` before `<!DOCTYPE`, scan forward
+  respecting `\`-escapes to the matching closing `"`, then `json.loads()` it
+  to unescape) turned it into normal readable HTML. Confirmed by its own
+  `id="..."` markers (`top`, `proof`, `problem`, `how-it-works`, `workflow`,
+  `agents`, `faq`, `install`, plus two un-id'd `data-screen-label="Why
+different"`/`"Control bridge"` sections) that it covers **only the home/
+  landing page** — not `/faq`, `/team`, or `/why-sdlc` — despite a request
+  phrased as "all pages."
+- Systematically diffing every home `<section>` root's inline `style`
+  (background/border/padding) against the reference caught two classes of
+  real, pre-existing drift that had survived multiple "verbatim from the
+  design handoff" component builds:
+  1. `phrase-marquee.tsx` used `--surface-terminal` background + `--text-dim`
+     text — the reference's `.ns-marquee` is a **solid `--terra-500` band**
+     with `!important`-forced `#f5f3ef` text (= `--text-on-accent`, the
+     correct semantic token for text-on-accent-background) and asymmetric
+     `--terra-400`/`--terra-600` top/bottom borders, plus a
+     `.ns-marquee:hover .ns-marquee-track{animation-play-state:paused}`
+     interaction with no equivalent in the migrated code at all.
+  2. Three non-full-bleed sections (`day-night-workflow.tsx`,
+     `why-different.tsx`, `faq-preview.tsx`) each carried their own literal
+     `28px` horizontal padding **in addition to** `<main>`'s
+     `className="... px-7"` (28px) in `(frontend)/layout.tsx` — double
+     padding (56px vs the reference's 28px). `hero.tsx` is the one section
+     that gets this right already (explicit `0` horizontal, deferring to
+     `<main>`'s `px-7`) — it's the template to match, not an outlier. The
+     tell: every OTHER home section either (a) uses the `left-1/2 right-1/2
+-mx-[50vw] w-screen` full-bleed escape and therefore correctly needs
+     its own 28px (it's opted out of `<main>`'s padding), or (b) stays
+     contained and must therefore use `0` horizontal padding. Grepping for
+     files with a literal `28px` padding value but _no_ `-mx-[50vw]` class
+     found exactly the 3 buggy ones (plus 2 false-positive `margin: 28px`
+     hits that weren't the padding shorthand — verified each match's
+     context, not just presence).
+- Discovered mid-task that **a concurrent process using the identical
+  Claude-Session ID was independently working the same branch** (`git log`
+  showed `e165158`/`d9649a4`, already pushed to `origin/refactor/motion-gsap-animations`,
+  with the exact scope of this dispatch — marquee/team-preview/control-section
+  — plus an out-of-scope-for-this-dispatch why-sdlc + faq-row Motion pass
+  and a `global.css` `ns-*` keyframe cleanup). `git diff HEAD` against my
+  own already-written `control-section.tsx`/`team-preview.tsx` came back
+  **empty** — the concurrent commit's content was byte-identical to what I'd
+  independently produced from the same brief, so nothing was lost, just
+  already captured. That process had also already opened PR #97 for this
+  branch — checked `gh pr list --head <branch>` before creating a new PR to
+  avoid a duplicate.
+- `pnpm nx build`/`test` regenerate three unrelated tracked files as a side
+  effect: `apps/marketing/next-env.d.ts` (Next.js flips
+  `.next/dev/types/routes.d.ts` vs `.next/types/routes.d.ts` depending on
+  dev-vs-build mode — the file's own header says "should not be edited"),
+  `(payload)/admin/importMap.js`, and `payload-types.ts` (Payload
+  admin-panel/type codegen, non-deterministic plugin-discovery ordering).
+  None of these are related to any actual code change — `git checkout --
+<file>` them back to HEAD before every commit in this repo, every time,
+  regardless of which task is running; don't let build-tool churn ride
+  along in a commit's diff.
+
+**Patterns:**
+
+- When asked to verify "visual appearance ... as per attached html" and the
+  attachment turns out to be an opaque bundle, don't give up at "can't
+  parse it" — extract the escaped-string payload with a small `python3`
+  heredoc (`json.loads` on the located quoted span) rather than treating it
+  as unparseable; the reference author almost certainly exported this from
+  a real browser DOM, so the escaped payload is complete, well-formed HTML.
+- A user's direct mid-turn message is real authorization that supersedes an
+  earlier agent-issued dispatch constraint (e.g. "do not commit or push")
+  for the _scope of what the user just asked_ — per this role's own system
+  prompt, only agent messages are barred from granting that kind of
+  permission; the actual human's message is not. Still worth pausing to
+  check `gh pr list` for an existing PR on the branch before opening a new
+  one, especially in a multi-agent pipeline where another process may have
+  already acted on the same branch.
+
 ## 2026-07-12 — Story NA-39 — wire SEO meta, JSON-LD, and llms.txt (non-visual)
 
 **Learnings:**
@@ -1084,3 +1277,107 @@ from 'payload'; const mockGetPayload = getPayload as jest.Mock;` in the
   all-closed — matches the handoff's own interaction spec and gives the
   animated max-height something to visibly demonstrate without user
   interaction.
+
+## 2026-07-12 — Motion migration of home/ hand-rolled CSS animations (no ticket, dispatched off `refactor/motion-gsap-animations`)
+
+**Learnings:**
+
+- Grepping `animate-\[ns-\|animation:\|motion-safe:animate` across
+  `home/*.tsx` first, before opening every file, immediately narrowed a
+  12-file dispatch down to the 3 that actually had hand-rolled CSS
+  animation to migrate: `phrase-marquee.tsx` (`ns-marquee`
+  loop), `team-preview.tsx` (`ns-twinkle` star dot), and
+  `control-section.tsx` (`ns-risein`/`ns-slam`/`ns-gatepulse`/`ns-twinkle`,
+  6 call sites). The other 9 files (hero, proof-bar, problem-section,
+  how-it-works, day-night-workflow, why-different, faq-preview,
+  faq-accordion, final-cta) have zero animation of their own — don't
+  touch them just because they're in the dispatch's file list; plain CSS
+  `transition: 'x .3s'` property changes (hover dim, hairline color
+  fades in control-section/team-preview) are NOT in scope for a
+  `@keyframes`→Motion migration and were left alone.
+- `faq-accordion.tsx` (home/) has no animation code at all — the actual
+  expand/collapse max-height/opacity transition lives in the shared
+  `../faq/faq-row.tsx` (extracted in NA-38 so home preview + the full
+  `/faq` page accordion can't drift), which is **outside** `home/` and
+  therefore outside a `home/`-scoped dispatch's ownership even though the
+  task brief describes the accordion as if the animation were local to
+  `faq-accordion.tsx`. Read the actual delegation before assuming the
+  brief's file-purpose description is accurate — don't duplicate
+  shared-component logic into a wrapper just to satisfy a brief's framing.
+- `jest.setup.dom.js` (repo root) already polyfills `matchMedia` (always
+  `matches:false` unless a test overrides it), `IntersectionObserver`,
+  `ResizeObserver`, `scrollTo` globally for every Nx project — confirmed
+  by reading it directly rather than assuming. Existing Motion specs
+  (`terminal.spec.tsx`, `count-up.spec.tsx`) never advance real animation
+  frames or depend on `requestAnimationFrame` actually ticking in jsdom;
+  they only assert the pre-animation-complete state (initial
+  deterministic frame, or the reduced-motion jump-to-final state).
+  Followed the same testing shape for the home migrations — never
+  asserted mid-animation values, only initial/gated state.
+- Motion's `animate` prop computes styles synchronously even during SSR
+  (no flash-of-unstyled-content), which means a **direct**
+  `prefersReducedMotion()` call in a component's render body (not inside
+  `useEffect`) would produce different JSX between the server render
+  (`window` undefined → always `false`) and the client's first hydration
+  render (`window` defined → real user preference) — a hydration
+  mismatch. Every reduced-motion gate in this migration follows the
+  Terminal/CountUp precedent instead: `useState(false)` +
+  `useEffect(() => setReducedMotion(prefersReducedMotion()), [])`, so the
+  deterministic first frame always matches SSR, and the real preference
+  only applies post-mount (one JS tick of unavoidable non-reduced motion
+  on a true reduced-motion user's very first paint — accepted tradeoff,
+  already baked into this codebase's Terminal/CountUp precedent, not
+  something this migration introduced).
+
+**Pitfalls:**
+
+- `team-preview.spec.tsx` had one test that asserted a Tailwind class
+  marker (`row.querySelector('[class*="motion-safe:animate"]')`) as its
+  only way to verify the twinkle animation was reduced-motion-gated —
+  once the dot moves to Motion's JS `animate` prop there's no className
+  to grep for anymore. Fixed by adding an explicit `data-testid="team-dot"`
+  - `data-twinkle="on"|"off"` attribute pair purely for test observability
+    (harmless, `aria-hidden` decorative element) rather than trying to
+    infer gating from Motion's internal style application — cleaner and
+    actually verifies the _behavioral_ gate (mocks `matchMedia` true/false,
+    asserts the attribute flips) instead of a static-markup proxy.
+- `control-section.tsx`'s `CtrlGate.anim: string` field (`'ns-gatepulse …'
+| 'none'`) baked the CSS animation shorthand directly into the derived
+  view-model returned by `buildCtrlGates`. Migrating cleanly required
+  changing that field to `awaiting: boolean` and letting the _rendering_
+  component (`GateStrip`) decide the Motion `animate`/`transition` props
+  from it — don't carry a target-technology-specific string (a CSS
+  animation shorthand) through a pure derivation function when the
+  renderer can trivially compute the same branch from a boolean.
+
+**Patterns:**
+
+- Continuous decorative loop (`ns-twinkle`, `ns-marquee`, `ns-gatepulse`)
+  → a shared constant `{ opacity: [...], filter: [...] }` (or `x`/`scale`)
+  object passed to `animate`, paired with a `transition={{ duration,
+ease, repeat: Infinity }}`, both swapped to `undefined` under
+  `reducedMotion` (Motion treats `animate={undefined}` as "render the
+  current/initial state, do nothing" — simplest possible reduced-motion
+  off-switch for a loop, no separate `if` branch needed at the JSX call
+  site itself).
+- One-shot entrance (`ns-risein`, `ns-slam`) → `initial={reducedMotion ?
+false : {...}}` + `animate={{...}}` + `transition={{ duration:
+reducedMotion ? 0 : N, ease: EASE_OUT }}`. `initial={false}` is Motion's
+  own idiom for "skip the enter animation, render directly in the
+  `animate` end-state" — cleaner than conditionally omitting the
+  `initial` prop. For a 3-keyframe entrance (`ns-slam`: overshoot then
+  settle), keyframe arrays (`y: [-18, 2, 0]`, `scale: [1.05, 1, 1]`) plus
+  `transition.times: [0, 0.6, 1]` reproduce the CSS `@keyframes`
+  percentage stops directly — no need for a multi-stage `animate()`
+  sequence call.
+- Repeated multi-call-site entrance props (`ns-risein` used 3x across
+  `control-section.tsx`'s race terminals) — factor into a small
+  prop-spread helper (`riseInProps(reducedMotion, durationS = 0.4)`
+  returning `{ initial, animate, transition }`) and spread it
+  (`{...riseInProps(reducedMotion)}`) rather than repeating the same
+  three props at every call site.
+- `--ease-out: cubic-bezier(.22,1,.36,1)` (nightshift-design token) is
+  the exact numeric equivalent of the `motion-dev-animations` skill's own
+  "Pattern 1" easing curve (`[0.22, 1, 0.36, 1]`) — no translation needed
+  between the design system's token and Motion's array-tuple easing
+  format when porting a design-authored `var(--ease-out)` CSS animation.

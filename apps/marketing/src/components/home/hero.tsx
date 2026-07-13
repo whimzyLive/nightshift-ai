@@ -56,15 +56,20 @@ const TERMINAL_LINES: TerminalLine[] = [
 export function Hero() {
   return (
     <section
-      className="relative overflow-hidden"
-      style={{ padding: '92px 0 76px' }}
+      className="relative"
+      style={{
+        padding: 'clamp(1.25rem, 4.5vh, 5.75rem) 0 clamp(1rem, 3.5vh, 4.75rem)',
+      }}
     >
       <div
-        className="relative z-[1] mx-auto grid grid-cols-1 items-center gap-12 md:grid-cols-[1fr_1.12fr]"
+        className="relative z-[1] mx-auto grid grid-cols-1 items-center gap-x-12 gap-y-8 md:grid-cols-[1fr_1.12fr]"
         style={{ maxWidth: 'var(--container-max)' }}
       >
         <div>
-          <span className="mb-[22px] inline-flex items-center gap-2">
+          <span
+            className="inline-flex items-center gap-2"
+            style={{ marginBottom: 'clamp(0.625rem, 2.2vh, 1.75rem)' }}
+          >
             <Badge variant="accent" dot>
               v0.4.0 · MIT
             </Badge>
@@ -73,11 +78,13 @@ export function Hero() {
           <h1
             className="font-sans font-extrabold"
             style={{
-              fontSize: 'var(--display-clamp-hero)',
+              // Cap the hero display by viewport *height* too, so short
+              // laptops shrink it enough to keep the whole fold on screen.
+              fontSize: 'min(var(--display-clamp-hero), 6.6vh)',
               lineHeight: 1.04,
               letterSpacing: '-0.025em',
               color: 'var(--moon-100)',
-              margin: '0 0 20px',
+              margin: '0 0 clamp(0.75rem, 2.2vh, 1.75rem)',
             }}
           >
             Your AI software team that ships{' '}
@@ -87,36 +94,28 @@ export function Hero() {
           </h1>
           <p
             style={{
-              fontSize: 20,
-              lineHeight: 1.6,
+              fontSize: 'clamp(0.9375rem, 2.2vh, 1.25rem)',
+              lineHeight: 1.7,
               color: 'var(--text-muted)',
-              maxWidth: 500,
-              margin: '0 0 16px',
+              maxWidth: '31.25rem',
+              margin: '0 0 clamp(0.75rem, 2.4vh, 1.75rem)',
             }}
           >
             A Claude Code plugin that turns one terminal into a full delivery
             team — product manager, architect, tech lead, engineers, and QA. It
             reads a Jira ticket and ships the spec, plan, code, and review.
           </p>
-          <p
-            className="font-mono"
+          <div
+            className="flex flex-col"
             style={{
-              fontSize: 16,
-              color: 'var(--text-dim)',
-              margin: '0 0 28px',
+              maxWidth: '32.5rem',
+              gap: 'clamp(0.375rem, 1vh, 0.625rem)',
             }}
           >
-            Jira ticket <span style={{ color: 'var(--indigo-400)' }}>→</span>{' '}
-            spec <span style={{ color: 'var(--indigo-400)' }}>→</span> plan{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> implementation{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> review{' '}
-            <span style={{ color: 'var(--indigo-400)' }}>→</span> PR
-          </p>
-          <div className="flex flex-col gap-[10px]" style={{ maxWidth: 520 }}>
             <span
               className="font-mono uppercase"
               style={{
-                fontSize: 13,
+                fontSize: '0.8125rem',
                 letterSpacing: '0.14em',
                 color: 'var(--text-dim)',
               }}
@@ -125,9 +124,13 @@ export function Hero() {
             </span>
             <InstallSnippet command="/plugin marketplace add whimzyLive/nightshift-ai" />
             <InstallSnippet command="/plugin install sdlc@nightshift" />
-          </div>
-          <div className="mt-[22px] flex gap-3">
-            <CtaButton href={GITHUB_URL} target="_blank" rel="noopener">
+            <CtaButton
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener"
+              variant="secondary"
+              className="mt-1 self-start"
+            >
               ★ Star nightshift on GitHub
             </CtaButton>
           </div>
@@ -135,20 +138,20 @@ export function Hero() {
         <div className="relative">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute rounded-full blur-[10px]"
+            className="pointer-events-none absolute rounded-full blur-[60px]"
             style={{
-              top: -70,
-              left: -50,
-              width: 420,
-              height: 420,
+              top: '-7rem',
+              left: '-6rem',
+              width: '32rem',
+              height: '32rem',
               background:
-                'radial-gradient(circle, var(--terra-glow), transparent 62%)',
+                'radial-gradient(circle, var(--terra-glow), transparent 66%)',
             }}
           />
           <Terminal
             title="zsh — acme-api · claude code"
             lines={TERMINAL_LINES}
-            minHeight={420}
+            minHeight="clamp(16.25rem, 40vh, 26.25rem)"
           />
         </div>
       </div>

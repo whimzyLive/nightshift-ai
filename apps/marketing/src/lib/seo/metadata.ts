@@ -6,7 +6,11 @@ import type { Metadata } from 'next';
 // `alternates.canonical`/`openGraph.url` values resolve against
 // `metadataBase` (set once in the frontend layout — see layout.tsx).
 export const homeMetadata: Metadata = {
-  title: 'nightshift — your AI software team that ships while you sleep',
+  // Absolute — already brand-led, so it skips the layout `%s · nightshift`
+  // template.
+  title: {
+    absolute: 'nightshift — your AI software team that ships while you sleep',
+  },
   description:
     'nightshift is a free, MIT-licensed Claude Code plugin that runs your whole SDLC. It reads a Jira ticket and ships the spec, plan, code, and review automatically.',
   alternates: {
@@ -40,7 +44,8 @@ export const homeMetadata: Metadata = {
 };
 
 export const whySdlcMetadata: Metadata = {
-  title: 'Why nightshift keeps you in control of AI-built code',
+  // Absolute — already brand-led, so it skips the `%s · nightshift` template.
+  title: { absolute: 'Why nightshift keeps you in control of AI-built code' },
   description:
     'Most AI dev tools abstract the process away. nightshift enforces the software development lifecycle instead: a hard gate at every phase keeps you in control.',
   alternates: {
@@ -68,6 +73,74 @@ export const whySdlcMetadata: Metadata = {
       {
         url: seoSite.ogImageWhySdlc,
         alt: 'nightshift phases with a hard gate returning control at each: refine, spec, plan, implement, review',
+      },
+    ],
+  },
+};
+
+export const teamMetadata: Metadata = {
+  title: 'The team — 11 specialized agents that run your SDLC',
+  description:
+    'Meet the nightshift agents — product manager, architect, tech lead, engineers, and QA. Each owns a phase of the lifecycle, from ticket to reviewed PR. A team, not a megaprompt.',
+  alternates: {
+    canonical: '/team',
+  },
+  openGraph: {
+    type: 'website',
+    title: 'A full AI delivery team, not a megaprompt',
+    description:
+      'Eleven specialized agents — PM, architect, tech lead, engineers, QA — each owning a phase of the software lifecycle, from Jira ticket to reviewed PR.',
+    url: '/team',
+    images: [
+      {
+        url: seoSite.ogImageHome,
+        alt: 'The nightshift agents, each owning a phase of the software delivery lifecycle',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'A full AI delivery team, not a megaprompt',
+    description:
+      'Eleven specialized nightshift agents run your whole SDLC — spec, plan, code, review — from one ticket. Free and MIT.',
+    images: [
+      {
+        url: seoSite.ogImageHome,
+        alt: 'The nightshift agents, each owning a phase of the software delivery lifecycle',
+      },
+    ],
+  },
+};
+
+export const faqMetadata: Metadata = {
+  title: 'FAQ — everything builders ask',
+  description:
+    'Answers to the questions builders ask about nightshift — positioning, workflow & control, setup & stack, trust & quality, and cost & license.',
+  alternates: {
+    canonical: '/faq',
+  },
+  openGraph: {
+    type: 'website',
+    title: 'nightshift FAQ — everything builders ask',
+    description:
+      'Positioning, workflow & control, setup & stack, trust & quality, cost & license — the questions builders ask about nightshift, answered.',
+    url: '/faq',
+    images: [
+      {
+        url: seoSite.ogImageHome,
+        alt: 'nightshift — your AI software team that ships while you sleep',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'nightshift FAQ — everything builders ask',
+    description:
+      'The questions builders ask about nightshift — workflow, setup, trust, and license — answered. Free and MIT.',
+    images: [
+      {
+        url: seoSite.ogImageHome,
+        alt: 'nightshift — your AI software team that ships while you sleep',
       },
     ],
   },

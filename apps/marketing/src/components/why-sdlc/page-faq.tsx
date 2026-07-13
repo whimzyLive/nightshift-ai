@@ -15,7 +15,7 @@ export function PageFaq({ faqs }: { faqs: WhySdlcFaqItem[] }) {
 
   return (
     <section
-      className="border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
       style={{
         padding: '64px 28px',
         background: 'var(--bg-void)',

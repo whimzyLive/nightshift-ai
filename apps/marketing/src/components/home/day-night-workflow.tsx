@@ -50,7 +50,7 @@ export function DayNightWorkflow() {
   return (
     <section
       id="workflow"
-      className="relative overflow-hidden border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
       style={{ padding: '84px 28px', borderColor: 'var(--border-default)' }}
     >
       <div

@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+import { motion } from 'motion/react';
 
 import { Eyebrow } from '@nightshift-ai/ui';
 
@@ -8,6 +10,24 @@ import { agents, ORG_LEVELS } from './team-data';
 import type { AgentTone } from './team-data';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L320-373).
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+}
+
+// Matches the retired `--dur-twinkle` token (3.4s) / `ns-twinkle` keyframes.
+const TWINKLE_ANIMATE = {
+  opacity: [0.85, 1, 0.85],
+  filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'],
+};
+const TWINKLE_TRANSITION = {
+  duration: 3.4,
+  ease: 'easeInOut' as const,
+  repeat: Infinity,
+};
 
 const HUMAN_KEY = 'you';
 const HUMAN_META = {
@@ -210,12 +230,20 @@ function getSidePanel(active: string | null): SidePanel {
  */
 export function TeamPreview() {
   const [active, setActive] = useState<string | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const panel = getSidePanel(active);
+
+  // Direct `matchMedia` check (not Motion's `useReducedMotion`) — checked
+  // once post-mount so the deterministic server/first-hydration frame
+  // matches, then gates the twinkle loop off for reduced-motion users.
+  useEffect(() => {
+    setReducedMotion(prefersReducedMotion());
+  }, []);
 
   return (
     <section
       id="agents"
-      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t ns-cv"
       style={{
         padding: '80px 28px',
         background: 'var(--bg-void)',
@@ -308,9 +336,14 @@ export function TeamPreview() {
                     </span>
                   )}
                   {row.star && (
-                    <span
+                    <motion.span
                       aria-hidden="true"
-                      className="motion-safe:animate-[ns-twinkle_var(--dur-twinkle)_ease-in-out_infinite]"
+                      data-testid="team-dot"
+                      data-twinkle={reducedMotion ? 'off' : 'on'}
+                      animate={reducedMotion ? undefined : TWINKLE_ANIMATE}
+                      transition={
+                        reducedMotion ? undefined : TWINKLE_TRANSITION
+                      }
                       style={{
                         width: row.key === HUMAN_KEY ? 15 : 11,
                         height: row.key === HUMAN_KEY ? 15 : 11,

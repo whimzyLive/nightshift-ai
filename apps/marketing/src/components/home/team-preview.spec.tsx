@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { TeamPreview } from './team-preview';
 
@@ -6,6 +6,15 @@ function rowFor(label: string): HTMLElement {
   const row = screen.getByText(label).closest('div');
   if (!row) throw new Error(`row for "${label}" not found`);
   return row;
+}
+
+function mockMatchMedia(reduced: boolean) {
+  window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+    matches: query === '(prefers-reduced-motion: reduce)' ? reduced : false,
+    media: query,
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  })) as unknown as typeof window.matchMedia;
 }
 
 describe('TeamPreview', () => {
@@ -54,10 +63,19 @@ describe('TeamPreview', () => {
     expect(link.getAttribute('href')).toBe('/team');
   });
 
-  it('gates the tree twinkle animation behind motion-safe (AC5)', () => {
+  it('gates the tree twinkle animation behind a direct matchMedia check (AC5)', async () => {
+    mockMatchMedia(false);
     render(<TeamPreview />);
     const row = rowFor('product-manager');
-    const dot = row.querySelector('[class*="motion-safe:animate"]');
-    expect(dot).toBeTruthy();
+    const dot = await within(row).findByTestId('team-dot');
+    expect(dot.getAttribute('data-twinkle')).toBe('on');
+  });
+
+  it('freezes the tree twinkle animation under reduced motion (AC5)', async () => {
+    mockMatchMedia(true);
+    render(<TeamPreview />);
+    const row = rowFor('product-manager');
+    const dot = await within(row).findByTestId('team-dot');
+    expect(dot.getAttribute('data-twinkle')).toBe('off');
   });
 });

@@ -121,6 +121,13 @@ export function Footer() {
           Built on Claude Code — agents, commands, skills, and hooks all the way
           down.
         </span>
+        <span
+          className="flex items-center gap-1.5 font-mono text-xs text-[var(--text-muted)]"
+          title="This site was built and shipped by nightshift itself."
+        >
+          <Logomark size={14} />
+          shipped with <span className="text-[var(--accent)]">nightshift</span>
+        </span>
         <span className="font-mono text-xs text-[var(--text-dim)]">
           MIT © whimzyLive
         </span>

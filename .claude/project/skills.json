@@ -32,12 +32,6 @@
       "note": "locally built workspace skill at skills/atomic-design/ (repo-authored, published for others; not CLI-managed) — .claude/skills/atomic-design is a symlink for Claude Code discovery."
     },
     {
-      "name": "gsap-core",
-      "source": "custom",
-      "addedBy": "user",
-      "note": "managed by the skills CLI (npx skills add greensock/gsap-skills -s gsap-core) — content at .agents/skills/gsap-core/, pinned in skills-lock.json; .claude/skills/gsap-core is a symlink for Claude Code discovery. Update via the skills CLI, not by hand."
-    },
-    {
       "name": "motion-dev-animations",
       "source": "custom",
       "addedBy": "user",

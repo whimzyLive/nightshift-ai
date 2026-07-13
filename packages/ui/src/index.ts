@@ -22,6 +22,8 @@ export type { NightSkyProps } from './lib/nightshift/night-sky';
 
 export { CursorGlow } from './lib/nightshift/cursor-glow';
 
+export { ScrollProgress } from './lib/nightshift/scroll-progress';
+
 export { NavBar } from './lib/nightshift/nav-bar';
 
 export { Footer } from './lib/nightshift/footer';

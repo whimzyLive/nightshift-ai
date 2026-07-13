@@ -25,21 +25,21 @@ describe('NavBar', () => {
     mockUsePathname.mockReturnValue('/why-sdlc');
   });
 
-  it('renders exactly 5 nav links plus 1 primary CTA', () => {
+  it('renders the 4 nav links, the GitHub icon link, and the primary CTA', () => {
     render(<NavBar />);
-    const links = screen.getAllByRole('link');
-    // 5 nav links (How it works, Why SDLC, The team, FAQ, GitHub) + logo link + CTA link = 7
-    const labels = links.map((l) => l.textContent);
+    const labels = screen.getAllByRole('link').map((l) => l.textContent);
+    // 4 nav links + logo + GitHub icon (count "4") + CTA
     expect(labels).toEqual(
       expect.arrayContaining([
         'How it works',
         'Why SDLC',
         'The team',
         'FAQ',
-        'GitHub',
         'Install the plugin',
       ]),
     );
+    // GitHub moved out of the nav to an icon link — accessible name via aria-label.
+    expect(screen.getByRole('link', { name: 'GitHub' })).toBeTruthy();
   });
 
   it('marks the current route link active and others not', () => {
