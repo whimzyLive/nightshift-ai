@@ -115,7 +115,7 @@
   --halo-indigo: rgba(139, 156, 247, 0.18);
   --halo-cyan: rgba(98, 196, 211, 0.12);
   --meteor: var(--terra-400);
-  --sky-opacity-home: 0.6;
+  --sky-opacity-home: 0.35;
   --sky-opacity-subpage: 0.75;
 
   --btn-neon-bg: rgba(217, 119, 87, 0.08);
