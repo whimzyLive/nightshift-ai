@@ -64,10 +64,10 @@ const INDIGO = 'var(--star-indigo)';
 const BRIGHT = 'var(--star-bright)';
 const CYAN = 'var(--star-cyan)';
 
-// Dense deterministic layers (~4× the original count) tiled at 360px.
-const NEAR_DOTS = makeDots(54, 1337, 1.2, 2.0, [WHITE, WHITE, WHITE, INDIGO]);
-const MID_DOTS = makeDots(30, 7331, 2.0, 2.8, [WHITE, WHITE, INDIGO]);
-const FAR_DOTS = makeDots(16, 9157, 3.0, 3.9, [BRIGHT, CYAN, BRIGHT]);
+// Deterministic layers tiled at 360px (~half the earlier dense count).
+const NEAR_DOTS = makeDots(27, 1337, 1.2, 2.0, [WHITE, WHITE, WHITE, INDIGO]);
+const MID_DOTS = makeDots(15, 7331, 2.0, 2.8, [WHITE, WHITE, INDIGO]);
+const FAR_DOTS = makeDots(8, 9157, 3.0, 3.9, [BRIGHT, CYAN, BRIGHT]);
 
 const TILE = '360px 360px';
 
