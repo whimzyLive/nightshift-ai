@@ -229,8 +229,6 @@
 
   --glow-accent:
     0 0 0 1px rgba(217, 119, 87, 0.35), 0 8px 28px rgba(217, 119, 87, 0.22);
-  --glow-cool:
-    0 0 0 1px rgba(124, 147, 240, 0.35), 0 8px 28px rgba(124, 147, 240, 0.18);
   --glow-focus: 0 0 0 3px rgba(124, 147, 240, 0.45);
   --glow-cool: 0 0 22px rgba(124, 147, 240, 0.5);
 
@@ -419,4 +417,14 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Below-the-fold content sections opt into content-visibility so the browser
+   can skip their layout/paint while off-screen. `auto` intrinsic-size makes
+   the browser remember each section's real height after first render, so
+   scrolling back doesn't jump. Not used on sections whose glow bleeds past
+   the box (content-visibility implies contain:paint, which would re-clip it). */
+.ns-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }

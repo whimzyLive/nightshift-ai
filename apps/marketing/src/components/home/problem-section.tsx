@@ -25,7 +25,7 @@ const CARDS: { title: string; body: string }[] = [
 export function ProblemSection() {
   return (
     <section
-      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen overflow-hidden"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen overflow-hidden ns-cv"
       style={{ padding: '80px 28px' }}
     >
       <div

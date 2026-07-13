@@ -33,7 +33,7 @@ const VALUES: { title: string; body: React.ReactNode }[] = [
 export function WhyDifferent() {
   return (
     <section
-      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t ns-cv"
       style={{ padding: '80px 28px', borderColor: 'var(--border-default)' }}
     >
       <div className="mx-auto" style={{ maxWidth: 1000 }}>

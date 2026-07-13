@@ -243,7 +243,7 @@ export function TeamPreview() {
   return (
     <section
       id="agents"
-      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t"
+      className="relative left-1/2 right-1/2 -mx-[50vw] w-screen border-t ns-cv"
       style={{
         padding: '80px 28px',
         background: 'var(--bg-void)',
