@@ -136,17 +136,21 @@ const COMBO_SPOT_PX = 34; // "same spot" tolerance
 const COMBO_WINDOW_MS = 1400; // max gap between combo clicks
 // Deterministic radiating debris — fixed angles/distances so the render stays
 // pure (no Math.random at render time).
-const BIGBANG_PARTICLES = Array.from({ length: 22 }, (_, i) => {
-  const angle = (i / 22) * Math.PI * 2 + (i % 2 ? 0.14 : 0);
-  const dist = 240 + (i % 5) * 46;
+// Debris uses viewport-relative reach (vmax) so it always flies clear off the
+// edges of the screen from wherever the click landed.
+const BIGBANG_PARTICLES = Array.from({ length: 34 }, (_, i) => {
+  const angle = (i / 34) * Math.PI * 2 + (i % 2 ? 0.1 : 0);
+  const reach = 110 + (i % 5) * 18; // vmax units
   return {
-    dx: Math.cos(angle) * dist,
-    dy: Math.sin(angle) * dist,
+    dx: `${(Math.cos(angle) * reach).toFixed(1)}vmax`,
+    dy: `${(Math.sin(angle) * reach).toFixed(1)}vmax`,
     size: 2 + (i % 3),
     color: i % 4 === 0 ? 'var(--star-bright)' : 'rgba(217,119,87,0.95)',
   };
 });
-const BIGBANG_RINGS = [0, 0.08, 0.18]; // stagger delays (s)
+const BIGBANG_RINGS = [0, 0.1, 0.22]; // stagger delays (s), post-blackout
+// Blast starts only after the sky has snapped to black.
+const BLACKOUT_S = 0.18;
 
 interface Meteor {
   id: number;
@@ -405,27 +409,45 @@ export function NightSky({
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 z-[9990] overflow-hidden"
         >
-          {/* Core flash — clears the counter/removes the burst on complete. */}
+          {/* Blackout — the whole sky snaps to black before the blast, then
+              clears as debris flies out. Longest-lived → owns the cleanup. */}
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: '#000', willChange: 'opacity' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 1, 0] }}
+            transition={{
+              duration: 1.7,
+              ease: 'easeOut',
+              times: [0, BLACKOUT_S / 1.7, 0.45, 1],
+            }}
+            onAnimationComplete={() => setBigBang(null)}
+          />
+          {/* Core flash — erupts once the sky is black, filling the screen. */}
           <motion.span
             className="absolute rounded-full"
             style={{
               left: bigBang.x,
               top: bigBang.y,
-              width: 60,
-              height: 60,
-              marginLeft: -30,
-              marginTop: -30,
+              width: 80,
+              height: 80,
+              marginLeft: -40,
+              marginTop: -40,
               background:
-                'radial-gradient(circle, #ffffff 0%, var(--star-bright) 30%, rgba(217,119,87,0.7) 55%, transparent 72%)',
+                'radial-gradient(circle, #ffffff 0%, var(--star-bright) 28%, rgba(217,119,87,0.7) 52%, transparent 72%)',
               mixBlendMode: 'screen',
               willChange: 'transform, opacity',
             }}
-            initial={{ scale: 0, opacity: 1 }}
-            animate={{ scale: [0, 6, 9], opacity: [1, 0.9, 0] }}
-            transition={{ duration: 1.3, ease: 'easeOut', times: [0, 0.3, 1] }}
-            onAnimationComplete={() => setBigBang(null)}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 14, 34], opacity: [0, 1, 0] }}
+            transition={{
+              duration: 1.5,
+              ease: 'easeOut',
+              times: [0, 0.28, 1],
+              delay: BLACKOUT_S,
+            }}
           />
-          {/* Shockwave rings. */}
+          {/* Shockwave rings — expand clear across the viewport. */}
           {BIGBANG_RINGS.map((delay, i) => (
             <motion.span
               key={i}
@@ -437,17 +459,22 @@ export function NightSky({
                 height: 40,
                 marginLeft: -20,
                 marginTop: -20,
-                border: '2px solid rgba(217,119,87,0.85)',
-                boxShadow: '0 0 18px rgba(217,119,87,0.6)',
+                border: '2px solid rgba(217,119,87,0.9)',
+                boxShadow:
+                  '0 0 22px rgba(217,119,87,0.7), inset 0 0 22px rgba(245,243,239,0.4)',
                 mixBlendMode: 'screen',
                 willChange: 'transform, opacity',
               }}
-              initial={{ scale: 0, opacity: 0.9 }}
-              animate={{ scale: 18, opacity: 0 }}
-              transition={{ duration: 1.1, ease: 'easeOut', delay }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: [0, 90], opacity: [0.95, 0] }}
+              transition={{
+                duration: 1.4,
+                ease: 'easeOut',
+                delay: BLACKOUT_S + delay,
+              }}
             />
           ))}
-          {/* Radiating debris. */}
+          {/* Radiating debris — flung off every edge. */}
           {BIGBANG_PARTICLES.map((p, i) => (
             <motion.span
               key={i}
@@ -464,17 +491,18 @@ export function NightSky({
                 mixBlendMode: 'screen',
                 willChange: 'transform, opacity',
               }}
-              initial={{ x: 0, y: 0, opacity: 1 }}
+              initial={{ x: 0, y: 0, opacity: 0 }}
               animate={{
                 x: p.dx,
                 y: p.dy,
-                opacity: [1, 1, 0],
+                opacity: [0, 1, 1, 0],
                 scale: [1, 0.3],
               }}
               transition={{
-                duration: 1.2,
+                duration: 1.45,
                 ease: 'easeOut',
-                times: [0, 0.7, 1],
+                times: [0, 0.08, 0.75, 1],
+                delay: BLACKOUT_S,
               }}
             />
           ))}
