@@ -40,7 +40,6 @@ export interface TerminalProps {
 
 const REVEAL_MS = 520; // --dur-terminal-line
 const REVEAL_S = REVEAL_MS / 1000;
-const HOLD_STEPS = 2; // extra beats to pause on the fully-revealed frame
 const CARET_BLINK_S = 0.5;
 const INDENT_STEP_PX = 16;
 
@@ -66,6 +65,7 @@ export function Terminal({
 }: TerminalProps) {
   const [visibleCount, setVisibleCount] = useState(1);
   const [hovering, setHovering] = useState(false);
+  const [replayNonce, setReplayNonce] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // 3D transform driven by Motion values: tilt on hover, idle drift otherwise.
@@ -81,13 +81,13 @@ export function Terminal({
     }
     setVisibleCount(1);
     const total = lines.length;
-    // onUpdate fires every frame (~60/s); only push state when the revealed
-    // count actually changes, so React re-renders ~once per line, not per frame.
+    // Reveal once, then stop (no infinite loop — that kept burning frames).
+    // onUpdate fires ~60/s; only push state when the revealed count changes,
+    // so React re-renders ~once per line. `replayNonce` re-runs it on demand.
     let lastCount = 1;
-    const controls = animate(0, total + HOLD_STEPS, {
-      duration: (total + HOLD_STEPS) * REVEAL_S,
+    const controls = animate(0, total, {
+      duration: total * REVEAL_S,
       ease: 'linear',
-      repeat: Infinity,
       onUpdate: (v) => {
         const next = Math.min(total, Math.max(1, Math.floor(v) + 1));
         if (next !== lastCount) {
@@ -95,9 +95,10 @@ export function Terminal({
           setVisibleCount(next);
         }
       },
+      onComplete: () => setVisibleCount(total),
     });
     return () => controls.stop();
-  }, [lines.length]);
+  }, [lines.length, replayNonce]);
 
   // Magnetic tilt on hover; idle drift when not hovered. Both operate on the
   // same Motion values and are mutually exclusive.
@@ -204,6 +205,16 @@ export function Terminal({
         >
           {title}
         </span>
+        {fullyRevealed && (
+          <button
+            type="button"
+            onClick={() => setReplayNonce((n) => n + 1)}
+            aria-label="Replay the terminal run"
+            className="ml-auto flex-none rounded-none border border-[var(--border-default)] px-2 py-0.5 font-mono text-[11px] tracking-[0.04em] text-[var(--text-dim)] uppercase transition-colors duration-150 ease-out hover:border-[var(--link)] hover:text-[var(--text-strong)] focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)] motion-reduce:transition-none"
+          >
+            ↺ replay
+          </button>
+        )}
       </div>
       <div
         aria-hidden="true"
