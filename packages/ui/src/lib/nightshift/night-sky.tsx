@@ -65,17 +65,18 @@ const BRIGHT = 'var(--star-bright)';
 const CYAN = 'var(--star-cyan)';
 
 // Deterministic layers tiled at 360px (~half the earlier dense count).
-const NEAR_DOTS = makeDots(27, 1337, 1.2, 2.0, [WHITE, WHITE, WHITE, INDIGO]);
-const MID_DOTS = makeDots(15, 7331, 2.0, 2.8, [WHITE, WHITE, INDIGO]);
-const FAR_DOTS = makeDots(8, 9157, 3.0, 3.9, [BRIGHT, CYAN, BRIGHT]);
+const NEAR_DOTS = makeDots(30, 1337, 1.2, 2.0, [WHITE, WHITE, WHITE, INDIGO]);
+const MID_DOTS = makeDots(20, 7331, 2.0, 2.8, [WHITE, WHITE, INDIGO]);
+const FAR_DOTS = makeDots(10, 9157, 3.0, 3.9, [BRIGHT, CYAN, BRIGHT]);
 
 const TILE = '360px 360px';
 
 // Parallax depth per layer (px of travel at the screen edge). Foreground
-// (near) shifts most; the far bright layer barely moves.
-const NEAR_DEPTH = 34;
-const MID_DEPTH = 20;
-const FAR_DEPTH = 10;
+// (near) shifts most; the far bright layer barely moves. Scaled up in step
+// with the raised dot counts (30/20/10).
+const NEAR_DEPTH = 38;
+const MID_DEPTH = 27;
+const FAR_DEPTH = 13;
 
 function layerBackground(dots: StarDot[]): string {
   return dots
