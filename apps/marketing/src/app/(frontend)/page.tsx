@@ -65,7 +65,7 @@ export default async function HomePage() {
           ],
         }}
       />
-      <NightSky />
+      <NightSky variant="home" />
       <PhraseMarquee />
       <Hero />
       <ProofBar />
