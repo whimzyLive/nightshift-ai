@@ -62,32 +62,32 @@ export function CursorGlow() {
 
   if (!enabled) return null;
 
-  const size = active ? 'var(--cursor-size-active)' : 'var(--cursor-size)';
-  const background = active
-    ? 'radial-gradient(circle, var(--cursor-glow-active), rgba(124,147,240,0.16) 58%, transparent 72%)'
-    : 'radial-gradient(circle, var(--cursor-glow), transparent 70%)';
+  // Rest size ÷ active size (28 / 84) — the spotlight is a fixed active-size
+  // element scaled down at rest, so the size change animates on `transform`
+  // (GPU) instead of width/height (layout + paint).
+  const REST_SCALE = 28 / 84;
 
   return (
     <>
-      {/* Large focus spotlight — grows + brightens over clickable elements. */}
+      {/* Large focus spotlight — grows + brightens over clickable elements.
+          Scale/opacity only, so it stays on the compositor. */}
       <motion.div
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-[9997] rounded-full transition-[width,height,background] duration-200 ease-out motion-reduce:transition-none"
+        className="pointer-events-none fixed top-0 left-0 z-[9997] rounded-full"
         style={{
           x: sx,
           y: sy,
-          width: size,
-          height: size,
-          marginTop: active
-            ? 'calc(var(--cursor-size-active) / -2)'
-            : 'calc(var(--cursor-size) / -2)',
-          marginLeft: active
-            ? 'calc(var(--cursor-size-active) / -2)'
-            : 'calc(var(--cursor-size) / -2)',
-          background,
+          width: 'var(--cursor-size-active)',
+          height: 'var(--cursor-size-active)',
+          marginTop: 'calc(var(--cursor-size-active) / -2)',
+          marginLeft: 'calc(var(--cursor-size-active) / -2)',
+          background:
+            'radial-gradient(circle, var(--cursor-glow-active), rgba(124,147,240,0.16) 58%, transparent 72%)',
           mixBlendMode: 'screen',
           willChange: 'transform',
         }}
+        animate={{ scale: active ? 1 : REST_SCALE, opacity: active ? 1 : 0.6 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
       />
       {/* Connector dot — trails behind the cursor. */}
       <motion.div
