@@ -1,4 +1,9 @@
-import { CtaButton, InstallSnippet } from '@nightshift-ai/ui';
+import {
+  CtaButton,
+  InstallSnippet,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 
@@ -30,8 +35,9 @@ export function FaqCta() {
             'radial-gradient(circle, var(--terra-glow), transparent 62%)',
         }}
       />
-      <div className="relative z-[1] mx-auto" style={{ maxWidth: 640 }}>
-        <h2
+      <RevealGroup className="relative z-[1] mx-auto" style={{ maxWidth: 640 }}>
+        <Reveal
+          as="h2"
           style={{
             fontSize: 'clamp(26px, 3.2vw, 36px)',
             letterSpacing: '-0.02em',
@@ -40,15 +46,16 @@ export function FaqCta() {
           }}
         >
           Question answered? Put a ticket in tonight.
-        </h2>
-        <div
+        </Reveal>
+        <Reveal
+          as="div"
           className="mx-auto flex flex-col gap-[10px] text-left"
           style={{ maxWidth: 560, marginBottom: 20 }}
         >
           <InstallSnippet command="/plugin marketplace add whimzyLive/nightshift-ai" />
           <InstallSnippet command="/plugin install sdlc@nightshift" />
-        </div>
-        <div className="flex justify-center">
+        </Reveal>
+        <Reveal as="div" className="flex justify-center">
           <CtaButton
             variant="secondary"
             size="lg"
@@ -58,8 +65,8 @@ export function FaqCta() {
           >
             ★ Star nightshift on GitHub
           </CtaButton>
-        </div>
-        <p style={{ margin: '22px 0 0' }}>
+        </Reveal>
+        <Reveal as="p" style={{ margin: '22px 0 0' }}>
           <a
             href="/"
             className="font-mono"
@@ -67,8 +74,8 @@ export function FaqCta() {
           >
             ← Back to overview
           </a>
-        </p>
-      </div>
+        </Reveal>
+      </RevealGroup>
     </section>
   );
 }

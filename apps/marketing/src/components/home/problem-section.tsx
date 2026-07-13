@@ -1,4 +1,4 @@
-import { Card, Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L211-232).
 const CARDS: { title: string; body: string }[] = [
@@ -18,9 +18,9 @@ const CARDS: { title: string; body: string }[] = [
 
 /**
  * Problem framing: ghost 80% motif, eyebrow, H2 with strikethrough/accent
- * spans, two body paragraphs, three static cards. Full-bleed wrapper (Open-
- * Question default 1) so the oversized ghost glyph can clip at viewport
- * width rather than the shared `<main>` container.
+ * spans, two body paragraphs, three glassmorphic scroll-reveal cards. Full-
+ * bleed wrapper (Open-Question default 1) so the oversized ghost glyph can
+ * clip at viewport width rather than the shared `<main>` container.
  */
 export function ProblemSection() {
   return (
@@ -40,12 +40,15 @@ export function ProblemSection() {
       >
         80%
       </div>
-      <div
+      <RevealGroup
         className="relative z-[1] mx-auto text-center"
         style={{ maxWidth: 900 }}
       >
-        <Eyebrow>01 · the other 80%</Eyebrow>
-        <h2
+        <Reveal>
+          <Eyebrow>01 · the other 80%</Eyebrow>
+        </Reveal>
+        <Reveal
+          as="h2"
           style={{
             fontSize: 'clamp(32px, 4vw, 46px)',
             lineHeight: 1.12,
@@ -66,8 +69,9 @@ export function ProblemSection() {
           </span>
           . You lose it{' '}
           <span style={{ color: 'var(--accent)' }}>around the code</span>.
-        </h2>
-        <p
+        </Reveal>
+        <Reveal
+          as="p"
           style={{
             fontSize: 19,
             lineHeight: 1.65,
@@ -80,8 +84,9 @@ export function ProblemSection() {
           connective tissue: turning a vague ticket into a real spec, a spec
           into a plan, keeping the plan honest while you implement, then
           reviewing the result without rubber-stamping your own work.
-        </p>
-        <p
+        </Reveal>
+        <Reveal
+          as="p"
           style={{
             fontSize: 19,
             lineHeight: 1.65,
@@ -93,14 +98,32 @@ export function ProblemSection() {
           Coding assistants handle the middle 20%. The other 80% — the{' '}
           <strong style={{ color: 'var(--moon-100)' }}>process</strong> — stays
           manual, or gets skipped on vibes and shipped unreviewed.
-        </p>
-      </div>
-      <div
+        </Reveal>
+      </RevealGroup>
+      <RevealGroup
+        as="div"
         className="relative z-[1] mx-auto mt-[44px] grid grid-cols-1 gap-[16px] sm:grid-cols-3"
         style={{ maxWidth: 960 }}
+        amount={0.2}
       >
         {CARDS.map((card) => (
-          <Card key={card.title}>
+          <Reveal
+            key={card.title}
+            scale={0.97}
+            blur={8}
+            duration={0.6}
+            style={{
+              // Glassmorphic surface — translucent over the starfield with a
+              // backdrop blur + top highlight; the Reveal frosts it in.
+              background:
+                'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(13,13,24,0.45))',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--glass-border)',
+              padding: 24,
+              boxShadow: 'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)',
+            }}
+          >
             <h3
               style={{
                 fontSize: 18,
@@ -120,9 +143,9 @@ export function ProblemSection() {
             >
               {card.body}
             </p>
-          </Card>
+          </Reveal>
         ))}
-      </div>
+      </RevealGroup>
     </section>
   );
 }

@@ -305,6 +305,13 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* The root element's overflow propagates to the viewport, so clipping the
+     * x-axis here (not just on `body`) reliably suppresses page-wide horizontal
+     * scroll from decorative full-bleed/overflowing descendants — including
+     * absolutely-positioned glow blobs whose containing block is a section, not
+     * `body`, which `body`'s own clip does not catch. `clip` (not `hidden`)
+     * leaves `position: sticky`/`fixed` descendants working. */
+    overflow-x: clip;
   }
 
   body {

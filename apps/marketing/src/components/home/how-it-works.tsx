@@ -1,4 +1,9 @@
-import { Eyebrow, InstallSnippet } from '@nightshift-ai/ui';
+import {
+  Eyebrow,
+  InstallSnippet,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 
@@ -96,9 +101,12 @@ export function HowItWorks() {
       }}
     >
       <div className="mx-auto" style={{ maxWidth: 1000 }}>
-        <div className="mb-10 text-center">
-          <Eyebrow>02 · how it works</Eyebrow>
-          <h2
+        <RevealGroup className="mb-10 text-center">
+          <Reveal>
+            <Eyebrow>02 · how it works</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
             style={{
               fontSize: 'clamp(32px, 4vw, 46px)',
               letterSpacing: '-0.02em',
@@ -107,8 +115,9 @@ export function HowItWorks() {
             }}
           >
             One command runs the whole lifecycle
-          </h2>
-          <p
+          </Reveal>
+          <Reveal
+            as="p"
             className="mx-auto"
             style={{
               fontSize: 18,
@@ -120,188 +129,208 @@ export function HowItWorks() {
             Point it at a ticket. It triages the work, then runs each stage in
             order and closes the loop back to your tracker — spec before plan,
             plan before code, review before merge, tests as the gate.
-          </p>
-        </div>
+          </Reveal>
+        </RevealGroup>
 
-        <div className="mb-9 flex flex-wrap items-stretch justify-center">
-          {PIPELINE.map((stage, i) => {
-            const s = STAGE_STYLE[stage.status];
-            return (
-              <div key={stage.command} className="flex items-stretch">
+        <RevealGroup>
+          <Reveal className="mb-9 flex flex-col items-stretch md:flex-row md:flex-wrap md:items-stretch md:justify-center">
+            {PIPELINE.map((stage, i) => {
+              const s = STAGE_STYLE[stage.status];
+              return (
                 <div
-                  className="flex flex-col gap-1.5"
-                  style={{
-                    minWidth: 148,
-                    padding: '14px 16px',
-                    background: 'var(--surface-card)',
-                    border: '1px solid',
-                    borderColor: s.border,
-                    // Active stage keeps its accent glow; the rest get a soft
-                    // drop + inset top highlight so the flat fill reads raised.
-                    boxShadow:
-                      s.glow ??
-                      'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.05)',
-                  }}
+                  key={stage.command}
+                  className="flex flex-col items-stretch md:flex-row"
                 >
-                  <span
-                    className="font-mono font-medium"
-                    style={{ fontSize: 13, color: s.cmd }}
-                  >
-                    {stage.status === 'done' ? '✓ ' : ''}
-                    {stage.command}
-                  </span>
-                  <span style={{ fontSize: 13, color: 'var(--text-strong)' }}>
-                    {stage.label}
-                  </span>
-                  <span
-                    className="font-mono"
-                    style={{ fontSize: 11, color: 'var(--text-dim)' }}
-                  >
-                    {stage.agent}
-                  </span>
-                </div>
-                {i < PIPELINE.length - 1 && (
-                  <span
-                    aria-hidden="true"
-                    className="flex items-center font-mono"
+                  <div
+                    className="flex w-full flex-col gap-1.5 text-center md:w-auto md:text-left"
                     style={{
-                      padding: '0 6px',
-                      fontSize: 14,
-                      color:
-                        stage.status === 'done'
-                          ? 'var(--success)'
-                          : 'var(--moon-500)',
+                      minWidth: 148,
+                      padding: '14px 16px',
+                      background: 'var(--surface-card)',
+                      border: '1px solid',
+                      borderColor: s.border,
+                      // Active stage keeps its accent glow; the rest get a soft
+                      // drop + inset top highlight so the flat fill reads raised.
+                      boxShadow:
+                        s.glow ??
+                        'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.05)',
                     }}
                   >
-                    →
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                    <span
+                      className="font-mono font-medium"
+                      style={{ fontSize: 13, color: s.cmd }}
+                    >
+                      {stage.status === 'done' ? '✓ ' : ''}
+                      {stage.command}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text-strong)' }}>
+                      {stage.label}
+                    </span>
+                    <span
+                      className="font-mono"
+                      style={{ fontSize: 11, color: 'var(--text-dim)' }}
+                    >
+                      {stage.agent}
+                    </span>
+                  </div>
+                  {i < PIPELINE.length - 1 && (
+                    <span
+                      aria-hidden="true"
+                      className="flex rotate-90 items-center justify-center py-1.5 font-mono md:rotate-0 md:justify-start md:px-1.5 md:py-0"
+                      style={{
+                        fontSize: 14,
+                        color:
+                          stage.status === 'done'
+                            ? 'var(--success)'
+                            : 'var(--moon-500)',
+                      }}
+                    >
+                      →
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </Reveal>
+        </RevealGroup>
 
-        <div className="mx-auto mb-[22px]" style={{ maxWidth: 520 }}>
-          <InstallSnippet command="/auto PROJ-142" />
-        </div>
+        <RevealGroup>
+          <Reveal className="mx-auto mb-[22px]" style={{ maxWidth: 520 }}>
+            <InstallSnippet command="/auto PROJ-142" />
+          </Reveal>
+        </RevealGroup>
 
-        <div
-          className="border"
-          style={{
-            borderColor: 'var(--border-default)',
-            background: 'var(--surface-card)',
-            boxShadow: 'var(--elev-3), inset 0 1px 0 rgba(255,255,255,0.05)',
-          }}
-        >
-          <div
-            className="grid font-mono uppercase"
+        <RevealGroup>
+          <Reveal
+            className="border"
             style={{
-              gridTemplateColumns: '56px 1.1fr 1.6fr',
-              background: 'rgba(255,255,255,0.03)',
-              borderBottom: '1px solid var(--border-default)',
-              fontSize: 12,
-              letterSpacing: '0.1em',
-              color: 'var(--text-dim)',
+              borderColor: 'var(--border-default)',
+              background: 'var(--surface-card)',
+              boxShadow: 'var(--elev-3), inset 0 1px 0 rgba(255,255,255,0.05)',
             }}
           >
-            <span style={{ padding: '12px 14px' }}>Step</span>
-            <span style={{ padding: '12px 14px' }}>What runs</span>
-            <span style={{ padding: '12px 14px' }}>What you get</span>
-          </div>
-          {STEPS.map((row, i) => (
             <div
-              key={row.step}
-              className="grid items-baseline"
+              className="grid font-mono uppercase"
               style={{
                 gridTemplateColumns: '56px 1.1fr 1.6fr',
-                borderBottom:
-                  i < STEPS.length - 1
-                    ? '1px solid var(--border-soft)'
-                    : undefined,
+                background: 'rgba(255,255,255,0.03)',
+                borderBottom: '1px solid var(--border-default)',
+                fontSize: 12,
+                letterSpacing: '0.1em',
+                color: 'var(--text-dim)',
               }}
             >
-              <span
-                className="font-mono font-bold"
-                style={{ padding: 14, color: 'var(--accent)' }}
-              >
-                {row.step}
-              </span>
-              <span
-                className="font-mono"
-                style={{ padding: 14, fontSize: 14, color: 'var(--moon-100)' }}
-              >
-                {row.runs}
-              </span>
-              <span
-                style={{ padding: 14, fontSize: 16, color: 'var(--text-body)' }}
-              >
-                {row.get}
-              </span>
+              <span style={{ padding: '12px 14px' }}>Step</span>
+              <span style={{ padding: '12px 14px' }}>What runs</span>
+              <span style={{ padding: '12px 14px' }}>What you get</span>
             </div>
-          ))}
-        </div>
+            {STEPS.map((row, i) => (
+              <div
+                key={row.step}
+                className="grid items-baseline"
+                style={{
+                  gridTemplateColumns: '56px 1.1fr 1.6fr',
+                  borderBottom:
+                    i < STEPS.length - 1
+                      ? '1px solid var(--border-soft)'
+                      : undefined,
+                }}
+              >
+                <span
+                  className="font-mono font-bold"
+                  style={{ padding: 14, color: 'var(--accent)' }}
+                >
+                  {row.step}
+                </span>
+                <span
+                  className="font-mono"
+                  style={{
+                    padding: 14,
+                    fontSize: 14,
+                    color: 'var(--moon-100)',
+                  }}
+                >
+                  {row.runs}
+                </span>
+                <span
+                  style={{
+                    padding: 14,
+                    fontSize: 16,
+                    color: 'var(--text-body)',
+                  }}
+                >
+                  {row.get}
+                </span>
+              </div>
+            ))}
+          </Reveal>
+        </RevealGroup>
 
-        <div className="mt-[22px] flex flex-wrap gap-3">
-          <p
-            className="flex-1"
-            style={{
-              minWidth: 260,
-              fontSize: 14,
-              lineHeight: 1.55,
-              color: 'var(--text-muted)',
-              margin: 0,
-              background: 'var(--surface-card)',
-              border: '1px solid var(--border-soft)',
-              padding: '14px 16px',
-              boxShadow: 'var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)',
-            }}
-          >
-            <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
-              /auto
-            </span>{' '}
-            triages by size. Stories at or under the lightweight threshold
-            (default ≤3 points) skip the spec and plan and go straight to
-            implementation.
-          </p>
-        </div>
+        <RevealGroup>
+          <Reveal className="mt-[22px] flex flex-wrap gap-3">
+            <p
+              className="flex-1"
+              style={{
+                minWidth: 260,
+                fontSize: 14,
+                lineHeight: 1.55,
+                color: 'var(--text-muted)',
+                margin: 0,
+                background: 'var(--surface-card)',
+                border: '1px solid var(--border-soft)',
+                padding: '14px 16px',
+                boxShadow:
+                  'var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
+            >
+              <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
+                /auto
+              </span>{' '}
+              triages by size. Stories at or under the lightweight threshold
+              (default ≤3 points) skip the spec and plan and go straight to
+              implementation.
+            </p>
+          </Reveal>
 
-        <div className="mt-3 flex flex-wrap gap-3">
-          <p
-            className="flex-1"
-            style={{
-              minWidth: 260,
-              fontSize: 14,
-              lineHeight: 1.55,
-              color: 'var(--text-muted)',
-              margin: 0,
-              background: 'var(--surface-card)',
-              border: '1px solid var(--border-soft)',
-              padding: '14px 16px',
-              boxShadow: 'var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)',
-            }}
-          >
-            <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
-              Drive a stage yourself.
-            </span>{' '}
-            Every stage has its own verb:{' '}
-            <code style={{ color: 'var(--terra-400)' }}>/spec</code>{' '}
-            <code style={{ color: 'var(--terra-400)' }}>/plan</code>{' '}
-            <code style={{ color: 'var(--terra-400)' }}>/impl</code>{' '}
-            <code style={{ color: 'var(--terra-400)' }}>/review</code>.
-          </p>
-        </div>
+          <Reveal className="mt-3 flex flex-wrap gap-3">
+            <p
+              className="flex-1"
+              style={{
+                minWidth: 260,
+                fontSize: 14,
+                lineHeight: 1.55,
+                color: 'var(--text-muted)',
+                margin: 0,
+                background: 'var(--surface-card)',
+                border: '1px solid var(--border-soft)',
+                padding: '14px 16px',
+                boxShadow:
+                  'var(--elev-1), inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
+            >
+              <span style={{ color: 'var(--moon-100)', fontWeight: 600 }}>
+                Drive a stage yourself.
+              </span>{' '}
+              Every stage has its own verb:{' '}
+              <code style={{ color: 'var(--terra-400)' }}>/spec</code>{' '}
+              <code style={{ color: 'var(--terra-400)' }}>/plan</code>{' '}
+              <code style={{ color: 'var(--terra-400)' }}>/impl</code>{' '}
+              <code style={{ color: 'var(--terra-400)' }}>/review</code>.
+            </p>
+          </Reveal>
 
-        <div className="mt-6 text-center">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener"
-            className="font-mono"
-            style={{ fontSize: 14, color: 'var(--link)' }}
-          >
-            See the commands on GitHub →
-          </a>
-        </div>
+          <Reveal className="mt-6 text-center">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener"
+              className="font-mono"
+              style={{ fontSize: 14, color: 'var(--link)' }}
+            >
+              See the commands on GitHub →
+            </a>
+          </Reveal>
+        </RevealGroup>
       </div>
     </section>
   );

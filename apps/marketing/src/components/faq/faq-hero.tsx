@@ -1,4 +1,4 @@
-import { Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 /**
  * `/faq` header — breadcrumb, eyebrow, H1, subhead, terra glow. Static
@@ -27,31 +27,38 @@ export function FaqHero() {
             'radial-gradient(circle, var(--terra-glow), transparent 62%)',
         }}
       />
-      <div className="relative z-[1] mx-auto" style={{ maxWidth: 860 }}>
-        <nav
-          className="font-mono"
-          style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}
-        >
-          <a href="/" style={{ color: 'var(--text-muted)' }}>
-            Home
-          </a>{' '}
-          <span style={{ color: 'var(--moon-500)' }}>/</span>{' '}
-          <span style={{ color: 'var(--moon-300)' }}>FAQ</span>
-        </nav>
-        <Eyebrow>questions</Eyebrow>
-        <h1
-          className="font-sans font-extrabold"
-          style={{
-            fontSize: 'clamp(34px, 4.6vw, 54px)',
-            lineHeight: 1.06,
-            letterSpacing: '-0.025em',
-            color: 'var(--moon-100)',
-            margin: '16px 0 16px',
-          }}
-        >
-          Everything builders ask
-        </h1>
-        <p
+      <RevealGroup className="relative z-[1] mx-auto" style={{ maxWidth: 860 }}>
+        <Reveal>
+          <nav
+            className="font-mono"
+            style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}
+          >
+            <a href="/" style={{ color: 'var(--text-muted)' }}>
+              Home
+            </a>{' '}
+            <span style={{ color: 'var(--moon-500)' }}>/</span>{' '}
+            <span style={{ color: 'var(--moon-300)' }}>FAQ</span>
+          </nav>
+        </Reveal>
+        <Reveal>
+          <Eyebrow>questions</Eyebrow>
+        </Reveal>
+        <Reveal as="div">
+          <h1
+            className="font-sans font-extrabold"
+            style={{
+              fontSize: 'clamp(34px, 4.6vw, 54px)',
+              lineHeight: 1.06,
+              letterSpacing: '-0.025em',
+              color: 'var(--moon-100)',
+              margin: '16px 0 16px',
+            }}
+          >
+            Everything builders ask
+          </h1>
+        </Reveal>
+        <Reveal
+          as="p"
           style={{
             fontSize: 18,
             lineHeight: 1.65,
@@ -62,8 +69,8 @@ export function FaqHero() {
         >
           The full set, grouped by topic. Click any question — one answer open
           at a time.
-        </p>
-      </div>
+        </Reveal>
+      </RevealGroup>
     </section>
   );
 }

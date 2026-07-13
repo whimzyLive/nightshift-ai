@@ -1,4 +1,4 @@
-import { Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 interface WorkflowCard {
   eyebrow: string;
@@ -66,9 +66,12 @@ export function DayNightWorkflow() {
         }}
       />
       <div className="relative mx-auto" style={{ zIndex: 1, maxWidth: 1000 }}>
-        <div className="mb-4 text-center">
-          <Eyebrow>03 · your day, split in two</Eyebrow>
-          <h2
+        <RevealGroup className="mb-4 text-center">
+          <Reveal>
+            <Eyebrow>03 · your day, split in two</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
             style={{
               fontSize: 'clamp(32px, 4vw, 46px)',
               letterSpacing: '-0.02em',
@@ -77,8 +80,9 @@ export function DayNightWorkflow() {
             }}
           >
             Review by day. Ship by night.
-          </h2>
-          <p
+          </Reveal>
+          <Reveal
+            as="p"
             className="mx-auto"
             style={{
               fontSize: 18,
@@ -90,52 +94,69 @@ export function DayNightWorkflow() {
             &quot;Ships while you sleep&quot; is a workflow, not a slogan. The
             split is simple: your day is for decisions, the night is for
             execution.
-          </p>
-        </div>
+          </Reveal>
+        </RevealGroup>
 
-        <div
-          className="mx-auto flex items-center gap-[14px] font-mono"
-          style={{
-            maxWidth: 760,
-            margin: '36px auto 20px',
-            fontSize: 13,
-            letterSpacing: '0.1em',
-          }}
-        >
-          <span style={{ color: 'var(--indigo-400)', whiteSpace: 'nowrap' }}>
-            ☀ 09:00
-          </span>
-          <div
-            className="h-px flex-1"
+        <RevealGroup>
+          <Reveal
+            className="mx-auto flex items-center gap-[14px] font-mono"
             style={{
-              background:
-                'linear-gradient(90deg, rgba(139,156,247,.55), rgba(217,119,87,.75))',
+              maxWidth: 760,
+              margin: '36px auto 20px',
+              fontSize: 13,
+              letterSpacing: '0.1em',
             }}
-          />
-          <span style={{ color: 'var(--accent)', whiteSpace: 'nowrap' }}>
-            🌙 23:00
-          </span>
-          <div
-            className="h-px flex-1"
-            style={{
-              background:
-                'linear-gradient(90deg, rgba(217,119,87,.75), rgba(139,156,247,.55))',
-            }}
-          />
-          <span style={{ color: 'var(--indigo-400)', whiteSpace: 'nowrap' }}>
-            ↑ 07:00
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {CARDS.map((card) => (
+          >
+            <span style={{ color: 'var(--indigo-400)', whiteSpace: 'nowrap' }}>
+              ☀ 09:00
+            </span>
             <div
-              key={card.title}
+              className="h-px flex-1"
               style={{
-                background: 'var(--surface-card)',
-                border: `1px solid ${card.accent ? 'var(--border-accent)' : 'var(--border-default)'}`,
+                background:
+                  'linear-gradient(90deg, rgba(139,156,247,.55), rgba(217,119,87,.75))',
+              }}
+            />
+            <span style={{ color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+              🌙 23:00
+            </span>
+            <div
+              className="h-px flex-1"
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(217,119,87,.75), rgba(139,156,247,.55))',
+              }}
+            />
+            <span style={{ color: 'var(--indigo-400)', whiteSpace: 'nowrap' }}>
+              ↑ 07:00
+            </span>
+          </Reveal>
+        </RevealGroup>
+
+        <RevealGroup
+          as="div"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+          amount={0.2}
+        >
+          {CARDS.map((card) => (
+            <Reveal
+              key={card.title}
+              scale={0.97}
+              blur={8}
+              duration={0.6}
+              style={{
+                // Glassmorphic surface — translucent over the starfield with a
+                // backdrop blur + top highlight; the Reveal frosts it in.
+                background: card.accent
+                  ? 'linear-gradient(180deg, rgba(217,119,87,0.12), rgba(13,13,24,0.5))'
+                  : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(13,13,24,0.45))',
+                backdropFilter: 'var(--glass-blur)',
+                WebkitBackdropFilter: 'var(--glass-blur)',
+                border: `1px solid ${card.accent ? 'var(--border-accent)' : 'var(--glass-border)'}`,
                 padding: 24,
-                boxShadow: card.accent ? 'var(--glow-accent)' : undefined,
+                boxShadow: card.accent
+                  ? 'var(--glow-accent), inset 0 1px 0 rgba(255,255,255,0.08)'
+                  : 'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
             >
               <span
@@ -167,27 +188,30 @@ export function DayNightWorkflow() {
               >
                 {card.body}
               </p>
-            </div>
+            </Reveal>
           ))}
-        </div>
+        </RevealGroup>
 
-        <p
-          className="mx-auto text-center"
-          style={{
-            fontSize: 17,
-            lineHeight: 1.6,
-            color: 'var(--text-muted)',
-            maxWidth: 680,
-            margin: '28px auto 0',
-          }}
-        >
-          You kept every decision. The plugin did the execution. Prefer to drive
-          a stage yourself? Each one has a verb:{' '}
-          <code style={{ color: 'var(--terra-400)' }}>/refine-issue</code>{' '}
-          <code style={{ color: 'var(--terra-400)' }}>/spec</code>{' '}
-          <code style={{ color: 'var(--terra-400)' }}>/impl</code>{' '}
-          <code style={{ color: 'var(--terra-400)' }}>/review</code>.
-        </p>
+        <RevealGroup>
+          <Reveal
+            as="p"
+            className="mx-auto text-center"
+            style={{
+              fontSize: 17,
+              lineHeight: 1.6,
+              color: 'var(--text-muted)',
+              maxWidth: 680,
+              margin: '28px auto 0',
+            }}
+          >
+            You kept every decision. The plugin did the execution. Prefer to
+            drive a stage yourself? Each one has a verb:{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/refine-issue</code>{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/spec</code>{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/impl</code>{' '}
+            <code style={{ color: 'var(--terra-400)' }}>/review</code>.
+          </Reveal>
+        </RevealGroup>
       </div>
     </section>
   );

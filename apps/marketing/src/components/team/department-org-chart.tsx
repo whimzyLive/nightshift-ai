@@ -1,3 +1,5 @@
+import { Reveal, RevealGroup } from '@nightshift-ai/ui';
+
 import { AgentProfileCard } from './agent-profile-card';
 import { DEPARTMENTS, YOU } from './roster-data';
 
@@ -11,19 +13,12 @@ export function DepartmentOrgChart() {
     <section style={{ padding: '64px 28px 40px' }}>
       <div className="mx-auto" style={{ maxWidth: 1120 }}>
         <div className="relative">
-          <div
-            aria-hidden="true"
-            className="absolute top-0"
-            style={{
-              left: '50%',
-              bottom: 20,
-              width: 0,
-              borderLeft: '1px dashed rgba(217,119,87,.4)',
-            }}
-          />
-
-          <div className="relative mx-auto" style={{ maxWidth: 480 }}>
-            <div
+          <RevealGroup
+            as="div"
+            className="relative mx-auto"
+            style={{ maxWidth: 480 }}
+          >
+            <Reveal
               className="text-center"
               style={{
                 background: 'var(--surface-card)',
@@ -63,8 +58,8 @@ export function DepartmentOrgChart() {
               >
                 {YOU.flow}
               </span>
-            </div>
-          </div>
+            </Reveal>
+          </RevealGroup>
 
           {DEPARTMENTS.map((dept) => (
             <div
@@ -72,49 +67,77 @@ export function DepartmentOrgChart() {
               className="relative"
               style={{ marginTop: 46 }}
             >
-              <div className="relative mb-[18px] flex justify-center">
-                <span
-                  className="relative z-[1] inline-block whitespace-nowrap font-mono uppercase"
+              {/* Spine segment: fills only the gap above this section label —
+                  connects the previous block's cards (or the YOU card) down to
+                  the top of this "//" eyebrow, then stops. No line runs through
+                  the label, heading, blurb, or card row. */}
+              <div
+                aria-hidden="true"
+                className="absolute left-1/2 -top-[46px] h-[46px]"
+                style={{
+                  width: 0,
+                  borderLeft: '1px dashed rgba(217,119,87,.4)',
+                }}
+              />
+              {/* Text lines only — plain (non-scaling) reveals so the absolute
+                  dashed spine connector above never shifts. */}
+              <RevealGroup as="div">
+                <Reveal className="relative mb-[18px] flex justify-center">
+                  <span
+                    className="relative z-[1] inline-block whitespace-nowrap font-mono uppercase"
+                    style={{
+                      background: 'var(--bg-void)',
+                      border: '1px solid var(--border-accent)',
+                      color: 'var(--accent)',
+                      fontSize: 12,
+                      letterSpacing: '.14em',
+                      padding: '7px 16px',
+                    }}
+                  >
+                    {dept.eyebrow}
+                  </span>
+                </Reveal>
+                <Reveal
+                  as="h3"
+                  className="text-center font-sans"
                   style={{
-                    background: 'var(--bg-void)',
-                    border: '1px solid var(--border-accent)',
-                    color: 'var(--accent)',
-                    fontSize: 12,
-                    letterSpacing: '.14em',
-                    padding: '7px 16px',
+                    fontSize: 18,
+                    color: 'var(--moon-100)',
+                    margin: '0 0 8px',
                   }}
                 >
-                  {dept.eyebrow}
-                </span>
-              </div>
-              <h3
-                className="text-center font-sans"
-                style={{
-                  fontSize: 18,
-                  color: 'var(--moon-100)',
-                  margin: '0 0 8px',
-                }}
+                  {dept.title}
+                </Reveal>
+                <Reveal
+                  as="p"
+                  className="mx-auto text-center"
+                  style={{
+                    fontSize: 14,
+                    color: 'var(--text-dim)',
+                    maxWidth: 560,
+                    margin: '0 auto 20px',
+                  }}
+                >
+                  {dept.blurb}
+                </Reveal>
+              </RevealGroup>
+              <RevealGroup
+                as="div"
+                className="relative flex flex-wrap justify-center gap-[14px]"
+                amount={0.2}
               >
-                {dept.title}
-              </h3>
-              <p
-                className="mx-auto text-center"
-                style={{
-                  fontSize: 14,
-                  color: 'var(--text-dim)',
-                  maxWidth: 560,
-                  margin: '0 auto 20px',
-                }}
-              >
-                {dept.blurb}
-              </p>
-              <div className="relative flex flex-wrap justify-center gap-[14px]">
                 {dept.members.map((member) => (
-                  <div key={member.name} style={{ width: 330 }}>
+                  <Reveal
+                    key={member.name}
+                    scale={0.97}
+                    blur={8}
+                    duration={0.6}
+                    style={{ width: 330 }}
+                  >
                     <AgentProfileCard agent={member} />
-                  </div>
+                  </Reveal>
                 ))}
-              </div>
+              </RevealGroup>
             </div>
           ))}
         </div>

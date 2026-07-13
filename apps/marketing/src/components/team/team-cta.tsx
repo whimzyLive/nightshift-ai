@@ -1,4 +1,9 @@
-import { CtaButton, InstallSnippet } from '@nightshift-ai/ui';
+import {
+  CtaButton,
+  InstallSnippet,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 
@@ -26,11 +31,13 @@ export function TeamCta() {
             'radial-gradient(circle, var(--terra-glow), transparent 62%)',
         }}
       />
-      <div
+      <RevealGroup
+        as="div"
         className="relative z-[1] mx-auto text-center"
         style={{ maxWidth: 640 }}
       >
-        <h2
+        <Reveal
+          as="h2"
           style={{
             fontSize: 'clamp(28px, 3.4vw, 38px)',
             letterSpacing: '-0.02em',
@@ -39,8 +46,9 @@ export function TeamCta() {
           }}
         >
           Hire the whole team in 60 seconds
-        </h2>
-        <p
+        </Reveal>
+        <Reveal
+          as="p"
           style={{
             fontSize: 16,
             lineHeight: 1.6,
@@ -50,15 +58,15 @@ export function TeamCta() {
         >
           No interviews, no onboarding docs, no salaries. One config file per
           repo and they start tonight.
-        </p>
-        <div
+        </Reveal>
+        <Reveal
           className="mx-auto flex flex-col gap-[10px] text-left"
           style={{ maxWidth: 560, marginBottom: 22 }}
         >
           <InstallSnippet command="/plugin marketplace add whimzyLive/nightshift-ai" />
           <InstallSnippet command="/plugin install sdlc@nightshift" />
-        </div>
-        <div className="flex justify-center">
+        </Reveal>
+        <Reveal className="flex justify-center">
           <CtaButton
             variant="secondary"
             size="lg"
@@ -68,8 +76,8 @@ export function TeamCta() {
           >
             ★ Star nightshift on GitHub
           </CtaButton>
-        </div>
-        <p style={{ margin: '22px 0 0' }}>
+        </Reveal>
+        <Reveal as="p" style={{ margin: '22px 0 0' }}>
           <a
             href="/"
             className="font-mono"
@@ -77,8 +85,8 @@ export function TeamCta() {
           >
             ← Back to overview
           </a>
-        </p>
-      </div>
+        </Reveal>
+      </RevealGroup>
     </section>
   );
 }

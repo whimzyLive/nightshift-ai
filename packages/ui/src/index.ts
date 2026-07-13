@@ -40,3 +40,6 @@ export type {
 
 export { CountUp } from './lib/nightshift/count-up';
 export type { CountUpProps } from './lib/nightshift/count-up';
+
+export { Reveal, RevealGroup } from './lib/nightshift/reveal';
+export type { RevealProps, RevealGroupProps } from './lib/nightshift/reveal';

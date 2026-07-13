@@ -37,12 +37,23 @@ export function AgentProfileCard({ agent }: { agent: AgentProfile }) {
     <div
       className="motion-safe:hover:-translate-y-[3px] motion-safe:transition-[border-color,transform,box-shadow] motion-safe:duration-300 motion-safe:ease-[var(--ease-out)] motion-safe:hover:shadow-[0_0_22px_rgba(217,119,87,.14),0_24px_50px_-28px_rgba(0,0,0,.8)] motion-safe:hover:border-[var(--border-accent)]"
       style={{
-        background: 'var(--surface-card)',
-        border: '1px solid var(--border-default)',
+        // Glassmorphic surface — translucent over the starfield with a
+        // backdrop blur + top highlight, matching the home workflow cards.
+        background:
+          'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(13,13,24,0.45))',
+        backdropFilter: 'var(--glass-blur)',
+        WebkitBackdropFilter: 'var(--glass-blur)',
+        border: '1px solid var(--glass-border)',
+        boxShadow: 'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)',
         padding: '20px 22px',
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        // Uniform card height across every department — sized just above the
+        // tallest card (~296px) so future copy has ~1 line of headroom without
+        // desyncing the grid. `marginTop:auto` on the footer keeps the
+        // flow/artifact row pinned to the bottom of the taller box.
+        minHeight: 310,
       }}
     >
       <div className="flex items-center gap-3">

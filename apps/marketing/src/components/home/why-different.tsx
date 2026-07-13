@@ -1,4 +1,4 @@
-import { Card, Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L376-401).
 const VALUES: { title: string; body: React.ReactNode }[] = [
@@ -27,8 +27,9 @@ const VALUES: { title: string; body: React.ReactNode }[] = [
 ];
 
 /**
- * Why-different: eyebrow/header, then a 2x2 grid of value cards. Reuses
- * `Card` for the accent hover-ring (AC4) — no custom hover logic needed.
+ * Why-different: eyebrow/header, then a 2x2 grid of value cards. The header
+ * and cards ride the shared scroll-reveal system — each card is a glassmorphic
+ * `Reveal` that frosts into place as the grid scrolls into view.
  */
 export function WhyDifferent() {
   return (
@@ -37,9 +38,12 @@ export function WhyDifferent() {
       style={{ padding: '80px 28px', borderColor: 'var(--border-default)' }}
     >
       <div className="mx-auto" style={{ maxWidth: 1000 }}>
-        <div className="mb-10 text-center">
-          <Eyebrow>05 · why different</Eyebrow>
-          <h2
+        <RevealGroup className="mb-10 text-center">
+          <Reveal>
+            <Eyebrow>05 · why different</Eyebrow>
+          </Reveal>
+          <Reveal
+            as="h2"
             style={{
               fontSize: 'clamp(32px, 4vw, 46px)',
               letterSpacing: '-0.02em',
@@ -48,11 +52,32 @@ export function WhyDifferent() {
             }}
           >
             Why builders choose it
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          </Reveal>
+        </RevealGroup>
+        <RevealGroup
+          as="div"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          amount={0.2}
+        >
           {VALUES.map((value) => (
-            <Card key={value.title}>
+            <Reveal
+              key={value.title}
+              scale={0.97}
+              blur={8}
+              duration={0.6}
+              style={{
+                // Glassmorphic surface — translucent over the starfield with a
+                // backdrop blur + top highlight; the Reveal frosts it in.
+                background:
+                  'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(13,13,24,0.45))',
+                backdropFilter: 'var(--glass-blur)',
+                WebkitBackdropFilter: 'var(--glass-blur)',
+                border: '1px solid var(--glass-border)',
+                padding: 24,
+                boxShadow:
+                  'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.06)',
+              }}
+            >
               <h3
                 style={{
                   fontSize: 20,
@@ -72,9 +97,9 @@ export function WhyDifferent() {
               >
                 {value.body}
               </p>
-            </Card>
+            </Reveal>
           ))}
-        </div>
+        </RevealGroup>
       </div>
     </section>
   );

@@ -1,6 +1,6 @@
 import { RichText } from '@payloadcms/richtext-lexical/react';
 
-import { Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
 import type { WhySdlcIntro } from '../../lib/why-sdlc';
 
@@ -36,43 +36,56 @@ export function Hero({ intro }: { intro: WhySdlcIntro | null }) {
             'radial-gradient(circle, var(--terra-glow), transparent 66%)',
         }}
       />
-      <div className="relative z-[1] mx-auto" style={{ maxWidth: 820 }}>
-        <nav
-          className="font-mono"
-          style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}
-        >
-          <a href="/" style={{ color: 'var(--text-muted)' }}>
-            Home
-          </a>{' '}
-          <span style={{ color: 'var(--moon-500)' }}>/</span>{' '}
-          <span style={{ color: 'var(--moon-300)' }}>Why SDLC</span>
-        </nav>
-        <Eyebrow>{intro.eyebrow.replace(/^\/\/\s*/, '')}</Eyebrow>
-        <h1
-          className="font-sans font-extrabold"
-          style={{
-            fontSize: 'clamp(34px, 4.6vw, 54px)',
-            lineHeight: 1.06,
-            letterSpacing: '-0.025em',
-            color: 'var(--moon-100)',
-            margin: '16px 0 18px',
-          }}
-        >
-          {intro.heading}
-        </h1>
-        <div
+      <RevealGroup
+        as="div"
+        className="relative z-[1] mx-auto"
+        style={{ maxWidth: 820 }}
+      >
+        {/* `nav` and `h1` aren't `Reveal`-supported tags, so they ride inside a
+            plain (div) Reveal rather than becoming the animated element. */}
+        <Reveal>
+          <nav
+            className="font-mono"
+            style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}
+          >
+            <a href="/" style={{ color: 'var(--text-muted)' }}>
+              Home
+            </a>{' '}
+            <span style={{ color: 'var(--moon-500)' }}>/</span>{' '}
+            <span style={{ color: 'var(--moon-300)' }}>Why SDLC</span>
+          </nav>
+        </Reveal>
+        <Reveal>
+          <Eyebrow>{intro.eyebrow.replace(/^\/\/\s*/, '')}</Eyebrow>
+        </Reveal>
+        <Reveal>
+          <h1
+            className="font-sans font-extrabold"
+            style={{
+              fontSize: 'clamp(34px, 4.6vw, 54px)',
+              lineHeight: 1.06,
+              letterSpacing: '-0.025em',
+              color: 'var(--moon-100)',
+              margin: '16px 0 18px',
+            }}
+          >
+            {intro.heading}
+          </h1>
+        </Reveal>
+        <Reveal
           className="[&_p]:m-0 [&_p]:max-w-[640px]"
           style={{ fontSize: 19, lineHeight: 1.65, color: 'var(--text-muted)' }}
         >
           <RichText data={intro.lead} disableContainer />
-        </div>
-        <p
+        </Reveal>
+        <Reveal
+          as="p"
           className="font-mono"
           style={{ fontSize: 13, color: 'var(--text-dim)', margin: '20px 0 0' }}
         >
           {intro.scrollHint}
-        </p>
-      </div>
+        </Reveal>
+      </RevealGroup>
     </section>
   );
 }

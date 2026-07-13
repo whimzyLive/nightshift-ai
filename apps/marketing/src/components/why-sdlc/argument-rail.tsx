@@ -236,9 +236,8 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
         <div className="relative flex flex-col gap-[26px]">
           <div
             aria-hidden="true"
-            className="absolute"
+            className="absolute left-4 md:left-[27px]"
             style={{
-              left: 27,
               top: 44,
               bottom: 44,
               width: 0,
@@ -249,7 +248,7 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
             <div
               key={i}
               data-why-sec={i}
-              className="relative grid grid-cols-[56px_1fr] gap-6"
+              className="relative grid grid-cols-[32px_1fr] gap-3 md:grid-cols-[56px_1fr] md:gap-6"
             >
               <div className="flex items-start justify-center pt-[30px]">
                 <GateNode
@@ -260,10 +259,10 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
                 />
               </div>
               <div
+                className="px-5 py-7 md:px-[34px] md:py-[30px]"
                 style={{
                   background: 'var(--surface-card)',
                   border: '1px solid var(--border-default)',
-                  padding: '30px 34px',
                 }}
               >
                 <Eyebrow>{arg.eyebrow.replace(/^\/\/\s*/, '')}</Eyebrow>
