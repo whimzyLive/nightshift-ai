@@ -123,6 +123,9 @@ const INTERACTIVE_SELECTOR =
   'a,button,[role="button"],input,textarea,select,summary,label';
 
 const MAX_METEORS = 6;
+// Ambient shooting-star cadence: check every ~4.2s, fire on ~45% of checks.
+const AMBIENT_METEOR_MS = 4200;
+const AMBIENT_METEOR_CHANCE = 0.55; // skip when Math.random() < this
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
 
 interface Meteor {
@@ -174,10 +177,7 @@ export function NightSky({
       py.set(e.clientY / window.innerHeight - 0.5);
     }
 
-    function onTap(e: PointerEvent) {
-      // Only fire on empty sky — never when clicking an interactive element.
-      const target = e.target as Element | null;
-      if (target?.closest?.(INTERACTIVE_SELECTOR)) return;
+    function spawnMeteor(x: number, y: number) {
       setMeteors((cur) => {
         if (cur.length >= MAX_METEORS) return cur;
         const id = nextId.current++;
@@ -185,8 +185,8 @@ export function NightSky({
           ...cur,
           {
             id,
-            x: e.clientX,
-            y: e.clientY,
+            x,
+            y,
             angle: 28 + ((id * 5) % 10), // 28–37° → smooth down-right diagonal
             travel: 360 + ((id * 47) % 120), // 360–480px
           },
@@ -194,9 +194,28 @@ export function NightSky({
       });
     }
 
+    function onTap(e: PointerEvent) {
+      // Only fire on empty sky — never when clicking an interactive element.
+      const target = e.target as Element | null;
+      if (target?.closest?.(INTERACTIVE_SELECTOR)) return;
+      spawnMeteor(e.clientX, e.clientY);
+    }
+
+    // Ambient shooting stars — every ~4.2s there's a chance one streaks from
+    // the upper-left, so the sky feels alive without any interaction. Paused
+    // while the tab is hidden.
+    const ambient = window.setInterval(() => {
+      if (document.hidden || Math.random() < AMBIENT_METEOR_CHANCE) return;
+      spawnMeteor(
+        Math.random() * window.innerWidth * 0.7,
+        Math.random() * window.innerHeight * 0.4,
+      );
+    }, AMBIENT_METEOR_MS);
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('pointerdown', onTap);
     return () => {
+      window.clearInterval(ambient);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('pointerdown', onTap);
     };
