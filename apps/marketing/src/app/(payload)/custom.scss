@@ -1,0 +1,54 @@
+// nightshift admin theme — values mirror .claude/skills/nightshift-design/tokens/colors.css.
+// Payload's admin derives most chrome (--theme-bg, --theme-text, --theme-input-bg, borders,
+// checked/focus states) from the --theme-elevation-* scale plus --color-success-500 /
+// --theme-success-500 (see @payloadcms/ui/dist/scss/{colors,app,vars}.scss and the
+// Checkbox/RadioGroup/Dropzone/Auth components that read it directly) — overriding those
+// verified custom properties repaints the admin without touching Payload's own SCSS.
+:root {
+  // ---- Elevation scale: night-sky backgrounds, deepest → raised ----
+  --theme-elevation-0: #08080f; /* --night-900 — page void */
+  --theme-elevation-50: #0d0d18; /* --night-800 — default page background */
+  --theme-elevation-100: #12121f; /* --night-700 — sunken / input background */
+  --theme-elevation-150: #1a1a2e; /* --night-600 — hairline / border-color source */
+  --theme-elevation-200: #22223a; /* --night-500 — raised surface */
+  --theme-elevation-250: #2c2c47; /* --night-400 — overlay / active surface */
+  --theme-elevation-400: #4d4c63; /* --moon-500 — disabled / placeholder text */
+  --theme-elevation-800: #d8d6e0; /* --moon-200 — secondary text */
+  --theme-elevation-900: #f5f3ef; /* --moon-100 — primary text */
+  --theme-elevation-1000: #f5f3ef; /* --moon-100 — primary text (dark-mode alias) */
+
+  // ---- Direct aliases Payload reads without going through the elevation scale ----
+  --theme-bg: var(--theme-elevation-50);
+  --theme-input-bg: var(--theme-elevation-100);
+  --theme-text: var(--theme-elevation-900);
+  --theme-border-color: var(--theme-elevation-150);
+
+  // ---- Accent: repurpose the success token — the one custom property
+  // @payloadcms/ui actually reads for focus rings, checked checkboxes/radios,
+  // the dropzone drag-over border, and the auth "confirmed" state — as the
+  // terracotta brand accent. ----
+  --color-success-500: #d97757; /* --terra-500 */
+  --theme-success-500: #d97757; /* --terra-500 */
+}
+
+// nightshift is dark-mode-first — force the same palette under Payload's
+// dark-mode attribute so toggling themes in the admin doesn't fall back to
+// Payload's stock palette.
+html[data-theme='dark'] {
+  --theme-elevation-0: #08080f;
+  --theme-elevation-50: #0d0d18;
+  --theme-elevation-100: #12121f;
+  --theme-elevation-150: #1a1a2e;
+  --theme-elevation-200: #22223a;
+  --theme-elevation-250: #2c2c47;
+  --theme-elevation-400: #4d4c63;
+  --theme-elevation-800: #d8d6e0;
+  --theme-elevation-900: #f5f3ef;
+  --theme-elevation-1000: #f5f3ef;
+  --theme-bg: var(--theme-elevation-50);
+  --theme-input-bg: var(--theme-elevation-100);
+  --theme-text: var(--theme-elevation-900);
+  --theme-border-color: var(--theme-elevation-150);
+  --color-success-500: #d97757;
+  --theme-success-500: #d97757;
+}

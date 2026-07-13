@@ -1,3 +1,61 @@
+## 2026-07-13 — Brand the Payload admin (logo, icon, theme)
+
+**Learnings:**
+
+- `admin.components.graphics.Icon`/`.Logo` in `payload.config.ts` are real
+  fields (`payload/dist/config/types.d.ts` — `CustomComponent`), path format
+  `'/relative/to/importMap.baseDir/file#ExportName'`. `baseDir` here is `src/`,
+  so `apps/marketing/src/components/admin/icon.tsx` exporting `Icon` becomes
+  `'/components/admin/icon#Icon'` — filename kebab-case per this repo's
+  convention, export name PascalCase to match Payload's own graphics-slot
+  contract. `npx payload generate:importmap` (or `next build`, which calls it
+  internally) picks this up with zero extra config; its "No new imports found,
+  skipping writing import map" console line is stale/misleading — the file
+  updates anyway, always verify via `git diff` on `importMap.js`, not the CLI
+  text.
+- Payload's admin CSS theming surface is narrower than it looks: almost
+  everything (bg, text, input bg, borders, checked-state color, focus rings,
+  dropzone drag-border, auth "confirmed" border) derives from
+  `--theme-elevation-0..1000` plus `--color-success-500`/`--theme-success-500`
+  (verified by grepping the installed `@payloadcms/ui/dist/**/*.scss`, not the
+  project skill — the `payload` skill doc has no admin-theming reference at
+  all). There's no independent "brand/accent" custom property — repurposing
+  the success token for the terracotta accent is the only documented lever
+  that hits buttons/checked-inputs/focus without touching Payload's own SCSS.
+  Primary buttons read `--theme-elevation-800` for their bg, which is also
+  reused all over as a text/border color — overriding it to terracotta directly
+  would repaint far more than buttons and risks contrast breaks, so it's set to
+  a light moonlight tone instead (matches the brand's moonlight-on-night look)
+  rather than forcing every primary button terracotta.
+- This exact `custom.scss` (elevation scale + `--theme-bg/-text/-input-bg/-border-color`
+  aliases + success-token accent) had already been authored once before on an
+  unmerged `feat/NA-22` worktree branch (commit `8f15445`, refined in
+  `5a8dba7`) — found via `git log --all -- '.../custom.scss'`. Confirmed its
+  hex values still match the canonical `.claude/skills/nightshift-design/tokens/colors.css`
+  scale exactly before reusing it; dropped its `--font-body`/`--font-mono`
+  overrides since this dispatch's brand facts didn't ask for admin typography
+  and the `--font-inter`/`--font-jetbrains-mono` vars those overrides pointed
+  at aren't wired into `(payload)/layout.tsx` on this branch (that self-hosting
+  change lived only on the same unmerged branch).
+- `git log --all -- <path>` is a cheap way to check whether a "new" file this
+  dispatch is about to create was already built and abandoned/orphaned on some
+  other branch — worth doing before hand-authoring CSS/config from scratch
+  when a plausible prior attempt could exist.
+
+**Pitfalls:**
+
+- `apps/marketing/next-env.d.ts` churns on every `next build` (quote-style
+  only, `'...'` → `"..."`) — `git checkout --` it before staging, same
+  established finding as prior stories.
+
+**Patterns:**
+
+- New Payload admin custom components (graphics, custom views, etc.) belong
+  under `apps/marketing/src/components/admin/` — plain RSC, static string ids
+  instead of `useId` (no `'use client'` needed), geometry ported verbatim from
+  the canonical `packages/ui/src/lib/nightshift/logomark.tsx` source rather
+  than re-derived.
+
 ## 2026-07-13 — PR #97 review-fix round — 8 small accepted findings across scroll-progress/terminal/nav-bar/jest.setup/cta-kicker/argument-rail
 
 **Learnings:**
