@@ -6,17 +6,11 @@ import { FaqHero } from '../../../components/faq/faq-hero';
 import { getFaqPageGroups } from '../../../lib/faq';
 import { JsonLd } from '../../../lib/seo/json-ld';
 import { buildFaqPageNode } from '../../../lib/seo/jsonld';
+import { faqMetadata } from '../../../lib/seo/metadata';
 
 import type { FaqSchemaInput } from '../../../lib/seo/jsonld';
 
-// No brief copy exists to author /faq meta/OG from (NA-39 spec: "Enhancing
-// /faq meta/OG copy" is out of scope) — the existing NA-38 metadata is
-// unchanged; this page only gains FAQPage JSON-LD below.
-export const metadata: Metadata = {
-  title: 'FAQ — Everything builders ask',
-  description:
-    'Answers to the questions builders ask about Nightshift — positioning, workflow & control, setup & stack, trust & quality, and cost & license.',
-};
+export const metadata: Metadata = faqMetadata;
 
 // A Payload Local API read below would otherwise make this route attempt
 // static prerendering at `next build` time, which requires a migrated

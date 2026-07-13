@@ -3,6 +3,11 @@ import { HandbookTerminal } from '../../../components/team/handbook-terminal';
 import { TeamHero } from '../../../components/team/hero';
 import { PhilosophyStrip } from '../../../components/team/philosophy-strip';
 import { TeamCta } from '../../../components/team/team-cta';
+import { teamMetadata } from '../../../lib/seo/metadata';
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = teamMetadata;
 
 // Synchronous server component, no async, no data fetch, no `dynamic`
 // export — the roster/philosophy/handbook content is static TypeScript

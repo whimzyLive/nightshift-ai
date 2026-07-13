@@ -12,8 +12,19 @@ import '../global.css';
 // override of their own (e.g. /team).
 export const metadata: Metadata = {
   metadataBase: new URL(seoSite.siteUrl),
-  title: 'nightshift — your AI software team that ships while you sleep',
+  title: {
+    default: 'nightshift — your AI software team that ships while you sleep',
+    template: '%s · nightshift',
+  },
   description: 'Your AI software team that ships while you sleep.',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [{ url: '/favicon.svg' }],
+  },
   openGraph: {
     siteName: seoSite.siteName,
   },
