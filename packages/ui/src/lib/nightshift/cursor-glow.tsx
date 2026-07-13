@@ -62,10 +62,11 @@ export function CursorGlow() {
 
   if (!enabled) return null;
 
-  // Rest size ÷ active size (28 / 84) — the spotlight is a fixed active-size
+  // Rest size ÷ active size (56 / 84) — the spotlight is a fixed active-size
   // element scaled down at rest, so the size change animates on `transform`
-  // (GPU) instead of width/height (layout + paint).
-  const REST_SCALE = 28 / 84;
+  // (GPU) instead of width/height (layout + paint). Rest blob is 2× the base
+  // --cursor-size (28 → 56).
+  const REST_SCALE = 56 / 84;
 
   return (
     <>
