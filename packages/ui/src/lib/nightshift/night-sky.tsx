@@ -129,12 +129,37 @@ const AMBIENT_METEOR_MS = 4200;
 const AMBIENT_METEOR_CHANCE = 0.55; // skip when Math.random() < this
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
 
+// Easter egg: N rapid clicks on the same spot detonate a big bang there
+// instead of a meteor.
+const COMBO_THRESHOLD = 5;
+const COMBO_SPOT_PX = 34; // "same spot" tolerance
+const COMBO_WINDOW_MS = 1400; // max gap between combo clicks
+// Deterministic radiating debris — fixed angles/distances so the render stays
+// pure (no Math.random at render time).
+const BIGBANG_PARTICLES = Array.from({ length: 22 }, (_, i) => {
+  const angle = (i / 22) * Math.PI * 2 + (i % 2 ? 0.14 : 0);
+  const dist = 240 + (i % 5) * 46;
+  return {
+    dx: Math.cos(angle) * dist,
+    dy: Math.sin(angle) * dist,
+    size: 2 + (i % 3),
+    color: i % 4 === 0 ? 'var(--star-bright)' : 'rgba(217,119,87,0.95)',
+  };
+});
+const BIGBANG_RINGS = [0, 0.08, 0.18]; // stagger delays (s)
+
 interface Meteor {
   id: number;
   x: number;
   y: number;
   angle: number;
   travel: number;
+}
+
+interface BigBang {
+  id: number;
+  x: number;
+  y: number;
 }
 
 /**
@@ -168,7 +193,15 @@ export function NightSky({
   const farY = useTransform(sy, (v) => -v * FAR_DEPTH);
 
   const [meteors, setMeteors] = useState<Meteor[]>([]);
+  const [bigBang, setBigBang] = useState<BigBang | null>(null);
   const nextId = useRef(0);
+  // Same-spot click combo tracker (position + timestamp + count).
+  const comboRef = useRef<{ x: number; y: number; t: number; n: number }>({
+    x: 0,
+    y: 0,
+    t: 0,
+    n: 0,
+  });
 
   useEffect(() => {
     if (prefersReduced) return;
@@ -199,7 +232,26 @@ export function NightSky({
       // Only fire on empty sky — never when clicking an interactive element.
       const target = e.target as Element | null;
       if (target?.closest?.(INTERACTIVE_SELECTOR)) return;
-      spawnMeteor(e.clientX, e.clientY);
+
+      const x = e.clientX;
+      const y = e.clientY;
+      const t = e.timeStamp;
+      const c = comboRef.current;
+      const sameSpot =
+        Math.hypot(x - c.x, y - c.y) <= COMBO_SPOT_PX &&
+        t - c.t <= COMBO_WINDOW_MS;
+      const n = sameSpot ? c.n + 1 : 1;
+      comboRef.current = { x, y, t, n };
+
+      if (n >= COMBO_THRESHOLD) {
+        // Combo hit — swallow the meteor, clear the sky, and detonate.
+        comboRef.current = { x: 0, y: 0, t: 0, n: 0 };
+        setMeteors([]);
+        setBigBang({ id: nextId.current++, x, y });
+        return;
+      }
+
+      spawnMeteor(x, y);
     }
 
     // Ambient shooting stars — every ~4.2s there's a chance one streaks from
@@ -344,6 +396,88 @@ export function NightSky({
               />
             );
           })}
+        </div>
+      )}
+
+      {bigBang && (
+        <div
+          key={bigBang.id}
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-[9990] overflow-hidden"
+        >
+          {/* Core flash — clears the counter/removes the burst on complete. */}
+          <motion.span
+            className="absolute rounded-full"
+            style={{
+              left: bigBang.x,
+              top: bigBang.y,
+              width: 60,
+              height: 60,
+              marginLeft: -30,
+              marginTop: -30,
+              background:
+                'radial-gradient(circle, #ffffff 0%, var(--star-bright) 30%, rgba(217,119,87,0.7) 55%, transparent 72%)',
+              mixBlendMode: 'screen',
+              willChange: 'transform, opacity',
+            }}
+            initial={{ scale: 0, opacity: 1 }}
+            animate={{ scale: [0, 6, 9], opacity: [1, 0.9, 0] }}
+            transition={{ duration: 1.3, ease: 'easeOut', times: [0, 0.3, 1] }}
+            onAnimationComplete={() => setBigBang(null)}
+          />
+          {/* Shockwave rings. */}
+          {BIGBANG_RINGS.map((delay, i) => (
+            <motion.span
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                left: bigBang.x,
+                top: bigBang.y,
+                width: 40,
+                height: 40,
+                marginLeft: -20,
+                marginTop: -20,
+                border: '2px solid rgba(217,119,87,0.85)',
+                boxShadow: '0 0 18px rgba(217,119,87,0.6)',
+                mixBlendMode: 'screen',
+                willChange: 'transform, opacity',
+              }}
+              initial={{ scale: 0, opacity: 0.9 }}
+              animate={{ scale: 18, opacity: 0 }}
+              transition={{ duration: 1.1, ease: 'easeOut', delay }}
+            />
+          ))}
+          {/* Radiating debris. */}
+          {BIGBANG_PARTICLES.map((p, i) => (
+            <motion.span
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                left: bigBang.x,
+                top: bigBang.y,
+                width: p.size,
+                height: p.size,
+                marginLeft: -p.size / 2,
+                marginTop: -p.size / 2,
+                background: p.color,
+                boxShadow: '0 0 6px rgba(245,243,239,0.8)',
+                mixBlendMode: 'screen',
+                willChange: 'transform, opacity',
+              }}
+              initial={{ x: 0, y: 0, opacity: 1 }}
+              animate={{
+                x: p.dx,
+                y: p.dy,
+                opacity: [1, 1, 0],
+                scale: [1, 0.3],
+              }}
+              transition={{
+                duration: 1.2,
+                ease: 'easeOut',
+                times: [0, 0.7, 1],
+              }}
+            />
+          ))}
         </div>
       )}
     </>
