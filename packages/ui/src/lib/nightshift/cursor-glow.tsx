@@ -66,7 +66,7 @@ export function CursorGlow() {
   // element scaled down at rest, so the size change animates on `transform`
   // (GPU) instead of width/height (layout + paint). Rest blob is 2× the base
   // --cursor-size (28 → 56).
-  const REST_SCALE = 56 / 84;
+  const REST_SCALE = 40 / 84;
 
   return (
     <>
