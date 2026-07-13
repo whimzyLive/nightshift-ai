@@ -6,3 +6,8 @@
 pnpm-lock.yaml
 # Committed design handoff must stay byte-faithful to the approved export — never reformat
 docs/design/marketing-site-handoff/
+# Generated artifacts — keep the generator's exact output; prettier reformatting
+# them just churns the diff on every `payload generate` / `next build`.
+apps/marketing/src/payload-types.ts
+apps/marketing/src/app/(payload)/admin/importMap.js
+apps/marketing/next-env.d.ts
