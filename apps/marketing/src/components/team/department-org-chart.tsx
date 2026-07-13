@@ -11,17 +11,6 @@ export function DepartmentOrgChart() {
     <section style={{ padding: '64px 28px 40px' }}>
       <div className="mx-auto" style={{ maxWidth: 1120 }}>
         <div className="relative">
-          <div
-            aria-hidden="true"
-            className="absolute top-0"
-            style={{
-              left: '50%',
-              bottom: 20,
-              width: 0,
-              borderLeft: '1px dashed rgba(217,119,87,.4)',
-            }}
-          />
-
           <div className="relative mx-auto" style={{ maxWidth: 480 }}>
             <div
               className="text-center"
@@ -72,6 +61,18 @@ export function DepartmentOrgChart() {
               className="relative"
               style={{ marginTop: 46 }}
             >
+              {/* Spine segment: fills only the gap above this section label —
+                  connects the previous block's cards (or the YOU card) down to
+                  the top of this "//" eyebrow, then stops. No line runs through
+                  the label, heading, blurb, or card row. */}
+              <div
+                aria-hidden="true"
+                className="absolute left-1/2 -top-[46px] h-[46px]"
+                style={{
+                  width: 0,
+                  borderLeft: '1px dashed rgba(217,119,87,.4)',
+                }}
+              />
               <div className="relative mb-[18px] flex justify-center">
                 <span
                   className="relative z-[1] inline-block whitespace-nowrap font-mono uppercase"

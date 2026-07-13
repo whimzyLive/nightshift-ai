@@ -123,13 +123,16 @@ export function HowItWorks() {
           </p>
         </div>
 
-        <div className="mb-9 flex flex-wrap items-stretch justify-center">
+        <div className="mb-9 flex flex-col items-stretch md:flex-row md:flex-wrap md:items-stretch md:justify-center">
           {PIPELINE.map((stage, i) => {
             const s = STAGE_STYLE[stage.status];
             return (
-              <div key={stage.command} className="flex items-stretch">
+              <div
+                key={stage.command}
+                className="flex flex-col items-stretch md:flex-row"
+              >
                 <div
-                  className="flex flex-col gap-1.5"
+                  className="flex w-full flex-col gap-1.5 text-center md:w-auto md:text-left"
                   style={{
                     minWidth: 148,
                     padding: '14px 16px',
@@ -163,9 +166,8 @@ export function HowItWorks() {
                 {i < PIPELINE.length - 1 && (
                   <span
                     aria-hidden="true"
-                    className="flex items-center font-mono"
+                    className="flex rotate-90 items-center justify-center py-1.5 font-mono md:rotate-0 md:justify-start md:px-1.5 md:py-0"
                     style={{
-                      padding: '0 6px',
                       fontSize: 14,
                       color:
                         stage.status === 'done'

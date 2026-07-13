@@ -1007,24 +1007,22 @@ function GateStrip({
       >
         // feel a gate — approve each phase yourself
       </div>
-      <div className="mx-auto my-1.5 mb-[22px] flex flex-wrap items-start justify-center">
+      <div className="mx-auto my-1.5 mb-[22px] flex flex-col items-center md:flex-row md:flex-wrap md:items-start md:justify-center">
         {gates.map((g) => (
-          <div key={g.key} className="flex items-start">
+          <div
+            key={g.key}
+            className="flex flex-col items-center md:flex-row md:items-start"
+          >
             {g.conn && (
               <div
+                className="h-[26px] w-px md:mt-[17px] md:h-px md:w-[30px]"
                 style={{
-                  width: 30,
-                  height: 1,
                   background: g.connBg,
-                  marginTop: 17,
                   transition: 'background .4s',
                 }}
               />
             )}
-            <div
-              className="flex flex-col items-center gap-2"
-              style={{ padding: '0 14px' }}
-            >
+            <div className="flex flex-col items-center gap-2 px-[14px] py-2.5 md:py-0">
               <motion.span
                 className="font-mono flex items-center justify-center"
                 animate={

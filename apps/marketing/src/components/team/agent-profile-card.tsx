@@ -43,6 +43,11 @@ export function AgentProfileCard({ agent }: { agent: AgentProfile }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        // Uniform card height across every department — sized just above the
+        // tallest card (~296px) so future copy has ~1 line of headroom without
+        // desyncing the grid. `marginTop:auto` on the footer keeps the
+        // flow/artifact row pinned to the bottom of the taller box.
+        minHeight: 310,
       }}
     >
       <div className="flex items-center gap-3">
