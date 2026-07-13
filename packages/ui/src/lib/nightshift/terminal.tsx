@@ -249,7 +249,7 @@ export function Terminal({
                     : { duration: 0 }
                 }
               >
-                {line.text || ' '}
+                {line.text || ' '}
               </motion.span>
             </div>
           );

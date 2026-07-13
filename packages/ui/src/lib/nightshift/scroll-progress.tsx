@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion, useScroll, useSpring } from 'motion/react';
 
 const SPRING = { stiffness: 120, damping: 30, mass: 0.4 } as const;
@@ -9,10 +10,23 @@ const SPRING = { stiffness: 120, damping: 30, mass: 0.4 } as const;
  * filling left→right as the document scrolls — a lightweight "how much is
  * left" indicator shown on every page. Spring-smoothed `scaleX` on a
  * GPU-cheap transform; purely decorative, hidden from assistive tech.
+ * Under `prefers-reduced-motion`, binds directly to the raw scroll
+ * progress instead of the spring so the bar doesn't animate.
  */
 export function ScrollProgress() {
   const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, SPRING);
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    setReduced(
+      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false,
+    );
+  }, []);
+
+  const smooth = useSpring(scrollYProgress, SPRING);
+  const scaleX = reduced ? scrollYProgress : smooth;
 
   return (
     <motion.div

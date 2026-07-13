@@ -1,3 +1,55 @@
+## 2026-07-13 — PR #97 review-fix round — 8 small accepted findings across scroll-progress/terminal/nav-bar/jest.setup/cta-kicker/argument-rail
+
+**Learnings:**
+
+- The reduced-motion "latch in state via a post-mount effect" pattern (already
+  established for `terminal.tsx`/`phrase-marquee.tsx`) needed to be applied to
+  two more render-time `prefersReducedMotion()` call sites this round:
+  `cta-kicker.tsx` (one call) and `argument-rail.tsx` (four calls — one inside
+  `GateNode`, three inside `ArgumentRail`'s `AnimatePresence` crossfade).
+  Reading matchMedia during render (not inside `useEffect`) is an SSR/hydration
+  mismatch risk on every Motion `initial`/`animate` prop that branches on it —
+  worth grepping for this specific shape (`const reduced = prefersReducedMotion()`
+  as a bare top-of-body `const`, not inside `useEffect`) across a whole
+  component tree, not just the file a reviewer flagged, since the same author
+  pattern tends to repeat within one PR.
+- For a helper called from a child component (`GateNode`'s own `pulse` calc),
+  the fix is to latch the boolean once in the parent and thread it down as an
+  explicit prop (`reduced: boolean` added to `GateNodeProps`) rather than
+  duplicating the effect/state pair in the child — keeps `matchMedia` reads to
+  exactly one per component tree per mount.
+- `argument-rail.spec.tsx`/`cta-kicker.spec.tsx` needed **no changes** for this
+  fix — neither spec mocks `matchMedia` to the reduced-motion branch or asserts
+  render-time timing, so latching the read behind a `useEffect` (which fires
+  synchronously enough after the initial render in RTL's `render()` for the
+  assertions in these specs, which only check text/attribute content, not
+  animation props) left both suites green with zero spec edits. Don't assume a
+  hydration-mismatch fix always requires a test update — check what the
+  existing spec actually asserts first.
+- The non-breaking-space fix (`line.text || ' '` → `line.text || ' '` in
+  `terminal.tsx`) is invisible in a normal diff view/prompt text (NBSP and a
+  regular space render identically in most editors/terminals) — verified the
+  edit actually landed the `\xa0` byte (not a plain `0x20`) via a `python3`
+  `repr()`/`ord()` check on the file content before trusting the `Edit` tool's
+  success message. Worth this extra verification step any time a fix's
+  before/after snippets are visually indistinguishable.
+- `git status` at dispatch start already showed `apps/marketing/src/payload-types.ts`
+  modified (stale churn from a prior session's build, unrelated to this PR's
+  scope) — by the time this round's own `pnpm nx build marketing` finished, that
+  file no longer showed as modified (regenerated back to match committed
+  content), so nothing needed discarding there this round. `next-env.d.ts` did
+  churn as expected (established NA-32/NA-36 finding) — `git checkout --` it
+  before staging, same as always.
+
+**Patterns:**
+
+- Renaming a component identifier for brand casing (`GithubMark` →
+  `GitHubMark`) is a pure find-and-replace across its one declaration + one
+  JSX usage site in the same file — no export from the file, so no other
+  file in the repo needed touching. Confirmed via reading the whole file
+  first rather than grepping repo-wide for a name that turned out to be
+  file-local.
+
 ## 2026-07-12 — refactor/motion-gsap-animations follow-up — visual-fidelity pass against the design handoff HTML
 
 **Learnings:**

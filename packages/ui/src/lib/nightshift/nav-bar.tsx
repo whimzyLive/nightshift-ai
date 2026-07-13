@@ -27,7 +27,7 @@ export function isActiveLink(pathname: string, href: string): boolean {
  * GitHub octicon mark, tinted terracotta with a soft accent glow that warms
  * further on hover (the parent link owns the `group` hover state).
  */
-function GithubMark() {
+function GitHubMark() {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -131,7 +131,7 @@ export function NavBar() {
         size="sm"
         className="font-mono"
       >
-        <GithubMark />
+        <GitHubMark />
         <span aria-hidden="true">4</span>
       </CtaButton>
 

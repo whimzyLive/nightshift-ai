@@ -1,9 +1,9 @@
-// jsdom polyfills for Motion (motion.dev) + GSAP driven components.
+// jsdom polyfills for Motion (motion.dev) driven components.
 // jsdom ships none of these; without them any component that calls
 // matchMedia (reduced-motion), uses Motion `whileInView`
 // (IntersectionObserver), or measures layout (ResizeObserver) throws on
 // render. matchMedia reports `matches: false` for every query, so
-// `prefers-reduced-motion: no-preference` is false in tests and GSAP/Motion
+// `prefers-reduced-motion: no-preference` is false in tests and Motion
 // setup guarded behind it stays inert — components render statically.
 if (typeof window !== 'undefined') {
   if (typeof window.matchMedia !== 'function') {

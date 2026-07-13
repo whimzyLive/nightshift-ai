@@ -1,6 +1,7 @@
 'use client';
 
 import { RichText } from '@payloadcms/richtext-lexical/react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { AnimatePresence, motion } from 'motion/react';
@@ -155,9 +156,10 @@ interface GateNodeProps {
   index: number;
   reached: number;
   active: number;
+  reduced: boolean;
 }
 
-function GateNode({ index, reached, active }: GateNodeProps) {
+function GateNode({ index, reached, active, reduced }: GateNodeProps) {
   const isCurrent = index === active;
   const isPassed = !isCurrent && index < reached;
   const state = isCurrent ? 'current' : isPassed ? 'passed' : 'idle';
@@ -176,7 +178,7 @@ function GateNode({ index, reached, active }: GateNodeProps) {
       : state === 'passed'
         ? '0 0 8px rgba(217,119,87,.3)'
         : 'none';
-  const pulse = state === 'current' && !prefersReducedMotion();
+  const pulse = state === 'current' && !reduced;
 
   return (
     <motion.span
@@ -221,6 +223,9 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
   const { reached, active } = useScrollProgress();
   const activeIllustration = ILLUSTRATIONS[active] ?? ILLUSTRATIONS[0];
   const activeCaption = CAPTIONS[active] ?? CAPTIONS[0];
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => setReducedMotion(prefersReducedMotion()), []);
 
   return (
     <section style={{ padding: '64px 28px 72px' }}>
@@ -247,7 +252,12 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
               className="relative grid grid-cols-[56px_1fr] gap-6"
             >
               <div className="flex items-start justify-center pt-[30px]">
-                <GateNode index={i} reached={reached} active={active} />
+                <GateNode
+                  index={i}
+                  reached={reached}
+                  active={active}
+                  reduced={reducedMotion}
+                />
               </div>
               <div
                 style={{
@@ -296,11 +306,11 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={active}
-                initial={prefersReducedMotion() ? false : { opacity: 0 }}
+                initial={reducedMotion ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={prefersReducedMotion() ? undefined : { opacity: 0 }}
+                exit={reducedMotion ? undefined : { opacity: 0 }}
                 transition={{
-                  duration: prefersReducedMotion() ? 0 : 0.3,
+                  duration: reducedMotion ? 0 : 0.3,
                   ease: EASE_OUT,
                 }}
               >

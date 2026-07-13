@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 
 import { useScrollProgress } from './scroll-progress';
@@ -34,7 +35,9 @@ const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 export function CtaKicker() {
   const { reached } = useScrollProgress();
   const allPassed = reached >= 5;
-  const reduced = prefersReducedMotion();
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => setReduced(prefersReducedMotion()), []);
 
   return (
     <motion.p
