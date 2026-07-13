@@ -81,12 +81,20 @@ export function Terminal({
     }
     setVisibleCount(1);
     const total = lines.length;
+    // onUpdate fires every frame (~60/s); only push state when the revealed
+    // count actually changes, so React re-renders ~once per line, not per frame.
+    let lastCount = 1;
     const controls = animate(0, total + HOLD_STEPS, {
       duration: (total + HOLD_STEPS) * REVEAL_S,
       ease: 'linear',
       repeat: Infinity,
-      onUpdate: (v) =>
-        setVisibleCount(Math.min(total, Math.max(1, Math.floor(v) + 1))),
+      onUpdate: (v) => {
+        const next = Math.min(total, Math.max(1, Math.floor(v) + 1));
+        if (next !== lastCount) {
+          lastCount = next;
+          setVisibleCount(next);
+        }
+      },
     });
     return () => controls.stop();
   }, [lines.length]);

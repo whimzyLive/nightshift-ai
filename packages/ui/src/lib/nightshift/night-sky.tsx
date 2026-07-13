@@ -222,12 +222,9 @@ export function NightSky({
   }, [prefersReduced, px, py]);
 
   const drift = animate ? { x: [0, -40], y: [0, -40] } : undefined;
-  const twinkle = animate
-    ? {
-        opacity: [0.85, 1, 0.85],
-        filter: ['brightness(1)', 'brightness(1.6)', 'brightness(1)'],
-      }
-    : undefined;
+  // Opacity-only twinkle — animating `filter: brightness` here repainted the
+  // whole tiled gradient layer every frame; opacity stays on the compositor.
+  const twinkle = animate ? { opacity: [0.6, 1, 0.6] } : undefined;
 
   return (
     <>
