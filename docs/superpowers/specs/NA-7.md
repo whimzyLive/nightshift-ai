@@ -39,7 +39,7 @@ Surface" is re-framed below as the **Command & Agent Surface**, and "Backend Imp
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | `plugins/gtm/.claude-plugin/plugin.json`         | Bump `version` (patch) — new command shipped. No dependency change (`marketing-skills` marketplace already declared). |
 | `plugins/gtm/refs/marketing-context-template.md` | Add a `Docs audit` block (audit path glob + exclude globs) so init seeds it; see Config below.                        |
-| `README.md` (plugin) `plugins/gtm/README.md`     | Document the new `/gtm:docs` command in the command list.                                                             |
+| `plugins/gtm/README.md`                          | Document the new `/gtm:docs` command in the command list.                                                             |
 
 No generated/mirror files (`agents/`, `.codex/`, `.opencode/`, `.gemini/`) are hand-edited — they are
 machine-maintained by the nx generator per the workspace→agent table.
@@ -48,10 +48,10 @@ machine-maintained by the nx generator per the workspace→agent table.
 
 `/gtm:docs` is generic across repos, so the audit corpus is config-driven, seeded by `/gtm:init`:
 
-| Field                 | Type      | Default                                                                                                   | Notes                                                 |
-| --------------------- | --------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `Docs audit paths`    | glob list | `README.md`, `docs/**/*.md`, `docs/**/*.mdx`                                                              | Human-facing documentation to audit                   |
-| `Docs audit excludes` | glob list | `docs/superpowers/**`, `docs/features/**`, `docs/gtm/digests/**`, `docs/gtm/briefs/**`, `**/CHANGELOG.md` | SDLC/gtm internal + machine artifacts — never audited |
+| Field                 | Type      | Default                                                                     | Notes                                                                                                                                         |
+| --------------------- | --------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Docs audit paths`    | glob list | `README.md`, `docs/**/*.md`, `docs/**/*.mdx`                                | Human-facing documentation to audit                                                                                                           |
+| `Docs audit excludes` | glob list | `docs/superpowers/**`, `docs/features/**`, `docs/gtm/**`, `**/CHANGELOG.md` | SDLC/gtm internal + machine artifacts — never audited (`docs/gtm/**` covers `site-brief.md`, `digests/`, and any future gtm handoff artifact) |
 
 If the field is absent (config predates this story), the command falls back to these defaults and
 notes the fallback in its report.
@@ -89,7 +89,9 @@ Resolves `${CLAUDE_PLUGIN_ROOT}` via `.claude/.gtm-plugin-root` (the standard ag
 resolver block — the command writes the marker before dispatch).
 
 **Agent input (from the command):** the resolved audit path globs, exclude globs, `--dry-run` state,
-and `--max-prs` cap.
+`--max-prs` cap, and the **set of existing open `gtm/docs-audit/*` PRs** (branch + findingIds each,
+enumerated by the command via `gh pr list`). The agent's step-4 idempotency guard diffs new finding
+groups against this set so a re-run never re-opens a duplicate PR for a group already under review.
 
 **Agent output (returned inline to the command):**
 
@@ -115,7 +117,7 @@ type DocsFindingCategory =
 interface DocsAuditPr {
   findingIds: string[]; // findings this PR addresses (>= 1)
   branch: string; // gtm/docs-audit/<group-slug>
-  url: string; // opened PR URL (empty on --dry-run)
+  url: string; // opened PR URL — always populated (a DocsAuditPr is constructed only for an actually-opened PR; `prs` is [] on --dry-run, so no empty-url object exists)
 }
 
 interface DocsAuditResult {
