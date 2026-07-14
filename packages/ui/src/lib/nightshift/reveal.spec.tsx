@@ -35,4 +35,16 @@ describe('Reveal', () => {
     expect(el.className).toContain('marker');
     expect(el.style.color).toBe('rgb(1, 2, 3)');
   });
+
+  it('forwards data-* attributes to the item DOM node (e.g. data-lift)', () => {
+    render(
+      <RevealGroup data-lift>
+        <Reveal data-lift>card</Reveal>
+      </RevealGroup>,
+    );
+    const item = screen.getByText('card');
+    expect(item.getAttribute('data-lift')).toBe('true');
+    // The group wrapper carries it too.
+    expect(item.parentElement?.getAttribute('data-lift')).toBe('true');
+  });
 });

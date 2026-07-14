@@ -719,6 +719,7 @@ function TriageCard({
 }: TriageCardProps) {
   return (
     <div
+      data-lift
       className="mt-[30px] text-left"
       style={{
         border: '1px solid var(--border-default)',

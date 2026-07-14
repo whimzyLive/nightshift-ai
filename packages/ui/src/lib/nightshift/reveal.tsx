@@ -40,6 +40,8 @@ export interface RevealGroupProps {
   as?: MotionTag;
   className?: string;
   style?: CSSProperties;
+  /** Forwarded to the DOM node (e.g. `data-lift`, `aria-*`). */
+  [key: `data-${string}`]: unknown;
 }
 
 /**
@@ -57,6 +59,7 @@ export function RevealGroup({
   as = 'div',
   className,
   style,
+  ...rest
 }: RevealGroupProps) {
   const [reduced, setReduced] = useState(false);
   useEffect(() => setReduced(prefersReducedMotion()), []);
@@ -67,6 +70,7 @@ export function RevealGroup({
     <Comp
       className={className}
       style={style}
+      {...rest}
       variants={{
         hidden: {},
         shown: {
@@ -101,6 +105,8 @@ export interface RevealProps {
   as?: MotionTag;
   className?: string;
   style?: CSSProperties;
+  /** Forwarded to the DOM node (e.g. `data-lift`, `aria-*`). */
+  [key: `data-${string}`]: unknown;
 }
 
 /**
@@ -118,6 +124,7 @@ export function Reveal({
   as = 'div',
   className,
   style,
+  ...rest
 }: RevealProps) {
   const [reduced, setReduced] = useState(false);
   useEffect(() => setReduced(prefersReducedMotion()), []);
@@ -130,6 +137,7 @@ export function Reveal({
     <Comp
       className={className}
       style={style}
+      {...rest}
       variants={
         reduced
           ? // Reduced motion: identity variants — the parent still drives the

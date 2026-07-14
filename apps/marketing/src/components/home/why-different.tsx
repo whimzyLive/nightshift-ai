@@ -61,6 +61,7 @@ export function WhyDifferent() {
         >
           {VALUES.map((value) => (
             <Reveal
+              data-lift
               key={value.title}
               scale={0.97}
               blur={8}

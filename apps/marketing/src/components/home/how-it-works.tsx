@@ -142,6 +142,7 @@ export function HowItWorks() {
                   className="flex flex-col items-stretch md:flex-row"
                 >
                   <div
+                    data-lift
                     className="flex w-full flex-col gap-1.5 text-center md:w-auto md:text-left"
                     style={{
                       minWidth: 148,
@@ -269,6 +270,7 @@ export function HowItWorks() {
         <RevealGroup>
           <Reveal className="mt-[22px] flex flex-wrap gap-3">
             <p
+              data-lift
               className="flex-1"
               style={{
                 minWidth: 260,
@@ -294,6 +296,7 @@ export function HowItWorks() {
 
           <Reveal className="mt-3 flex flex-wrap gap-3">
             <p
+              data-lift
               className="flex-1"
               style={{
                 minWidth: 260,

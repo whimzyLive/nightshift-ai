@@ -20,6 +20,7 @@ export function FaqAccordion({ items }: { items: FaqAccordionItem[] }) {
 
   return (
     <div
+      data-lift
       style={{
         background: 'var(--surface-card)',
         border: '1px solid var(--border-default)',

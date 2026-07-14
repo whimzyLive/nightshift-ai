@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'motion/react';
 
+// The spotlight grows + brightens over anything "focusable-feeling": true
+// interactive controls, card surfaces (marked `data-lift`), and section
+// headings — matching the hover-lift micro-interaction on those same cards.
 const INTERACTIVE_SELECTOR =
-  'a,button,[role="button"],input,textarea,select,summary';
+  'a,button,[role="button"],input,textarea,select,summary,[data-lift],h1,h2,h3';
 
 // Connector springs off the raw cursor with lag, so it trails behind the
 // lead dot instead of tracking it exactly.

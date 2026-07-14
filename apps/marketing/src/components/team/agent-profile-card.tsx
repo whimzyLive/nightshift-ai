@@ -35,7 +35,7 @@ export function AgentProfileCard({ agent }: { agent: AgentProfile }) {
 
   return (
     <div
-      className="motion-safe:hover:-translate-y-[3px] motion-safe:transition-[border-color,transform,box-shadow] motion-safe:duration-300 motion-safe:ease-[var(--ease-out)] motion-safe:hover:shadow-[0_0_22px_rgba(217,119,87,.14),0_24px_50px_-28px_rgba(0,0,0,.8)] motion-safe:hover:border-[var(--border-accent)]"
+      data-lift
       style={{
         // Glassmorphic surface — translucent over the starfield with a
         // backdrop blur + top highlight, matching the home workflow cards.

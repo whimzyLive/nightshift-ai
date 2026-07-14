@@ -48,6 +48,7 @@ export function FullFaqAccordion({
             {group.eyebrow}
           </Reveal>
           <Reveal
+            data-lift
             style={{
               background: 'var(--surface-card)',
               border: '1px solid var(--border-default)',

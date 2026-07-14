@@ -140,6 +140,7 @@ export function DayNightWorkflow() {
         >
           {CARDS.map((card) => (
             <Reveal
+              data-lift
               key={card.title}
               scale={0.97}
               blur={8}

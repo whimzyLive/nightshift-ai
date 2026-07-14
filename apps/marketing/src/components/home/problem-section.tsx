@@ -108,6 +108,7 @@ export function ProblemSection() {
       >
         {CARDS.map((card) => (
           <Reveal
+            data-lift
             key={card.title}
             scale={0.97}
             blur={8}
