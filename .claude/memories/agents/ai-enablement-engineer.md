@@ -561,6 +561,45 @@ before any other step` section, but it listed **only a subset** of the frontmatt
   still uses the bare `for f in "$dir"/*.ext; do [ -e "$f" ] || continue` idiom to iterate a glob —
   it is silently vacuous on a missing/empty directory, not just fragile.
 
+## NA-7 — `/gtm:docs` docs-SEO audit command + `docs-auditor` agent + rubric (`plugins/gtm`)
+
+- `docs-auditor` is the first `plugins/gtm` agent authored under the NA-25 Skill-tool-loading
+  pattern from day one (no frontmatter `skills:` list at all — `content-writer.md` and
+  `product-marketing-manager.md`, both pre-NA-25, still carry frontmatter `skills:`). The spec
+  said so explicitly ("both loaded via the Skill tool, per the NA-25 resume workaround — not
+  relied on via frontmatter preload"), and NA-25's own memory entries document the pattern was
+  only ever applied to the 12 `plugins/sdlc/agents/*.md` files, not gtm's. When a new agent's spec
+  names the NA-25 pattern by name, follow the sdlc-plugin agents' shape (no `skills:` frontmatter
+  field, `tools:` includes `Skill`, a body "## Required skills" section with the exact marker
+  sentence) rather than copying the sibling `content-writer.md`/`product-marketing-manager.md`
+  frontmatter-`skills:` shape it's dispatched alongside — the two conventions now legitimately
+  coexist in the same plugin until a future story converts the older agents.
+- `gh pr list --search "head:<prefix>"` (substring/ref match, confirmed by `dep-gate.sh`'s own
+  comment in `plugins/sdlc/scripts/dep-gate.sh`) is exactly the right tool for a
+  branch-namespace-prefix idempotency probe (`gtm/docs-audit/*`) — `--head` only does exact-match
+  and can't express a prefix at all. Paired it with a documented, greppable PR-body convention
+  (`- \`<findingId>\` (\`<rubricRef>\`): <summary>`, finding ID = first backtick token on a `- `line) so the command's step-3 idempotency-guard-input enumeration and the agent's step-5
+PR-authoring convention stay in lockstep — defined the exact`grep -oE` pattern once in the
+  command doc and cross-referenced it (not re-derived) from the agent doc's PR-body instructions.
+- A spec's "so init seeds it" phrasing for a new `marketing-context-template.md` block does not
+  always mean `commands/init.md` itself needs editing: this story's Config table gives the new
+  `Docs audit paths`/`excludes` fields **fixed, non-interviewed defaults** (no founder decision
+  point), and `init.md` Step 5 already generically "fills this template from
+  `${CLAUDE_PLUGIN_ROOT}/refs/marketing-context-template.md`" — so a template-only edit (new
+  section + Schema rows + a Fill rule stating "no interview, always the documented default")
+  is sufficient and correctly matches the spec's own New/Modified-files table, which does NOT list
+  `commands/init.md` as touched. Verified against the live repo: `.claude/project/marketing-context.md`
+  in this worktree predates the story and genuinely lacks the `## Docs audit` block, which is
+  exactly the "config predates this story" fallback case `/gtm:docs` step 2 is written to handle
+  — confirms the fallback path is real, not speculative, and that this file itself is correctly
+  out of this story's write-scope (owned by init runs, not hand-edited by a plugin-authoring story).
+- Read the actual `ai-seo` and `content-strategy` marketingskills skill bodies (via the Skill tool)
+  before drafting `refs/docs-audit-rubric.md` rather than inferring criteria from the skill names —
+  concrete section titles/quotes from those skills (e.g. ai-seo's "40-60 word... snippet
+  extraction", "Query Fan-Out", the Princeton GEO citation-boost table; content-strategy's
+  "Keyword Research by Buyer Stage") became the rubric's `Source` column citations, which is what
+  makes `rubricRef` genuinely traceable (AC-1) instead of a plausible-sounding invention.
+
 ## NA-25 — third review round on PR #73 (6 accepted findings: `refs/domain-agent-handoff.md`, `README.md`, all 12 `agents/*.md`, `scripts/check-agent-skill-preloads.sh`)
 
 - A prose passage explaining a mechanism ("frontmatter-preloaded") that a PR itself just removed is
