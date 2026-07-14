@@ -54,7 +54,7 @@ Read `## Docs audit` from `.claude/project/marketing-context.md`:
 | `Docs audit excludes` | `docs/superpowers/**`, `docs/features/**`, `docs/gtm/**`, `**/CHANGELOG.md` |
 
 If the `## Docs audit` block is absent (the config predates this story), fall back to the
-defaults above and note the fallback in the step-6 report — do not treat this as an error.
+defaults above and note the fallback in the step-5 report — do not treat this as an error.
 
 If `--paths` was passed on this invocation, it **replaces** the resolved `Docs audit paths` for
 this run only (the excludes still apply; `--paths` never overrides excludes).
@@ -78,7 +78,7 @@ line is the finding ID):
 
 ```bash
 gh pr view "<number>" --json body --jq '.body' \
-  | grep -oE '^- `[a-z0-9][a-z0-9-]*`' | tr -d '`- '
+  | grep -oE '^- `[a-z0-9][a-z0-9-]*`' | sed -E 's/^- `([^`]+)`$/\1/'
 ```
 
 Build the existing-PR set — `{ branch, url, findingIds }` per PR — to pass into the dispatch
@@ -108,8 +108,9 @@ Return:
    `prs` is empty, an explicit **"no PRs opened"** line stating the reason (clean audit,
    `--dry-run`, or zero-file corpus).
 4. **Deferred groups**: `deferredGroups` slugs, if any (finding groups beyond `--max-prs`).
-5. **Skipped-as-already-open groups**: from the agent's prose notes (step-4 idempotency guard
-   hits), with their existing PR URLs.
+5. **Skipped-as-already-open findings/groups**: from the agent's prose notes (its idempotency
+   guard — a finding-level match in its step 3, or a branch-slug match in its step 4), with the
+   existing PR URLs involved.
 6. **Degraded state**: any skill (`ai-seo` / `content-strategy`) that failed to load, the step-2
    config fallback (if used), or a `git`/`gh` error that stopped the PR loop.
 
@@ -123,7 +124,8 @@ Return:
 | Corpus resolves to zero files                                          | Agent returns empty `findings`; report states no documentation matched the audit paths               | Clean no-op, no PR                                      |
 | Audit finds no issues                                                  | Agent returns `findings: []`, `prs: []`                                                              | Clean no-op — no PR opened (AC-4)                       |
 | `--dry-run` passed                                                     | Agent audits and returns findings; opens no PR                                                       | Report-only                                             |
-| Finding group already has an open `gtm/docs-audit/*` PR                | Agent skips that group (its step 4)                                                                  | No duplicate PR                                         |
+| A finding is already covered by an existing open `gtm/docs-audit/*` PR | Agent drops it before grouping (its step 3) — never recommended in a new PR                          | No duplicate recommendation                             |
+| A group's branch slug matches an existing open `gtm/docs-audit/*` PR   | Agent skips opening a PR for that group (its step 4, defense-in-depth)                               | No duplicate PR                                         |
 | Finding groups exceed `--max-prs`                                      | Agent opens up to the cap; remainder listed in `deferredGroups`                                      | Partial, reported                                       |
 | `gh`/`git` not authenticated or push rejected                          | Agent stops the PR loop, returns findings + the git/gh error; command surfaces it                    | Findings reported, PRs failed — surfaced, not swallowed |
 | `ai-seo` or `content-strategy` skill unavailable at dispatch           | Agent degrades — audits with the remaining skill + the rubric, flags the missing skill in its return | Degraded audit, non-fatal                               |

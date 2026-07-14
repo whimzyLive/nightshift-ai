@@ -1,5 +1,57 @@
 # ai-enablement-engineer — memory
 
+## NA-7 QA fix round 1 on commit 93c24e9 (`plugins/gtm`)
+
+- `tr -d '`- '`(delete-set semantics) is the wrong tool whenever the very characters you're
+  stripping as delimiters (here: hyphens) also legitimately occur *inside* the payload you want to
+  keep —`tr -d`has no concept of "only leading/trailing", so`readme-missing-h1-keyword`came
+  out as`readmemissingh1keyword`, silently breaking every future idempotency match. `sed -E
+  's/^- `([^`]+)`$/\1/'` (anchored capture-group extraction) is the correct pattern any time a
+  parseable line has fixed prefix/suffix framing around a payload that may contain the same
+  characters as the framing — reach for `sed`/capture-group extraction over `tr -d` by default for
+  this shape, not just when a bug surfaces.
+- An idempotency guard keyed only on a "group slug vs. branch name" match silently breaks the
+  instant a re-run's grouping heuristic (fewest-PRs-possible, corpus-size-dependent) produces a
+  _different_ shape than a prior run — e.g. run 1 merges everything into `gtm/docs-audit/all`, run
+  2's larger corpus splits per-category into `gtm/docs-audit/metadata` etc.; slug-level matching
+  alone sees no collision and re-opens PRs for already-covered findings. The durable fix is a
+  two-layer guard: a **finding-ID-level** filter (drop any finding whose `id` already appears in
+  _any_ existing open PR's claimed IDs, checked before the grouping heuristic even runs) as the
+  primary defense, plus the original slug-level check retained as a cheap defense-in-depth
+  secondary layer for the now-rare case a group's final slug still collides. When a review finds
+  "guard operates at the wrong granularity," check whether the guard needs a second, finer-grained
+  layer added _before_ the existing one rather than just changing what the existing layer compares.
+- A dense mesh of cross-file "step N" prose citations (command step ↔ agent step ↔ ref step, each
+  file numbering its own steps independently) is exactly the kind of thing that goes stale the
+  moment ANY numbered step gets inserted/reworded during a later fix round — inserting the new
+  finding-ID-filter content as extra prose _inside_ existing Step 3 (rather than as a new numbered
+  step) was a deliberate choice to avoid cascading every downstream step number and its citations.
+  When a fix must add a step's worth of new behavior to an already-numbered, cross-referenced
+  document set, prefer folding it into the front of the most relevant _existing_ step over
+  inserting a new numbered step, specifically to keep every other file's "step N" citations valid
+  without a full renumbering pass. Still always finish with a blind `grep -n 'step[- ][0-9]'` across
+  every touched file and manually verify each hit — don't rely on "I didn't renumber anything" as
+  proof none went stale, since several citations in this round were wrong from the _original_
+  authoring (not the renumbering), e.g. `docs-auditor.md`'s own input-contract line said "step-5
+  idempotency guard" when the guard was always Step 4, and a "future runs' idempotency check (step
+  5)" reference actually meant the sibling _command_ file's Step 3 — cross-file references
+  (agent-citing-command, command-citing-agent) are the ones most likely to be wrong on first
+  authoring since there's no single file where both numberings are visible side-by-side.
+- **A markdown table cell containing a bare, unescaped `**/_.ext`-shaped glob is not stable under
+this repo's real `prettier --write`.** `docs/\*\*/_.md` sitting directly in a table cell (not
+inside a code span) is genuinely CommonMark-ambiguous emphasis syntax (`**`+`/`+`_..._`), so
+remark's formatter round-trips it to `docs/**/\*.md`on every`--write`pass — my first attempt
+to "just remove the backslashes" was silently undone the next time I ran prettier to verify
+idempotence, because the *escaped* form, not the bare form, is prettier's actual stable output
+for that raw shape. The fix that's genuinely stable AND matches this file's own established
+convention (Postiz's`Backend URL`/`API key env var` rows already wrap similar literal
+values in backticks) is to wrap each glob in an inline code span — `` `docs/\*_/_.md` `` — which
+sidesteps emphasis-parsing entirely (code spans aren't parsed for markdown syntax) and reads
+identically to how the same defaults are already presented in `commands/docs.md`'s Step 2 table.
+Lesson: when a "just fix the escaping" review finding involves `\*`in raw table prose, verify the
+fix with a real two-pass`prettier --write` (not just a visual diff) before trusting it — and
+  reach for a code span first, not a bare backslash-removal, whenever the token is glob/regex-like.
+
 ## NA-6 — content-writer agent + voice-rules ref + /gtm:site command (`plugins/gtm`)
 
 - A plan's structural verification grep can accidentally match its own explanatory prose. The

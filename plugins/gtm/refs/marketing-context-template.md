@@ -66,10 +66,10 @@ never written to this file.
 
 ## Docs audit
 
-| Token               | Value                                                               |
-| ------------------- | ------------------------------------------------------------------- |
-| Docs audit paths    | README.md, docs/**/\*.md, docs/**/\*.mdx                            |
-| Docs audit excludes | docs/superpowers/**, docs/features/**, docs/gtm/**, **/CHANGELOG.md |
+| Token               | Value                                                                       |
+| ------------------- | --------------------------------------------------------------------------- |
+| Docs audit paths    | `README.md`, `docs/**/*.md`, `docs/**/*.mdx`                                |
+| Docs audit excludes | `docs/superpowers/**`, `docs/features/**`, `docs/gtm/**`, `**/CHANGELOG.md` |
 ```
 
 **KPI row values above are illustrative only (never render these into a generated file):** the row

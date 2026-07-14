@@ -44,7 +44,8 @@ The dispatching command passes:
 - **`--dry-run`** — boolean; when true, audit and return findings but open no PR.
 - **`--max-prs`** — ceiling on PRs opened this run (never a target).
 - **Existing open PRs** — the set of currently-open `gtm/docs-audit/*` PRs the command enumerated
-  via `gh pr list`, each as `{ branch, url, findingIds }`. Used by the step-5 idempotency guard.
+  via `gh pr list`, each as `{ branch, url, findingIds }`. Used by the step-3 finding-level filter
+  and the step-4 idempotency guard.
 
 ## Process
 
@@ -76,32 +77,44 @@ type DocsFindingCategory = 'metadata' | 'structure' | 'keyword-intent' | 'answer
 ```
 
 `id` must be a stable kebab-case slug (lowercase letters, digits, hyphens only) — it is the token
-extracted from your PR bodies by future runs' idempotency check (step 5), so keep it deterministic
-for the same file+issue rather than randomly generated per run.
+extracted from your PR bodies by future runs' idempotency check (the command's step 3), so keep it
+deterministic for the same file+issue rather than randomly generated per run.
 
 If the corpus is entirely clean (every file passes every applicable rubric check), return
 `findings: []`, `prs: []` — a clean audit opens no PR (AC-4).
 
 ### Step 3 — Group findings, biased toward the fewest PRs
 
-Default grouping is by `category`, per `refs/docs-audit-rubric.md`'s finding-group taxonomy:
+**First, filter out already-covered findings.** Before grouping anything, drop any finding whose
+`id` already appears in the command's **existing open PRs** input's `findingIds` — check across
+**every** existing PR, regardless of that PR's branch slug. A finding is already under review the
+moment any open `gtm/docs-audit/*` PR claims its ID, even if this run would otherwise group it
+differently than a prior run did (e.g. a prior run opened `gtm/docs-audit/all`; this run's larger
+corpus would otherwise split per-category and put the same finding under
+`gtm/docs-audit/metadata`). Keep already-covered findings in the `findings[]` you return — they're
+still real findings — but never recommend one again in a new PR. Note in your prose summary which
+findings were dropped this way and the existing PR URL each is already covered by.
 
-- When the corpus touched by findings is small (a handful of files), merge **all** findings into
-  a **single** group, slug `all`.
-- Split into per-category groups only when the documentation scope genuinely large enough to
+**Then group the remaining, not-yet-covered findings.** Default grouping is by `category`, per
+`refs/docs-audit-rubric.md`'s finding-group taxonomy:
+
+- When the corpus touched by the remaining findings is small (a handful of files), merge **all**
+  of them into a **single** group, slug `all`.
+- Split into per-category groups only when the documentation scope is genuinely large enough to
   warrant it (many files, many categories represented).
 
 `--max-prs` (default 5) is a **ceiling only, never a target** — open up to the cap; any remaining
 groups beyond it go into `deferredGroups` (their slugs), not dropped.
 
-### Step 4 — Idempotency guard
+### Step 4 — Idempotency guard (branch-slug, defense-in-depth)
 
-For each candidate group, compare its slug against the command's **existing open PRs** input: if
-a group with that slug already has an open PR under `gtm/docs-audit/*`, skip opening a new PR for
-it — do not duplicate. Its findings still count in the `findings[]` you return; note in your
-prose summary (not the structured result) which groups were skipped because they're already
-covered by an open PR — this is distinct from `deferredGroups`, which is only for groups cut by
-`--max-prs`.
+The step-3 finding-level filter already drops every already-covered finding before a group is
+even formed, so a group built entirely from new findings should rarely collide with an existing
+PR's branch. As a second, belt-and-braces check: for each candidate group, compare its slug
+against the command's **existing open PRs** input — if a group with that exact slug already has
+an open PR under `gtm/docs-audit/*`, skip opening a new PR for it — do not duplicate. Note in your
+prose summary (not the structured result) which groups were skipped this way — distinct from
+`deferredGroups`, which is only for groups cut by `--max-prs`.
 
 ### Step 5 — Open a PR per remaining group
 
@@ -114,7 +127,7 @@ by step 4. For every other group, up to `--max-prs`:
 4. Push the branch.
 5. Open the PR with `gh pr create --base develop --title "docs(<scope>): <group summary>" --body
 "..."`. The body **must** list every finding the PR addresses, one per line, in this exact
-   shape so future runs' idempotency check (the command's step 4) can parse it back out:
+   shape so future runs' idempotency check (the command's step 3) can parse it back out:
 
    ```
    ## Docs audit findings addressed
@@ -156,22 +169,24 @@ interface DocsAuditResult {
 Alongside the structured result, return:
 
 1. A one-paragraph summary of what was audited and what changed.
-2. Which groups (if any) were skipped by the step-4 idempotency guard, and their existing PR
-   URLs.
+2. Which findings/groups (if any) were skipped because they're already covered by an existing
+   open PR — whether dropped by the step-3 finding-level filter or a group cut by the step-4
+   slug-level guard — and the existing PR URL(s) involved.
 3. Any degraded state: a skill that failed to load (name it), a config fallback the command
    already told you it used, or a git/gh error that stopped the PR loop.
 
 ## Error Handling
 
-| Scenario                                                     | Behaviour                                                                                        | Outcome                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| Corpus resolves to zero files                                | Return empty `findings` immediately (step 1) — no rubric pass, no PR work                        | Clean no-op, no PR                                      |
-| Audit finds no issues                                        | Return `findings: []`, `prs: []`                                                                 | Clean no-op — no PR opened (AC-4)                       |
-| `--dry-run` passed                                           | Audit and return findings; skip step 5 entirely                                                  | Report-only                                             |
-| Group already has an open `gtm/docs-audit/*` PR              | Skip opening a PR for that group (step 4); note it in the prose summary                          | No duplicate PR                                         |
-| Finding groups exceed `--max-prs`                            | Open up to the cap; list the remainder's slugs in `deferredGroups`                               | Partial, reported                                       |
-| `gh`/`git` not authenticated or push rejected                | Stop the PR-opening loop; return the findings collected so far plus the git/gh error             | Findings reported, PRs failed — surfaced, not swallowed |
-| `ai-seo` or `content-strategy` skill unavailable at dispatch | Degrade: audit with the remaining skill + the rubric alone; flag the missing skill in the return | Degraded audit, non-fatal                               |
+| Scenario                                                               | Behaviour                                                                                        | Outcome                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Corpus resolves to zero files                                          | Return empty `findings` immediately (step 1) — no rubric pass, no PR work                        | Clean no-op, no PR                                      |
+| Audit finds no issues                                                  | Return `findings: []`, `prs: []`                                                                 | Clean no-op — no PR opened (AC-4)                       |
+| `--dry-run` passed                                                     | Audit and return findings; skip step 5 entirely                                                  | Report-only                                             |
+| A finding is already covered by an existing open `gtm/docs-audit/*` PR | Drop it before grouping (step 3); never recommended in a new PR                                  | No duplicate recommendation                             |
+| A group's branch slug matches an existing open `gtm/docs-audit/*` PR   | Skip opening a PR for that group (step 4, defense-in-depth); note it in the prose summary        | No duplicate PR                                         |
+| Finding groups exceed `--max-prs`                                      | Open up to the cap; list the remainder's slugs in `deferredGroups`                               | Partial, reported                                       |
+| `gh`/`git` not authenticated or push rejected                          | Stop the PR-opening loop; return the findings collected so far plus the git/gh error             | Findings reported, PRs failed — surfaced, not swallowed |
+| `ai-seo` or `content-strategy` skill unavailable at dispatch           | Degrade: audit with the remaining skill + the rubric alone; flag the missing skill in the return | Degraded audit, non-fatal                               |
 
 ## Scope note
 

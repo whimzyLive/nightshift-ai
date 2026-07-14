@@ -1,6 +1,6 @@
 # Docs Audit Rubric
 
-Applies at `docs-auditor` agent step 3 (Audit each file against the rubric), dispatched by
+Applies at `docs-auditor` agent step 2 (Audit each file against the rubric), dispatched by
 `/gtm:docs`. Every `DocsAuditFinding.rubricRef` value **must** be one of the rubric IDs below —
 this file is the traceable source those references point at (NA-7 AC-1: "audits existing
 documentation against ai-seo and content-strategy guidance").
@@ -81,7 +81,7 @@ Content currency vs. product reality.
 
 ## Finding-group taxonomy
 
-`docs-auditor` step 4 groups findings into PR-sized units, biased toward the fewest PRs possible
+`docs-auditor` step 3 groups findings into PR-sized units, biased toward the fewest PRs possible
 (the spec's Resolved Decision). Group **slugs** — used to build the `gtm/docs-audit/<group-slug>`
 branch name — follow one of two shapes:
 
