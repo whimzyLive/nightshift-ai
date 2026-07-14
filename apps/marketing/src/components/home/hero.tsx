@@ -6,54 +6,8 @@ import {
   RevealGroup,
   Terminal,
 } from '@nightshift-ai/ui';
-import type { TerminalLine } from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
-
-// Verbatim from the design handoff (nightshift Landing.dc.html L725-738,
-// LINES) — the scripted /auto PROJ-142 run the Terminal loops through.
-const TERMINAL_LINES: TerminalLine[] = [
-  { prompt: '$', text: '/auto PROJ-142' },
-  { text: '' },
-  { text: 'Reading ticket PROJ-142 from Jira…', tone: 'muted' },
-  {
-    agent: 'product-manager',
-    text: '→ wrote PRD · 4 acceptance criteria',
-    tone: 'accent',
-  },
-  {
-    agent: 'solutions-architect',
-    text: '→ technical spec · 2 new endpoints',
-    tone: 'accent',
-  },
-  {
-    agent: 'tech-lead',
-    text: '→ ordered plan · 7 verifiable steps',
-    tone: 'accent',
-  },
-  {
-    agent: 'principal-engineer',
-    text: '→ dispatching domain engineers…',
-    tone: 'accent',
-  },
-  {
-    text: 'platform-engineer  ✓ implemented, 142 tests green',
-    tone: 'muted',
-    indent: 1,
-  },
-  {
-    text: 'web-engineer       ✓ UI wired, a11y pass',
-    tone: 'muted',
-    indent: 1,
-  },
-  {
-    agent: 'qa-engineer',
-    text: '→ quality gate passed · ACs verified',
-    tone: 'success',
-  },
-  { text: '→ opened PR #318 · commented on PROJ-142', tone: 'success' },
-  { prompt: '$', text: '▌', tone: 'accent' },
-];
 
 /**
  * Above-the-fold hero: value line, install snippets, GitHub star CTA, and
@@ -161,7 +115,10 @@ export function Hero() {
           />
           <Terminal
             title="zsh — acme-api · claude code"
-            lines={TERMINAL_LINES}
+            video={{
+              src: '/hero-promo.mp4',
+              poster: '/hero-promo-poster.jpg',
+            }}
             minHeight="clamp(16.25rem, 40vh, 26.25rem)"
           />
         </div>
