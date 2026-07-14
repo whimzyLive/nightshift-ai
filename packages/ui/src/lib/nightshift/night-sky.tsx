@@ -152,6 +152,82 @@ const BIGBANG_RINGS = [0, 0.1, 0.22]; // stagger delays (s), post-blackout
 // Blast starts only after the sky has snapped to black.
 const BLACKOUT_S = 0.18;
 
+// Crack phase — jagged fractures spread from the click point across the whole
+// viewport while the page shudders. The blast expands in LOCKSTEP with the
+// cracks (same duration + easing), so the light races out along the fractures
+// and fills the screen exactly as they reach the edges — then it snaps black
+// and the debris flies.
+// Pacing multiplier for the whole detonation (cracks + blast stay in lockstep).
+// Higher = slower; 1.7 ≈ 70% slower than the base timing.
+const SLOWMO = 1.7;
+const CRACK_S = 0.85 * SLOWMO;
+// Connected cascade — each phase kicks off when the previous is ~20% in:
+//   cracks (0) → explosion (20% of cracks) → debris + blackout (20% of explosion).
+const EXPL_DELAY = CRACK_S * 0.2; // explosion ignites 20% into the crack draw
+const DEBRIS_DELAY = EXPL_DELAY + CRACK_S * 0.25; // debris flings 20% into the blast
+const BLACKOUT_DELAY = EXPL_DELAY + CRACK_S * 0.3; // black snaps with the debris
+// Post-cracks blast durations, kept on the same slow-mo scale.
+const BLACKOUT_DUR = 1.7 * SLOWMO;
+const DEBRIS_DUR = 1.45 * SLOWMO;
+const IMPACT_DUR = 0.45 * SLOWMO;
+// The fractures' easing — shared by the flash + rings so they expand together.
+const CRACK_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+interface CrackStep {
+  dist: number; // px from the origin along the crack direction
+  perp: number; // px zig-zag offset perpendicular to that direction
+}
+interface Crack {
+  angle: number;
+  seg: CrackStep[];
+}
+
+// Deterministic fracture templates (no Math.random at render — angles/offsets
+// derive from the index, so server and client agree).
+function makeCrack(
+  angle: number,
+  steps: number,
+  reach: number,
+  seed: number,
+): Crack {
+  const seg: CrackStep[] = [];
+  for (let s = 1; s <= steps; s++) {
+    const dist = (reach * s) / steps;
+    const perp = (s % 2 ? 1 : -1) * (14 + ((s * (seed + 3)) % 5) * 9);
+    seg.push({ dist, perp });
+  }
+  return { angle, seg };
+}
+// Long primary fractures reaching off every edge, plus shorter secondary
+// splinters near the impact for density.
+const CRACK_MAINS: Crack[] = Array.from({ length: 11 }, (_, i) =>
+  makeCrack(
+    (i / 11) * Math.PI * 2 + (i % 2 ? 0.16 : -0.1),
+    6,
+    1500 + (i % 4) * 220,
+    i,
+  ),
+);
+const CRACK_BRANCHES: Crack[] = Array.from({ length: 9 }, (_, i) =>
+  makeCrack((i / 9) * Math.PI * 2 + 0.3, 4, 620 + (i % 3) * 160, i + 5),
+);
+const CRACKS: Crack[] = [...CRACK_MAINS, ...CRACK_BRANCHES];
+
+// Build the jagged SVG path for a crack originating at the click point.
+function crackPath(x: number, y: number, c: Crack): string {
+  const ux = Math.cos(c.angle);
+  const uy = Math.sin(c.angle);
+  const nx = -uy; // perpendicular unit vector
+  const ny = ux;
+  let d = `M ${x} ${y}`;
+  for (const { dist, perp } of c.seg) {
+    const gx = x + ux * dist + nx * perp;
+    const gy = y + uy * dist + ny * perp;
+    d += ` L ${gx.toFixed(1)} ${gy.toFixed(1)}`;
+  }
+  return d;
+}
+
 interface Meteor {
   id: number;
   x: number;
@@ -198,7 +274,11 @@ export function NightSky({
 
   const [meteors, setMeteors] = useState<Meteor[]>([]);
   const [bigBang, setBigBang] = useState<BigBang | null>(null);
+  // Combo build-up level: 0 = idle, 3 or 4 = charging toward detonation. Drives
+  // the escalating pre-blast shudder that merges into the crack shake at click 5.
+  const [charge, setCharge] = useState(0);
   const nextId = useRef(0);
+  const chargeTimer = useRef<number | null>(null);
   // Same-spot click combo tracker (position + timestamp + count).
   const comboRef = useRef<{ x: number; y: number; t: number; n: number }>({
     x: 0,
@@ -247,12 +327,31 @@ export function NightSky({
       const n = sameSpot ? c.n + 1 : 1;
       comboRef.current = { x, y, t, n };
 
+      if (chargeTimer.current != null) {
+        window.clearTimeout(chargeTimer.current);
+        chargeTimer.current = null;
+      }
+
       if (n >= COMBO_THRESHOLD) {
-        // Combo hit — swallow the meteor, clear the sky, and detonate.
+        // Combo hit — swallow the meteor, clear the sky, and detonate. The
+        // build-up shudder rolls straight into the crack shake.
         comboRef.current = { x: 0, y: 0, t: 0, n: 0 };
+        setCharge(0);
         setMeteors([]);
         setBigBang({ id: nextId.current++, x, y });
         return;
+      }
+
+      if (n >= COMBO_THRESHOLD - 2) {
+        // Two clicks out from detonation — start the escalating shudder, and
+        // let it decay if the combo goes cold before the next click.
+        setCharge(n);
+        chargeTimer.current = window.setTimeout(
+          () => setCharge(0),
+          COMBO_WINDOW_MS,
+        );
+      } else {
+        setCharge(0);
       }
 
       spawnMeteor(x, y);
@@ -273,10 +372,42 @@ export function NightSky({
     window.addEventListener('pointerdown', onTap);
     return () => {
       window.clearInterval(ambient);
+      if (chargeTimer.current != null) window.clearTimeout(chargeTimer.current);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('pointerdown', onTap);
     };
   }, [prefersReduced, px, py]);
+
+  // Merged crack-phase / build-up shudder — all on the starfield layer only
+  // (scroll-safe: a `fixed` sibling of the blast, never its ancestor).
+  //   • detonating → one heavy decaying shake across the crack draw
+  //   • charging (3rd/4th combo click) → escalating jitter loop that rolls
+  //     straight into the detonation shake
+  let shudderAnimate: { x: number[] | number; y: number[] | number } = {
+    x: 0,
+    y: 0,
+  };
+  let shudderTransition: object = { duration: 0 };
+  if (animate && bigBang) {
+    // Amplitude envelope ramps up to a mid-shake peak then eases back down, so
+    // the shudder starts and ends gently instead of jerking hard at t=0.
+    shudderAnimate = {
+      x: [0, -2, 4, -6, 6, -4.5, 3, -1, 0],
+      y: [0, 1.5, -3, 4.5, -4.5, 3, -1.5, 0.5, 0],
+    };
+    shudderTransition = { duration: CRACK_S * 0.5, ease: 'easeInOut' };
+  } else if (animate && charge >= COMBO_THRESHOLD - 2) {
+    const a = charge >= COMBO_THRESHOLD - 1 ? 5.5 : 3; // heavier on the 4th click
+    shudderAnimate = {
+      x: [0, -a, a, -a * 0.6, a * 0.6, 0],
+      y: [0, a * 0.7, -a * 0.7, a * 0.5, -a * 0.5, 0],
+    };
+    shudderTransition = {
+      duration: charge >= COMBO_THRESHOLD - 1 ? 0.13 : 0.17,
+      ease: 'easeInOut',
+      repeat: Infinity,
+    };
+  }
 
   const drift = animate ? { x: [0, -40], y: [0, -40] } : undefined;
   // Opacity-only twinkle — animating `filter: brightness` here repainted the
@@ -285,9 +416,14 @@ export function NightSky({
 
   return (
     <>
-      <div
+      <motion.div
         aria-hidden="true"
         className={`pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[var(--bg-void)] ${opacityClass} ${className}`}
+        // Scroll-safe shudder: shakes ONLY this starfield layer. It's a `fixed`
+        // sibling of the blast overlay, not an ancestor, so its transform can't
+        // re-base the blast (the bug that killed the old body/html shake).
+        animate={shudderAnimate}
+        transition={shudderTransition}
       >
         <motion.div className="absolute inset-0" style={{ x: nearX, y: nearY }}>
           <motion.div
@@ -360,7 +496,7 @@ export function NightSky({
             transition={{ duration: 20, ease: 'easeInOut', repeat: Infinity }}
           />
         </motion.div>
-      </div>
+      </motion.div>
 
       {meteors.length > 0 && (
         <div
@@ -409,7 +545,69 @@ export function NightSky({
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 z-[9990] overflow-hidden"
         >
-          {/* Blackout — the whole sky snaps to black before the blast, then
+          {/* Crack phase — jagged fractures draw out from the click point
+              across the whole viewport, over the still-live site, before the
+              screen goes black. */}
+          <svg
+            className="absolute inset-0 h-full w-full"
+            style={{ overflow: 'visible' }}
+          >
+            {CRACKS.map((c, i) => {
+              const main = i < CRACK_MAINS.length;
+              return (
+                <motion.path
+                  key={i}
+                  d={crackPath(bigBang.x, bigBang.y, c)}
+                  fill="none"
+                  stroke="rgba(245,243,239,0.95)"
+                  strokeWidth={main ? 2.6 : 1.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    filter:
+                      'drop-shadow(0 0 3px rgba(217,119,87,0.9)) drop-shadow(0 0 7px rgba(245,243,239,0.45))',
+                  }}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: [0, 1, 1, 0] }}
+                  transition={{
+                    duration: CRACK_S,
+                    ease: CRACK_EASE,
+                    delay: (i % 5) * 0.02,
+                    // Hold the fractures bright until they finish drawing
+                    // (~CRACK_S), then snuff them out fast as the blast erupts
+                    // from the same point — so nothing lingers once the black
+                    // clears.
+                    opacity: {
+                      // Fully snuffed out by ~0.92·CRACK_S — before the black
+                      // lands — so nothing lingers once it clears.
+                      duration: CRACK_S,
+                      times: [0, 0.05, 0.7, 0.92],
+                    },
+                  }}
+                />
+              );
+            })}
+          </svg>
+          {/* Impact flash at the fracture origin. */}
+          <motion.span
+            className="absolute rounded-full"
+            style={{
+              left: bigBang.x,
+              top: bigBang.y,
+              width: 60,
+              height: 60,
+              marginLeft: -30,
+              marginTop: -30,
+              background:
+                'radial-gradient(circle, #ffffff 0%, rgba(217,119,87,0.6) 45%, transparent 70%)',
+              mixBlendMode: 'screen',
+              willChange: 'transform, opacity',
+            }}
+            initial={{ scale: 0, opacity: 0.9 }}
+            animate={{ scale: [0, 3, 5], opacity: [0.9, 0.5, 0] }}
+            transition={{ duration: IMPACT_DUR, ease: 'easeOut' }}
+          />
+          {/* Blackout — the whole sky snaps to black after the cracks, then
               clears as debris flies out. Longest-lived → owns the cleanup. */}
           <motion.div
             className="absolute inset-0"
@@ -417,9 +615,10 @@ export function NightSky({
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 1, 1, 0] }}
             transition={{
-              duration: 1.7,
+              duration: BLACKOUT_DUR,
               ease: 'easeOut',
-              times: [0, BLACKOUT_S / 1.7, 0.45, 1],
+              times: [0, BLACKOUT_S / BLACKOUT_DUR, 0.45, 1],
+              delay: BLACKOUT_DELAY,
             }}
             onAnimationComplete={() => setBigBang(null)}
           />
@@ -439,12 +638,14 @@ export function NightSky({
               willChange: 'transform, opacity',
             }}
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: [0, 14, 34], opacity: [0, 1, 0] }}
+            // Blooms from the origin on the SAME curve + duration as the cracks
+            // so the light fills the screen exactly as they reach the edges.
+            animate={{ scale: [0, 42], opacity: [0, 1, 1, 0] }}
             transition={{
-              duration: 1.5,
-              ease: 'easeOut',
-              times: [0, 0.28, 1],
-              delay: BLACKOUT_S,
+              duration: CRACK_S,
+              ease: CRACK_EASE,
+              delay: EXPL_DELAY,
+              opacity: { duration: CRACK_S + 0.18, times: [0, 0.12, 0.72, 1] },
             }}
           />
           {/* Shockwave rings — expand clear across the viewport. */}
@@ -468,9 +669,9 @@ export function NightSky({
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: [0, 90], opacity: [0.95, 0] }}
               transition={{
-                duration: 1.4,
-                ease: 'easeOut',
-                delay: BLACKOUT_S + delay,
+                duration: CRACK_S + 0.2,
+                ease: CRACK_EASE,
+                delay: EXPL_DELAY + delay * 0.4,
               }}
             />
           ))}
@@ -499,10 +700,10 @@ export function NightSky({
                 scale: [1, 0.3],
               }}
               transition={{
-                duration: 1.45,
+                duration: DEBRIS_DUR,
                 ease: 'easeOut',
                 times: [0, 0.08, 0.75, 1],
-                delay: BLACKOUT_S,
+                delay: DEBRIS_DELAY,
               }}
             />
           ))}
