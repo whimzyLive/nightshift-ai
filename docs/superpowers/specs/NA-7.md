@@ -65,11 +65,11 @@ reports. Receives `${CLAUDE_PLUGIN_ROOT}` natively from the harness.
 
 **Flags:**
 
-| Flag                       | Optional | Behaviour                                                                                                        |
-| -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| `--dry-run`                | yes      | Run the full audit and report findings **inline**, but open **no** PRs.                                          |
-| `--paths <glob[,glob...]>` | yes      | Override the configured `Docs audit paths` for this run only.                                                    |
-| `--max-prs <n>`            | yes      | Cap the number of PRs opened this run (default `5`). Excess finding groups are listed in the report as deferred. |
+| Flag                       | Optional | Behaviour                                                                                                                                                                       |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--dry-run`                | yes      | Run the full audit and report findings **inline**, but open **no** PRs.                                                                                                         |
+| `--paths <glob[,glob...]>` | yes      | Override the configured `Docs audit paths` for this run only.                                                                                                                   |
+| `--max-prs <n>`            | yes      | **Ceiling** on PRs opened this run (default `5`) — never a target; the agent opens the fewest PRs the scope allows. Excess finding groups are listed in the report as deferred. |
 
 ### Agent: `docs-auditor` (dispatch-only)
 
@@ -170,9 +170,11 @@ Follow the existing gtm conventions established by `commands/site.md` and `agent
 1. Load `ai-seo` and `content-strategy` skills via the Skill tool.
 2. Enumerate the corpus via Glob against the resolved include globs minus excludes.
 3. Audit each file against `refs/docs-audit-rubric.md`, producing `DocsAuditFinding[]`.
-4. Group findings into PR-sized units — **default grouping = by `file`** (all findings for one doc =
-   one PR), falling back to grouping by `category` when a single finding spans many files (e.g. a
-   site-wide internal-linking fix). Cap opened groups at `--max-prs`; list the rest in `deferredGroups`.
+4. Group findings into PR-sized units — **default grouping = by `category`, biased toward the
+   fewest PRs possible**: when the corpus is small (a handful of touched files) merge **all**
+   findings into a **single** PR; split into per-category PRs only when the documentation scope is
+   genuinely large. `--max-prs` is a **ceiling only**, never a target — cap opened groups at it and
+   list the rest in `deferredGroups`.
 5. For each group (skipped entirely on `--dry-run` and for groups already covered by an open PR):
    branch `gtm/docs-audit/<group-slug>` off the base branch, apply the recommended doc edits with the
    Write tool, commit (`docs(<scope>): <finding summary>`), push, and open a PR via `gh pr create`
@@ -219,16 +221,17 @@ state (skill unavailable, config fallback, git failure); and — on a clean/`--d
 - **Channel drafts / Postiz publishing / KPI** — other gtm stories (NA-8+).
 - **Scheduling / running `/gtm:docs` on a loop** — invoked manually; automation is a later concern.
 
-## Open Questions
+## Resolved Decisions
 
-- [ ] **Default grouping granularity — per-file vs per-category PRs.** Suggested default: **per-file**
-      (one PR per doc), falling back to per-category only when a finding legitimately spans many files.
-      Keeps each PR small and reviewable while satisfying "one or more PRs" (AC-2).
-- [ ] **Default `--max-prs` cap.** Suggested default: **5** — bounds PR sprawl on a first audit of a
-      large corpus; overflow is reported as deferred, not dropped.
-- [ ] **Should `/gtm:docs` require `/gtm:init` context (the precondition STOP)?** Suggested default:
-      **yes** — ai-seo + content-strategy both consume product/audience context, and the story lists
-      `/gtm:init` as a dependency. Mirrors the `/gtm:site` precondition.
-- [ ] **Audit-corpus default excludes.** Suggested default: exclude `docs/superpowers/**`,
-      `docs/features/**`, `docs/gtm/{digests,briefs}/**`, and `**/CHANGELOG.md` (SDLC/gtm internal +
-      machine-generated artifacts); audit `README.md` + human-facing `docs/**` Markdown/MDX.
+All open questions resolved by founder review on PR #102:
+
+- [x] **Grouping granularity → per-category, fewest PRs possible.** Merge all findings into a
+      single PR when scope allows; split into per-category PRs only for a genuinely large
+      documentation scope. (Supersedes the earlier per-file suggestion.)
+- [x] **`--max-prs` → ceiling only, default `5`.** Never a target — the agent opens the fewest PRs
+      the scope allows; overflow is reported as deferred, not dropped.
+- [x] **`/gtm:docs` requires `/gtm:init` context — yes.** Precondition STOP when
+      `marketing-context.md` is absent, mirroring `/gtm:site`.
+- [x] **Audit-corpus default excludes — confirmed.** `docs/superpowers/**`, `docs/features/**`,
+      `docs/gtm/**`, `**/CHANGELOG.md` (SDLC/gtm internal + machine artifacts); audit `README.md` +
+      human-facing `docs/**` Markdown/MDX.
