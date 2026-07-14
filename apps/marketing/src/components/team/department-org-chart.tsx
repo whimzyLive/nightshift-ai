@@ -19,6 +19,7 @@ export function DepartmentOrgChart() {
             style={{ maxWidth: 480 }}
           >
             <Reveal
+              data-lift
               className="text-center"
               style={{
                 background: 'var(--surface-card)',

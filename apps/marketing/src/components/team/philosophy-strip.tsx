@@ -28,6 +28,7 @@ export function PhilosophyStrip() {
           {PHILOSOPHY.map((card) => (
             <Reveal
               key={card.title}
+              data-lift
               scale={0.97}
               blur={8}
               duration={0.6}

@@ -291,6 +291,7 @@ export function TeamPreview() {
           onMouseLeave={() => setActive(null)}
         >
           <div
+            data-lift
             className="overflow-x-auto border p-6"
             style={{
               background: 'var(--surface-terminal)',
@@ -393,6 +394,7 @@ export function TeamPreview() {
           </div>
 
           <div
+            data-lift
             className="flex flex-col gap-3 border p-6"
             style={{
               position: 'sticky',

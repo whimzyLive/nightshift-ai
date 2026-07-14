@@ -30,6 +30,7 @@ export function PageFaq({ faqs }: { faqs: WhySdlcFaqItem[] }) {
         </RevealGroup>
         <RevealGroup>
           <Reveal
+            data-lift
             className="mt-5"
             scale={0.97}
             blur={8}

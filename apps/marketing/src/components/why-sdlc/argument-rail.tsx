@@ -259,6 +259,7 @@ export function ArgumentRail({ args }: { args: WhySdlcArgument[] }) {
                 />
               </div>
               <div
+                data-lift
                 className="px-5 py-7 md:px-[34px] md:py-[30px]"
                 style={{
                   background: 'var(--surface-card)',

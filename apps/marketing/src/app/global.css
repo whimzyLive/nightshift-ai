@@ -435,3 +435,37 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 600px;
 }
+
+/* Card hover-lift micro-interaction — any surface marked `data-lift` raises a
+ * little, warms its border to accent, and gains a soft glow on hover. Uses
+ * `!important` so it wins over the cards' inline border/shadow styles and over
+ * Motion's resting inline transform (Motion animates on rAF and rests at an
+ * identity translate, so this only takes effect on hover — never fighting the
+ * reveal). The global reduced-motion guard above already flattens the
+ * transition; the lift transform is additionally cancelled there. */
+[data-lift] {
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+  will-change: transform;
+}
+
+[data-lift]:hover {
+  transform: var(--lift-card) !important;
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--glow-card-hover) !important;
+}
+
+/* Section headings brighten on hover — the "text highlights" half of the
+ * cursor-grow interaction (CursorGlow also enlarges over h1–h3). */
+:where(h1, h2, h3):hover {
+  color: var(--moon-100) !important;
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-lift]:hover {
+    transform: none !important;
+  }
+}
