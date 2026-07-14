@@ -63,23 +63,43 @@ this run only (the excludes still apply; `--paths` never overrides excludes).
 
 List every currently-open PR whose head branch is namespaced under `gtm/docs-audit/*`, and pull
 the finding IDs each one's body already claims — a re-run must not duplicate a PR for a finding
-group that's already under review:
+group that's already under review. Do this with a **single** `gh pr list` call — never a
+`gh pr view` per PR (an N+1 pattern that costs one extra API round trip per already-open audit
+PR for no benefit, since `gh pr list --json` already exposes `body`):
 
 ```bash
 gh pr list --search "head:gtm/docs-audit/" --state open \
-  --json number,headRefName,url --jq '.[] | "\(.number)\t\(.headRefName)\t\(.url)"' 2>&1
+  --json headRefName,url,body 2>&1 | jq -c '.[]'
 ```
 
 `head:` in `--search` is a substring match on the ref (unlike `--head`'s exact match), which is
-exactly what a `gtm/docs-audit/` prefix probe needs. For each returned PR, pull its body and
-extract the finding IDs it lists (the `docs-auditor` PR-body convention: each finding is a line
-`- \`<findingId>\` (\`<rubricRef>\`): <summary>`, so the first backtick-quoted token on a `- `
-line is the finding ID):
+exactly what a `gtm/docs-audit/` prefix probe needs. `jq -c '.[]'` (real `jq`, run locally on the
+already-fetched JSON — not another `gh` call) prints one compact, single-line JSON object per PR,
+which is safe to loop over even though `body` itself is multi-line text (compact mode escapes the
+embedded newlines, so each PR still occupies exactly one line of the loop's input).
+
+For each PR line, extract its finding IDs from `body`. **Scope the extraction to the "## Docs
+audit findings addressed" section only** — the `docs-auditor` PR-body convention also appends a
+`## Summary` section afterward, and that section's own bullets may start with backtick-quoted
+kebab-case tokens too (e.g. a category or group slug); grepping the whole body would harvest
+those as spurious finding IDs and cause a later run to silently treat genuinely new findings as
+already covered. Each real finding is a line ``- `<findingId>` (`<rubricRef>`): <summary>``, so
+the first backtick-quoted token on a `- ` line **within that section** is the finding ID:
 
 ```bash
-gh pr view "<number>" --json body --jq '.body' \
-  | grep -oE '^- `[a-z0-9][a-z0-9-]*`' | sed -E 's/^- `([^`]+)`$/\1/'
+while IFS= read -r pr; do
+  branch="$(printf '%s' "$pr" | jq -r '.headRefName')"
+  url="$(printf '%s' "$pr" | jq -r '.url')"
+  ids="$(printf '%s' "$pr" | jq -r '.body' \
+    | sed -n '/^## Docs audit findings addressed/,/^## /p' \
+    | grep -oE '^- `[a-z0-9][a-z0-9-]*`' | sed -E 's/^- `([^`]+)`$/\1/')"
+  printf 'PR\t%s\t%s\t%s\n' "$branch" "$url" "$ids"
+done
 ```
+
+(`sed -n '/start/,/end/p'` prints from the findings heading up to — and including — the next
+`## ` heading; if the findings section were ever the last thing in the body, with no following
+heading, the range simply prints to end of input, which still scopes correctly.)
 
 Build the existing-PR set — `{ branch, url, findingIds }` per PR — to pass into the dispatch
 below. An empty result (no open `gtm/docs-audit/*` PRs) is not an error; pass an empty set.
@@ -116,16 +136,14 @@ Return:
 
 ## Error handling
 
-| Scenario                                                               | Behaviour                                                                                            | Outcome                                                 |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `marketing-context.md` or `.agents/product-marketing.md` missing/empty | STOP at step 1 with the `/gtm:init` guidance                                                         | No dispatch, no PR                                      |
-| `.claude/.gtm-plugin-root` missing                                     | Not an error — step 1 writes it before dispatch (gitignored per-machine cache)                       | Proceeds                                                |
-| `## Docs audit` block absent from `marketing-context.md`               | Fall back to documented defaults (step 2); note the fallback in the report                           | Proceeds, reported                                      |
-| Corpus resolves to zero files                                          | Agent returns empty `findings`; report states no documentation matched the audit paths               | Clean no-op, no PR                                      |
-| Audit finds no issues                                                  | Agent returns `findings: []`, `prs: []`                                                              | Clean no-op — no PR opened (AC-4)                       |
-| `--dry-run` passed                                                     | Agent audits and returns findings; opens no PR                                                       | Report-only                                             |
-| A finding is already covered by an existing open `gtm/docs-audit/*` PR | Agent drops it before grouping (its step 3) — never recommended in a new PR                          | No duplicate recommendation                             |
-| A group's branch slug matches an existing open `gtm/docs-audit/*` PR   | Agent skips opening a PR for that group (its step 4, defense-in-depth)                               | No duplicate PR                                         |
-| Finding groups exceed `--max-prs`                                      | Agent opens up to the cap; remainder listed in `deferredGroups`                                      | Partial, reported                                       |
-| `gh`/`git` not authenticated or push rejected                          | Agent stops the PR loop, returns findings + the git/gh error; command surfaces it                    | Findings reported, PRs failed — surfaced, not swallowed |
-| `ai-seo` or `content-strategy` skill unavailable at dispatch           | Agent degrades — audits with the remaining skill + the rubric, flags the missing skill in its return | Degraded audit, non-fatal                               |
+Command-level scenarios only — everything that happens once `docs-auditor` is dispatched (clean
+audit, `--dry-run`, zero-file corpus, the two idempotency-guard layers, `--max-prs` overflow,
+git/gh failures, a missing marketingskills skill) is the agent's own error handling, not
+restated here: see `docs-auditor.md`'s **Error Handling** table, which this command's step-5
+report surfaces verbatim from the agent's return.
+
+| Scenario                                                               | Behaviour                                                                      | Outcome            |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------ |
+| `marketing-context.md` or `.agents/product-marketing.md` missing/empty | STOP at step 1 with the `/gtm:init` guidance                                   | No dispatch, no PR |
+| `.claude/.gtm-plugin-root` missing                                     | Not an error — step 1 writes it before dispatch (gitignored per-machine cache) | Proceeds           |
+| `## Docs audit` block absent from `marketing-context.md`               | Fall back to documented defaults (step 2); note the fallback in the report     | Proceeds, reported |

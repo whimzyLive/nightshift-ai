@@ -121,13 +121,14 @@ prose summary (not the structured result) which groups were skipped this way —
 Skip this step entirely on `--dry-run` (audit + return findings only) and for any group skipped
 by step 4. For every other group, up to `--max-prs`:
 
-1. Branch `gtm/docs-audit/<group-slug>` off the base branch (`develop`, per project-context).
+0. **Resolve the base branch once per run, before branching anything.** gtm is a public plugin installed into arbitrary consumer repos — most of them will NOT have `.claude/project/project-context.md` (that file is an sdlc-plugin artifact). Default to this repo's actual default branch: `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. Only if `.claude/project/project-context.md` exists AND sets a `Base branch` token, treat that value as an explicit override and use it instead of the repo default. Never hardcode `develop` — on a consumer repo whose default branch is `main`, hardcoding `develop` would make every `gh pr create --base develop` fail, silently opening zero PRs for the whole run.
+1. Branch `gtm/docs-audit/<group-slug>` off the resolved base branch (step 0).
 2. Apply the recommended doc edits with the Write tool.
 3. Commit: `docs(<scope>): <finding summary>` (scope = the group slug or a short doc area name).
-4. Push the branch.
-5. Open the PR with `gh pr create --base develop --title "docs(<scope>): <group summary>" --body
-"..."`. The body **must** list every finding the PR addresses, one per line, in this exact
-   shape so future runs' idempotency check (the command's step 3) can parse it back out:
+4. **Before pushing, check whether a remote branch of this name already exists**: `git ls-remote --heads origin gtm/docs-audit/<group-slug>`.
+   - **No match** — push normally: `git push -u origin gtm/docs-audit/<group-slug>`.
+   - **A match exists** — the Step 4 branch-slug guard above already skipped this group if an _open_ PR owns that branch, so a surviving remote branch here can only belong to a PR that's no longer open (closed without merging, or merged without its branch auto-deleted). Force-push with lease to reuse the name: `git push --force-with-lease origin gtm/docs-audit/<group-slug>`. **This is intentional, not a bug workaround:** closing a PR without merging it is not a permanent rejection of the findings it proposed — the underlying doc issues are still real (the audit re-detected them this run) until the doc is actually fixed, so re-proposing them under the same branch name is the correct default. Note in your prose summary whenever a group's branch was reused this way, so the founder can see it wasn't a fresh branch.
+5. Open the PR with `gh pr create --base "<resolved base branch>" --title "docs(<scope>): <group summary>" --body "..."`. The body **must** list every finding the PR addresses, one per line, in this exact shape so future runs' idempotency check (the command's step 3) can parse it back out:
 
    ```
    ## Docs audit findings addressed
@@ -140,9 +141,10 @@ by step 4. For every other group, up to `--max-prs`:
    idempotency guard greps for `^- \`<token>\``. Follow the findings list with a `## Summary`
    section describing the group's overall change.
 
-If `git`/`gh` is not authenticated or a push is rejected, stop the PR-opening loop for the
-remaining groups, but do not discard the findings you've already collected — return them along
-with the git/gh error (see Error Handling).
+If `git`/`gh` is not authenticated, or a push is rejected for a reason OTHER than the handled
+stale-remote-branch case above (the push sub-step), stop the PR-opening loop for the remaining
+groups, but do not discard the findings you've already collected — return them along with the
+git/gh error (see Error Handling).
 
 ### Step 6 — Return the result
 
@@ -177,16 +179,17 @@ Alongside the structured result, return:
 
 ## Error Handling
 
-| Scenario                                                               | Behaviour                                                                                        | Outcome                                                 |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| Corpus resolves to zero files                                          | Return empty `findings` immediately (step 1) — no rubric pass, no PR work                        | Clean no-op, no PR                                      |
-| Audit finds no issues                                                  | Return `findings: []`, `prs: []`                                                                 | Clean no-op — no PR opened (AC-4)                       |
-| `--dry-run` passed                                                     | Audit and return findings; skip step 5 entirely                                                  | Report-only                                             |
-| A finding is already covered by an existing open `gtm/docs-audit/*` PR | Drop it before grouping (step 3); never recommended in a new PR                                  | No duplicate recommendation                             |
-| A group's branch slug matches an existing open `gtm/docs-audit/*` PR   | Skip opening a PR for that group (step 4, defense-in-depth); note it in the prose summary        | No duplicate PR                                         |
-| Finding groups exceed `--max-prs`                                      | Open up to the cap; list the remainder's slugs in `deferredGroups`                               | Partial, reported                                       |
-| `gh`/`git` not authenticated or push rejected                          | Stop the PR-opening loop; return the findings collected so far plus the git/gh error             | Findings reported, PRs failed — surfaced, not swallowed |
-| `ai-seo` or `content-strategy` skill unavailable at dispatch           | Degrade: audit with the remaining skill + the rubric alone; flag the missing skill in the return | Degraded audit, non-fatal                               |
+| Scenario                                                                                                                                               | Behaviour                                                                                        | Outcome                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Corpus resolves to zero files                                                                                                                          | Return empty `findings` immediately (step 1) — no rubric pass, no PR work                        | Clean no-op, no PR                                      |
+| Audit finds no issues                                                                                                                                  | Return `findings: []`, `prs: []`                                                                 | Clean no-op — no PR opened (AC-4)                       |
+| `--dry-run` passed                                                                                                                                     | Audit and return findings; skip step 5 entirely                                                  | Report-only                                             |
+| A finding is already covered by an existing open `gtm/docs-audit/*` PR                                                                                 | Drop it before grouping (step 3); never recommended in a new PR                                  | No duplicate recommendation                             |
+| A group's branch slug matches an existing open `gtm/docs-audit/*` PR                                                                                   | Skip opening a PR for that group (step 4, defense-in-depth); note it in the prose summary        | No duplicate PR                                         |
+| A remote branch already exists for a group slug (from a closed-unmerged, or undeleted-merged, PR — never an open one, step 4 already caught that case) | Force-push with lease to reuse it (step 5.4); note it in the prose summary                       | Findings re-proposed, no push-failure cascade           |
+| Finding groups exceed `--max-prs`                                                                                                                      | Open up to the cap; list the remainder's slugs in `deferredGroups`                               | Partial, reported                                       |
+| `gh`/`git` not authenticated, or push rejected for any other reason                                                                                    | Stop the PR-opening loop; return the findings collected so far plus the git/gh error             | Findings reported, PRs failed — surfaced, not swallowed |
+| `ai-seo` or `content-strategy` skill unavailable at dispatch                                                                                           | Degrade: audit with the remaining skill + the rubric alone; flag the missing skill in the return | Degraded audit, non-fatal                               |
 
 ## Scope note
 

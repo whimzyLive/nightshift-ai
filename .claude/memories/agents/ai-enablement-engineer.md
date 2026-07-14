@@ -1,5 +1,98 @@
 # ai-enablement-engineer — memory
 
+## NA-7 QA fix round 2 on PR #103 (`plugins/gtm`)
+
+- gtm is a published plugin installed into arbitrary consumer repos, most of which have no
+  `.claude/project/project-context.md` at all (that file is an sdlc-plugin artifact this agent
+  wrongly assumed was universal). Hardcoding `gh pr create --base develop` meant every consumer
+  repo whose default branch is `main` would silently open zero PRs. Fix: resolve the base branch
+  at runtime with `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`, and treat
+  project-context's `Base branch` token as an optional override only when that file happens to
+  exist and sets one. Lesson: any gtm-plugin instruction that reaches for an sdlc-owned artifact
+  (project-context.md, its Base branch row, etc.) needs an explicit "this file may not exist"
+  branch, not a bare read — gtm and sdlc are installed independently and neither depends on the
+  other.
+- A rubric with 21 checks phrased as "the PASS condition" and 1 check (META-4) phrased as "the
+  FAILURE condition" is a real bug, not a style nit, under a "finding = check fails" evaluation
+  rule: the odd-one-out check fires on exactly the pages that are actually fine and stays silent
+  on the pages that need the flag. When a rubric or any other checklist-style table states most
+  rows in one polarity, grep the whole table for rows that read as a negative/failure description
+  before shipping it — a single inverted row is easy to miss in review because it still reads as
+  sensible English in isolation.
+- Scoping a text-extraction grep to "the whole PR body" instead of to a specific named section is
+  a latent false-positive generator the moment ANY other part of the body can start a line with
+  the same token shape the grep targets. Here, the finding-ID grep (`- ` followed by a
+  backtick-quoted kebab token) also matched the `## Summary` section's own bullets, since group
+  and category slugs are also backtick-quoted kebab tokens. Fix: scope with a `sed -n` range over
+  the target heading before the grep, so extraction only sees the section whose line shape the
+  grep assumes. Generalizable rule: when a convention document
+  defines a specific section for a structured extraction target, and the same body ALSO contains
+  other free-form sections that could coincidentally match the same line pattern, always scope
+  the extraction to the named section first — never grep the whole document and trust the pattern
+  alone to disambiguate.
+- The idempotency-guard input contract only ever covered OPEN PRs (by design — that's the set a
+  fresh audit needs to avoid duplicating). But a PR that gets closed WITHOUT merging leaves two
+  things behind that the open-PR-only contract can't see: its remote branch (a future run's
+  fresh branch of the same slug collides on push) and its finding IDs (never actually fixed, so
+  the next audit re-detects them and tries to re-propose them under a branch name that's already
+  taken). The fix has two independent parts that are each worth remembering on their own: (1) a
+  `git ls-remote --heads` probe before every push, with `--force-with-lease` reuse when a stale
+  branch is found — probing before pushing is cheap and turns a hard push-rejection failure into
+  a handled case; (2) an explicit written policy on WHETHER closure means permanent rejection
+  (chosen here: no — closing without merging doesn't retract the underlying doc issue, so
+  re-proposing is the correct default, but a different agent/tool might reasonably choose the
+  opposite policy and must say so explicitly rather than leaving the behavior implicit).
+- Replacing an "N+1 gh calls" pattern (`gh pr list` then `gh pr view` once per result) with a
+  single `gh pr list --json headRefName,url,body` has one non-obvious wrinkle: `body` is
+  multi-line text, so a naive `--jq '.[] | "\(.headRefName)\t...\(.body)"'` TSV-per-line approach
+  breaks immediately, since the embedded body newlines split what should be one logical row
+  across several physical lines. `jq -c '.[]'` (compact mode, run locally — not another `gh`
+  call) is the fix: it escapes embedded newlines as `\n` inside the JSON string, so each PR still
+  occupies exactly one physical line of loop input, and per-field extraction becomes a second,
+  purely local `jq -r` call per line rather than a second network round trip.
+- A command's error-handling table that restates 8 of a dispatched agent's 9 rows nearly verbatim
+  is pure duplication risk (two copies of the same behavior contract that WILL drift the next
+  time only one gets edited) with no reader benefit, since the command's own step 5 already
+  surfaces the agent's return verbatim. Slimmed it to the 3 rows that are genuinely
+  command-level (precondition STOP, plugin-root marker write, config-fallback note) plus one
+  pointer row naming the agent's own Error Handling table as the source of truth for every
+  audit-time scenario — the same "one source of truth plus pointers" pattern already established
+  for cross-file shared-contract prose in the sdlc plugin.
+- While rewriting the base-branch and stale-branch prose above, found (unprompted by this round's
+  named findings) that several sentences had a single-backtick code span split across two
+  physical source lines by manual wrapping, e.g. a `.claude/project/` path and a
+  `gh pr create --base ...` command each broken mid-span. This is not just ugly source — per
+  CommonMark, a code span's embedded line ending is converted to a literal space when rendered,
+  so a path or command broken mid-span can render with a spurious space inserted in the middle of
+  a literal token. Fix: never let a manually-wrapped sentence break a code span across lines;
+  since this repo's prettier config has `proseWrap: preserve` (confirmed in earlier NA-25 work),
+  it never rewraps prose for you, so the safe default for any sentence carrying a long inline
+  code span is to just write it as one long physical source line rather than hand-wrapping it.
+- Re-verified this round's own memory-file edits (this entry, plus the `patterns.md` fix) survive
+  a real two-pass `prettier --write` before committing, per the now-established scratch-file
+  protocol from the previous round's self-inflicted corruption — draft in a scratch file under
+  the repo tree, run `prettier --write` twice and confirm the second pass is a no-op, THEN copy
+  the verified text into the real file. Held for this round too; no corruption this time.
+- A "fix the flagged line" edit to `patterns.md` appeared to silently vanish on the first attempt
+  this round: I fixed lines 45 and 48, ran a bundled `prettier --write` across five files, saw
+  "unchanged" on the second pass, moved on — then a later `git status` showed the file byte-
+  identical to `HEAD`, meaning the fix never actually landed. Root cause, found by isolating the
+  file and re-running `prettier --write` alone: two OTHER lines in the same blank-line-separated
+  paragraph (46 and 47, neither flagged by the review, neither touched by my edit) contained the
+  same invalid nested-backtick-escape anti-pattern from earlier rounds (a literal backtick inside
+  a single-backtick code span written as a backslash escape, which CommonMark does not support).
+  Prettier's remark parser treats the whole four-line paragraph as one reflow unit, so editing
+  ANY line within it can shift where the corruption lands on the NEXT prettier pass — it moved
+  from the lines I'd just fixed onto two lines I hadn't touched, which is why a same-file,
+  same-command sanity check looked clean right after my edit but a later independent check showed
+  the fix gone. Lesson: when a paragraph contains this anti-pattern anywhere, the WHOLE paragraph
+  is unstable, not just the specific line with the bug — fix every nested-backtick-escape in the
+  paragraph in the same pass (convert to a proper double-backtick delimiter, or drop the literal
+  regex from prose entirely and describe it in words), and verify with an isolated, single-file
+  two-pass `prettier --write` plus a `diff` against the pre-edit copy — a bundled multi-file
+  prettier run's summary output is not a reliable enough signal that a specific file's specific
+  fix actually survived; check that one file in isolation.
+
 ## NA-7 QA fix round 1 on commit 93c24e9 (`plugins/gtm`)
 
 - `tr -d` deletes every occurrence of each character in its argument set, not just leading/trailing
@@ -643,10 +736,12 @@ before any other step` section, but it listed **only a subset** of the frontmatt
 - `gh pr list --search "head:<prefix>"` (substring/ref match, confirmed by `dep-gate.sh`'s own
   comment in `plugins/sdlc/scripts/dep-gate.sh`) is exactly the right tool for a
   branch-namespace-prefix idempotency probe (`gtm/docs-audit/*`) — `--head` only does exact-match
-  and can't express a prefix at all. Paired it with a documented, greppable PR-body convention
-  (`- \`<findingId>\` (\`<rubricRef>\`): <summary>`, finding ID = first backtick token on a `- `line) so the command's step-3 idempotency-guard-input enumeration and the agent's step-5
-PR-authoring convention stay in lockstep — defined the exact`grep -oE` pattern once in the
-  command doc and cross-referenced it (not re-derived) from the agent doc's PR-body instructions.
+  and can't express a prefix at all. Paired it with a documented, greppable PR-body convention —
+  each finding is a dash-prefixed line whose first backtick-quoted token is the finding ID,
+  followed by a second backtick-quoted rubric reference and a colon-prefixed summary — so the
+  command's step-3 idempotency-guard-input enumeration and the agent's step-5 PR-authoring
+  convention stay in lockstep. Defined the exact `grep -oE` pattern once in the command doc and
+  cross-referenced it (not re-derived) from the agent doc's PR-body instructions.
 - A spec's "so init seeds it" phrasing for a new `marketing-context-template.md` block does not
   always mean `commands/init.md` itself needs editing: this story's Config table gives the new
   `Docs audit paths`/`excludes` fields **fixed, non-interviewed defaults** (no founder decision
