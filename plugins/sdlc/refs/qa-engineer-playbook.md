@@ -327,6 +327,15 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
 DATE=$(date +%Y-%m-%d)
 ```
 
+**ADR-index check first (applies to both appends below).** Before the `patterns.md` append AND
+the per-agent memory append, consult `docs/adr/index.md` in `$WORKTREE` — the relevant agent's
+section(s) plus `General` — if it exists. If a **`status: accepted`** ADR already captures the
+learning, **soft-skip that append and note it** (the ADR is canonical). A match against a
+`superseded`, `rejected`, or `proposed` ADR does **NOT** skip — the learning is still appended,
+since the index line carries status and lets this check filter without opening the ADR. A missing
+index (repo has no ADRs yet) is a no-op — append as normal. Additive guard: never changes the
+append format below; the skip is always soft (skipped, never failed).
+
 **1. Audit log** — append to `$WORKTREE/.claude/memories/reviews/patterns.md`:
 
 ```

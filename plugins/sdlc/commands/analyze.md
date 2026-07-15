@@ -29,7 +29,10 @@ The agent should:
    [`#output-shape`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#output-shape): the resolved
    write-scope, then the drift/gap list, the conflict report (own section, one entry per conflict:
    the contradictory sources + their exact assertions + file paths), proposed fixes, and any
-   `find-skills` suggestions for skill gaps. If nothing was found, report "no drift detected" and
+   `find-skills` suggestions for skill gaps. If a **memory bloat** finding is present (oversized
+   agent memory files, or repeated/duplicated learnings), surface it as a **recommendation to run
+   `/sdlc:adr --distill`** to curate them into ADRs — recommendation only, this scan never runs
+   distill itself and gains no new apply path. If nothing was found, report "no drift detected" and
    exit cleanly.
 
 ## Apply — only after explicit human confirmation, never auto-apply
