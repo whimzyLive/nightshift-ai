@@ -1,6 +1,6 @@
 {
   "name": "gtm",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "GTM marketing engine — Postiz-backed channel publishing and marketingskills-driven positioning for Claude Code. Reads per-repo config from .claude/project/marketing-context.md.",
   "author": { "name": "nightshift" },
   "dependencies": [

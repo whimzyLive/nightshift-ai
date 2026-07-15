@@ -6,13 +6,23 @@ invoking the marketingskills `product-marketing` skill — before any channel, K
 launch configuration exists.
 
 ## Install
+
     /plugin marketplace add <path-or-git-url-to-this-repo>
     /plugin install gtm@nightshift
 
 Installing `gtm@nightshift` also pulls its two cross-marketplace dependencies (below) via the
 marketplace allowlist.
 
+## Commands
+
+| Command     | What it does                                                                                                                                                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/gtm:init` | Bootstraps the gtm marketing foundation — `.claude/project/marketing-context.md` + `.agents/product-marketing.md`. Run this first; every other command requires it.                                                                                |
+| `/gtm:site` | Produces reviewed, brand-correct landing-page copy with a full SEO layer and writes the durable `docs/gtm/site-brief.md` handoff artifact. Building the site from the brief is a separate step.                                                    |
+| `/gtm:docs` | Audits this repo's existing documentation (README + `docs/**`) against `ai-seo` + `content-strategy` guidance and opens the fewest improvement PRs the scope allows, each citing the finding it fixes. A clean audit or `--dry-run` opens nothing. |
+
 ## Consumer repo requirements
+
 - `.claude/project/marketing-context.md` — gtm's operational config, written by `/gtm:init`
   (auto-loaded each session by this plugin's SessionStart hook).
 - `.agents/product-marketing.md` — the marketingskills canonical product-context doc, created and
@@ -20,6 +30,7 @@ marketplace allowlist.
 - Add `.claude/.gtm-plugin-root` to the repo's `.gitignore` (done automatically by `/gtm:init`).
 
 ## Plugin-path resolution (`.claude/.gtm-plugin-root`)
+
 `${CLAUDE_PLUGIN_ROOT}` is only available to Claude Code hooks and slash commands — it is **not**
 injected into subagents. Since the `product-marketing-manager` agent needs to read bundled refs
 and run bundled scripts, the SessionStart hook (which does have the variable) writes the resolved
@@ -30,6 +41,7 @@ reads that one-line marker from cwd and substitutes it wherever its instructions
 you).
 
 ## Dependencies
+
 - **`postiz@postiz-agent`** — **auto-installed.** Declared as a cross-marketplace dependency
   (marketplace `postiz-agent`, source `gitroomhq/postiz-agent`), so `/plugin install gtm@nightshift`
   reuses an existing install or pulls it. Provides the `postiz` skill wrapping the `postiz` npm CLI
@@ -50,10 +62,10 @@ you).
 The `postiz` CLI reads its backend URL from the `POSTIZ_API_URL` environment variable and its API
 key from `POSTIZ_API_KEY`. gtm splits these differently by sensitivity:
 
-| Value | Where it lives | Persisted? |
-| ----- | --------------- | ---------- |
+| Value              | Where it lives                                                  | Persisted?                                                                                                                                                                                                                                                  |
+| ------------------ | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Postiz backend URL | `.claude/project/marketing-context.md` (Postiz → `Backend URL`) | **Yes** — a config token, not a secret. Chosen at `/gtm:init` via `AskUserQuestion`: **cloud default** (`https://api.postiz.com`) or a **self-hosted** URL you supply. Commands that invoke the `postiz` CLI export it as `POSTIZ_API_URL` from this token. |
-| Postiz API key | environment only (`POSTIZ_API_KEY`) | **Never** — only the env-var **name** `POSTIZ_API_KEY` is persisted; the key value must stay in your shell/`.env`, never written to disk. |
+| Postiz API key     | environment only (`POSTIZ_API_KEY`)                             | **Never** — only the env-var **name** `POSTIZ_API_KEY` is persisted; the key value must stay in your shell/`.env`, never written to disk.                                                                                                                   |
 
 An already-set `POSTIZ_API_URL` env var, if present at `/gtm:init` time, seeds the default answer
 to the backend-URL question — it does not skip it. After init, the `marketing-context.md` token is
