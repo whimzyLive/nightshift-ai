@@ -53,3 +53,10 @@
 **Root causes:** (1) hedged prose trying to hold an absolute rule and its exception in one sentence; (2) version-bump convention lives in repo habit, not in a checklist the authoring agent reads.
 **Preventions:** rules an autonomous agent will mechanically apply must resolve deterministically — state rule, then explicit narrow exception, never blended; any change under plugins/<plugin>/ ships with a plugin.json version bump in the same PR.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-16 — Story NA-43
+
+**Issues found:** Important x1 — pipeline defined draft status (proposed) but never the proposed→accepted transition, leaving the accepted-only write-path guard permanently unarmed; Minor x2 — literal bad-slug string in a warning (denylist trip hazard), unspecified combined-flag input (--distill "<focus>"). All fixed in-review before merge.
+**Root causes:** lifecycle designed from the draft side only — nobody asked "what event flips the status?"; warning text quoted the exact anti-pattern token it warned against; mode tables written for the disjoint cases only.
+**Preventions:** for any status/lifecycle field, spec the TRANSITION events, not just the states; never quote a forbidden token literally in guidance text; mode/argument tables must cover combined inputs or explicitly reject them.
+**Domains affected:** ai-enablement-engineer

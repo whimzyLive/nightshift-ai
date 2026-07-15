@@ -965,3 +965,14 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   grouping rule in a skill or ref have an explicit branch for the empty/omitted case," since an
   implicit "and if it has none, ???" is exactly the kind of gap a reviewer (or a future
   implementer) will hit on the very first real edge-case record.
+
+## 2026-07-16 — Story NA-43 — review fix
+
+**Learnings:**
+
+- When authoring a lifecycle (status enum) into pipeline docs, define the transition event for every edge — a guard keyed on a status that nothing ever sets is silently inert.
+- Guidance warning against a specific token must describe it, never quote it literally — the literal trips future grep/denylist scans.
+
+**Pitfalls:**
+
+- Command mode tables covering only disjoint flag cases leave combined inputs (flag + free text) implementation-defined; add a row or an explicit STOP.
