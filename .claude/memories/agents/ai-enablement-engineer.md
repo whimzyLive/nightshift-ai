@@ -822,3 +822,84 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   consistency and because it's the pattern already proven prettier-stable in this exact file.
   Verified via the same two-pass `prettier --write` idempotence check (both passes report
   `(unchanged)`) plus the `grep -c '```'` = 24 fence-count invariant.
+
+## NA-44 — `writing-adrs` skill, ships ahead of its own consumer (`plugins/sdlc/skills`)
+
+- This story deliberately ships a plugin-bundled skill (`writing-adrs`) with zero live consumer:
+  the knowledge-engineer agent and `/sdlc:adr` command that will invoke it are a separate,
+  not-yet-implemented story (NA-43). AC-5 still requires documenting the exact `agents:` /
+  `source-stories:` ADR-frontmatter contract the future pipeline will read, so the skill had to
+  be written from the _planned_ contract description in the dispatch prompt, not from any
+  existing code to cross-check against — verified there was nothing under `plugins/sdlc/agents/`
+  or `plugins/sdlc/commands/` yet named `adr`/`knowledge-engineer` before writing, so the skill's
+  routing-field prose is the first and only place that contract exists on disk right now.
+- Distinguishing "this SKILL.md's own frontmatter" (name+description, controls Claude's skill
+  triggering) from "the frontmatter a _generated ADR document_ carries" (status/agents/
+  source-stories, read by a future pipeline) needed an explicit callout sentence
+  ("This is distinct from this SKILL.md's own frontmatter above...") — both are YAML frontmatter
+  blocks in the same file, one describing the skill itself and one being a worked/templated
+  example of a _different_ file's frontmatter, and without the callout a reader skimming past the
+  second `---...---` block could easily conflate the two.
+- Kept the one required worked example deliberately framework/stack-agnostic (a generic
+  "PostgreSQL as primary datastore" decision) rather than reaching for this repo's own real stack
+  choices (e.g. Payload/Neon from the marketing-site memory) — `plugins/` ships as a public,
+  install-anywhere artifact per the existing published-skills rule, and a worked example tied to
+  nightshift's own infra would read as this-repo-specific inside a generic authoring skill, even
+  though nothing in `portability-lint.sh`'s actual checks (absolute paths/emails/frontmatter/
+  JSON/skill-structure) would have caught that as a violation — it's a stylistic generality
+  concern the lint doesn't enforce, not a lint failure.
+- Fetched both canonical sources in full before writing (Fowler's 2026 `ArchitectureDecisionRecord`
+  bliki entry, and Nygard's original 2011 Cognitect post, both reachable via plain `curl -sL`,
+  stripped to text with a small inline Python `re.sub('<[^>]+>', ...)` pass rather than any
+  fetch/index MCP tool — this session's actual tool list only exposed Read/Write/Edit/Bash/Skill,
+  no context-mode MCP functions were actually callable despite the dispatch prompt's context-mode
+  tool-preference banner, so Bash `curl` was the only usable option and is explicitly what the
+  task's own instructions asked for). Fowler's confidence/uncertainty-honesty framing and the
+  "forces" borrowing from pattern-writing came from his piece; Nygard's exact five-part format
+  (Title/Context/Decision/Status/Consequences) and the "written as a conversation with a future
+  developer, full sentences not bullet fragments" discipline came from his. Cross-checking both
+  against the dispatch's distilled-canon bullets surfaced no contradictions, only Nygard's
+  original three-status set (proposed/accepted/deprecated-or-superseded) which the distilled canon
+  and Fowler's later piece both simplify to proposed/accepted/superseded — used the
+  simplified/canonical three-state set since that's what both the dispatch AC and Fowler's own
+  "further developments" framing settled on.
+
+## 2026-07-15 — Story NA-44 — review fix
+
+**Learnings:**
+
+- When authoring skills that autonomous agents apply mechanically, every rule must resolve deterministically: state the rule, then the single explicit exception with its boundary — never hedge both into one sentence.
+- Shipping any new content under plugins/<plugin>/ requires bumping that plugin's .claude-plugin/plugin.json version in the same PR (plugins/ is a published artifact; pinned consumers won't see unversioned additions).
+
+**Pitfalls:**
+
+- "This rule holds even for X — unless truly cosmetic" phrasing reads as contradiction when X is itself cosmetic; reviewers will (correctly) block on it.
+
+## 2026-07-15 — Story NA-44 — review fix, round 2 (PR #106, in-session /code-review + Copilot)
+
+- A rule genuinely worth stating in more than one place (here: immutability, mentioned in a "why"
+  rationale bullet, a lifecycle bullet, and a standalone paragraph) drifts the moment only one of
+  the N restatements gets a later edit — round 1 fixed the contradiction in the standalone
+  paragraph only, leaving the lifecycle bullet still saying "never edited or reopened" with no
+  exception and the rationale bullet re-deriving the whole thing independently. Same "one source
+  of truth + pointers" pattern from the NA-26 memory entries, but the trigger this time was subtler:
+  the first review round fixed the wording it was pointed at, not the fact that the same fact was
+  stated three times at three different strengths — after any "fix the contradiction" finding,
+  grep the whole file for the concept's other restatements before declaring it resolved, don't
+  just fix the one paragraph the finding cited.
+- A skill authored for a pipeline that hasn't shipped yet (`/sdlc:adr` + knowledge-engineer, NA-43
+  pending) needs "not yet shipped" framing repeated at every place the pipeline is named, not just
+  the first — round 1 didn't get flagged for this because the skill correctly stood alone as an
+  authoring standard, but round 2's reviewer read four separate mentions of `/sdlc:adr` and
+  `knowledge-engineer` as claims the pipeline already existed. Fix pattern: state "upcoming/not yet
+  shipped" once where the entity is first introduced, then keep every subsequent mention
+  consistent with that framing (e.g. "once it exists", "where the pipeline is installed and in
+  use") rather than dropping back to bare present-tense phrasing on later mentions of the same
+  not-yet-real thing.
+- A per-agent index-generation contract with no explicit unrouted-item rule is an easy latent drop:
+  an ADR with `agents: []` (or the field omitted) has nowhere to go in a "one section per named
+  agent" grouping scheme unless a fallback bucket is named explicitly. Fixed by adding a `General`
+  (unrouted) section to the index contract — the generalizable check is "does every classification/
+  grouping rule in a skill or ref have an explicit branch for the empty/omitted case," since an
+  implicit "and if it has none, ???" is exactly the kind of gap a reviewer (or a future
+  implementer) will hit on the very first real edge-case record.
