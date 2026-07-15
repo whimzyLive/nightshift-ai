@@ -864,6 +864,68 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   simplified/canonical three-state set since that's what both the dispatch AC and Fowler's own
   "further developments" framing settled on.
 
+## NA-43 — `knowledge-engineer` agent + `/sdlc:adr` command (`plugins/sdlc`, consumes NA-44's `writing-adrs` skill)
+
+- A spec's assumed MCP tool slug can be wrong even when the tool BASE names (`observation_search`,
+  `get_observations`) are right — the merged spec assumed `mcp__claude-mem__*`, but the installed
+  `claude-mem` plugin registers its MCP server as `mcp-search`, not `claude-mem`. The plan (and the
+  dispatch prompt that carried it forward) had already corrected this with a concrete,
+  session-verified fully-qualified name (`mcp__plugin_claude-mem_mcp-search__observation_search` /
+  `__get_observations` — the plugin-installed form) rather than leaving it as an open question to
+  re-derive at implementation time. When a grounding correction hands you an already-verified
+  literal, use it verbatim in agent frontmatter `tools:` rather than re-deriving or second-guessing
+  it from static docs — this session's own tool list had no way to independently confirm an MCP
+  server slug (no claude-mem tools were present to introspect), so the orchestrator-supplied,
+  live-session-verified value was the only trustworthy source of truth available.
+- Splitting a founder-confirmation gate across a two-dispatch boundary (draft-and-return, then
+  write-after-confirmation) is the same pattern `/sdlc:analyze`'s scan-then-apply flow already
+  established — reused its exact framing ("a dispatched subagent runs to completion and cannot
+  block for interactive input") almost verbatim in three places (`adr-pipeline.md` §3,
+  `knowledge-engineer.md`'s Pipeline section, `commands/adr.md`'s Shared pipeline section) rather
+  than inventing new prose for what is structurally the identical constraint. When a new
+  command/agent pair needs a human-in-the-loop gate, check whether an existing command already
+  solved the "subagent can't block" problem before designing a new mechanism.
+- Adding a second sanctioned cross-agent-memory-write exception to `analyze-protocol.md` required
+  promoting the previously-implicit single exception (referenced only as "the human-arbitrated
+  memory-conflict reset" inline in two places — the read-only-carve-out bullet and the
+  memory-conflict-resolution step) into a first-class named `## Memory-ownership exceptions`
+  section with both exceptions enumerated, then updating both original inline mentions to point at
+  it instead of restating the rule. This is the same "one source of truth + pointers" pattern from
+  NA-26 — creating Exception 2 without first extracting Exception 1 into the same anchor would have
+  left the "exactly one exception" framing contradicted by a second exception documented somewhere
+  else, which a reviewer would catch as an internal inconsistency.
+- The five domain-implementer agents (`database-administrator`, `platform-engineer`,
+  `sync-engineer`, `web-engineer`, `mobile-engineer`) are still byte-identical to each other
+  (confirmed via `diff` before editing, same as the NA-25 family-split lesson) — but `web-engineer`
+  is ALSO byte-identical to them now (an earlier memory entry only diffed the first four against
+  each other). Editing the shared "Read your memory archives" line required six near-identical
+  edits (five domain agents each with their own agent-name interpolated into the new sentence, plus
+  a differently-worded sixth for `ai-enablement-engineer.md` whose First-steps section already had
+  extra prose around it) rather than one shared edit — there is no ref file backing this literal
+  sentence the way `domain-agent-handoff.md` backs the branch/memory/commit protocol, so the
+  duplication is structural to the current agent-file design, not an oversight to "fix" in this
+  story.
+- `qa-engineer.md`'s ADR read-path could NOT go in the same spot as the six domain agents (a
+  numbered "First steps" step 3) because that file has no such numbered list at all — its
+  equivalent section is a prose "## Read project context first" bullet list. The plan's own task
+  text anticipated this ("~L59 and/or the Learn loop step ~L113-114") but the actual file (132
+  lines total) has no line 113-114 region matching that description — the QA playbook (a separate,
+  much longer file) is where the "Learn" step with `patterns.md` lives, not the agent file itself.
+  Read the actual target file's structure before trusting a plan's approximate line-range citation
+  when the plan was written from the spec's prose rather than a byte-level line count.
+  Cross-checked instead against the file's real structure and added the ADR read as a new paragraph
+  after the existing bullet list in "Read project context first," with an explicit sentence tying
+  it to Step 5 of the (separate) `qa-engineer-playbook.md` so a reader understands why QA specifically
+  needs this read-path (distill can promote-and-delete `patterns.md` entries).
+- Confirmed (again) that this repo's real `lint-staged`/`prettier --write` pre-commit hook silently
+  reflows every Markdown table this story touched (column-width realignment across
+  `adr-pipeline.md`, `adr.md`, `analyze-protocol.md`) on every commit — never trust the
+  pre-Edit-tool draft as the final committed byte content; the post-commit `git status --short`
+  empty check plus a targeted `grep`/verify-command re-run against the actual committed tree (not
+  the pre-commit draft) is what actually proves the fix landed, consistent with the NA-25/NA-27
+  "pre-commit `--check`/`--write` dry run never proves what actually lands" lesson family. All of
+  this story's own Task-level verify greps were re-run against the post-commit tree and passed.
+
 ## 2026-07-15 — Story NA-44 — review fix
 
 **Learnings:**
