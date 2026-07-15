@@ -60,3 +60,10 @@
 **Root causes:** lifecycle designed from the draft side only — nobody asked "what event flips the status?"; warning text quoted the exact anti-pattern token it warned against; mode tables written for the disjoint cases only.
 **Preventions:** for any status/lifecycle field, spec the TRANSITION events, not just the states; never quote a forbidden token literally in guidance text; mode/argument tables must cover combined inputs or explicitly reject them.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-16 — Story NA-43 (PR review round 2)
+
+**Issues found:** 9 accepted (fixed in 5bf753d) — unspecified phase-2 dispatch payload (fresh subagent would re-draft founder-confirmed content), stale single-exception wording after adding a second exception, sanctioned-path enumeration missing a documented source, NNNN + date-branch race conditions under concurrent runs, over-broad guard suppressing the QA audit log, promoted-pattern tags escaping QA's read path, stale "not yet shipped" self-references, incomplete usage string. 1 rejected: claude-mem hard dependency (founder design decision).
+**Root causes:** two-phase dispatch designed without an explicit data handoff contract; docs updated for the new rule but not the old rule's absolutist wording; uniqueness schemes (numbers, date branches) designed single-writer; guard scope stated ambiguously ("both appends").
+**Preventions:** every cross-dispatch boundary needs an explicit payload contract (what, verbatim, via which channel); when adding exception N, grep for "only" claims about exceptions 1..N-1; any generated identifier needs a collision rule; guards state their exact scope per append site.
+**Domains affected:** ai-enablement-engineer
