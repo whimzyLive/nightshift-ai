@@ -1,5 +1,164 @@
 # ai-enablement-engineer — memory
 
+## NA-7 QA fix round 2 on PR #103 (`plugins/gtm`)
+
+- gtm is a published plugin installed into arbitrary consumer repos, most of which have no
+  `.claude/project/project-context.md` at all (that file is an sdlc-plugin artifact this agent
+  wrongly assumed was universal). Hardcoding `gh pr create --base develop` meant every consumer
+  repo whose default branch is `main` would silently open zero PRs. Fix: resolve the base branch
+  at runtime with `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`, and treat
+  project-context's `Base branch` token as an optional override only when that file happens to
+  exist and sets one. Lesson: any gtm-plugin instruction that reaches for an sdlc-owned artifact
+  (project-context.md, its Base branch row, etc.) needs an explicit "this file may not exist"
+  branch, not a bare read — gtm and sdlc are installed independently and neither depends on the
+  other.
+- A rubric with 21 checks phrased as "the PASS condition" and 1 check (META-4) phrased as "the
+  FAILURE condition" is a real bug, not a style nit, under a "finding = check fails" evaluation
+  rule: the odd-one-out check fires on exactly the pages that are actually fine and stays silent
+  on the pages that need the flag. When a rubric or any other checklist-style table states most
+  rows in one polarity, grep the whole table for rows that read as a negative/failure description
+  before shipping it — a single inverted row is easy to miss in review because it still reads as
+  sensible English in isolation.
+- Scoping a text-extraction grep to "the whole PR body" instead of to a specific named section is
+  a latent false-positive generator the moment ANY other part of the body can start a line with
+  the same token shape the grep targets. Here, the finding-ID grep (`- ` followed by a
+  backtick-quoted kebab token) also matched the `## Summary` section's own bullets, since group
+  and category slugs are also backtick-quoted kebab tokens. Fix: scope with a `sed -n` range over
+  the target heading before the grep, so extraction only sees the section whose line shape the
+  grep assumes. Generalizable rule: when a convention document
+  defines a specific section for a structured extraction target, and the same body ALSO contains
+  other free-form sections that could coincidentally match the same line pattern, always scope
+  the extraction to the named section first — never grep the whole document and trust the pattern
+  alone to disambiguate.
+- The idempotency-guard input contract only ever covered OPEN PRs (by design — that's the set a
+  fresh audit needs to avoid duplicating). But a PR that gets closed WITHOUT merging leaves two
+  things behind that the open-PR-only contract can't see: its remote branch (a future run's
+  fresh branch of the same slug collides on push) and its finding IDs (never actually fixed, so
+  the next audit re-detects them and tries to re-propose them under a branch name that's already
+  taken). The fix has two independent parts that are each worth remembering on their own: (1) a
+  `git ls-remote --heads` probe before every push, with `--force-with-lease` reuse when a stale
+  branch is found — probing before pushing is cheap and turns a hard push-rejection failure into
+  a handled case; (2) an explicit written policy on WHETHER closure means permanent rejection
+  (chosen here: no — closing without merging doesn't retract the underlying doc issue, so
+  re-proposing is the correct default, but a different agent/tool might reasonably choose the
+  opposite policy and must say so explicitly rather than leaving the behavior implicit).
+- Replacing an "N+1 gh calls" pattern (`gh pr list` then `gh pr view` once per result) with a
+  single `gh pr list --json headRefName,url,body` has one non-obvious wrinkle: `body` is
+  multi-line text, so a naive `--jq '.[] | "\(.headRefName)\t...\(.body)"'` TSV-per-line approach
+  breaks immediately, since the embedded body newlines split what should be one logical row
+  across several physical lines. `jq -c '.[]'` (compact mode, run locally — not another `gh`
+  call) is the fix: it escapes embedded newlines as `\n` inside the JSON string, so each PR still
+  occupies exactly one physical line of loop input, and per-field extraction becomes a second,
+  purely local `jq -r` call per line rather than a second network round trip.
+- A command's error-handling table that restates 8 of a dispatched agent's 9 rows nearly verbatim
+  is pure duplication risk (two copies of the same behavior contract that WILL drift the next
+  time only one gets edited) with no reader benefit, since the command's own step 5 already
+  surfaces the agent's return verbatim. Slimmed it to the 3 rows that are genuinely
+  command-level (precondition STOP, plugin-root marker write, config-fallback note) plus one
+  pointer row naming the agent's own Error Handling table as the source of truth for every
+  audit-time scenario — the same "one source of truth plus pointers" pattern already established
+  for cross-file shared-contract prose in the sdlc plugin.
+- While rewriting the base-branch and stale-branch prose above, found (unprompted by this round's
+  named findings) that several sentences had a single-backtick code span split across two
+  physical source lines by manual wrapping, e.g. a `.claude/project/` path and a
+  `gh pr create --base ...` command each broken mid-span. This is not just ugly source — per
+  CommonMark, a code span's embedded line ending is converted to a literal space when rendered,
+  so a path or command broken mid-span can render with a spurious space inserted in the middle of
+  a literal token. Fix: never let a manually-wrapped sentence break a code span across lines;
+  since this repo's prettier config has `proseWrap: preserve` (confirmed in earlier NA-25 work),
+  it never rewraps prose for you, so the safe default for any sentence carrying a long inline
+  code span is to just write it as one long physical source line rather than hand-wrapping it.
+- Re-verified this round's own memory-file edits (this entry, plus the `patterns.md` fix) survive
+  a real two-pass `prettier --write` before committing, per the now-established scratch-file
+  protocol from the previous round's self-inflicted corruption — draft in a scratch file under
+  the repo tree, run `prettier --write` twice and confirm the second pass is a no-op, THEN copy
+  the verified text into the real file. Held for this round too; no corruption this time.
+- A "fix the flagged line" edit to `patterns.md` appeared to silently vanish on the first attempt
+  this round: I fixed lines 45 and 48, ran a bundled `prettier --write` across five files, saw
+  "unchanged" on the second pass, moved on — then a later `git status` showed the file byte-
+  identical to `HEAD`, meaning the fix never actually landed. Root cause, found by isolating the
+  file and re-running `prettier --write` alone: two OTHER lines in the same blank-line-separated
+  paragraph (46 and 47, neither flagged by the review, neither touched by my edit) contained the
+  same invalid nested-backtick-escape anti-pattern from earlier rounds (a literal backtick inside
+  a single-backtick code span written as a backslash escape, which CommonMark does not support).
+  Prettier's remark parser treats the whole four-line paragraph as one reflow unit, so editing
+  ANY line within it can shift where the corruption lands on the NEXT prettier pass — it moved
+  from the lines I'd just fixed onto two lines I hadn't touched, which is why a same-file,
+  same-command sanity check looked clean right after my edit but a later independent check showed
+  the fix gone. Lesson: when a paragraph contains this anti-pattern anywhere, the WHOLE paragraph
+  is unstable, not just the specific line with the bug — fix every nested-backtick-escape in the
+  paragraph in the same pass (convert to a proper double-backtick delimiter, or drop the literal
+  regex from prose entirely and describe it in words), and verify with an isolated, single-file
+  two-pass `prettier --write` plus a `diff` against the pre-edit copy — a bundled multi-file
+  prettier run's summary output is not a reliable enough signal that a specific file's specific
+  fix actually survived; check that one file in isolation.
+
+## NA-7 QA fix round 1 on commit 93c24e9 (`plugins/gtm`)
+
+- `tr -d` deletes every occurrence of each character in its argument set, not just leading/trailing
+  ones. Using it to strip the `- `, backticks, and space framing a parsed finding ID also strips
+  every hyphen inside the ID, since hyphens were already in the delete set for a different reason
+  (the list-marker separator) — `readme-missing-h1-keyword` came out as `readmemissingh1keyword`,
+  silently breaking every future idempotency match. Fix: anchor a `sed` capture group instead —
+  `sed -E 's/^- `([^`]+)`$/\1/'` — whenever a parsed payload can contain the same characters used
+  as its own framing/delimiters, reach for an anchored regex capture group, not `tr -d`.
+- An idempotency guard keyed only on a "group slug vs. branch name" match silently breaks the
+  instant a re-run's grouping heuristic (fewest-PRs-possible, corpus-size-dependent) produces a
+  different shape than a prior run — e.g. run 1 merges everything into `gtm/docs-audit/all`, run
+  2's larger corpus splits per-category into `gtm/docs-audit/metadata` etc.; slug-level matching
+  alone sees no collision and re-opens PRs for already-covered findings. The durable fix is a
+  two-layer guard: a finding-ID-level filter (drop any finding whose `id` already appears in any
+  existing open PR's claimed IDs, checked before the grouping heuristic even runs) as the primary
+  defense, plus the original slug-level check retained as a cheap defense-in-depth secondary layer
+  for the now-rare case a group's final slug still collides. When a review finds "guard operates at
+  the wrong granularity," check whether the guard needs a second, finer-grained layer added before
+  the existing one rather than just changing what the existing layer compares.
+- A dense mesh of cross-file "step N" prose citations (command step to agent step to ref step, each
+  file numbering its own steps independently) is exactly the kind of thing that goes stale the
+  moment any numbered step gets inserted or reworded during a later fix round — inserting the new
+  finding-ID-filter content as extra prose inside the existing Step 3 (rather than as a new
+  numbered step) was a deliberate choice to avoid cascading every downstream step number and its
+  citations. When a fix must add a step's worth of new behavior to an already-numbered,
+  cross-referenced document set, prefer folding it into the front of the most relevant existing
+  step over inserting a new numbered step, specifically to keep every other file's "step N"
+  citations valid without a full renumbering pass. Still always finish with a blind
+  `grep -n 'step[- ][0-9]'` across every touched file and manually verify each hit — don't rely on
+  "I didn't renumber anything" as proof none went stale, since several citations in this round were
+  wrong from the original authoring (not the renumbering), e.g. `docs-auditor.md`'s own
+  input-contract line said "step-5 idempotency guard" when the guard was always Step 4, and a
+  "future runs' idempotency check (step 5)" reference actually meant the sibling command file's
+  Step 3 — cross-file references (agent citing command, command citing agent) are the ones most
+  likely to be wrong on first authoring, since there's no single file where both numberings are
+  visible side-by-side.
+- A markdown table cell containing a bare, unescaped double-star-slash-star-dot-ext glob is not
+  stable under this repo's real `prettier --write`. Writing the literal glob directly in a table
+  cell (not inside a code span) is genuinely CommonMark-ambiguous emphasis syntax, so remark's
+  formatter round-trips it to an escaped form on every `--write` pass — my first attempt to "just
+  remove the backslashes" was silently undone the next time I ran prettier to verify idempotence,
+  because the escaped form, not the bare form, is prettier's actual stable output for that raw
+  shape. The fix that's genuinely stable, and matches this file's own established convention
+  (the Postiz `Backend URL` and `API key env var` rows already wrap similar literal values in
+  backticks), is to wrap each glob in its own inline code span, which sidesteps emphasis-parsing
+  entirely (code spans aren't parsed for markdown syntax) and reads identically to how the same
+  defaults are already presented in `commands/docs.md`'s Step 2 table. Lesson: when a "just fix
+  the escaping" review finding involves asterisks in raw table prose, verify the fix with a real
+  two-pass `prettier --write` run (not just a visual diff) before trusting it — and reach for a
+  code span first, not a bare backslash-removal, whenever the token is glob- or regex-shaped.
+- This exact memory file was itself corrupted by the repo's real `lint-staged`/`prettier --write`
+  pre-commit hook in this round: an Edit-tool draft mixing `*single-asterisk*` italics with
+  backtick code spans placed immediately adjacent to punctuation (no surrounding space) caused
+  remark to reflow the paragraph and drop the spaces around several code spans entirely (e.g.
+  `` `tr -d`has no concept `` — backtick glued straight onto the next word), and a bullet that
+  described a literal `**/*.ext`-shaped glob in prose suffered the exact same corruption the bullet
+  was warning about. Confirmed via `git show HEAD:<file>` after the commit, per the established
+  "pre-commit `--check`/`--write` dry run never proves what actually lands" lesson — this time the
+  corruption happened on a file that was never dry-run tested before committing at all. Fix: for
+  any memory bullet mixing heavy backtick usage with emphasis markers, draft it in a scratch file
+  under the repo tree first, run a real two-pass `prettier --write` there to confirm both stability
+  and non-corruption, and only then copy the verified-stable text into the real file — don't trust
+  Edit-tool content to survive the commit hook unchanged just because the file being edited "is
+  just documentation."
+
 ## NA-6 — content-writer agent + voice-rules ref + /gtm:site command (`plugins/gtm`)
 
 - A plan's structural verification grep can accidentally match its own explanatory prose. The
@@ -560,6 +719,47 @@ before any other step` section, but it listed **only a subset** of the frontmatt
   side-effect. This same nullglob-array pattern is worth reusing anywhere else in the plugin that
   still uses the bare `for f in "$dir"/*.ext; do [ -e "$f" ] || continue` idiom to iterate a glob —
   it is silently vacuous on a missing/empty directory, not just fragile.
+
+## NA-7 — `/gtm:docs` docs-SEO audit command + `docs-auditor` agent + rubric (`plugins/gtm`)
+
+- `docs-auditor` is the first `plugins/gtm` agent authored under the NA-25 Skill-tool-loading
+  pattern from day one (no frontmatter `skills:` list at all — `content-writer.md` and
+  `product-marketing-manager.md`, both pre-NA-25, still carry frontmatter `skills:`). The spec
+  said so explicitly ("both loaded via the Skill tool, per the NA-25 resume workaround — not
+  relied on via frontmatter preload"), and NA-25's own memory entries document the pattern was
+  only ever applied to the 12 `plugins/sdlc/agents/*.md` files, not gtm's. When a new agent's spec
+  names the NA-25 pattern by name, follow the sdlc-plugin agents' shape (no `skills:` frontmatter
+  field, `tools:` includes `Skill`, a body "## Required skills" section with the exact marker
+  sentence) rather than copying the sibling `content-writer.md`/`product-marketing-manager.md`
+  frontmatter-`skills:` shape it's dispatched alongside — the two conventions now legitimately
+  coexist in the same plugin until a future story converts the older agents.
+- `gh pr list --search "head:<prefix>"` (substring/ref match, confirmed by `dep-gate.sh`'s own
+  comment in `plugins/sdlc/scripts/dep-gate.sh`) is exactly the right tool for a
+  branch-namespace-prefix idempotency probe (`gtm/docs-audit/*`) — `--head` only does exact-match
+  and can't express a prefix at all. Paired it with a documented, greppable PR-body convention —
+  each finding is a dash-prefixed line whose first backtick-quoted token is the finding ID,
+  followed by a second backtick-quoted rubric reference and a colon-prefixed summary — so the
+  command's step-3 idempotency-guard-input enumeration and the agent's step-5 PR-authoring
+  convention stay in lockstep. Defined the exact `grep -oE` pattern once in the command doc and
+  cross-referenced it (not re-derived) from the agent doc's PR-body instructions.
+- A spec's "so init seeds it" phrasing for a new `marketing-context-template.md` block does not
+  always mean `commands/init.md` itself needs editing: this story's Config table gives the new
+  `Docs audit paths`/`excludes` fields **fixed, non-interviewed defaults** (no founder decision
+  point), and `init.md` Step 5 already generically "fills this template from
+  `${CLAUDE_PLUGIN_ROOT}/refs/marketing-context-template.md`" — so a template-only edit (new
+  section + Schema rows + a Fill rule stating "no interview, always the documented default")
+  is sufficient and correctly matches the spec's own New/Modified-files table, which does NOT list
+  `commands/init.md` as touched. Verified against the live repo: `.claude/project/marketing-context.md`
+  in this worktree predates the story and genuinely lacks the `## Docs audit` block, which is
+  exactly the "config predates this story" fallback case `/gtm:docs` step 2 is written to handle
+  — confirms the fallback path is real, not speculative, and that this file itself is correctly
+  out of this story's write-scope (owned by init runs, not hand-edited by a plugin-authoring story).
+- Read the actual `ai-seo` and `content-strategy` marketingskills skill bodies (via the Skill tool)
+  before drafting `refs/docs-audit-rubric.md` rather than inferring criteria from the skill names —
+  concrete section titles/quotes from those skills (e.g. ai-seo's "40-60 word... snippet
+  extraction", "Query Fan-Out", the Princeton GEO citation-boost table; content-strategy's
+  "Keyword Research by Buyer Stage") became the rubric's `Source` column citations, which is what
+  makes `rubricRef` genuinely traceable (AC-1) instead of a plausible-sounding invention.
 
 ## NA-25 — third review round on PR #73 (6 accepted findings: `refs/domain-agent-handoff.md`, `README.md`, all 12 `agents/*.md`, `scripts/check-agent-skill-preloads.sh`)
 

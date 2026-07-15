@@ -12,11 +12,11 @@ detail.
 ```markdown
 # Marketing Context
 
-| Token       | Value            |
-| ----------- | ---------------- |
-| Product name | <name> |
-| One-liner    | <one-liner> |
-| Repo         | <repo> |
+| Token        | Value                   |
+| ------------ | ----------------------- |
+| Product name | <name>                  |
+| One-liner    | <one-liner>             |
+| Repo         | <repo>                  |
 | Landing URL  | <landing URL, or blank> |
 
 Canonical product-marketing detail: see [`.agents/product-marketing.md`](../../.agents/product-marketing.md)
@@ -24,10 +24,10 @@ Canonical product-marketing detail: see [`.agents/product-marketing.md`](../../.
 
 ## Postiz
 
-| Token             | Value              |
-| ----------------- | ------------------ |
-| Backend URL       | <resolved Postiz backend URL — cloud default `https://api.postiz.com` or a self-hosted URL, chosen at init> |
-| API key env var   | <API key env var, default `POSTIZ_API_KEY`> |
+| Token           | Value                                                                                                       |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| Backend URL     | <resolved Postiz backend URL — cloud default `https://api.postiz.com` or a self-hosted URL, chosen at init> |
+| API key env var | <API key env var, default `POSTIZ_API_KEY`>                                                                 |
 
 **Secret hygiene:** the **Backend URL** is a non-secret config value, persisted by design — the
 `postiz` CLI reads it from the `POSTIZ_API_URL` environment variable at run time, so any command
@@ -38,21 +38,21 @@ environment and is never written to this file or any other file `/gtm:init` writ
 ## Channels
 
 | Channel | Name | Integration ID | Ownership | Voice | Cadence | Content types |
-| ------- | ---- | --------------- | --------- | ----- | ------- | ------------- |
+| ------- | ---- | -------------- | --------- | ----- | ------- | ------------- |
 
 ## KPI
 
-| Token             | Value |
-| ----------------- | ----- |
-| Metric name       | GitHub stars |
-| Source type       | managed |
-| Provider          | github |
-| GitHub metric     | stars |
-| Custom command    |  |
-| Custom endpoint   |  |
-| Value path        |  |
-| Auth env var      |  |
-| Verified value    | 128 |
+| Token           | Value        |
+| --------------- | ------------ |
+| Metric name     | GitHub stars |
+| Source type     | managed      |
+| Provider        | github       |
+| GitHub metric   | stars        |
+| Custom command  |              |
+| Custom endpoint |              |
+| Value path      |              |
+| Auth env var    |              |
+| Verified value  | 128          |
 
 **Secret hygiene:** only the `Auth env var` **name** is persisted above, never its value. The
 GitHub source persists no secret at all (it relies on ambient `gh` CLI auth). `Custom command` /
@@ -63,6 +63,13 @@ never written to this file.
 ## Voice
 
 <voice overrides — markdown block, empty at init; populated by a downstream story>
+
+## Docs audit
+
+| Token               | Value                                                                       |
+| ------------------- | --------------------------------------------------------------------------- |
+| Docs audit paths    | `README.md`, `docs/**/*.md`, `docs/**/*.mdx`                                |
+| Docs audit excludes | `docs/superpowers/**`, `docs/features/**`, `docs/gtm/**`, `**/CHANGELOG.md` |
 ```
 
 **KPI row values above are illustrative only (never render these into a generated file):** the row
@@ -73,11 +80,11 @@ omitted and never `<...>`.
 **Example rows (illustrative only — never render these into a generated file):** a materialised
 `## Channels` table looks like this once real channels are configured:
 
-| Channel  | Name              | Integration ID | Ownership | Voice   | Cadence | Content types              |
-| -------- | ----------------- | -------------- | --------- | ------- | ------- | -------------------------- |
-| x        | Nightshift        | <id>           | draft     | brand   | default | release-note, milestone    |
-| linkedin | Rishi Patel       | <id>           | draft     | founder | weekly  | release-note, article-link |
-| reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link               |
+| Channel  | Name             | Integration ID | Ownership | Voice   | Cadence | Content types              |
+| -------- | ---------------- | -------------- | --------- | ------- | ------- | -------------------------- |
+| x        | Nightshift       | <id>           | draft     | brand   | default | release-note, milestone    |
+| linkedin | Rishi Patel      | <id>           | draft     | founder | weekly  | release-note, article-link |
+| reddit   | u/nightshift-bot | <id>           | manual    | founder | paused  | article-link               |
 
 ## Schema
 
@@ -86,31 +93,33 @@ changelog highlight) · `tip` (usage tip / how-to) · `thread` (long-form multi-
 `article-link` (link to a cross-posted long-form article) · `demo-clip` (the VHS + Remotion demo
 video) · `milestone` (KPI / community milestone, e.g. star count).
 
-| Section | Field | Type | Required | Default | Notes |
-| ------- | ----- | ---- | -------- | ------- | ----- |
-| Product | `name` | string | Yes | — | Detected or interviewed |
-| Product | `one-liner` | string | Yes | — | Tagline / one-sentence pitch |
-| Product | `repo` | string (URL or `owner/name`) | Yes | — | From `git remote` or interview |
-| Product | `landing URL` | string (URL) | No | empty | Blank allowed if none exists yet |
-| Postiz  | `Backend URL` | string (URL) | Yes | `https://api.postiz.com` | Postiz backend URL — cloud default or self-hosted, chosen at init via AskUserQuestion (seeded from `POSTIZ_API_URL` env if already set). Not a secret — persisted by design; exported as `POSTIZ_API_URL` by any command invoking the `postiz` CLI. |
-| Postiz  | `API key env var` | string (env var name) | Yes | `POSTIZ_API_KEY` | Name only — never the value |
-| Channels | `Channel` | string | Yes | — | Postiz `identifier` — platform key from `integrations:list`. |
-| Channels | `Name` | string | Yes | — | Postiz `name` — account display name; disambiguates multiple accounts on one platform. Refreshed every run alongside `Integration ID` (display data, not a founder setting) — keeps the `(Channel, Name)` fallback match key current across account renames. |
-| Channels | `Integration ID` | string | Yes | — | Postiz `id`, refreshed every run; downstream publish handle; primary re-run match key but not stable identity (reconnect can go stale — `(Channel, Name)` fallback applies). |
-| Channels | `Ownership` | enum `auto` \| `draft` \| `manual` | Yes | `draft` | AC-4: any channel not explicitly set is `draft`. |
-| Channels | `Voice` | enum `brand` \| `founder` | Yes | `brand` | `brand` = product/brand account voice; `founder` = founder's personal voice; distinct from the global Voice overrides section below. |
-| Channels | `Cadence` | enum `default` \| `daily` \| `weekly` \| `paused` | Yes | `default` | `default` = inherit global pulse cadence; `paused` = prepared but never scheduled. |
-| Channels | `Content types` | comma-separated subset of the six-value catalogue | Yes | `release-note, milestone` | Multi-select. |
-| KPI | `Metric name` | string | Yes | none | Founder-named metric (AC-1). No plugin default — never pre-filled. |
-| KPI | `Source type` | enum `managed` \| `custom` | Yes | none | AC-2. |
-| KPI | `Provider` | enum `github` (when `managed`) \| `command` \| `endpoint` (when `custom`) | Yes | none | Managed → `github`; custom → the mechanism. |
-| KPI | `GitHub metric` | enum `stars` \| `forks` \| `watchers` \| `open-issues` | When `Provider=github` | `stars` | Countable repo field. `open-issues` = `.open_issues_count`, which includes open pull requests as well as issues. Blank for custom sources. |
-| KPI | `Custom command` | string (shell command) | When `Provider=command` | none | Prints the metric's current value to stdout. Shell-expanded at probe time. Blank otherwise. |
-| KPI | `Custom endpoint` | string (URL) | When `Provider=endpoint` | none | URL whose response contains the current value. Shell-expanded at probe time. Blank otherwise. |
-| KPI | `Value path` | string (jq filter) | No | `.` | For `endpoint` JSON responses — jq filter (`.` = raw numeric body). Requires `jq` when non-`.`. Blank for `command`/`github`. |
-| KPI | `Auth env var` | string (env var name) | No | blank | Env var **name** only — never the value. For the **endpoint** source, when set it is injected as `Authorization: Bearer $<name>` at probe time; embedded `$VAR` in a `command`/`endpoint` string is shell-expanded from the environment. Blank for `github`. |
-| KPI | `Verified value` | string (numeric) | Yes | none | The one live value read by the Step-4c probe (AC-4). Refreshed on every Re-run/Merge re-probe. |
-| Voice   | `voice overrides` | markdown block | No | empty | ECC anti-slop overrides, populated by a downstream story |
+| Section    | Field                 | Type                                                                      | Required                 | Default                                                               | Notes                                                                                                                                                                                                                                                        |
+| ---------- | --------------------- | ------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Product    | `name`                | string                                                                    | Yes                      | —                                                                     | Detected or interviewed                                                                                                                                                                                                                                      |
+| Product    | `one-liner`           | string                                                                    | Yes                      | —                                                                     | Tagline / one-sentence pitch                                                                                                                                                                                                                                 |
+| Product    | `repo`                | string (URL or `owner/name`)                                              | Yes                      | —                                                                     | From `git remote` or interview                                                                                                                                                                                                                               |
+| Product    | `landing URL`         | string (URL)                                                              | No                       | empty                                                                 | Blank allowed if none exists yet                                                                                                                                                                                                                             |
+| Postiz     | `Backend URL`         | string (URL)                                                              | Yes                      | `https://api.postiz.com`                                              | Postiz backend URL — cloud default or self-hosted, chosen at init via AskUserQuestion (seeded from `POSTIZ_API_URL` env if already set). Not a secret — persisted by design; exported as `POSTIZ_API_URL` by any command invoking the `postiz` CLI.          |
+| Postiz     | `API key env var`     | string (env var name)                                                     | Yes                      | `POSTIZ_API_KEY`                                                      | Name only — never the value                                                                                                                                                                                                                                  |
+| Channels   | `Channel`             | string                                                                    | Yes                      | —                                                                     | Postiz `identifier` — platform key from `integrations:list`.                                                                                                                                                                                                 |
+| Channels   | `Name`                | string                                                                    | Yes                      | —                                                                     | Postiz `name` — account display name; disambiguates multiple accounts on one platform. Refreshed every run alongside `Integration ID` (display data, not a founder setting) — keeps the `(Channel, Name)` fallback match key current across account renames. |
+| Channels   | `Integration ID`      | string                                                                    | Yes                      | —                                                                     | Postiz `id`, refreshed every run; downstream publish handle; primary re-run match key but not stable identity (reconnect can go stale — `(Channel, Name)` fallback applies).                                                                                 |
+| Channels   | `Ownership`           | enum `auto` \| `draft` \| `manual`                                        | Yes                      | `draft`                                                               | AC-4: any channel not explicitly set is `draft`.                                                                                                                                                                                                             |
+| Channels   | `Voice`               | enum `brand` \| `founder`                                                 | Yes                      | `brand`                                                               | `brand` = product/brand account voice; `founder` = founder's personal voice; distinct from the global Voice overrides section below.                                                                                                                         |
+| Channels   | `Cadence`             | enum `default` \| `daily` \| `weekly` \| `paused`                         | Yes                      | `default`                                                             | `default` = inherit global pulse cadence; `paused` = prepared but never scheduled.                                                                                                                                                                           |
+| Channels   | `Content types`       | comma-separated subset of the six-value catalogue                         | Yes                      | `release-note, milestone`                                             | Multi-select.                                                                                                                                                                                                                                                |
+| KPI        | `Metric name`         | string                                                                    | Yes                      | none                                                                  | Founder-named metric (AC-1). No plugin default — never pre-filled.                                                                                                                                                                                           |
+| KPI        | `Source type`         | enum `managed` \| `custom`                                                | Yes                      | none                                                                  | AC-2.                                                                                                                                                                                                                                                        |
+| KPI        | `Provider`            | enum `github` (when `managed`) \| `command` \| `endpoint` (when `custom`) | Yes                      | none                                                                  | Managed → `github`; custom → the mechanism.                                                                                                                                                                                                                  |
+| KPI        | `GitHub metric`       | enum `stars` \| `forks` \| `watchers` \| `open-issues`                    | When `Provider=github`   | `stars`                                                               | Countable repo field. `open-issues` = `.open_issues_count`, which includes open pull requests as well as issues. Blank for custom sources.                                                                                                                   |
+| KPI        | `Custom command`      | string (shell command)                                                    | When `Provider=command`  | none                                                                  | Prints the metric's current value to stdout. Shell-expanded at probe time. Blank otherwise.                                                                                                                                                                  |
+| KPI        | `Custom endpoint`     | string (URL)                                                              | When `Provider=endpoint` | none                                                                  | URL whose response contains the current value. Shell-expanded at probe time. Blank otherwise.                                                                                                                                                                |
+| KPI        | `Value path`          | string (jq filter)                                                        | No                       | `.`                                                                   | For `endpoint` JSON responses — jq filter (`.` = raw numeric body). Requires `jq` when non-`.`. Blank for `command`/`github`.                                                                                                                                |
+| KPI        | `Auth env var`        | string (env var name)                                                     | No                       | blank                                                                 | Env var **name** only — never the value. For the **endpoint** source, when set it is injected as `Authorization: Bearer $<name>` at probe time; embedded `$VAR` in a `command`/`endpoint` string is shell-expanded from the environment. Blank for `github`. |
+| KPI        | `Verified value`      | string (numeric)                                                          | Yes                      | none                                                                  | The one live value read by the Step-4c probe (AC-4). Refreshed on every Re-run/Merge re-probe.                                                                                                                                                               |
+| Voice      | `voice overrides`     | markdown block                                                            | No                       | empty                                                                 | ECC anti-slop overrides, populated by a downstream story                                                                                                                                                                                                     |
+| Docs audit | `Docs audit paths`    | comma-separated glob list                                                 | Yes                      | `README.md, docs/**/*.md, docs/**/*.mdx`                              | Human-facing documentation corpus `/gtm:docs` audits                                                                                                                                                                                                         |
+| Docs audit | `Docs audit excludes` | comma-separated glob list                                                 | Yes                      | `docs/superpowers/**, docs/features/**, docs/gtm/**, **/CHANGELOG.md` | SDLC/gtm internal + machine artifacts — never audited by `/gtm:docs`                                                                                                                                                                                         |
 
 > The `open-issues`-includes-PRs caveat is captured in the `GitHub metric` row above. The
 > `Auth env var` row scopes the `Authorization: Bearer` injection specifically to the **endpoint**
@@ -158,3 +167,9 @@ video) · `milestone` (KPI / community milestone, e.g. star count).
     `Verified value`) are treated as **missing** and re-prompted — matching
     `${CLAUDE_PLUGIN_ROOT}/commands/init.md`'s Merge-path malformed-enum-as-missing rule, not
     silently preserved as-is.
+15. `Docs audit paths` / `Docs audit excludes` are always written to the documented plugin defaults
+    (see the Schema table above) — the founder is not interviewed for these, and no value ever
+    varies per repo at init time. A run-specific override belongs to `/gtm:docs`'s own `--paths`
+    flag, not this template; on the Merge/Re-run path, preserve either row if a founder or a later
+    story has since hand-edited it in the file, only backfilling if the `## Docs audit` block is
+    absent entirely (a file written before this story existed).

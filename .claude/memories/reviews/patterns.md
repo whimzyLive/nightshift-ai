@@ -39,3 +39,10 @@
 **Root causes:** editing agent-body markdown near indented pseudo-list items (`10a.`/`10b.`) re-triggers the known prettier fence-corruption class (same as NA-27 e510d80); guard scripts that glob a directory without existence/zero-match checks silently pass when the target moves.
 **Preventions:** after ANY auto-formatted markdown commit touching plugins/, run a fence-count sanity check against the pre-edit count and verify prettier idempotence (second --write must be a no-op); every CI guard script fails loudly on missing target dir and zero-glob (nullglob + count check) — never vacuous green.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-14 — Story NA-7
+
+**Issues found:** 4 Important — (1) ``tr -d '`- '`` in a finding-ID extraction pipeline deletes hyphens INSIDE kebab-case IDs, breaking the idempotency contract; (2) idempotency guard matched group-slug/branch only, ignoring the findingIds the input contract carries — cross-shape re-runs would duplicate PRs; (3) four stale step-N cross-references after implementation renumbered spec steps; (4) escaped globs (`docs/star-star/star.md`) inside a fenced template block written verbatim into generated config.
+**Root causes:** `tr -d` is char-class deletion, not token stripping — wrong tool for framed-token extraction (use anchored sed); guards written against one matching key when the contract supplies two; renumbering steps without grepping cross-refs; prettier round-trip escaping inside fenced markdown templates.
+**Preventions:** extract framed tokens with an anchored sed capture group, never `tr -d`; when an input contract carries a field for dedup, the guard MUST consume it — slug-level matching alone is a red flag; after renumbering steps in LLM-executed markdown, grep `[Ss]tep[- ][0-9]` across every touched file; check generated-template glob rows render literally (wrap in code spans, verify prettier idempotence).
+**Domains affected:** ai-enablement-engineer
