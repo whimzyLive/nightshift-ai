@@ -118,10 +118,9 @@ proposed  →  accepted  →  superseded
 - `superseded` — no longer the operative decision, but preserved so the history of what the team
   believed (and when it changed its mind) stays intact.
 
-This rule holds even for typo fixes or clarifications once a record is `accepted` — if the
-change is truly cosmetic and doesn't touch the decision, context, alternatives, or consequences,
-it's the one narrow exception; anything that could be read as changing the substance of the
-record requires a new ADR instead.
+Once accepted, never edit the substance. The only permitted in-place change is a purely cosmetic
+fix (typo, broken link) that no reader could interpret as changing the decision, context,
+alternatives, or consequences; anything else requires a new superseding ADR instead.
 
 ## Filename & Location Convention
 
