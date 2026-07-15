@@ -1,6 +1,6 @@
 ---
 name: writing-adrs
-description: Use when authoring an Architecture Decision Record (ADR) — a short document that captures one significant, hard-to-reverse technical or architectural decision, its context, and its consequences. Triggered by the sdlc ADR pipeline (the knowledge-engineer agent behind /sdlc:adr) when generating an ADR from a story, and by anyone hand-authoring an ADR under docs/adr/. Covers why ADRs are kept short and inverted-pyramid, the required sections (Decision, Context, Alternatives Considered, Consequences), the proposed→accepted→superseded status lifecycle and the never-edit-only-supersede immutability rule, the NNNN-decision-slug.md filename convention, and the ADR frontmatter fields (status, agents, source-stories) the pipeline reads to route a generated ADR into docs/adr/index.md.
+description: Use when authoring an Architecture Decision Record (ADR) — a short document that captures one significant, hard-to-reverse technical or architectural decision, its context, and its consequences. Triggered by the sdlc ADR pipeline (the upcoming knowledge-engineer agent behind /sdlc:adr, not yet shipped) when generating an ADR from a story, and by anyone hand-authoring an ADR under docs/adr/ today. Covers why ADRs are kept short and inverted-pyramid, the required sections (Title, Status, Decision, Context, Alternatives Considered, Consequences), the proposed→accepted→superseded (or →rejected) status lifecycle and the never-edit-only-supersede immutability rule, the NNNN-decision-slug.md filename convention, and the ADR frontmatter fields (status, agents, source-stories) that pipeline will read to route a generated ADR into docs/adr/index.md once it exists.
 ---
 
 # writing-adrs — Architecture Decision Records
@@ -16,8 +16,9 @@ signal to split it into several ADRs.
 - Whenever a decision is architecturally significant: it affects structure, non-functional
   characteristics (performance, security, cost), external dependencies, interfaces between
   systems, or is expensive to reverse later.
-- When the sdlc ADR pipeline (`/sdlc:adr`, knowledge-engineer agent) generates an ADR from a
-  Jira story or a completed piece of work.
+- When the sdlc ADR pipeline (upcoming `/sdlc:adr` command + knowledge-engineer agent — not yet
+  shipped) generates an ADR from a Jira story or a completed piece of work, once that pipeline
+  exists.
 - Not for routine implementation choices that any competent engineer would make the same way
   and that cost nothing to change later — those don't need a permanent record.
 
@@ -64,10 +65,10 @@ to the future reader it's written for.
 - **Accepted records are immutable; supersede, never edit.** The value of an ADR is as a
   historical log — proof of what the team believed and why, at the time. Editing an accepted
   record in place destroys that: a reader (or another agent) with a link to it later has no way
-  to know the ground shifted under them. When a decision changes, write a new ADR and have it
-  link back to the one it replaces; mark the old one `superseded`. This is exactly how source
-  control itself works, and for the same reason — the record of what happened matters as much as
-  the current state.
+  to know the ground shifted under them. This is exactly how source control itself works, and for
+  the same reason — the record of what happened matters as much as the current state. The exact
+  rule and how superseding works are stated once, in full, under Status Lifecycle & Immutability
+  below — this bullet is a pointer to it, not a second copy.
 - **Kept in the source repo, in plain markdown, monotonically numbered.** Storing ADRs alongside
   the code they govern means they travel with the code (checked out, diffed, reviewed the same
   way), and a lightweight markup language keeps them cheap to read and write. Monotonic numbering
@@ -81,9 +82,9 @@ Every ADR — hand-authored or pipeline-generated — MUST contain these section
 1. **Title** — a short noun phrase naming the decision, not the problem (e.g. "Use PostgreSQL as
    the primary datastore", not "Datastore options"). The ADR number belongs in the filename, not
    necessarily repeated in the title.
-2. **Status** — one of `proposed`, `accepted`, `superseded` (see Status Lifecycle below). If
-   superseded, link to the ADR that replaces it. If superseding another ADR, link back to the one
-   it replaces.
+2. **Status** — one of `proposed`, `accepted`, `superseded`, `rejected` (see Status Lifecycle
+   below). If superseded, link to the ADR that replaces it. If superseding another ADR, link back
+   to the one it replaces.
 3. **Decision** — what was decided, stated as a clear, active-voice commitment ("We will …"), not
    a passive description of an option. This is the part inverted-pyramid puts first for a reason:
    lead with the answer.
@@ -106,21 +107,31 @@ manufacture doubt that wasn't there.
 
 ```
 proposed  →  accepted  →  superseded
+proposed  →  rejected
 ```
 
 - `proposed` — under discussion, not yet binding. Safe to edit freely while in this state.
-- `accepted` — the team has agreed and the decision is active. **Once an ADR is accepted, it is
-  never edited or reopened.** If new information means the decision should change, write a brand
-  new ADR with the next sequence number, set the new one's status to `accepted`, set the old one's
-  status to `superseded`, and link each to the other (old → "Superseded by ADR-NNNN", new →
-  "Supersedes ADR-NNNN"). The superseded record stays in the repo permanently — it's a historical
-  fact, not a mistake to delete.
+- `accepted` — the team has agreed and the decision is active.
+- `rejected` — the proposal was discussed and declined; terminal, it never later becomes
+  `accepted`. If the idea resurfaces, write a fresh ADR at a new number rather than reviving a
+  rejected one — the number stays retired, same as any other ADR number.
 - `superseded` — no longer the operative decision, but preserved so the history of what the team
   believed (and when it changed its mind) stays intact.
 
-Once accepted, never edit the substance. The only permitted in-place change is a purely cosmetic
-fix (typo, broken link) that no reader could interpret as changing the decision, context,
-alternatives, or consequences; anything else requires a new superseding ADR instead.
+**Immutability rule (stated once, here — every other mention in this skill is a pointer back to
+this paragraph, not a restatement):** once an ADR reaches `accepted`, never edit its substance.
+The only permitted in-place change is a purely cosmetic fix (typo, broken link) that no reader
+could interpret as changing the decision, context, alternatives, or consequences; anything else
+requires a new superseding ADR instead.
+
+**Supersede flow:** when a decision needs to change, write a brand-new ADR at the next sequence
+number and let it follow the normal lifecycle like any other — it starts `proposed`, not
+`accepted`. Only at the moment the new ADR is itself accepted do the two records flip together:
+the new one becomes `accepted`, and the old one becomes `superseded` — never before, since the old
+decision is still the operative one until its replacement is actually accepted, not merely
+drafted. Add the cross-links both ways at that same moment (old → "Superseded by ADR-NNNN", new →
+"Supersedes ADR-NNNN"). The superseded record stays in the repo permanently — it's a historical
+fact, not a mistake to delete.
 
 ## Filename & Location Convention
 
@@ -134,14 +145,16 @@ alternatives, or consequences; anything else requires a new superseding ADR inst
 ## ADR Frontmatter (pipeline routing)
 
 This is distinct from this SKILL.md's own frontmatter above — it's the YAML frontmatter that
-belongs at the top of every **generated ADR file** itself, so the sdlc ADR pipeline (the
-knowledge-engineer agent behind `/sdlc:adr`) can route and index it without re-parsing prose:
+belongs at the top of every **generated ADR file** itself, so the sdlc ADR pipeline (the upcoming
+knowledge-engineer agent behind `/sdlc:adr`, not yet shipped) can route and index it without
+re-parsing prose once it exists. Authoring with this frontmatter costs nothing today and means
+nothing needs retrofitting once the pipeline lands:
 
 ```yaml
 ---
-status: proposed # proposed | accepted | superseded
+status: proposed # proposed | accepted | superseded | rejected
 agents: [web-engineer, platform-engineer] # which sdlc agents this decision is routed to
-source-stories: [NA-44, NA-51] # Jira keys that motivated or are evidenced by this decision
+source-stories: [PROJ-142, PROJ-156] # Jira keys that motivated or are evidenced by this decision
 ---
 ```
 
@@ -155,11 +168,18 @@ source-stories: [NA-44, NA-51] # Jira keys that motivated or are evidenced by th
 - `source-stories` — the Jira story key(s) that led to this decision (an evidence trail back to
   why it exists), as a list even when there's only one.
 
-A generated `docs/adr/index.md` is rebuilt deterministically from this frontmatter across every
-file in `docs/adr/` — grouped into a section per agent named in `agents`, listing each ADR's
-number, title, and status. Because the index is fully derived from frontmatter, never hand-edit
-`docs/adr/index.md` directly; fix the frontmatter of the source ADR(s) and regenerate instead —
-otherwise the index will just be silently overwritten out of sync on the next regeneration.
+Where the sdlc ADR pipeline is installed and in use — the knowledge-engineer agent and its
+regeneration tooling, not yet shipped as of this skill's 0.32.0 release — a generated
+`docs/adr/index.md` is rebuilt deterministically from this frontmatter across every file in
+`docs/adr/`: grouped into a section per agent named in `agents`, plus one `General` (unrouted)
+section for any ADR whose `agents` list is empty or omitted, so no ADR is ever silently dropped
+from the index just because it wasn't routed anywhere. Each listing carries the ADR's number,
+title, and status. Because the index is fully derived from frontmatter in that world, never
+hand-edit `docs/adr/index.md` directly there; fix the frontmatter of the source ADR(s) and
+regenerate instead — otherwise the index will just be silently overwritten out of sync on the next
+regeneration. Until that pipeline exists in a given repo, a hand-maintained index (or no index at
+all) is perfectly fine — the never-hand-edit rule only starts to apply once there's something to
+regenerate from.
 
 Hand-authored ADRs that aren't part of the pipeline may omit `agents`/`source-stories` if there's
 no sdlc routing use for them yet, but should still carry `status` — it costs nothing and keeps
@@ -220,7 +240,7 @@ consequences including the negative one:
 ---
 status: accepted
 agents: [database-administrator, platform-engineer]
-source-stories: [NA-12]
+source-stories: [PROJ-89]
 ---
 
 # 0007. Use PostgreSQL as the primary datastore
@@ -304,13 +324,13 @@ throughput that would justify a distributed database's added operational cost.
 
 ## Anti-Patterns
 
-| Anti-pattern                                                              | Fix                                                                                            |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Editing an `accepted` ADR's Decision/Context/Consequences in place        | Write a new ADR, link both ways, mark the old one `superseded`                                 |
-| Bundling several decisions into one record                                | Split into separate ADRs, one decision each                                                    |
-| Alternatives section that only lists the option that "lost," no pros      | Give every alternative real pros AND cons — a one-sided list reads as rationalization          |
-| Consequences section that only states positives                           | List negative and neutral consequences too — never leave them implied                          |
-| Multi-page document covering a whole subsystem's design                   | Cut to the single decision; link to supporting material instead of inlining it                 |
-| Writing with false certainty about a decision made under real doubt       | State the uncertainty and the revisit trigger honestly                                         |
-| Filename without a monotonic number, or reusing a superseded ADR's number | Always take the highest existing number in `docs/adr/` + 1                                     |
-| Hand-editing `docs/adr/index.md` directly                                 | Fix the source ADR's frontmatter and regenerate the index — it's fully derived, never authored |
+| Anti-pattern                                                              | Fix                                                                                                                 |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Editing an `accepted` ADR's Decision/Context/Consequences in place        | Write a new ADR, link both ways, mark the old one `superseded`                                                      |
+| Bundling several decisions into one record                                | Split into separate ADRs, one decision each                                                                         |
+| Alternatives section that only lists the option that "lost," no pros      | Give every alternative real pros AND cons — a one-sided list reads as rationalization                               |
+| Consequences section that only states positives                           | List negative and neutral consequences too — never leave them implied                                               |
+| Multi-page document covering a whole subsystem's design                   | Cut to the single decision; link to supporting material instead of inlining it                                      |
+| Writing with false certainty about a decision made under real doubt       | State the uncertainty and the revisit trigger honestly                                                              |
+| Filename without a monotonic number, or reusing a superseded ADR's number | Always take the highest existing number in `docs/adr/` + 1                                                          |
+| Hand-editing a pipeline-generated `docs/adr/index.md` directly            | Fix the source ADR's frontmatter and regenerate instead (fine to hand-maintain the index until the pipeline exists) |

@@ -870,5 +870,36 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
 
 - When authoring skills that autonomous agents apply mechanically, every rule must resolve deterministically: state the rule, then the single explicit exception with its boundary — never hedge both into one sentence.
 - Shipping any new content under plugins/<plugin>/ requires bumping that plugin's .claude-plugin/plugin.json version in the same PR (plugins/ is a published artifact; pinned consumers won't see unversioned additions).
-  **Pitfalls:**
+
+**Pitfalls:**
+
 - "This rule holds even for X — unless truly cosmetic" phrasing reads as contradiction when X is itself cosmetic; reviewers will (correctly) block on it.
+
+## 2026-07-15 — Story NA-44 — review fix, round 2 (PR #106, in-session /code-review + Copilot)
+
+- A rule genuinely worth stating in more than one place (here: immutability, mentioned in a "why"
+  rationale bullet, a lifecycle bullet, and a standalone paragraph) drifts the moment only one of
+  the N restatements gets a later edit — round 1 fixed the contradiction in the standalone
+  paragraph only, leaving the lifecycle bullet still saying "never edited or reopened" with no
+  exception and the rationale bullet re-deriving the whole thing independently. Same "one source
+  of truth + pointers" pattern from the NA-26 memory entries, but the trigger this time was subtler:
+  the first review round fixed the wording it was pointed at, not the fact that the same fact was
+  stated three times at three different strengths — after any "fix the contradiction" finding,
+  grep the whole file for the concept's other restatements before declaring it resolved, don't
+  just fix the one paragraph the finding cited.
+- A skill authored for a pipeline that hasn't shipped yet (`/sdlc:adr` + knowledge-engineer, NA-43
+  pending) needs "not yet shipped" framing repeated at every place the pipeline is named, not just
+  the first — round 1 didn't get flagged for this because the skill correctly stood alone as an
+  authoring standard, but round 2's reviewer read four separate mentions of `/sdlc:adr` and
+  `knowledge-engineer` as claims the pipeline already existed. Fix pattern: state "upcoming/not yet
+  shipped" once where the entity is first introduced, then keep every subsequent mention
+  consistent with that framing (e.g. "once it exists", "where the pipeline is installed and in
+  use") rather than dropping back to bare present-tense phrasing on later mentions of the same
+  not-yet-real thing.
+- A per-agent index-generation contract with no explicit unrouted-item rule is an easy latent drop:
+  an ADR with `agents: []` (or the field omitted) has nowhere to go in a "one section per named
+  agent" grouping scheme unless a fallback bucket is named explicitly. Fixed by adding a `General`
+  (unrouted) section to the index contract — the generalizable check is "does every classification/
+  grouping rule in a skill or ref have an explicit branch for the empty/omitted case," since an
+  implicit "and if it has none, ???" is exactly the kind of gap a reviewer (or a future
+  implementer) will hit on the very first real edge-case record.

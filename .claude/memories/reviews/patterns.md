@@ -49,7 +49,7 @@
 
 ## 2026-07-15 — Story NA-44
 
-**Issues found:** Important x2 — (1) self-contradictory immutability rule in new writing-adrs SKILL.md ("rule holds even for typo fixes" + cosmetic exception in same sentence); (2) plugin.json version not bumped when new plugin-bundled skill shipped.
+**Issues found:** Important x2 — (1) self-contradictory immutability rule in new writing-adrs SKILL.md ("rule holds even for typo fixes" + cosmetic exception in same sentence); (2) plugin.json version not bumped when new plugin-bundled skill shipped (both fixed in-review before merge, review round 1).
 **Root causes:** (1) hedged prose trying to hold an absolute rule and its exception in one sentence; (2) version-bump convention lives in repo habit, not in a checklist the authoring agent reads.
 **Preventions:** rules an autonomous agent will mechanically apply must resolve deterministically — state rule, then explicit narrow exception, never blended; any change under plugins/<plugin>/ ships with a plugin.json version bump in the same PR.
 **Domains affected:** ai-enablement-engineer
