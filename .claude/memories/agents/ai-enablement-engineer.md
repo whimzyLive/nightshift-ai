@@ -863,3 +863,12 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   and Fowler's later piece both simplify to proposed/accepted/superseded — used the
   simplified/canonical three-state set since that's what both the dispatch AC and Fowler's own
   "further developments" framing settled on.
+
+## 2026-07-15 — Story NA-44 — review fix
+
+**Learnings:**
+
+- When authoring skills that autonomous agents apply mechanically, every rule must resolve deterministically: state the rule, then the single explicit exception with its boundary — never hedge both into one sentence.
+- Shipping any new content under plugins/<plugin>/ requires bumping that plugin's .claude-plugin/plugin.json version in the same PR (plugins/ is a published artifact; pinned consumers won't see unversioned additions).
+  **Pitfalls:**
+- "This rule holds even for X — unless truly cosmetic" phrasing reads as contradiction when X is itself cosmetic; reviewers will (correctly) block on it.
