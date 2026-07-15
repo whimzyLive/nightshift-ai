@@ -109,8 +109,8 @@ reviewable diff/PR:
   picks a source of truth and the wrong side is another agent's memory, `ai-enablement-engineer`
   may reset it to match — applied only as a reviewable diff/PR (or under explicit human
   instruction), never silently.
-- **Exception 2 — founder-gated distill deletion.** `knowledge-engineer`, running `/sdlc:adr
---distill`, may delete promoted raw learning entries from any agent's memory file
+- **Exception 2 — founder-gated distill deletion.**
+  `knowledge-engineer`, running `/sdlc:adr --distill`, may delete promoted raw learning entries from any agent's memory file
   (`.claude/memories/agents/*.md`, `shared.md` subject to the audience-preservation rule in
   `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md`, and `.claude/memories/reviews/patterns.md` — a
   distill evidence source per `adr-pipeline.md` §4 whose promoted-and-deleted entries `qa-engineer`

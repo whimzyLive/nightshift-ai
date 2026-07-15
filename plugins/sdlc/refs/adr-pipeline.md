@@ -22,8 +22,14 @@ same split `/sdlc:analyze` uses for its scan-then-apply flow.
 **Phase 1 — draft & return (writes nothing):**
 
 1. Draft candidate ADR(s) from the `writing-adrs` template: full body (Title, Status `proposed`,
-   Decision, Context, Alternatives Considered, Consequences) + YAML frontmatter (`status:
-proposed`, `agents: [...]`, `source-stories: [...]`).
+   Decision, Context, Alternatives Considered, Consequences) + YAML frontmatter:
+
+   ```yaml
+   status: proposed
+   agents: [...]
+   source-stories: [...]
+   ```
+
 2. Propose `agents:` routing tags for each candidate — the sdlc agent identifier(s) whose future
    work the decision constrains. **Patterns.md tagging rule:** a candidate promoted from
    `.claude/memories/reviews/patterns.md` MUST always include `qa-engineer` in its proposed
@@ -123,9 +129,14 @@ candidate:
 
 - **Tools absent → halt.** If the claude-mem MCP tools (`observation_search` /
   `get_observations`) are not available in the session (the plugin is not installed / not
-  whitelisted), distill mode halts with a clear message, e.g.: `claude-mem tools unavailable —
-/sdlc:adr --distill requires the claude-mem plugin; install it or use seed mode`. It does not
-  silently proceed without them.
+  whitelisted), distill mode halts with a clear message, e.g.:
+
+  ```
+  claude-mem tools unavailable — /sdlc:adr --distill requires the claude-mem plugin; install it or use seed mode
+  ```
+
+  It does not silently proceed without them.
+
 - **Tools present but DB empty → non-fatal.** A zero-result observation search is not an error —
   per §4, a candidate carried entirely by repo-native citations still fully satisfies the evidence
   contract.
