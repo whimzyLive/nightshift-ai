@@ -4,12 +4,8 @@
  */
 :root {
   /* ---- Families ---- */
-  --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
-    sans-serif;
-  --font-mono:
-    'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo,
-    Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
 
   /* ---- Weights ---- */
   --fw-regular: 400; /* @kind font */
@@ -43,7 +39,7 @@
   --tracking-snug: -0.01em;
   --tracking-normal: 0;
   --tracking-wide: 0.04em;
-  --tracking-eyebrow: 0.16em; /* mono eyebrows / labels, uppercase */
+  --tracking-eyebrow: 0.16em;  /* mono eyebrows / labels, uppercase */
 
   /* ---- Semantic roles ---- */
   --display-font: var(--font-sans);
@@ -61,4 +57,16 @@
   --eyebrow-tracking: var(--tracking-eyebrow);
 
   --code-font: var(--font-mono);
+
+  /* ---- SITE ADDITIONS (source of truth: the shipped site) ---- */
+  /* Eyebrows render 12–13px, uppercase, terracotta, prefixed "// " (mono
+   * comment texture); numbered sections use "// 04 · the team". */
+  --eyebrow-size: 13px;
+  /* Hero display on the site runs past the type scale via clamp():
+   * clamp(46px, 5.6vw, 68px) — H1s on subpages clamp(34px, 4.6vw, 54px). */
+  --display-clamp-hero: clamp(46px, 5.6vw, 68px);
+  --display-clamp-page: clamp(34px, 4.6vw, 54px);
+  /* Body reading sizes in use: 17px/1.75 on editorial cards, 14.5–15px mono
+   * in terminals; minimum text size on the site is 10px (badge microcopy). */
+  --leading-reading: 1.75;
 }
