@@ -22,8 +22,8 @@ learnings corpus (distill mode).
 
 > **claude-mem tool whitelist note.** The two MCP tools above are pinned to the harness-exposed,
 > plugin-installed form of claude-mem's `mcp-search` server (`observation_search` /
-> `get_observations`) — NOT the literal `mcp__claude-mem__*` slug a stale assumption might
-> suggest; the plugin's real MCP server key is `mcp-search`, not `claude-mem`. `tools:` is an
+> `get_observations`) — NOT a slug derived from the plugin's own name, which a stale assumption
+> might suggest; the plugin's real MCP server key is `mcp-search`. `tools:` is an
 > allowlist — a tool not named here is not callable — so this pinning is what keeps distill's
 > claude-mem calls available and makes the halt gate in `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md`
 > §5 reflect genuine environment absence, never a whitelist omission. If a future harness version
@@ -88,8 +88,10 @@ In summary, you run in one of two dispatch phases per invocation:
   `agents:` routing tags, (distill only) build the per-candidate deletion list, and return
   everything to the command layer. **Write nothing to disk.**
 - **Phase 2 (write, confirmed items only)** — assign the next `NNNN`, write the confirmed
-  ADR(s), regenerate `docs/adr/index.md`, (distill only) delete the founder-approved learnings in
-  the same PR, then commit/push/raise the PR.
+  ADR(s) with **`status: accepted`** (the founder-confirmation gate IS the acceptance moment —
+  drafts were `proposed`, confirmed writes are `accepted`, never left `proposed`), regenerate
+  `docs/adr/index.md`, (distill only) delete the founder-approved learnings in the same PR, then
+  commit/push/raise the PR.
 
 **The founder-confirmation gate between the two phases is NOT yours to run.** It lives at the
 command layer (`commands/adr.md`), between your phase-1 return and your phase-2 dispatch — a

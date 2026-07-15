@@ -39,6 +39,22 @@ proposed`, `agents: [...]`, `source-stories: [...]`).
 5. For each confirmed ADR: list `docs/adr/`, take `NNNN = max(existing) + 1` (four-digit,
    zero-padded, never reused — including numbers retired by superseded/rejected ADRs), write
    `docs/adr/NNNN-<decision-slug>.md`.
+
+   **The founder-confirmation gate IS the acceptance moment.** Drafts presented at the gate (phase
+   1 output) carry `status: proposed` — under discussion, not yet binding, per `writing-adrs`'
+   lifecycle. The founder is the decision authority for this pipeline by design, so the gate's
+   confirmation is the acceptance event: phase 2 writes each confirmed ADR with frontmatter
+   **`status: accepted`** and body **`## Status` → `Accepted`** — never `proposed`. This is what
+   makes the accepted-only write-path guard (`domain-agent-handoff.md`,
+   `qa-engineer-playbook.md`) actually fire on pipeline-generated ADRs, and what makes distill's
+   same-PR deletion of the superseded raw learning correct — the replacing record is binding at
+   the moment the learning it replaces is removed, not merely proposed. If a confirmed ADR
+   supersedes an existing `accepted` ADR, phase 2 also flips that old record's `status` to
+   `superseded` and adds the two-way cross-links (old → "Superseded by ADR-NNNN", new →
+   "Supersedes ADR-NNNN") in the same write, per `writing-adrs`' supersede flow — the old decision
+   was still operative right up to this same acceptance moment, so both flips happen together,
+   never one ahead of the other.
+
 6. Regenerate `docs/adr/index.md` — see [§10 Index Regeneration algorithm](#10-index-regeneration-algorithm-docsadrindexmd).
 7. **(distill only)** Delete the founder-approved learnings from their source memory files in the
    same PR (git history preserves the deleted text) — see [§8 Deletion-on-promotion](#8-deletion-on-promotion).

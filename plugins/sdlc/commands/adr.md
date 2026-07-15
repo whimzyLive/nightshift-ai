@@ -4,10 +4,11 @@ description: Curate Architecture Decision Records under docs/adr/ — seed a fou
 
 ## Modes (dispatched from `$ARGUMENTS`)
 
-| Invocation              | Mode        | Corpus read?                                                    |
-| ----------------------- | ----------- | --------------------------------------------------------------- |
-| `/sdlc:adr "<pattern>"` | **seed**    | No — drafts inline from the founder-supplied pattern text only. |
-| `/sdlc:adr --distill`   | **distill** | Yes — mines the learnings corpus for promotable candidates.     |
+| Invocation                      | Mode        | Corpus read?                                                                                                                                        |
+| ------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sdlc:adr "<pattern>"`         | **seed**    | No — drafts inline from the founder-supplied pattern text only.                                                                                     |
+| `/sdlc:adr --distill`           | **distill** | Yes — mines the full learnings corpus for promotable candidates.                                                                                    |
+| `/sdlc:adr --distill "<focus>"` | **distill** | Yes — extra text after `--distill` scopes the corpus mining to that focus area (e.g. `--distill "QA review patterns"`) instead of the whole corpus. |
 
 Both modes run the same shared pipeline (`${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md`); they differ
 only in how the draft candidate(s) are sourced and (distill only) whether learnings are deleted.
@@ -47,7 +48,11 @@ around the founder-confirmation gate, which a dispatched subagent cannot itself 
 
 **Phase 2** — dispatch `knowledge-engineer` again to write only the confirmed items:
 
-- Assign the next `NNNN` and write each confirmed ADR.
+- Assign the next `NNNN` and write each confirmed ADR with **`status: accepted`** — the
+  founder-confirmation gate IS the acceptance moment, so confirmed writes are never left
+  `proposed` (drafts at the gate were `proposed`; see `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md`
+  §2). A confirmed ADR that supersedes an existing `accepted` one also flips the old record to
+  `superseded` with cross-links, in the same write.
 - Regenerate `docs/adr/index.md` deterministically.
 - (distill only) Delete the founder-confirmed learnings in the same PR.
 - Commit via `conventional-commit`, push, and self-raise the PR via `gh` /
