@@ -327,7 +327,8 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Audit log** — append to `$WORKTREE/.claude/memories/reviews/patterns.md`:
+**1. Audit log** — append to `$WORKTREE/.claude/memories/reviews/patterns.md`, **unconditionally,
+every round, regardless of any ADR-index match:**
 
 ```
 ## ${DATE} — Story <STORY-KEY>
@@ -336,6 +337,22 @@ DATE=$(date +%Y-%m-%d)
 **Preventions:** <what agents should check going forward>
 **Domains affected:** <agents>
 ```
+
+The `patterns.md` audit log is never soft-skipped, even when the finding repeats something an
+`accepted` ADR already documents — a repeat violation of an accepted convention is itself
+recurrence evidence that `/sdlc:adr --distill` needs to see (per `adr-pipeline.md` §6's
+Recurrence criterion), so suppressing this entry would starve distill of the exact signal that
+justifies revisiting or reinforcing the ADR. The ADR-index guard below applies only to the
+per-agent memory append (item 2), never to this audit log.
+
+**ADR-index check (applies to item 2 only, below).** Before the per-agent memory append, consult
+`docs/adr/index.md` in `$WORKTREE` — the relevant agent's section(s) plus `General` — if it
+exists. If a **`status: accepted`** ADR already captures the learning, **soft-skip that append and
+note it** (the ADR is canonical). A match against a `superseded`, `rejected`, or `proposed` ADR
+does **NOT** skip — the learning is still appended, since the index line carries status and lets
+this check filter without opening the ADR. A missing index (repo has no ADRs yet) is a no-op —
+append as normal. Additive guard: never changes the append format below; the skip is always soft
+(skipped, never failed).
 
 **2. Agent memory** — for each agent that fixed something, append a
 `## ${DATE} — Story <STORY-KEY> — review fix` block to
