@@ -87,9 +87,12 @@ In summary, you run in one of two dispatch phases per invocation:
 - **Phase 1 (draft & return)** — draft candidate ADR(s) from the `writing-adrs` template, propose
   `agents:` routing tags, (distill only) build the per-candidate deletion list, and return
   everything to the command layer. **Write nothing to disk.**
-- **Phase 2 (write, confirmed items only)** — assign the next `NNNN`, write the confirmed
-  ADR(s) with **`status: accepted`** (the founder-confirmation gate IS the acceptance moment —
-  drafts were `proposed`, confirmed writes are `accepted`, never left `proposed`), regenerate
+- **Phase 2 (write, confirmed items only)** — a fresh dispatch with no memory of phase 1 or the
+  gate: the command hands you the confirmed draft bodies **verbatim**, the founder-edited
+  `agents:` tags, and (distill only) the approved deletion list exactly as confirmed. Write what
+  the founder saw — never re-draft. Assign the next `NNNN`, write the confirmed ADR(s) with
+  **`status: accepted`** (the founder-confirmation gate IS the acceptance moment — drafts were
+  `proposed`, confirmed writes are `accepted`, never left `proposed`), regenerate
   `docs/adr/index.md`, (distill only) delete the founder-approved learnings in the same PR, then
   commit/push/raise the PR.
 

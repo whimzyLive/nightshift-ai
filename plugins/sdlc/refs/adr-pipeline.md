@@ -25,10 +25,13 @@ same split `/sdlc:analyze` uses for its scan-then-apply flow.
    Decision, Context, Alternatives Considered, Consequences) + YAML frontmatter (`status:
 proposed`, `agents: [...]`, `source-stories: [...]`).
 2. Propose `agents:` routing tags for each candidate — the sdlc agent identifier(s) whose future
-   work the decision constrains.
+   work the decision constrains. **Patterns.md tagging rule:** a candidate promoted from
+   `.claude/memories/reviews/patterns.md` MUST always include `qa-engineer` in its proposed
+   `agents:` list, in addition to whichever agent(s) the decision otherwise constrains — see
+   [§7 patterns.md tagging rule](#7-sharedmd-and-patternsmd-audience-preservation-rules).
 3. **(distill only)** Build the per-candidate deletion list: for each candidate, the exact memory
    entries proposed for deletion (file path + entry heading/anchor + verbatim text), subject to
-   the [`shared.md` audience-preservation rule](#7-sharedmd-audience-preservation-rule).
+   the [`shared.md` audience-preservation rule](#7-sharedmd-and-patternsmd-audience-preservation-rules).
 4. Return the drafted ADR(s), proposed tags, and (distill) the deletion list to the command layer.
    **Nothing is written to disk in phase 1.**
 
@@ -36,9 +39,22 @@ proposed`, `agents: [...]`, `source-stories: [...]`).
 
 **Phase 2 — write only confirmed items:**
 
-5. For each confirmed ADR: list `docs/adr/`, take `NNNN = max(existing) + 1` (four-digit,
-   zero-padded, never reused — including numbers retired by superseded/rejected ADRs), write
-   `docs/adr/NNNN-<decision-slug>.md`.
+Phase 2 is a fresh subagent dispatch with no visibility into phase 1's return or the gate that ran
+in between — the command MUST pass it the confirmed draft bodies **verbatim** (including any
+founder edits), the founder-edited `agents:` tags, and (distill only) the approved deletion list
+exactly as confirmed, inline in the dispatch prompt or via session temp-dir files passed by path.
+Phase 2 writes what the founder saw; it never re-drafts.
+
+5. For each confirmed ADR: compute `NNNN = max(existing) + 1` (four-digit, zero-padded, never
+   reused — including numbers retired by superseded/rejected ADRs) from the **union** of two
+   sources, not `docs/adr/` alone — a concurrent `/sdlc:adr` run on another branch can claim a
+   number before this one merges: (a) `docs/adr/` on the latest fetched `origin/<BASE-BRANCH>`,
+   and (b) every open `docs/adr-*` PR branch (`gh pr list --search 'head:docs/adr-'` or
+   equivalent, listing each candidate branch's `docs/adr/*.md` files). Take the max across both
+   sets, then write `docs/adr/NNNN-<decision-slug>.md`. If a duplicate `NNNN` is still detected at
+   PR time (the base moved again after this dispatch computed its number) — renumber the new ADR
+   before merge: rename the file, update its frontmatter/body number, and regenerate the index;
+   never reuse or leave two ADRs sharing one number.
 
    **The founder-confirmation gate IS the acceptance moment.** Drafts presented at the gate (phase
    1 output) carry `status: proposed` — under discussion, not yet binding, per `writing-adrs`'
@@ -131,7 +147,7 @@ A clustered learning is promoted to an ADR candidate iff it meets at least one o
 Candidates failing all three are NOT promoted — report them as "below threshold" and leave them in
 memory untouched.
 
-## 7. `shared.md` audience-preservation rule
+## 7. `shared.md` and `patterns.md` audience-preservation rules
 
 `.claude/memories/agents/shared.md` is readable by every agent; a per-agent ADR index section is
 read only by the agent(s) named in its `agents:` tag. Deleting a learning from `shared.md` and
@@ -146,6 +162,21 @@ all-agents down to tag-list-only. Therefore:
   the raw shared learning is not deleted, so no audience is silently starved of a learning it
   previously saw. The phase-1 deletion list must reflect this: a `shared.md` deletion is offered
   only when the audience-preservation condition holds.
+
+**`patterns.md` tagging rule (same audience-preservation concern, applied at tagging time rather
+than deletion time).** `.claude/memories/reviews/patterns.md` is `qa-engineer`'s working audit
+log — every QA round reads it (see `qa-engineer.md`'s read-path and
+`qa-engineer-playbook.md` Step 5). A candidate promoted from `patterns.md` whose proposed
+`agents:` tags name only the agent(s) whose _work_ the pattern constrains (e.g. `web-engineer`)
+and omit `qa-engineer` would silently drop the pattern out of QA's own read path — QA would no
+longer see, via its own index section, a review pattern it used to see directly in `patterns.md`.
+Therefore: **an ADR candidate promoted from `patterns.md` ALWAYS carries `qa-engineer` in its
+`agents:` list**, in addition to whichever other agent(s) the decision constrains — this is not
+optional and is not subject to founder override at the tag-editing step of the confirmation gate
+(the founder may add more agents; they may not remove `qa-engineer` from a `patterns.md`-sourced
+candidate). Unlike the `shared.md` rule above, this is enforced at **draft time** (phase 1, when
+tags are proposed), not at deletion time — there is no `General`-section escape hatch here because
+`patterns.md` promotion always needs the tag, never a broader/narrower substitute.
 
 ## 8. Deletion-on-promotion
 

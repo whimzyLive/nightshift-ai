@@ -111,8 +111,10 @@ reviewable diff/PR:
   instruction), never silently.
 - **Exception 2 — founder-gated distill deletion.** `knowledge-engineer`, running `/sdlc:adr
 --distill`, may delete promoted raw learning entries from any agent's memory file
-  (`.claude/memories/agents/*.md`, and `shared.md` subject to the audience-preservation rule in
-  `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md`) — **only** as a reviewable diff/PR, **only** after
+  (`.claude/memories/agents/*.md`, `shared.md` subject to the audience-preservation rule in
+  `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md`, and `.claude/memories/reviews/patterns.md` — a
+  distill evidence source per `adr-pipeline.md` §4 whose promoted-and-deleted entries `qa-engineer`
+  reads back via the ADR that replaces them) — **only** as a reviewable diff/PR, **only** after
   the founder-confirmation gate approved the specific deletions (the phase-1 deletion list from
   `adr-pipeline.md`), and **only** subject to the `shared.md` audience-preservation rule. Like
   Exception 1, this is never a silent write.
@@ -200,14 +202,14 @@ an apply via the [Apply flow](#apply-flow).
 Canonical error-handling table for both the `ai-enablement-engineer` agent and the `/sdlc:analyze`
 command — defined exactly once here; each references this anchor instead of restating the rows.
 
-| Scenario                                                                                                                                        | Behavior                                                                                                                  |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Repo not opted in / `project-context.md` missing or malformed table (agent not Active — see [Active (definition)](#ownership-resolution-rules)) | **STOP** — report-only: "repo not opted in or project-context unreadable — run `/sdlc:init`." Write nothing. Do not scan. |
-| Scan finds no drift/gaps/conflicts                                                                                                              | Report "no drift detected" and exit cleanly.                                                                              |
-| Apply attempted without human confirmation                                                                                                      | Refuse — confirmation is mandatory (never auto-apply).                                                                    |
-| Apply target outside resolved write-scope                                                                                                       | Refuse and abort; print the offending path(s); make no writes (AC-5).                                                     |
-| Memory conflict with no human decision (deferred)                                                                                               | Report only; reset nothing.                                                                                               |
-| Reset targets another agent's memory but not human-arbitrated                                                                                   | Refuse — the cross-agent memory exception applies only to a human-confirmed, reviewable reset.                            |
-| `find-skills` / `skill-creator` unavailable or offline                                                                                          | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip.                          |
-| `find-skills` install/update commands would run                                                                                                 | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only.                                |
-| `raise-pr.sh` fails during standalone apply                                                                                                     | Surface the failure; leave branch + local commit for manual recovery; do not retry silently.                              |
+| Scenario                                                                                                                                        | Behavior                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repo not opted in / `project-context.md` missing or malformed table (agent not Active — see [Active (definition)](#ownership-resolution-rules)) | **STOP** — report-only: "repo not opted in or project-context unreadable — run `/sdlc:init`." Write nothing. Do not scan.                     |
+| Scan finds no drift/gaps/conflicts                                                                                                              | Report "no drift detected" and exit cleanly.                                                                                                  |
+| Apply attempted without human confirmation                                                                                                      | Refuse — confirmation is mandatory (never auto-apply).                                                                                        |
+| Apply target outside resolved write-scope                                                                                                       | Refuse and abort; print the offending path(s); make no writes (AC-5).                                                                         |
+| Memory conflict with no human decision (deferred)                                                                                               | Report only; reset nothing.                                                                                                                   |
+| Cross-agent memory write attempted outside the two named exceptions (see [Memory-ownership exceptions](#memory-ownership-exceptions))           | Refuse — a reset must be human-arbitrated (Exception 1) and a distill deletion must be founder-gated (Exception 2); anything else is refused. |
+| `find-skills` / `skill-creator` unavailable or offline                                                                                          | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip.                                              |
+| `find-skills` install/update commands would run                                                                                                 | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only.                                                    |
+| `raise-pr.sh` fails during standalone apply                                                                                                     | Surface the failure; leave branch + local commit for manual recovery; do not retry silently.                                                  |

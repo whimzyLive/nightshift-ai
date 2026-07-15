@@ -70,7 +70,10 @@ exists — best-effort; a missing index (repo has no ADRs yet) is a no-op, not a
 full `docs/adr/NNNN-*.md` only on demand. This matters because `/sdlc:adr --distill` can promote —
 and delete — entries from `.claude/memories/reviews/patterns.md`, which Step 5 of the playbook
 consults; without this read-path, a promoted-and-deleted review pattern would vanish from QA's
-view instead of surfacing via its canonical ADR.
+view instead of surfacing via its canonical ADR. This is guaranteed to work: the pipeline's
+`patterns.md` tagging rule (`refs/adr-pipeline.md` §7) requires every ADR promoted from
+`patterns.md` to always carry `qa-engineer` in its `agents:` list, so it always lands in your own
+`docs/adr/index.md` section — it can never be tagged away from your read path.
 
 ## Role & Scope
 
