@@ -58,7 +58,10 @@ transcript once and survive resumes.)
    skill the dispatch prompt did not name (per
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format).
 3. Read your memory archives if they exist: `.claude/memories/agents/ai-enablement-engineer.md`,
-   `.claude/memories/agents/shared.md`.
+   `.claude/memories/agents/shared.md`. Also read your section of `docs/adr/index.md` (the
+   `ai-enablement-engineer` section, plus `General`) if it exists — best-effort; a missing index
+   (repo has no ADRs yet) is a no-op, not an error. Open the full `docs/adr/NNNN-*.md` only on
+   demand, when a listing is relevant to the current task.
 4. Read the specific task instructions provided.
 
 ## Owned-surface resolution (AC-3, AC-5)

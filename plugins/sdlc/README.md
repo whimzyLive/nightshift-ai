@@ -35,6 +35,12 @@ The file is a regenerated per-session cache — **gitignore it**.
   superpowers install or pulls it from the official marketplace. Agents invoke its skills:
   executing-plans, subagent-driven-development, test-driven-development,
   verification-before-completion, requesting-code-review, receiving-code-review, writing-plans.
+- **claude-mem plugin** — **auto-installed.** Declared as a cross-marketplace dependency
+  (`claude-mem@thedotmack`). The `knowledge-engineer` agent's `/sdlc:adr --distill` mode uses its
+  `observation_search` / `get_observations` MCP tools to mine claude-mem's persistent cross-session
+  observations as distill evidence; seed mode does not need it. If the tools are unavailable at
+  runtime, distill halts with a clear message (see `refs/adr-pipeline.md`) — seed mode is
+  unaffected.
 - **CLIs (install manually — not plugins):** `acli` (Jira), `gh` (GitHub).
 
 ## `ai-enablement-engineer` — AI workflow manager agent
@@ -60,6 +66,35 @@ workspace→agent table — never hard-coded. See `plugins/sdlc/refs/analyze-pro
 rule, the drift/gap checks, the memory-conflict analysis, and the apply flow. At the start of any run
 the agent prints its resolved write-scope; before any write it refuses and aborts on a path outside
 that scope.
+
+## `knowledge-engineer` — ADR curation agent
+
+A real-role domain agent, `plugins/sdlc/agents/knowledge-engineer.md`, that owns Architecture
+Decision Record curation under `docs/adr/**`. Runs behind `/sdlc:adr` in two modes — **seed**
+(formalize a founder-known pattern inline from `"<pattern>"`) and **distill** (mine the
+accumulated learnings corpus for promotable candidates) — through one shared draft →
+propose-tags → founder-confirm → write → regenerate-index → commit/PR pipeline defined once in
+`refs/adr-pipeline.md`. It also owns the founder-gated deletion of promoted raw learning entries
+from `.claude/memories/**` during a distill PR, sanctioned as Exception 2 in
+`analyze-protocol.md`'s memory-ownership rules. Domain agents (and `qa-engineer`) read their own
+section of the deterministically-regenerated `docs/adr/index.md` instead of re-deriving
+conventions or re-appending a learning an accepted ADR already covers.
+
+## `/sdlc:adr` — seed or distill Architecture Decision Records
+
+`plugins/sdlc/commands/adr.md` dispatches `knowledge-engineer` across two phases split by a
+founder-confirmation gate that lives at the command layer (a dispatched subagent cannot pause for
+interactive input): phase 1 drafts candidate ADR(s) and returns without writing; the command
+presents each draft, its proposed `agents:` tags, and (distill only) the exact memory entries
+slated for deletion, then waits for explicit founder confirmation; phase 2 writes only the
+confirmed items — assigns the next `NNNN`, writes `docs/adr/NNNN-slug.md`, regenerates
+`docs/adr/index.md` deterministically from ADR frontmatter, (distill only) deletes the confirmed
+learnings in the same PR, and self-raises the PR. `/sdlc:adr "<pattern>"` seeds inline with no
+corpus read; `/sdlc:adr --distill` mines `.claude/memories/agents/*.md`,
+`.claude/memories/reviews/patterns.md`, PR review threads, commit history, and claude-mem
+observations, promoting a candidate only on recurrence, cross-agent relevance, or durable
+convention. See `refs/adr-pipeline.md` for the full pipeline and `skills/writing-adrs/SKILL.md`
+for the ADR body/lifecycle/frontmatter contract it renders against.
 
 ## Project-skill loading enforcement
 

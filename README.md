@@ -2,7 +2,7 @@
 
 # 🌙 nightshift
 
-### Your AI software team that ships while you sleep.
+## Your AI software team that ships while you sleep.
 
 **A drop-in [Claude Code](https://claude.com/claude-code) plugin that turns one terminal into a full software-delivery team — Product Manager, Architect, Tech Lead, Engineers, and QA — driven straight from your issue tracker.**
 
@@ -14,7 +14,7 @@
 
 [![⭐ Star this repo](https://img.shields.io/github/stars/whimzyLive/nightshift-ai?style=for-the-badge&label=%E2%AD%90%20Star%20this%20repo&labelColor=0d0d18&color=d97757)](https://github.com/whimzyLive/nightshift-ai)
 
-[**Install**](#-install-in-60-seconds) · [**How it works**](#-how-it-works) · [**The team**](#-meet-your-team) · [**Configure**](#-configure-your-repo) · [**Extend**](#-extend-the-agents-to-your-stack) · [**Contribute**](#-contributing)
+[**Install**](#-install-in-60-seconds) · [**How it works**](#-how-it-works) · [**The team**](#-meet-your-team) · [**Configure**](#-configure-your-repo) · [**Extend**](#-extend-the-agents-to-your-stack) · [**FAQ**](#-faq) · [**Contribute**](#-contributing)
 
 </div>
 
@@ -175,6 +175,26 @@ repo** — no edits to the shipped plugin, so upstream updates never fight your 
 - **Portable.** One install, every repo. Onboard a new project by writing a single config file.
 - **Auditable.** Every stage leaves an artifact: a PRD, a spec, a plan, a review. No black box.
 - **Composable.** Built on open Claude Code primitives (agents, commands, skills, hooks) — fork it, extend it, swap a role.
+
+## ❓ FAQ
+
+**Does nightshift write code for me?**
+No. nightshift is a process engine, not a "writes code for you" wrapper. It enforces the discipline around the code — spec before plan, plan before code, review before merge — with tests as the merge gate and a _different_ agent reviewing the work than the one who wrote it.
+
+**What do I need to install it?**
+Claude Code, plus the `acli` (Jira) and `gh` (GitHub) CLIs for the ticket and PR integrations. Both CLIs are optional if you only want the local spec → plan → implement → review flow without issue-tracker sync.
+
+**How much does it cost?**
+nightshift is free and MIT-licensed. Install it, fork it, extend it, and use it in any repo — commercial or otherwise — at no cost.
+
+**Do I have to configure every agent for my stack?**
+No. The agents are 100% generic. Every project-specific fact — stack, owned paths, Jira key, base branch, quality-gate commands — lives in one `.claude/project/project-context.md` per repo. Write that single file and the whole team adapts.
+
+**Does every ticket go through the full spec-plan-review ceremony?**
+No. `/auto` triages each story by size first. A story at or under the lightweight threshold (default ≤3 points) goes straight to implementation; the full spec → plan → review-gate flow is reserved for larger stories. Raise a story's points to opt it into the full treatment.
+
+**Do I have to fork nightshift to extend it?**
+Almost never. You teach the generic agents your stack from your own repo's `.claude/` directory — add a skill, bind it to a role, and declare ownership once. Because you never edit the shipped plugin, upstream updates never fight your customizations.
 
 ## 🗺️ Roadmap
 

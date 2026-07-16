@@ -25,6 +25,17 @@ The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` 
 
 ## Memory write (before committing)
 
+**ADR-index check first.** Before appending, consult your section(s) of `docs/adr/index.md` (your
+agent's section, plus `General`) if it exists. If a **`status: accepted`** ADR already captures
+the learning, **soft-skip the append and note it** in your return — the ADR is the canonical
+record, and re-appending would just duplicate it. A match against a `superseded`, `rejected`, or
+`proposed` ADR does **NOT** skip — the learning is still appended (a superseded/rejected decision
+is no longer, or never was, the operative convention, and a merely `proposed` one isn't binding
+yet). The index line carries status, so this check never needs to open the ADR itself. A missing
+index (repo has no ADRs yet) is a no-op — append as normal. This is an additive guard: it never
+changes the append format below, and the skip is always soft (append skipped, never failed) — a
+domain agent is never blocked from finishing its story by ADR bookkeeping.
+
 Append non-obvious learnings to your agent memory file at `.claude/memories/agents/<your-name>.md`:
 
 ```

@@ -822,3 +822,157 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   consistency and because it's the pattern already proven prettier-stable in this exact file.
   Verified via the same two-pass `prettier --write` idempotence check (both passes report
   `(unchanged)`) plus the `grep -c '```'` = 24 fence-count invariant.
+
+## NA-44 — `writing-adrs` skill, ships ahead of its own consumer (`plugins/sdlc/skills`)
+
+- This story deliberately ships a plugin-bundled skill (`writing-adrs`) with zero live consumer:
+  the knowledge-engineer agent and `/sdlc:adr` command that will invoke it are a separate,
+  not-yet-implemented story (NA-43). AC-5 still requires documenting the exact `agents:` /
+  `source-stories:` ADR-frontmatter contract the future pipeline will read, so the skill had to
+  be written from the _planned_ contract description in the dispatch prompt, not from any
+  existing code to cross-check against — verified there was nothing under `plugins/sdlc/agents/`
+  or `plugins/sdlc/commands/` yet named `adr`/`knowledge-engineer` before writing, so the skill's
+  routing-field prose is the first and only place that contract exists on disk right now.
+- Distinguishing "this SKILL.md's own frontmatter" (name+description, controls Claude's skill
+  triggering) from "the frontmatter a _generated ADR document_ carries" (status/agents/
+  source-stories, read by a future pipeline) needed an explicit callout sentence
+  ("This is distinct from this SKILL.md's own frontmatter above...") — both are YAML frontmatter
+  blocks in the same file, one describing the skill itself and one being a worked/templated
+  example of a _different_ file's frontmatter, and without the callout a reader skimming past the
+  second `---...---` block could easily conflate the two.
+- Kept the one required worked example deliberately framework/stack-agnostic (a generic
+  "PostgreSQL as primary datastore" decision) rather than reaching for this repo's own real stack
+  choices (e.g. Payload/Neon from the marketing-site memory) — `plugins/` ships as a public,
+  install-anywhere artifact per the existing published-skills rule, and a worked example tied to
+  nightshift's own infra would read as this-repo-specific inside a generic authoring skill, even
+  though nothing in `portability-lint.sh`'s actual checks (absolute paths/emails/frontmatter/
+  JSON/skill-structure) would have caught that as a violation — it's a stylistic generality
+  concern the lint doesn't enforce, not a lint failure.
+- Fetched both canonical sources in full before writing (Fowler's 2026 `ArchitectureDecisionRecord`
+  bliki entry, and Nygard's original 2011 Cognitect post, both reachable via plain `curl -sL`,
+  stripped to text with a small inline Python `re.sub('<[^>]+>', ...)` pass rather than any
+  fetch/index MCP tool — this session's actual tool list only exposed Read/Write/Edit/Bash/Skill,
+  no context-mode MCP functions were actually callable despite the dispatch prompt's context-mode
+  tool-preference banner, so Bash `curl` was the only usable option and is explicitly what the
+  task's own instructions asked for). Fowler's confidence/uncertainty-honesty framing and the
+  "forces" borrowing from pattern-writing came from his piece; Nygard's exact five-part format
+  (Title/Context/Decision/Status/Consequences) and the "written as a conversation with a future
+  developer, full sentences not bullet fragments" discipline came from his. Cross-checking both
+  against the dispatch's distilled-canon bullets surfaced no contradictions, only Nygard's
+  original three-status set (proposed/accepted/deprecated-or-superseded) which the distilled canon
+  and Fowler's later piece both simplify to proposed/accepted/superseded — used the
+  simplified/canonical three-state set since that's what both the dispatch AC and Fowler's own
+  "further developments" framing settled on.
+
+## NA-43 — `knowledge-engineer` agent + `/sdlc:adr` command (`plugins/sdlc`, consumes NA-44's `writing-adrs` skill)
+
+- A spec's assumed MCP tool slug can be wrong even when the tool BASE names (`observation_search`,
+  `get_observations`) are right — the merged spec assumed `mcp__claude-mem__*`, but the installed
+  `claude-mem` plugin registers its MCP server as `mcp-search`, not `claude-mem`. The plan (and the
+  dispatch prompt that carried it forward) had already corrected this with a concrete,
+  session-verified fully-qualified name (`mcp__plugin_claude-mem_mcp-search__observation_search` /
+  `__get_observations` — the plugin-installed form) rather than leaving it as an open question to
+  re-derive at implementation time. When a grounding correction hands you an already-verified
+  literal, use it verbatim in agent frontmatter `tools:` rather than re-deriving or second-guessing
+  it from static docs — this session's own tool list had no way to independently confirm an MCP
+  server slug (no claude-mem tools were present to introspect), so the orchestrator-supplied,
+  live-session-verified value was the only trustworthy source of truth available.
+- Splitting a founder-confirmation gate across a two-dispatch boundary (draft-and-return, then
+  write-after-confirmation) is the same pattern `/sdlc:analyze`'s scan-then-apply flow already
+  established — reused its exact framing ("a dispatched subagent runs to completion and cannot
+  block for interactive input") almost verbatim in three places (`adr-pipeline.md` §3,
+  `knowledge-engineer.md`'s Pipeline section, `commands/adr.md`'s Shared pipeline section) rather
+  than inventing new prose for what is structurally the identical constraint. When a new
+  command/agent pair needs a human-in-the-loop gate, check whether an existing command already
+  solved the "subagent can't block" problem before designing a new mechanism.
+- Adding a second sanctioned cross-agent-memory-write exception to `analyze-protocol.md` required
+  promoting the previously-implicit single exception (referenced only as "the human-arbitrated
+  memory-conflict reset" inline in two places — the read-only-carve-out bullet and the
+  memory-conflict-resolution step) into a first-class named `## Memory-ownership exceptions`
+  section with both exceptions enumerated, then updating both original inline mentions to point at
+  it instead of restating the rule. This is the same "one source of truth + pointers" pattern from
+  NA-26 — creating Exception 2 without first extracting Exception 1 into the same anchor would have
+  left the "exactly one exception" framing contradicted by a second exception documented somewhere
+  else, which a reviewer would catch as an internal inconsistency.
+- The five domain-implementer agents (`database-administrator`, `platform-engineer`,
+  `sync-engineer`, `web-engineer`, `mobile-engineer`) are still byte-identical to each other
+  (confirmed via `diff` before editing, same as the NA-25 family-split lesson) — but `web-engineer`
+  is ALSO byte-identical to them now (an earlier memory entry only diffed the first four against
+  each other). Editing the shared "Read your memory archives" line required six near-identical
+  edits (five domain agents each with their own agent-name interpolated into the new sentence, plus
+  a differently-worded sixth for `ai-enablement-engineer.md` whose First-steps section already had
+  extra prose around it) rather than one shared edit — there is no ref file backing this literal
+  sentence the way `domain-agent-handoff.md` backs the branch/memory/commit protocol, so the
+  duplication is structural to the current agent-file design, not an oversight to "fix" in this
+  story.
+- `qa-engineer.md`'s ADR read-path could NOT go in the same spot as the six domain agents (a
+  numbered "First steps" step 3) because that file has no such numbered list at all — its
+  equivalent section is a prose "## Read project context first" bullet list. The plan's own task
+  text anticipated this ("~L59 and/or the Learn loop step ~L113-114") but the actual file (132
+  lines total) has no line 113-114 region matching that description — the QA playbook (a separate,
+  much longer file) is where the "Learn" step with `patterns.md` lives, not the agent file itself.
+  Read the actual target file's structure before trusting a plan's approximate line-range citation
+  when the plan was written from the spec's prose rather than a byte-level line count.
+  Cross-checked instead against the file's real structure and added the ADR read as a new paragraph
+  after the existing bullet list in "Read project context first," with an explicit sentence tying
+  it to Step 5 of the (separate) `qa-engineer-playbook.md` so a reader understands why QA specifically
+  needs this read-path (distill can promote-and-delete `patterns.md` entries).
+- Confirmed (again) that this repo's real `lint-staged`/`prettier --write` pre-commit hook silently
+  reflows every Markdown table this story touched (column-width realignment across
+  `adr-pipeline.md`, `adr.md`, `analyze-protocol.md`) on every commit — never trust the
+  pre-Edit-tool draft as the final committed byte content; the post-commit `git status --short`
+  empty check plus a targeted `grep`/verify-command re-run against the actual committed tree (not
+  the pre-commit draft) is what actually proves the fix landed, consistent with the NA-25/NA-27
+  "pre-commit `--check`/`--write` dry run never proves what actually lands" lesson family. All of
+  this story's own Task-level verify greps were re-run against the post-commit tree and passed.
+
+## 2026-07-15 — Story NA-44 — review fix
+
+**Learnings:**
+
+- When authoring skills that autonomous agents apply mechanically, every rule must resolve deterministically: state the rule, then the single explicit exception with its boundary — never hedge both into one sentence.
+- Shipping any new content under plugins/<plugin>/ requires bumping that plugin's .claude-plugin/plugin.json version in the same PR (plugins/ is a published artifact; pinned consumers won't see unversioned additions).
+
+**Pitfalls:**
+
+- "This rule holds even for X — unless truly cosmetic" phrasing reads as contradiction when X is itself cosmetic; reviewers will (correctly) block on it.
+
+## 2026-07-15 — Story NA-44 — review fix, round 2 (PR #106, in-session /code-review + Copilot)
+
+- A rule genuinely worth stating in more than one place (here: immutability, mentioned in a "why"
+  rationale bullet, a lifecycle bullet, and a standalone paragraph) drifts the moment only one of
+  the N restatements gets a later edit — round 1 fixed the contradiction in the standalone
+  paragraph only, leaving the lifecycle bullet still saying "never edited or reopened" with no
+  exception and the rationale bullet re-deriving the whole thing independently. Same "one source
+  of truth + pointers" pattern from the NA-26 memory entries, but the trigger this time was subtler:
+  the first review round fixed the wording it was pointed at, not the fact that the same fact was
+  stated three times at three different strengths — after any "fix the contradiction" finding,
+  grep the whole file for the concept's other restatements before declaring it resolved, don't
+  just fix the one paragraph the finding cited.
+- A skill authored for a pipeline that hasn't shipped yet (`/sdlc:adr` + knowledge-engineer, NA-43
+  pending) needs "not yet shipped" framing repeated at every place the pipeline is named, not just
+  the first — round 1 didn't get flagged for this because the skill correctly stood alone as an
+  authoring standard, but round 2's reviewer read four separate mentions of `/sdlc:adr` and
+  `knowledge-engineer` as claims the pipeline already existed. Fix pattern: state "upcoming/not yet
+  shipped" once where the entity is first introduced, then keep every subsequent mention
+  consistent with that framing (e.g. "once it exists", "where the pipeline is installed and in
+  use") rather than dropping back to bare present-tense phrasing on later mentions of the same
+  not-yet-real thing.
+- A per-agent index-generation contract with no explicit unrouted-item rule is an easy latent drop:
+  an ADR with `agents: []` (or the field omitted) has nowhere to go in a "one section per named
+  agent" grouping scheme unless a fallback bucket is named explicitly. Fixed by adding a `General`
+  (unrouted) section to the index contract — the generalizable check is "does every classification/
+  grouping rule in a skill or ref have an explicit branch for the empty/omitted case," since an
+  implicit "and if it has none, ???" is exactly the kind of gap a reviewer (or a future
+  implementer) will hit on the very first real edge-case record.
+
+## 2026-07-16 — Story NA-43 — review fix
+
+**Learnings:**
+
+- When authoring a lifecycle (status enum) into pipeline docs, define the transition event for every edge — a guard keyed on a status that nothing ever sets is silently inert.
+- Guidance warning against a specific token must describe it, never quote it literally — the literal trips future grep/denylist scans.
+
+**Pitfalls:**
+
+- Command mode tables covering only disjoint flag cases leave combined inputs (flag + free text) implementation-defined; add a row or an explicit STOP.
