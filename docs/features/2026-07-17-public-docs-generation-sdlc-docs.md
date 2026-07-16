@@ -245,6 +245,35 @@ Edge cases:
      the docs command layer, wire `seed adr` + `distill` to `refs/adr-pipeline.md`, update NA-43-era
      docs. **Depends on Story 3** (seed mode).
 
+### Story Dependency Graph (NA-50 stories)
+
+Canonical build order for the stories under `NA-50`. Jira `Blocks` / `is blocked by` links are kept in
+sync with this graph.
+
+The 5-story rollout above was decomposed into 7 Jira stories during `/stories`: the "Deterministic
+core" bullet split into a manifest/registry story (NA-51) and a sync-core story (NA-52) since the
+combined scope exceeded the 8-point split threshold; "Seed + audit modes" split into separate seed
+(NA-54) and audit (NA-55) stories since each is an independently demoable outcome.
+
+**Completion order:**
+
+- **L0:** NA-51 — doc-type registry + `/sdlc:init` docs-manifest scaffold
+- **L1:** NA-52 — `/sdlc:docs` command + `docs-pipeline.md` + `sync` mode + `llms.txt` regen
+- **L2** (parallel-safe, each depends only on NA-52): NA-53 — release mode · NA-54 — seed mode ·
+  NA-55 — audit mode · NA-56 — playbook integration (post-QA docs phase)
+- **L3:** NA-57 — absorb `/sdlc:adr` into `/sdlc:docs`
+
+**Dependency edges:**
+
+| Blocker | Blocks | Rationale |
+|---|---|---|
+| NA-51 | NA-52 | `sync` mode and the `/sdlc:docs` command read the doc-type registry and `docs-manifest.md` scaffolded by NA-51. |
+| NA-52 | NA-53 | `release` mode is a second mode on the `/sdlc:docs` command shell and reuses `docs-pipeline.md` shipped by NA-52. |
+| NA-52 | NA-54 | `seed` mode is a third mode on the same command shell; needs the registry/manifest read path and founder-confirm gate wiring from NA-52. |
+| NA-52 | NA-55 | `audit` mode needs the doc-type registry/manifest read path and the deterministic regen machinery from NA-52 to detect drift. |
+| NA-52 | NA-56 | The post-QA playbook phase dispatches the `sync` mode built in NA-52 (extended with dual diff-source); it does not need release/seed/audit. |
+| NA-54 | NA-57 | `seed adr` reuses the `seed` mode's command routing and founder-confirm gate shipped by NA-54. |
+
 ## Product Checks
 
 - **Roles affected:** founder / solo dev (invokes modes, reviews gated drafts); downstream
