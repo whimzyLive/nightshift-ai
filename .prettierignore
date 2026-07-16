@@ -11,3 +11,7 @@ docs/design/marketing-site-handoff/
 apps/marketing/src/payload-types.ts
 apps/marketing/src/app/(payload)/admin/importMap.js
 apps/marketing/next-env.d.ts
+
+# Ignore generated docs
+docs/superpowers
+docs/features
