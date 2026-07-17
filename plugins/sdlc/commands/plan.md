@@ -22,6 +22,7 @@ the `/auto` Step-0 gate + lightweight defect routing are the primary gate.) Othe
 Dispatch the `tech-lead` agent to produce an implementation plan for the Jira story.
 
 The agent should:
+
 1. Derive the spec path: `docs/superpowers/specs/<STORY-KEY>.md` — no Jira comment lookup needed
 2. Verify the spec file exists (must be merged to develop); if missing, STOP and tell user to run `/spec <STORY-KEY>` first
 3. Read the spec file at the derived path
@@ -60,13 +61,15 @@ The agent should:
       "plan/<STORY-KEY>" develop "docs(plan): <STORY-KEY> <story summary>" "$dir/pr-body.md" --phase plan)
     ```
 11. Comment the story. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
-    ```bash
-    acli jira workitem comment create --key <STORY-KEY> \
-      --body "Plan ready.
+
+```bash
+acli jira workitem comment create --key <STORY-KEY> \
+  --body "Plan ready.
 
 File: docs/superpowers/plans/<STORY-KEY>.md
 PR: <PR_URL>"
-    ```
+```
+
 12. Return: story key, plan file path, PR URL
 
 ## Final action — loop the PR to Copilot-clean, then release (when run standalone)

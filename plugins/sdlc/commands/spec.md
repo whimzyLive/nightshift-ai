@@ -22,6 +22,7 @@ Step-0 entry gate + lightweight defect routing are the primary gate; this guards
 Dispatch the `solutions-architect` agent to produce a technical spec for the Jira story.
 
 The agent should:
+
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<STORY-KEY>` from $ARGUMENTS
 2. Find the parent Epic key from the story view JSON, then apply the same protocol with `<KEY>=<EPIC-KEY>` — Epic Jira description and comments are the product context; do not read any feature file from the repository
 3. Read the existing code relevant to the story in the workspaces owned by the **Active** agents listed in `.claude/project/project-context.md` (use that file's workspace→agent table to locate them). Do not assume any specific framework path.
@@ -56,13 +57,15 @@ The agent should:
      "spec/<STORY-KEY>" develop "docs(spec): <STORY-KEY> <story summary>" "$dir/pr-body.md" --phase spec)
    ```
 8. Comment the story with the spec reference. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
-   ```bash
-   acli jira workitem comment create --key <STORY-KEY> \
-     --body "Spec ready.
+
+```bash
+acli jira workitem comment create --key <STORY-KEY> \
+  --body "Spec ready.
 
 File: docs/superpowers/specs/<STORY-KEY>.md
 PR: <PR_URL>"
-   ```
+```
+
 9. Return: story key, spec file path, PR URL
 
 ## Final action — loop the PR to Copilot-clean, then release (when run standalone)
