@@ -1,6 +1,6 @@
 ---
 name: writing-docs
-description: Use when writing, restructuring, or reviewing any prose documentation — a tutorial, how-to guide, reference page, or explanation/conceptual doc — for a public docs site (e.g. Mintlify MDX, docs/, README material) or any repository documentation meant for humans to read end to end. Applies the Diátaxis framework (see https://diataxis.fr/) — every document belongs to exactly one of the four quadrants (tutorial / how-to guide / reference / explanation), and mixing quadrants inside one document is the single most common documentation failure. Triggered by the sdlc docs pipeline (the knowledge-engineer agent behind /sdlc:docs) before drafting any prose documentation type, and by anyone hand-authoring a doc, a doc-site page, a getting-started guide, an API/CLI reference page, or a "why we built it this way" conceptual page. Covers the four-quadrant compass for picking the right form, per-quadrant structure templates, an anti-pattern list for quadrant drift, and generic voice/craft rules — repo-specific voice and target output format (e.g. Mintlify MDX) are resolved from the repo's docs-manifest (falling back to project-context), never hardcoded here.
+description: Use when writing, restructuring, or reviewing any prose documentation — a tutorial, how-to guide, reference page, or explanation/conceptual doc — for a public docs site (e.g. Mintlify MDX, docs/, README material), a getting-started guide, an API/CLI reference page, or a "why we built it this way" conceptual page. Applies the Diátaxis framework (see https://diataxis.fr/) — every document belongs to exactly one of the four quadrants (tutorial / how-to guide / reference / explanation), and mixing quadrants inside one document is the single most common documentation failure. Covers the four-quadrant compass for picking the right form, per-quadrant structure templates, an anti-pattern list for quadrant drift, and generic voice/craft rules — repo-specific voice and target output format (e.g. Mintlify MDX) are resolved from the repo's docs-manifest (falling back to project-context), never hardcoded here.
 ---
 
 # writing-docs — Diátaxis documentation authoring
@@ -238,9 +238,9 @@ so is the whole point.]
 [Where a documented architectural decision underlies this topic, link the source ADR(s) — e.g.
 `docs/adr/0007-use-postgresql-as-primary-datastore.md` — rather than restating the ADR's Context/
 Alternatives/Consequences here. If no ADR exists for a decision this page discusses, that's fine —
-not every explained decision needs a formal ADR — but check `docs/adr/index.md` first (or the
-skill's own knowledge if the pipeline output is available) before writing "why" content that a
-kept-current ADR might already own.]
+not every explained decision needs a formal ADR — but check `docs/adr/index.md` first if the repo
+has one, before writing "why" content that a kept-current ADR might already own. Skip this check
+entirely in a repo with no `docs/adr/` directory at all.]
 ```
 
 ## Voice, Craft, and Output Format (parameterized — never hardcode)

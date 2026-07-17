@@ -1,5 +1,36 @@
 # ai-enablement-engineer — memory
 
+## NA-58 — QA fix round on commit 9786198 (`plugins/sdlc/skills/writing-docs`)
+
+- Wrote a skill description for `writing-docs` at 1162 chars without ever checking it against the
+  plugin's own vendored validator — `writing-adrs`'s sibling description is 820 chars and passed
+  silently, so nothing in the authoring flow surfaced the limit until QA ran
+  `plugins/sdlc/skills/skill-creator/scripts/quick_validate.py plugins/sdlc/skills/<name>`
+  explicitly. That script (bundled at that exact path in this repo, part of the vendored
+  `skill-creator` skill) is the plugin's own executable AC-3 "passes the plugin's skill
+  conventions" check — run it on every new/edited `SKILL.md` in this plugin as a matter of course,
+  the same way `prettier --write` is run for formatting stability, rather than eyeballing
+  description length. It also enforces `name` kebab-case/length, frontmatter allowed-keys, and "no
+  angle brackets in description" — all worth checking in one pass, not just length.
+- The over-limit sentence was almost entirely a duplicate of the skill's own "When to Use" body
+  section ("Triggered by the sdlc docs pipeline… and by anyone hand-authoring a doc…") — the
+  frontmatter description and the body's first prose section had independently grown to say nearly
+  the same thing, once from a triggering-optimization angle and once from a "here's when to apply
+  this" angle. When trimming an over-limit description, check the body for a section already
+  covering the same ground before rewriting from scratch — here the fix was a straight deletion
+  (the body's "When to Use" section already carries the full list), not a rewrite, once that
+  duplication was spotted; just folded the highest-value trigger phrases from the deleted sentence
+  into the surviving lead sentence so no triggering signal was lost, only the duplicate framing.
+- A parenthetical aside drafted under time pressure ("or the skill's own knowledge if the pipeline
+  output is available") read as sensible to me while writing it but was genuinely unparseable to a
+  fresh reader — it conflated two different things (whether `docs/adr/index.md` exists vs. whether
+  some other unspecified "pipeline output" is available) into one ambiguous clause. When a review
+  flags a parenthetical as "garbled" rather than "wrong," the fix is usually to name the two things
+  separately rather than trying to preserve the original single clause's wording — here that meant
+  splitting into "check the index if the repo has one" plus an explicit "skip this check entirely
+  if the repo has no `docs/adr/` directory at all," which is both clearer and a strict improvement
+  (the original silently had no answer for the no-ADR-pipeline-adopted case at all).
+
 ## NA-58 — `writing-docs` skill for the future `/sdlc:docs` pipeline (`plugins/sdlc/skills`, `plugins/sdlc/agents/knowledge-engineer.md`)
 
 - Same "ship the skill ahead of its own consumer" shape as NA-44's `writing-adrs`, but this time a
