@@ -46,17 +46,18 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
      - does not end in ".lock"
    ```
 
-   **The trailing `-?` is deliberate, not a stray permissiveness.** Without it, a token ending in a
-   bare `-` (e.g. `1.4-`) fails the regex **outright** — the `(-[0-9A-Za-z.]+)*` group requires at
-   least one character after every `-`, so a trailing `-` has nothing to consume and the whole match
-   fails — meaning it never reaches the "ends in '-'" check below and instead surfaces the generic
-   "fails the token regex" message, which is **inaccurate** for this input (`1.4-` genuinely is only
-   letters, digits, and `-`; verified: `1.4-` rejects at the regex while `1.4.` and `1..4` pass it and
-   reach their specific checks). The trailing `-?` lets a bare trailing dash pass the character-class
-   check so it is caught by the **specific**, correctly-worded "ends in '-'" STOP instead — the same
-   fix shape as the `.lock` case below (widen the regex so the specific rule, not the generic one,
-   catches it). It does not loosen anything else: `1--2` (an interior double-dash) still fails,
-   because the repeated group still requires ≥1 character after each non-trailing `-`.
+   **The trailing `-?` is deliberate, not a stray permissiveness.** Without that trailing `-?`, a
+   token ending in a bare `-` (e.g. `1.4-`) fails the regex **outright** — the `(-[0-9A-Za-z.]+)*`
+   group requires at least one character after every `-`, so a trailing `-` has nothing to consume
+   and the whole match fails — meaning it never reaches the "ends in '-'" check below and instead
+   surfaces the generic "fails the token regex" message, which is **inaccurate** for this input
+   (`1.4-` genuinely is only letters, digits, and `-`). Verified **against that superseded,
+   `-?`-less regex**: `1.4-` was rejected outright, while `1.4.` and `1..4` passed it and reached
+   their specific checks. The trailing `-?` lets a bare trailing dash pass the character-class check
+   so it is caught by the **specific** "ends in '-'" STOP instead — the same fix shape as the
+   `.lock` case below (widen the regex so the specific rule, not the generic one, catches it). It
+   does not loosen anything else: `1--2` (an interior double-dash) still fails, because the repeated
+   group still requires ≥1 character after each non-trailing `-`.
 
    Each failure is a **usage STOP** raised **before** any branch, dispatch, draft, or founder gate —
    a caller passing `release ../../oops` is rejected at the ladder, never after the founder has
@@ -68,14 +69,24 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
                              (letters, digits, ".", "-"; no path separators or whitespace)
    contains ".."           → invalid version "<raw>" — must not contain ".." (git refuses the
                              branch ref docs/release-<VERSION>)
-   ends in "." or "-"      → invalid version "<raw>" — must not end in "." or "-" (git refuses
-                             the branch ref docs/release-<VERSION>)
+   ends in "."              → invalid version "<raw>" — must not end in "." (git refuses the
+                             branch ref docs/release-<VERSION> — verified:
+                             `git check-ref-format --branch docs/release-1.4.` → invalid)
+   ends in "-"              → invalid version "<raw>" — must not end in "-" (not a git ref-format
+                             violation — `docs/release-1.4-` is a valid ref; the real reason is
+                             token hygiene: "-" conventionally introduces a pre-release suffix, as
+                             in 1.4.0-RC1, and a bare trailing "-" leaves that suffix empty)
    ends in ".lock"         → invalid version "<raw>" — must not end in ".lock" (git refuses the
                              branch ref docs/release-<VERSION>)
    empty after normalising → invalid version "<raw>" — version is empty after stripping the
                              leading "v" or "V"
    ```
 
+   - **The `.` and `-` STOPs share one validation rule but have different true reasons — do not
+     conflate them.** A trailing `.` genuinely is a git ref-format violation (verified above); a
+     trailing `-` is not (also verified above) — its rejection is deliberate token hygiene, not a
+     git constraint. Stating "git refuses" for both, as an earlier version of this text did, is
+     false for the `-` half.
    - **The `.lock` rule is `VERSION.endswith(".lock")` — NOT a per-dot-component test.** Git's
      `.lock` prohibition applies to **slash**-separated ref components. The branch is
      `docs/release-<VERSION>`, whose last slash-component is `release-<VERSION>` — that component

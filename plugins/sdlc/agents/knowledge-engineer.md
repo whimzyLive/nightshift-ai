@@ -188,8 +188,10 @@ You run in one of two dispatch phases per invocation:
   gate: the command hands you `VERSION`, `ENABLED_ROWS`, and the founder-confirmed drafts
   **verbatim**. Check out the release branch per §13 (**at its remote head** on a re-run — never
   `reset --hard`, never force-push), write the confirmed content for `ENABLED_ROWS` **only**, apply
-  §11's changelog upsert, regenerate the doc index + `llms.txt`, then commit (with the
-  `Release-Generated: <VERSION>` trailer) / push / open-or-update the PR — **only if content changed**.
+  §11's changelog upsert, regenerate the doc index + `llms.txt` **only if the `llms-txt` row is
+  itself present and enabled in the manifest — check it independently of `ENABLED_ROWS`, which
+  covers only the three release rows** (§14), then commit (with the `Release-Generated: <VERSION>`
+  trailer) / push / open-or-update the PR — **only if content changed**.
 
 **The founder-confirmation gate between the two phases is NOT yours to run, in any of the three
 pipelines.** It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your
@@ -241,9 +243,12 @@ Branch/commit/PR mechanics (branch name + cut point from `origin/<BASE-BRANCH>`,
 owned once by `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow`
 — you already read it before running either phase. This section is a pointer, not a restatement.
 
-1. Write the founder-confirmed drafts for `ENABLED_ROWS` **only**, plus the regenerated doc index and
-   `llms.txt`, under their manifest-resolved `target-path`s, on the branch §13 names (checked out per
-   §13's re-run rule — **at the remote head; never reset, never force-push**).
+1. Write the founder-confirmed drafts for `ENABLED_ROWS` **only**, plus the regenerated doc index,
+   under their manifest-resolved `target-path`s, on the branch §13 names (checked out per §13's
+   re-run rule — **at the remote head; never reset, never force-push**). Write `llms.txt` **only if
+   its own manifest row is present and enabled** (§14) — it is a `sync`-triggered row, not a member
+   of `ENABLED_ROWS`, so its enabled state is never inferred from that set; if disabled or absent,
+   do not write or touch `llms.txt` at all this dispatch.
 2. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`, then follow
    §13's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
    paths is non-empty; if it's empty, skip commit/push/PR entirely (clean no-op) and still append any
