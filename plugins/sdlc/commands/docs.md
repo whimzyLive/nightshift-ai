@@ -1,5 +1,5 @@
 ---
-description: Generate and maintain this repo's public docs surface via the doc-type registry and the per-repo docs manifest. Ships two live modes — `sync` diff-drives deterministic regeneration of frontmatter-driven reference docs + `llms.txt` and drafts gated how-to refreshes; `release <version>` aggregates every story merged since the last tag into the manifest-enabled subset of changelog, ADR-linked release notes, and a migration-guide stub, then deterministically regenerates the doc index + `llms.txt`. Both run behind the knowledge-engineer agent (refs/docs-pipeline.md), with the founder-confirmation gate at this command layer. `seed`/`audit`/`distill` are not-yet-implemented stubs (see Epic NA-50).
+description: Generate and maintain this repo's public docs surface via the doc-type registry and the per-repo docs manifest. Ships three live modes — `sync` diff-drives deterministic regeneration of frontmatter-driven reference docs + `llms.txt` and drafts gated how-to refreshes; `release <version>` aggregates every story merged since the last tag into the manifest-enabled subset of changelog, ADR-linked release notes, and a migration-guide stub; `seed <type> [topic]` scaffolds one new page of a manifest-activated narrative type (concept/tutorial/integration-guide/how-to) for the founder to author inline at the confirm gate, then writes the confirmed page. All three deterministically regenerate the doc index + `llms.txt` and run behind the knowledge-engineer agent (refs/docs-pipeline.md), with the founder-confirmation gate at this command layer. `audit`/`distill` are not-yet-implemented stubs (see Epic NA-50).
 ---
 
 ## Modes (dispatched from `$ARGUMENTS`)
@@ -7,8 +7,8 @@ description: Generate and maintain this repo's public docs surface via the doc-t
 | Invocation                       | Mode        | v1 status                                                       |
 | -------------------------------- | ----------- | --------------------------------------------------------------- |
 | `/sdlc:docs sync <STORY-KEY>`    | **sync**    | Shipped (NA-52)                                                 |
-| `/sdlc:docs release <version>`   | **release** | **Shipped (NA-53)**                                             |
-| `/sdlc:docs seed <type> [topic]` | seed        | Not yet implemented (see Epic NA-50) — clean stub, not an error |
+| `/sdlc:docs release <version>`   | **release** | Shipped (NA-53)                                                 |
+| `/sdlc:docs seed <type> [topic]` | **seed**    | **Shipped (NA-54)** — except `seed adr`, which routes to NA-57  |
 | `/sdlc:docs audit [--dry-run]`   | audit       | Not yet implemented (see Epic NA-50) — clean stub, not an error |
 | `/sdlc:docs distill`             | distill     | Not yet implemented (see Epic NA-50) — clean stub, not an error |
 
@@ -17,7 +17,7 @@ description: Generate and maintain this repo's public docs surface via the doc-t
 Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args. Apply, in order:
 
 1. **Empty `$ARGUMENTS`** → STOP with the usage message:
-   `usage: /sdlc:docs sync <STORY-KEY> | release <version>  (seed|audit|distill land in later stories)`.
+   `usage: /sdlc:docs sync <STORY-KEY> | release <version> | seed <type> [topic]  (audit|distill land in later stories)`.
 2. **Unrecognised first token** (not one of `sync`/`release`/`seed`/`audit`/`distill`) → STOP with
    the same usage message.
 3. **Recognised future-mode token** (`audit`/`distill`) → print
@@ -119,6 +119,42 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
      the version body after it.
    - Beyond token safety, `<VERSION>` is **not** hard-validated against semver — a date-based label
      (e.g. `2026.07.1`) passes.
+
+7. **`seed` with a missing `<type>`** → STOP with the usage message **plus** the valid type list. A
+   **usage STOP** (caller error), distinct from the manifest-absent silent no-op below.
+8. **`seed` `<type>` = `adr`** → print the clean stub and exit 0. **Not an error, not a STOP** —
+   `adr` is a legitimate registry row carrying `seed` in its trigger, and NA-57 implements it against
+   the retained `refs/adr-pipeline.md`:
+
+   ```text
+   seed type "adr" is not yet implemented (see NA-57) — use /sdlc:adr until it lands
+   ```
+
+   The pointer to the still-live `/sdlc:adr` is load-bearing: **NA-57 removes that command and must
+   also delete this stub.** `adr` never enters `SEED_TYPES`, so it cannot reach a gate or a write
+   path.
+
+9. **`seed` `<type>` not in `SEED_TYPES` ∪ `{adr}`** → usage STOP naming what was passed and
+   enumerating the valid set:
+
+   ```text
+   unknown seed type "<type>" — valid types: concept, tutorial, integration-guide, how-to
+   (derived from the seed-triggered rows of refs/doc-types.md)
+   ```
+
+   `SEED_TYPES` is resolved **at read time** from `refs/doc-types.md`'s `trigger` cells, minus `adr`
+   — see `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §15. The enumerated list in this message is
+   **rendered from the resolved `SEED_TYPES`**, never typed as a literal — otherwise it becomes the
+   hardcoded copy the derivation rule exists to avoid.
+
+10. **`seed` `<topic>`, when supplied, is validated and normalised here — at the ladder, before any
+    gate.** The slugify rule and its **three** reachable STOPs (empty / >80 chars / reserved page id)
+    are defined once in `refs/docs-pipeline.md` §15 and are **not** restated here. This placement is
+    the direct lesson from NA-53, where a version token that forms a branch name reached the gate
+    unvalidated. **`<topic>` omitted is NOT an error** (the signature is `[topic]`) — the command
+    prompts for it, but **after** the manifest and type-activation gates, so a repo with nothing to
+    do is never prompted first. **A prompted topic runs the identical ladder** (§15): validation the
+    primary input path never reaches is not validation.
 
 ## `sync <STORY-KEY>` — shared pipeline split across the dispatch boundary
 
@@ -255,6 +291,82 @@ argument validation above, and the founder-confirm gate between the two dispatch
    commits via `conventional-commit` with the `Release-Generated: <VERSION>` trailer, pushes, and
    opens or updates the release PR.
 
+## `seed <type> [topic]` — shared pipeline split across the dispatch boundary
+
+The seed run mirrors `sync`/`release`'s two-phase dispatch and command-layer founder-confirm gate.
+The shared skeleton lives in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2, and the seed-specific
+procedure — type resolution, the topic/slug ladder, `PAGE` construction, the gate ladder, page
+artifacts, branch/PR control flow, no-op and re-run semantics — is defined once in that ref's
+**§§15–19**. This command owns only the gates below, the argument validation above, and the
+founder-confirm gate between the two dispatches.
+
+**The ordering below is load-bearing.** Everything through step 5 runs **before the founder authors
+anything**: for `seed`, a post-gate STOP does not merely waste a machine's work as it would in
+`sync` or `release` — **it destroys the founder's entire page**. Every rejection whose inputs are
+already available is hoisted ahead of the gate.
+
+1. **Argument validation** — the ladder above, including a supplied `<topic>`.
+
+2. **Manifest gate (AC5).** Shared with `sync` and `release` — defined once at
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed`
+   (base-ref resolution pre-check → checkout-independent `git show` → silent no-op on genuine
+   absence). **Not re-derived here**; `seed` is its third consumer. If **absent** → **silent no-op**:
+   no prompt, no branch, no dispatch, no PR, no error, **no stdout**, exit 0. Do not dispatch
+   `knowledge-engineer`.
+
+3. **Type-activation gate (AC2)** — per `refs/docs-pipeline.md` §16 step 3. Resolve `SEED_ROW` from
+   the manifest; the type is activated iff its row is **present** **and** `enabled = true`.
+   **Absent is never activated — never infer a missing row as enabled.** Not activated → print
+   `doc type "<type>" is not activated in .claude/project/docs-manifest.md — nothing seeded`
+   plus `(add or enable its row to seed this type)`, and make **no write**. **Informational, not
+   silent** — the manifest exists, so the founder opted in. Do not dispatch `knowledge-engineer`.
+   **`target-path` comes from `SEED_ROW`, not the registry default.**
+
+4. **Topic resolution (prompt if omitted).** Prompt here — this is the only layer that can pause for
+   input — and run the **identical** §15 ladder on the answer. Placed **after** gates 2–3 so a repo
+   with no manifest is never prompted before its silent no-op.
+
+5. **Page-exists + branch-state gate — all of it pre-gate** (`refs/docs-pipeline.md` §16 step 5).
+   Construct `PAGE` by **normalising the trailing slash before joining** — every registry
+   `target-path` ends in `/`, so a naive join makes this gate **fail open** and phase 2 overwrite a
+   published page (§16 carries the verified rationale). Check it checkout-independently at
+   `origin/<BASE-BRANCH>`. Exists at base → **STOP** (`seed` is a create verb). Exists only on the
+   branch → a re-run: **§18's local-branch precondition and both re-run guards are evaluated HERE**,
+   before phase 1 dispatches. Exists nowhere → first run — **the local-branch precondition still
+   runs.**
+
+6. **Dispatch `knowledge-engineer` Phase 1 (scaffold & draft, writes nothing).** Pass it `<type>`,
+   `SEED_ROW` (its `target-path`), `SLUG`, the **raw** topic text, the normalised `PAGE`, and
+   `origin/<BASE-BRANCH>`. Phase 1 loads `writing-docs` unconditionally, scaffolds exactly one page
+   from the `<type>`'s registry-quadrant template, never invents facts to fill a section, emits the
+   required frontmatter, and returns the scaffold. **Nothing is written to disk in phase 1.**
+
+7. **Founder-confirm gate (AC3) — this is where the founder authors.** Present the scaffold; the
+   founder may accept, edit, author over, or reject it. **This is the mode's whole point:** unlike
+   `sync`/`release`, where the gate mostly confirms machine-derived content, here the gate **is the
+   authoring surface**, and heavy editing is the expected path.
+   - **Validate the confirmed content HERE, at the gate, while it still exists** — specifically the
+     required `title` + `description` frontmatter (`refs/docs-pipeline.md` §17). **Not deferred to
+     phase 2**: phase 2 is a fresh dispatch holding an opaque payload, so a check there can only STOP
+     — it cannot ask the founder to fix the missing line — converting a one-line correction into the
+     loss of a whole authored page.
+   - For a `how-to` / `integration-guide`, present the `source:` glob list: globs supplied → written
+     with `source:` (future `sync` runs draft refreshes); omitted → **the key is omitted entirely**,
+     never written empty, and **never inferred** (§17).
+   - **Founder rejects / does not confirm** → write nothing, no branch, no PR, no phase-2 dispatch;
+     report and exit cleanly. Unlike `release`, there is no deterministic half worth committing.
+   - `gh` and the learnings corpus MAY enrich what is **displayed** here; neither may feed a written
+     byte except through the founder's confirmation (§19).
+
+8. **Dispatch `knowledge-engineer` Phase 2 (write confirmed, fresh dispatch).** Pass it `<type>`,
+   `SEED_ROW`, `SLUG`, the normalised `PAGE`, and the founder-confirmed content **verbatim** (inline
+   or via `scripts/tmp-dir.sh` temp files by path — **never re-derived**). Phase 2 re-verifies the
+   precondition + guards as a **mandatory** TOCTOU backstop (preserving the confirmed content on a
+   STOP), writes the confirmed content to `PAGE` and **only** to `PAGE`, regenerates the index +
+   `llms.txt` per §19 (**`llms.txt` only if its own manifest row is present and enabled — checked
+   independently of `SEED_ROW`**), and commits/pushes/opens-or-updates the PR **only if
+   `git status --porcelain` on the written paths is non-empty** (AC4).
+
 ## Release branch/PR naming
 
 - Branch `docs/release-<VERSION>`; PR title `docs(docs): release <VERSION>`. Cut from the **base
@@ -266,6 +378,16 @@ guards — including the prohibition on `reset --hard` / force-push, a deliberat
 — and the control-flow tail) is defined once in
 `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow` — this
 command does not re-derive it.
+
+## Seed branch/PR naming
+
+Defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §18. In summary: branch
+`docs/seed-<type>-<SLUG>` (the **normalised** slug) cut from `origin/<BASE-BRANCH>` head — **not** a
+story branch; commit and PR title `docs(docs): seed <type> <SLUG>`, carrying the trailer
+`Seed-Generated: <type>/<SLUG>` that both re-run guards key on; PR base `<BASE-BRANCH>` from
+project-context. `<type>` is in the branch name because two types may legitimately seed the same
+topic. **The branch is never reset and never force-pushed** — a deliberate divergence from §7 (see
+§18).
 
 ## Founder-confirm-gate authority note
 
@@ -310,43 +432,66 @@ pre-PR exit paths this covers.
 
 ## Error handling
 
-| Scenario                                                                                                        | Behaviour                                                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/project/docs-manifest.md` absent                                                                       | **Silent** no-op — no branch, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                            |
-| Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                |
-| `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                |
-| Recognised future-mode token (`audit`/`distill`)                                                                | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error.                                                                                                                                                                    |
-| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-55); exit **without** a silent success.                                                                                                                                  |
-| `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                              |
-| Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                 |
-| Deterministic regen produced byte-identical output and no narrative draft confirmed                             | No commit, no PR (AC6) — write phase detected an empty `git status --porcelain`.                                                                                                                                                                      |
-| Founder rejects all narrative drafts but deterministic content changed                                          | Still commit + PR the deterministic regen (AC6 — content changed).                                                                                                                                                                                    |
-| Story branch diff yields no changed files                                                                       | Only `llms.txt` is (re)generated; commit/PR only if it changed.                                                                                                                                                                                       |
-| `gh` / `raise-pr.sh` failure                                                                                    | STOP and surface — the write is on a branch and reviewable; never leave a raised-but-broken state silently.                                                                                                                                           |
-| `release` with missing/empty `<version>`                                                                        | Usage STOP (prints the usage message).                                                                                                                                                                                                                |
-| `release` with a `<version>` failing the token regex, or containing `..` / a path separator (e.g. `../../oops`) | Usage STOP stating **that** reason, raised **at the validation ladder** — before any branch, dispatch, draft, or founder gate.                                                                                                                        |
-| `release` with a `<version>` ending `.lock` (e.g. `1.4.lock`)                                                   | Usage STOP stating the `.lock` reason specifically — `VERSION.endswith(".lock")` is the test; git rejects the ref `docs/release-1.4.lock`, so it is caught up-front rather than at `git checkout` after the gate.                                     |
-| Manifest present but no `release`-triggered row enabled                                                         | Clean no-op — print `no release-triggered doc types enabled…`, no PR.                                                                                                                                                                                 |
-| Manifest row absent for a release type (declined at `/init`, or deleted)                                        | Treated as **not enabled** — never inferred as default-on. Excluded from `ENABLED_ROWS`.                                                                                                                                                              |
-| Manifest enables only **some** release rows                                                                     | Not an error — only those rows are drafted, gated, and written. Disabled rows' pages are never created or touched.                                                                                                                                    |
-| No stories merged in the range, `LAST_TAG` set                                                                  | Clean no-op — `no stories merged since <LAST_TAG> — nothing to release`, no PR.                                                                                                                                                                       |
-| No stories merged in the range, no tags exist                                                                   | Clean no-op — `no stories merged since the start of history — nothing to release` (never an empty interpolation).                                                                                                                                     |
-| Repo has no tags yet (full clone)                                                                               | Not an error — range is the **single-ended** `origin/<BASE-BRANCH>` (full history, root inclusive).                                                                                                                                                   |
-| **Shallow clone**                                                                                               | Surface and STOP (`run: git fetch --unshallow`) — caught by the **positive** `git rev-parse --is-shallow-repository` pre-check, because a shallow clone with unreachable tags emits the _identical_ `No names found` text as a genuine first release. |
-| `git fetch` fails, or `origin/<BASE-BRANCH>` will not resolve                                                   | Surface and STOP — resolved **before the manifest gate** (never mistaken for "manifest absent") and again **before** `git describe` (never mistaken for "no tags yet").                                                                               |
-| Manifest present but the `llms-txt` row is disabled or absent                                                   | Not an error — `llms.txt` is a `sync`-triggered row, not part of `ENABLED_ROWS`; `release` independently checks its enabled state and does not write or touch it this run if disabled/absent. Any existing `llms.txt` is left as-is.                  |
-| `git describe --tags` fails with anything other than `No names found`                                           | Surface and STOP. `No names found` is the **only** fallthrough text, trusted only because the shallow pre-check already ran. `No tags can describe` is deliberately **not** matched.                                                                  |
-| `git log` failure                                                                                               | Surface and STOP — never silently release an empty or partial range.                                                                                                                                                                                  |
-| A commit body mentions `BREAKING CHANGE:` in prose rather than as a footer                                      | **Not** breaking — the test is line-anchored (`^BREAKING[ -]CHANGE:`), never a substring search.                                                                                                                                                      |
-| `gh` unavailable / rate-limited                                                                                 | Never affects written content — `gh` is display-only enrichment at the confirm gate. Output is byte-identical whether `gh` answers or not.                                                                                                            |
-| A merged story has no motivating ADR                                                                            | Its release note omits the ADR link — never fabricated.                                                                                                                                                                                               |
-| Repo has no `docs/adr/` directory                                                                               | Every release note is ADR-less; not an error.                                                                                                                                                                                                         |
-| A **local** `docs/release-<VERSION>` holds commits not reachable from its remote                                | **STOP** (local-branch precondition) — never discard unpushed work, and never clobber it on the first-run path either.                                                                                                                                |
-| Re-run: branch exists on `origin`, all page-touching commits carry the trailer                                  | Not an error — check out at the remote head, write on top, commit + fast-forward push only if content changed. Never reset, never force-push.                                                                                                         |
-| Re-run: branch carries **out-of-pipeline** edits to generated pages (no `Release-Generated:` trailer)           | **STOP** (re-run content guard) — surface the paths and the PR number.                                                                                                                                                                                |
-| Re-run: a prior run's **founder gate edit** is present on a generated page                                      | **Re-derived**, not preserved and not STOPped — phase 1 re-drafts and the gate re-presents.                                                                                                                                                           |
-| Re-run: `## <VERSION>` already present in the cumulative changelog                                              | Not an error — the section is **replaced in place** (upsert), never prepended a second time.                                                                                                                                                          |
-| Founder rejects every enabled draft and deterministic regen is byte-identical                                   | No commit, no PR — write phase detected an empty `git status --porcelain`.                                                                                                                                                                            |
+| Scenario                                                                                                        | Behaviour                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/project/docs-manifest.md` absent                                                                       | **Silent** no-op — no branch, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                                                                                                    |
+| Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
+| `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
+| Recognised future-mode token (`audit`/`distill`)                                                                | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error.                                                                                                                                                                                                                                            |
+| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-55); exit **without** a silent success.                                                                                                                                                                                                          |
+| `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                                                                                                      |
+| Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                                                                                         |
+| Deterministic regen produced byte-identical output and no narrative draft confirmed                             | No commit, no PR (AC6) — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                              |
+| Founder rejects all narrative drafts but deterministic content changed                                          | Still commit + PR the deterministic regen (AC6 — content changed).                                                                                                                                                                                                                                                            |
+| Story branch diff yields no changed files                                                                       | Only `llms.txt` is (re)generated; commit/PR only if it changed.                                                                                                                                                                                                                                                               |
+| `gh` / `raise-pr.sh` failure                                                                                    | STOP and surface — the write is on a branch and reviewable; never leave a raised-but-broken state silently.                                                                                                                                                                                                                   |
+| `release` with missing/empty `<version>`                                                                        | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
+| `release` with a `<version>` failing the token regex, or containing `..` / a path separator (e.g. `../../oops`) | Usage STOP stating **that** reason, raised **at the validation ladder** — before any branch, dispatch, draft, or founder gate.                                                                                                                                                                                                |
+| `release` with a `<version>` ending `.lock` (e.g. `1.4.lock`)                                                   | Usage STOP stating the `.lock` reason specifically — `VERSION.endswith(".lock")` is the test; git rejects the ref `docs/release-1.4.lock`, so it is caught up-front rather than at `git checkout` after the gate.                                                                                                             |
+| Manifest present but no `release`-triggered row enabled                                                         | Clean no-op — print `no release-triggered doc types enabled…`, no PR.                                                                                                                                                                                                                                                         |
+| Manifest row absent for a release type (declined at `/init`, or deleted)                                        | Treated as **not enabled** — never inferred as default-on. Excluded from `ENABLED_ROWS`.                                                                                                                                                                                                                                      |
+| Manifest enables only **some** release rows                                                                     | Not an error — only those rows are drafted, gated, and written. Disabled rows' pages are never created or touched.                                                                                                                                                                                                            |
+| No stories merged in the range, `LAST_TAG` set                                                                  | Clean no-op — `no stories merged since <LAST_TAG> — nothing to release`, no PR.                                                                                                                                                                                                                                               |
+| No stories merged in the range, no tags exist                                                                   | Clean no-op — `no stories merged since the start of history — nothing to release` (never an empty interpolation).                                                                                                                                                                                                             |
+| Repo has no tags yet (full clone)                                                                               | Not an error — range is the **single-ended** `origin/<BASE-BRANCH>` (full history, root inclusive).                                                                                                                                                                                                                           |
+| **Shallow clone**                                                                                               | Surface and STOP (`run: git fetch --unshallow`) — caught by the **positive** `git rev-parse --is-shallow-repository` pre-check, because a shallow clone with unreachable tags emits the _identical_ `No names found` text as a genuine first release.                                                                         |
+| `git fetch` fails, or `origin/<BASE-BRANCH>` will not resolve                                                   | Surface and STOP — resolved **before the manifest gate** (never mistaken for "manifest absent") and again **before** `git describe` (never mistaken for "no tags yet").                                                                                                                                                       |
+| Manifest present but the `llms-txt` row is disabled or absent                                                   | Not an error — `llms.txt` is a `sync`-triggered row, not part of `ENABLED_ROWS`; `release` independently checks its enabled state and does not write or touch it this run if disabled/absent. Any existing `llms.txt` is left as-is.                                                                                          |
+| `git describe --tags` fails with anything other than `No names found`                                           | Surface and STOP. `No names found` is the **only** fallthrough text, trusted only because the shallow pre-check already ran. `No tags can describe` is deliberately **not** matched.                                                                                                                                          |
+| `git log` failure                                                                                               | Surface and STOP — never silently release an empty or partial range.                                                                                                                                                                                                                                                          |
+| A commit body mentions `BREAKING CHANGE:` in prose rather than as a footer                                      | **Not** breaking — the test is line-anchored (`^BREAKING[ -]CHANGE:`), never a substring search.                                                                                                                                                                                                                              |
+| `gh` unavailable / rate-limited                                                                                 | Never affects written content — `gh` is display-only enrichment at the confirm gate. Output is byte-identical whether `gh` answers or not.                                                                                                                                                                                    |
+| A merged story has no motivating ADR                                                                            | Its release note omits the ADR link — never fabricated.                                                                                                                                                                                                                                                                       |
+| Repo has no `docs/adr/` directory                                                                               | Every release note is ADR-less; not an error.                                                                                                                                                                                                                                                                                 |
+| A **local** `docs/release-<VERSION>` holds commits not reachable from its remote                                | **STOP** (local-branch precondition) — never discard unpushed work, and never clobber it on the first-run path either.                                                                                                                                                                                                        |
+| Re-run: branch exists on `origin`, all page-touching commits carry the trailer                                  | Not an error — check out at the remote head, write on top, commit + fast-forward push only if content changed. Never reset, never force-push.                                                                                                                                                                                 |
+| Re-run: branch carries **out-of-pipeline** edits to generated pages (no `Release-Generated:` trailer)           | **STOP** (re-run content guard) — surface the paths and the PR number.                                                                                                                                                                                                                                                        |
+| Re-run: a prior run's **founder gate edit** is present on a generated page                                      | **Re-derived**, not preserved and not STOPped — phase 1 re-drafts and the gate re-presents.                                                                                                                                                                                                                                   |
+| Re-run: `## <VERSION>` already present in the cumulative changelog                                              | Not an error — the section is **replaced in place** (upsert), never prepended a second time.                                                                                                                                                                                                                                  |
+| Founder rejects every enabled draft and deterministic regen is byte-identical                                   | No commit, no PR — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                                    |
+| `seed` with a missing `<type>`                                                                                  | Usage STOP — usage message **plus** the valid type list.                                                                                                                                                                                                                                                                      |
+| `seed adr [pattern]`                                                                                            | Clean stub — print `seed type "adr" is not yet implemented (see NA-57) — use /sdlc:adr until it lands`, exit 0. **Not an error, not a STOP.** `adr` never enters `SEED_TYPES`, so it cannot reach a gate or a write path.                                                                                                     |
+| `seed` with an unknown `<type>`                                                                                 | Usage STOP naming the passed type and enumerating the **resolved** `SEED_TYPES` (rendered, never a hardcoded literal).                                                                                                                                                                                                        |
+| `<topic>` slugs to empty (`...`, `@{`, `日本語`, `☕`)                                                          | Usage STOP — `must contain at least one ASCII letter or digit`. Says **ASCII** deliberately: a non-ASCII topic _is_ letters, and a message claiming otherwise would misdescribe the input.                                                                                                                                    |
+| `<topic>` slugs to more than 80 characters                                                                      | Usage STOP naming the derived length. **Never truncated** — truncation would collide two distinct topics onto one branch/page and silently overwrite one.                                                                                                                                                                     |
+| `<topic>` slugs to a reserved page id (`seed concept index`)                                                    | Usage STOP at the ladder, **naming the slug but not the `target-path`** (unresolved at that point). Without it the run destroys its own output: phase 2 writes `docs/concepts/index.md`, then the index regen fires **because that page now exists** and rewrites the founder's page as a generated index in the same commit. |
+| `<topic>` contains `..`, `/`, `.lock`, or trailing `.`/`-`                                                      | **Not an error** — slugification's `[a-z0-9-]` charset removes them (`../../oops` → `oops`). No rejection rule exists for these, deliberately: each would be **vacuous**. The docs tree cannot be escaped via the slug.                                                                                                       |
+| `target-path` ends in `/` (every registry default does) and `PAGE` is joined naively                            | **Silent destruction of a published page** — `git show` fails on `docs/concepts//x.md` so the gate reports "first run", while the filesystem collapses `//` and phase 2 overwrites the real file. Both verified. Closed by normalising `target-path` before the join (§16).                                                   |
+| `<topic>` omitted                                                                                               | Not an error — the founder is prompted **after** the manifest and type-activation gates, and the answer runs the **identical** validation ladder as a supplied topic.                                                                                                                                                         |
+| Requested `<type>`'s manifest row absent or `enabled = false`                                                   | Treated as **not activated** — never inferred as default-on. Report + **no write** (AC2). Informational, **not** silent: the manifest exists, so the founder opted in.                                                                                                                                                        |
+| `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never resolve `SEED_TYPES` from a partial registry, and never fall back to a hardcoded list.                                                                                                                                                                                                   |
+| `<PAGE>` already exists at `origin/<BASE-BRANCH>`                                                               | **STOP** — `seed` is a create verb; a published page may carry hand edits and a founder-authored `source:` list. Never overwritten.                                                                                                                                                                                           |
+| Founder rejects / does not confirm at the gate                                                                  | Write nothing; report and exit cleanly — no branch, no PR, no phase-2 dispatch. Unlike `release`, there is no deterministic half worth committing.                                                                                                                                                                            |
+| Founder confirms a page missing `title` or `description` frontmatter                                            | Caught **at the gate**, where the content still exists and the founder fixes the line in place. **Not** a phase-2 STOP: phase 2 holds an opaque payload and could only discard a fully authored page over a one-line defect.                                                                                                  |
+| A **pre-existing** enabled `public: yes` page lacks `title`/`description` during the regen                      | **Skipped and surfaced** (path in phase-2 output + PR body) — never a STOP (which would tear the write: page committed, index not), and never inferred from body/filename (which would fabricate published index copy).                                                                                                       |
+| Founder omits `source:` on a seeded `how-to` / `integration-guide`                                              | Not an error — the key is **omitted entirely** (never written empty). Per §5 the page is simply never auto-refreshed. `seed` never infers globs.                                                                                                                                                                              |
+| claude-mem tools unavailable                                                                                    | **Never a halt for `seed`** — phase 1 proceeds without corpus enrichment and says so at the gate. (Contrast `distill`, which halts: the corpus is `seed`'s enrichment but `distill`'s entire input.)                                                                                                                          |
+| `<type>` is `tutorial` and the corpus is available                                                              | Not consulted — `tutorial`'s registry `source-of-truth` is `founder-authored` only.                                                                                                                                                                                                                                           |
+| Manifest present but the `llms-txt` row is disabled or absent                                                   | Not an error — checked **independently** of the row `seed` was invoked for. Phase 2 does not write or touch `llms.txt` this run; any existing file is left exactly as-is.                                                                                                                                                     |
+| No section index page exists at `SEED_ROW`'s `target-path`                                                      | Not an error — `llms.txt` is the sole index; no separate section index is created. The existence test reads the **pre-write** tree, so a page this run wrote can never satisfy it.                                                                                                                                            |
+| Re-run: branch carries **out-of-pipeline** edits to generated pages (no trailer)                                | **STOP at step 5**, before the founder authors — surface the paths and the PR number. Never overwritten. The scanned path set is `PAGE` **plus** `llms.txt` (when enabled) **plus** any regenerated section index page.                                                                                                       |
+| A guard condition first becomes true **while the founder is authoring** (TOCTOU)                                | Phase 2 **MUST** re-check and STOP — but **MUST preserve the confirmed content** (session temp dir, path surfaced in the STOP), never discard it. The re-check is **mandatory, not optional**.                                                                                                                                |
+| A **local** `docs/seed-<type>-<SLUG>` holds commits not reachable from its remote                               | **STOP** (local-branch precondition, evaluated at step 5) — never discard unpushed work.                                                                                                                                                                                                                                      |
 
 Mode + args:
 $ARGUMENTS
