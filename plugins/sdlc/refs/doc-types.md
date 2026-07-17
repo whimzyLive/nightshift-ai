@@ -6,10 +6,11 @@ explanation), plus a `meta` quadrant for cross-cutting artifacts. Consumer repos
 file directly — they activate rows via their own `.claude/project/docs-manifest.md`, scaffolded
 by `/sdlc:init` from `refs/docs-manifest-template.md`.
 
-`/sdlc:docs sync` now reads this registry for every `sync`-triggered row (see
-`refs/docs-pipeline.md`) — the `release`/`seed`/`audit`/`distill` `trigger` modes are specified now
-so `/sdlc:docs` can grow into them later, but only `sync` exists today (see Epic NA-50 for the
-rest).
+`/sdlc:docs` reads this registry for every row whose `trigger` names a live mode (see
+`refs/docs-pipeline.md`). `sync` (NA-52), `release` (NA-53), and `seed` (NA-54) are **live**;
+`seed` additionally derives its valid type set from the `trigger` cells below at read time, so this
+table — not the command — decides what is seedable. `audit` (NA-55) and `distill` (NA-57) are
+specified now so `/sdlc:docs` can grow into them later, but do not exist yet (see Epic NA-50).
 
 Mirrors the documentary style of `refs/skills-map.yml` (a flat table registry). Do **not**
 abstract a shared registry format between the two files — copy the shape, do not generalize.

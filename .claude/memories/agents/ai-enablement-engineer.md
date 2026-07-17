@@ -1,5 +1,59 @@
 # ai-enablement-engineer — memory
 
+## NA-54 — `/sdlc:docs seed` mode implementation (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`)
+
+- **A plan's own literal verification grep can fail to match the plan's own verbatim template
+  text, with no line-wrap involved at all** — a genuinely new variant of the "grep trap" family.
+  NA-54's Task 3 Step 8 asserted `grep -c "docs-pipeline.md\` \*\*§§15–19\*\*"`, expecting the
+behavioural-contract section's pointer sentence to have those two tokens adjacent. But the same
+plan's own Step 5 dictated the sentence verbatim as "...lives in
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md`§2, and the seed-specific procedure — ... — is
+defined once in that ref's **§§15–19**." — a full independent clause sits between the two tokens,
+so the assertion cannot pass no matter how faithfully the template text is transcribed. Confirmed
+by grepping the finished file for`§§15` alone: exactly one hit, at the correct location, just not
+  in the shape the assertion demanded. When a plan's own dictated prose and its own verification grep
+  disagree like this, trust the dictated prose (it's the spec-derived content) and flag the grep as
+  wrong, rather than rewriting mandated verbatim text to chase a miswritten check.
+- **When a plan adds an Nth branch to an agent file that already enumerates "N-1 of something" in
+  more than one place, the plan may name only the most prominent occurrence for you to fix, and miss
+  siblings.** NA-54's plan explicitly called out "All three dispatch types" → "All four" in the
+  Required-skills preamble, but the same file separately said "You run one of three pipelines" (the
+  `## Pipeline` intro bullet list) and "in any of the three [pipelines]" (the phase-boundary note
+  after the release Phase-1/2 summary) — neither named by the plan, both genuinely stale once a
+  fourth dispatch branch existed, and both the exact "NA-53 shipped 'seed'/'audit'/'distill' stale in
+  three places, plan named two" defect shape from this file's own NA-52 entry above. Fixed both for
+  consistency and noted the deviation from the plan's literal step list in the PR return — grep the
+  whole file for the literal word "three" (or whatever cardinal the pre-change state used) before
+  considering an Nth-branch addition complete, don't rely on the plan enumerating every site.
+- **`plugins/sdlc/.claude-plugin/plugin.json`'s "every commit shipping new content bumps the
+  version" convention (stated as a hard rule in this same file's NA-58 entry below: "every prior
+  commit shipping new content under `plugins/sdlc/` bumps `plugin.json`'s version in the same
+  commit … pinned consumers won't see the new skill or the agent's updated instructions otherwise")
+  was silently NOT followed by NA-53** (`git show <every NA-53 commit> --stat | grep plugin.json` →
+  no hits across all of NA-53's commits, despite NA-53 shipping a full new release-mode dispatch
+  branch) — confirmed via `git log -p --follow -- plugins/sdlc/.claude-plugin/plugin.json`, which
+  showed the version frozen at `0.36.0` since NA-52's last commit. **My first-round mistake:** I
+  read that unbumped gap as a "more recent precedent" and deliberately matched it (no bump for
+  NA-54 either), reasoning that resurrecting an unfollowed convention unilaterally would itself be
+  an inconsistency. **That reasoning was wrong** — a documented hard rule that one sibling story
+  silently skipped is a **known gap in that story**, not a new counter-rule superseding the
+  original. NA-54 ships a whole new `seed` mode (unambiguously new content, exactly the case the
+  rule was written for); a consumer pinned at `0.36.0` would silently never receive it. Fixed:
+  bumped `0.36.0` → `0.37.0` (minor — new backward-compatible feature) in the same PR round this
+  memory correction landed in. **Lesson for any future story that finds a documented hard rule
+  unfollowed by a recent sibling:** the rule wins; treat the sibling's gap as a defect to flag
+  (and, ideally, backfill), never as a new precedent to extend. Silently matching an unfollowed
+  rule compounds the drift instead of surfacing it.
+- The `tr '\n' ' ' | tr -s ' '` (flatten-and-squeeze) idiom the plan mandated for every prose-spanning
+  verification grep held up in practice across all of Tasks 2/4/5 — every squeezed assertion matched
+  on the first attempt; the plain `tr '\n' ' '` trap the plan warned about (indented continuation
+  lines flattening to a double space) was never hit because the squeeze was applied unconditionally
+  from the start, per the plan's own "do not add a multi-word grep over prose without both" rule.
+- Confirmed `pnpm nx affected -t test --base=remotes/origin/develop` reports "No tasks were run" for
+  a plugin-authoring-only change under `plugins/sdlc/**` (no Nx project owns that path) — this is the
+  expected, correct result for a docs/instructions-only story, not a sign the gate didn't run; don't
+  mistake a clean "no tasks" affected-scoped result for a skipped quality gate.
+
 ## NA-52 — PR #115 review round 3, 10 accepted findings (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/commands/docs.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `docs/superpowers/plans/NA-52.md`)
 
 - **A load/list asymmetry (skill loaded unconditionally but the `Skills loaded:` return contract
