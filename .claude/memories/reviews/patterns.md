@@ -81,3 +81,10 @@
 **Root causes:** committing whichever form the prettier hook emits instead of restructuring to prettier-stable ≤3-level nesting; wiring a new init step into Step 0's jump list without re-checking the merge-run path that bypasses the prompt step.
 **Preventions:** run prettier twice + diff before committing any init.md edit; when adding an init step, verify every Step 0 path (merge run, full re-run) can reach it; write plugin refs in timeless language (no story refs).
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-17 — Story NA-52
+
+**Issues found:** Important: knowledge-engineer.md shared sections (branch/commit/return, completion checklist) not branched per dispatch type — ADR-only instructions were a live wrong-branch-cut hazard for docs-sync phase 2; Minor: diff range used local base (stale-base risk), manifest resolution checkout-dependency undocumented, fossil examples in registry schema.
+**Root causes:** adding a second dispatch type to an agent without sweeping EVERY shared section for type-specific assumptions; spec text inherited verbatim without checkout-independence audit.
+**Preventions:** when an agent gains a dispatch type, grep every section heading for unbranched instructions; prefer origin/<base> remote-tracking refs in all diff ranges.
+**Domains affected:** ai-enablement-engineer
