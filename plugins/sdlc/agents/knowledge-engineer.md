@@ -47,6 +47,15 @@ frontmatter — as the NA-25 workaround: frontmatter preloads are re-injected on
 resume, harness bug anthropics/claude-code#76337; Skill-tool loads land in the transcript once and
 survive resumes.)
 
+In addition — before drafting any **prose documentation type** (a tutorial, how-to guide,
+reference page, or explanation/conceptual doc, as opposed to an ADR) — load `writing-docs` via the
+Skill tool too, the same way the four skills above are loaded. `writing-docs` is not in the
+always-load-first list above because it is only relevant to doc-drafting work (the future
+`/sdlc:docs` pipeline), not to every `knowledge-engineer` dispatch (e.g. a pure ADR seed/distill
+run never touches it) — but the moment a dispatch does involve drafting prose documentation, load
+it before writing a single word, following the same "load before doing the work it governs"
+convention `writing-adrs` already establishes for ADR dispatches.
+
 ## First steps (always)
 
 1. **Read `.claude/project/project-context.md`** — identity, the workspace→agent ownership table,
@@ -131,5 +140,6 @@ contract — your phase-2 write dispatch **self-raises its own PR**, the same wa
 
 Required on every return, per the handoff Return format
 (`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List every skill you invoked this
-dispatch — `writing-adrs`, `verification-before-completion`, `gh-cli`, `conventional-commit`, and
-any project-tech skill applicable to the task — or the literal `none` if none applied.
+dispatch — `writing-adrs`, `verification-before-completion`, `gh-cli`, `conventional-commit`,
+`writing-docs` when the dispatch drafted prose documentation, and any project-tech skill
+applicable to the task — or the literal `none` if none applied.
