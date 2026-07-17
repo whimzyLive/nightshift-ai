@@ -3,6 +3,7 @@ description: Full SDLC automation for a Jira story. Quality-assesses and triages
 ---
 
 Parse $ARGUMENTS:
+
 - `STORY_KEY` = $ARGUMENTS with `--async-review` stripped (e.g. `CER-123 --async-review` → `CER-123`)
 - `ASYNC_REVIEW` = `true` if `--async-review` present in $ARGUMENTS, else `false`
 
@@ -20,7 +21,7 @@ ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null
 
 Route on `ITYPE`:
 
-- `story` **or** `bug` (or any non-epic *implementable* type your project routes through `/auto` as a
+- `story` **or** `bug` (or any non-epic _implementable_ type your project routes through `/auto` as a
   single story) → **continue to Step 1 below — the single-story flow is UNCHANGED.** A `bug` is an
   implementable single-story type: it flows the same single-story path as `story`, and the inline
   triage step (Step 2) classifies it `WORK_KIND=defect` + forces `TRIAGE=lightweight` → Workflow B
@@ -45,6 +46,7 @@ Route on `ITYPE`:
 Dispatch the `scrum-master` agent in **Mode 3 (Auto-Assess)** with `STORY_KEY`.
 
 Wait for its response — it returns exactly:
+
 ```
 QUALITY=ok|triaged
 STORY_POINTS=N|missing
@@ -68,7 +70,7 @@ Set story points in Jira, then re-run `/auto STORY_KEY`."
 > short-circuit for Bugs means a Bug now always reaches the inline triage call, so a transient `acli`
 > failure there surfaces as the standard acli-failure STOP (no `WORK_KIND`/`TRIAGE` block) — a clean,
 > **re-runnable** STOP, not a silent misroute (a re-run routes the Bug correctly because `ITYPE == bug`
-> is known from Step 0). The short-circuit's real guarantee (never *silently* mis-route) is preserved;
+> is known from Step 0). The short-circuit's real guarantee (never _silently_ mis-route) is preserved;
 > only the "avoid the triage call entirely" optimisation is traded away for Bugs, by design.
 
 Otherwise, run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE** (in
@@ -248,11 +250,13 @@ Dispatch the `solutions-architect` agent as instructed in `${CLAUDE_PLUGIN_ROOT}
 Wait for completion. Capture the returned spec PR URL as `SPEC_PR_URL`.
 
 **If ASYNC_REVIEW=true** — fire JSON-RPC event then stop:
+
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 \
   -H "Content-Type: application/json" \
   -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/pr_raised\",\"params\":{\"storyKey\":\"STORY_KEY\",\"type\":\"spec\",\"url\":\"SPEC_PR_URL\"},\"id\":1}"
 ```
+
 **Exit.** Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
 
 **If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then run the
@@ -263,20 +267,24 @@ curl -s --retry 3 -X POST http://localhost:9001 \
   (it auto-merges the spec PR on clean exit; that merge webhook then resumes Phase 2 automatically):
   ```bash
   acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
+  ```
 
 Driving Copilot review-fix now; will auto-merge once review + checks pass, then advance to plan + implementation automatically."
-  ```
+
+````
 - **Any other mode** → post the human-merge note, then run the tail loop **without** a hook (drives
-  the PR to Copilot-clean, leaves it open for a human merge):
-  ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Spec PR ready for review.
+the PR to Copilot-clean, leaves it open for a human merge):
+```bash
+acli jira workitem comment create --key STORY_KEY --body "Spec PR ready for review.
 
 Spec PR: SPEC_PR_URL
 
 Driven to Copilot-clean. Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
-  ```
-  Tell the user:
-  > Spec PR raised; driving it to Copilot-clean as the session tail. Review and merge it to `develop`, then re-run `/auto STORY_KEY`.
+````
+
+Tell the user:
+
+> Spec PR raised; driving it to Copilot-clean as the session tail. Review and merge it to `develop`, then re-run `/auto STORY_KEY`.
 
 The **tail loop owns the release** — do not run `session-complete.sh` here. Do **not** proceed to A2
 in this run; Phase 2 is resumed by the spec-PR merge (human, or the Full-Auto auto-merge) as a fresh
@@ -290,10 +298,11 @@ in this run; Phase 2 is resumed by the spec-PR merge (human, or the Full-Auto au
 
 1. **Branch.** Create the implementation branch `feat/STORY_KEY` off `develop`.
 2. **Plan.** Dispatch the `tech-lead` agent for `STORY_KEY` to produce `docs/superpowers/plans/STORY_KEY.md` as instructed in `${CLAUDE_PLUGIN_ROOT}/commands/plan.md`, but **commit the plan doc onto `feat/STORY_KEY`** — do **not** create a separate plan branch or plan PR. (Same plan content as `/plan`; only the delivery target changes.)
-3. **Implement.** Run the implementation exactly as `${CLAUDE_PLUGIN_ROOT}/commands/impl.md` specifies for `STORY_KEY`: execute the Principal Engineer playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`) **inline in this session** — dispatch the domain agents yourself with the `Agent` tool, working on the **existing `feat/STORY_KEY` branch** (do not create a new branch). Do NOT dispatch a `principal-engineer` subagent (nesting is blocked; it cannot dispatch domain agents).
+3. **Implement.** Run the implementation exactly as `${CLAUDE_PLUGIN_ROOT}/commands/impl.md` specifies for `STORY_KEY`: execute the Principal Engineer playbook (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`) **inline in this session** — dispatch the domain agents yourself with the `Agent` tool, working on the **existing `feat/STORY_KEY` branch** (do not create a new branch). Do NOT dispatch a `principal-engineer` subagent (nesting is blocked; it cannot dispatch domain agents). (The playbook's Step 6.5 runs a post-QA docs sync on the `clean` verdict, before the PR, so regenerated docs land in the same `feat/STORY_KEY` PR — a docs-content failure WARNs, not blocks.)
 4. **Single PR.** Raise one PR from `feat/STORY_KEY` → `develop` containing **both** the plan doc and the implementation. Capture its URL as `IMPL_PR_URL`.
 
 **If ASYNC_REVIEW=true** — fire **both** `pr_raised` events for the single PR (`type=plan` then `type=impl`), both pointing at `IMPL_PR_URL`. The plan and impl now ship in one PR, so the service's spec→plan→impl state machine is satisfied by emitting both phases against that PR; merging it confirms both:
+
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 \
   -H "Content-Type: application/json" \
@@ -318,21 +327,24 @@ tense; any merge happens inside the loop's clean exit):
 - **`Full Auto`:**
   ```bash
   acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete (Full Auto).
+  ```
 
 PR: IMPL_PR_URL
 
 Single PR contains the implementation plan and code. Driving Copilot review-fix; will auto-merge once review + checks pass. Spec was merged separately."
-  ```
+
+````
 - **Any other mode:**
-  ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete.
+```bash
+acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete.
 
 PR: IMPL_PR_URL
 
 Single PR contains the implementation plan and code, driven to Copilot-clean. Review and merge to develop. Spec was reviewed and merged separately."
-  ```
+````
 
 **If ASYNC_REVIEW=true** — fire completion event:
+
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 \
   -H "Content-Type: application/json" \
@@ -350,7 +362,7 @@ deliberate fast-path for small (≤ threshold-points) stories — the spec/plan 
 `full` stories (Workflow A).
 
 > **No `docs/superpowers/plans/STORY_KEY.md` is created or required on this path.** A plan doc is
-> neither generated (no `tech-lead` dispatch) nor a precondition. If you *want* a recorded plan and a
+> neither generated (no `tech-lead` dispatch) nor a precondition. If you _want_ a recorded plan and a
 > review gate, the story should be triaged `full` (raise its story points above the threshold).
 
 ### B1 — Implement (direct)
@@ -363,7 +375,9 @@ its lightweight path the playbook skips the plan-file STOP and **derives tasks i
 (Step 2), so no plan doc is needed. **`WORK_KIND=defect` activates the playbook's systematic-debugging
 defect variant** (reproduce → root-cause → failing regression test → fix+verify) on a `fix/STORY_KEY`
 branch; `WORK_KIND=feature` keeps the normal feature ladder on `feat/STORY_KEY`. Do NOT dispatch a
-`principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`.
+`principal-engineer` subagent (nesting is blocked). Capture the impl PR URL as `IMPL_PR_URL`. (As on
+the full path, the playbook's Step 6.5 runs a post-QA docs sync on the `clean` verdict, before the
+PR, folding regenerated docs into the same PR; a docs-content failure WARNs, not blocks.)
 
 Then resolve `MODE`, post the mode-aware Jira comment (B2 below) **before** the loop, and run the
 **Loop-after-raise** procedure (above) for the impl PR as the session **tail**
@@ -379,21 +393,24 @@ Post the mode-aware comment now — before entering the loop, since the loop is 
 - **`Full Auto`:**
   ```bash
   acli jira workitem comment create --key STORY_KEY --body "Implementation complete (Full Auto).
+  ```
 
 PR: IMPL_PR_URL
 
 Small story (≤3pts) — direct implementation path. Driving Copilot review-fix; will auto-merge once review + checks pass."
-  ```
+
+````
 - **Any other mode:**
-  ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Implementation complete.
+```bash
+acli jira workitem comment create --key STORY_KEY --body "Implementation complete.
 
 PR: IMPL_PR_URL
 
 Small story (≤3pts) — direct implementation path. Driven to Copilot-clean; review and merge to develop."
-  ```
+````
 
 **If ASYNC_REVIEW=true** — fire completion event:
+
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 \
   -H "Content-Type: application/json" \
@@ -416,8 +433,8 @@ parent's release sentinel and each child's completion sentinel never collide.
 ### E0 — Epic precondition: the Epic's AI Workflow mode (`epicFallback`)
 
 Read the **Epic's own** AI Workflow mode **once**, at loop start, using the same definitive,
-format-stable JQL probes the single-story flow uses for a story's mode (see *Resolving the working
-issue's mode* — field first, `AI-Workflow:<mode>` label fallback only when the field is unset/absent,
+format-stable JQL probes the single-story flow uses for a story's mode (see _Resolving the working
+issue's mode_ — field first, `AI-Workflow:<mode>` label fallback only when the field is unset/absent,
 most-conservative label wins) — applied to `EPIC_KEY`:
 
 ```bash
@@ -498,7 +515,7 @@ idempotent: already-finished stories are passed over.
 
 - `storyMode(S)` = `S`'s own AI Workflow value via the single-story JQL probes (`Full Auto` /
   non-Full-Auto / unset) — field first, `AI-Workflow:<mode>` label fallback when the field is
-  unset/absent, exactly as in *Resolving the working issue's mode*.
+  unset/absent, exactly as in _Resolving the working issue's mode_.
 - `effectiveMode(S) = storyMode(S) ?? epicFallback` — the story's own mode if it has one, else the
   Epic's `epicFallback`.
 - `gated(S) := effectiveMode(S) != "Full Auto"`.
@@ -565,7 +582,7 @@ next one:
 
 The epic stays **resumable**: a later `/auto EPIC_KEY` skips every terminal story (E2a) and resumes
 at the still-unfinished failed story. An idle-timeout-with-no-sentinel is **always** a HALT, never a
-silent skip — a child that went quiet without signalling completion has *not* succeeded.
+silent skip — a child that went quiet without signalling completion has _not_ succeeded.
 
 ### E5 — Suspend-primitive protocol (the seam)
 
@@ -647,7 +664,7 @@ plugin exposes to it.
 > `refs/triage.md`), spec/plan (the agents), impl (the playbook inline), and the loop-after-raise
 > itself — must NOT emit its own `session-complete`. After a phase has handed off to the tail loop,
 > `/auto` runs **nothing** further — running `session-complete.sh` again would be a double release.
-> (A Full-Auto auto-merge of the spec PR resumes Phase 2 as a *separate* `/auto` invocation with its
+> (A Full-Auto auto-merge of the spec PR resumes Phase 2 as a _separate_ `/auto` invocation with its
 > own tail-loop release — not a nested one.)
 
 **Direct release whenever no tail loop ran.** The tail loop owns the release only on the paths that
