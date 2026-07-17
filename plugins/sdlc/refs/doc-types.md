@@ -1,4 +1,4 @@
-# Doc-type registry for `/sdlc:init` and (later) `/sdlc:docs`
+# Doc-type registry for `/sdlc:init` and `/sdlc:docs`
 
 This file is a **plugin-owned data registry** — a generic, stack-agnostic taxonomy of
 documentation types keyed on the Diataxis framework (tutorials, how-to guides, reference,
@@ -6,9 +6,10 @@ explanation), plus a `meta` quadrant for cross-cutting artifacts. Consumer repos
 file directly — they activate rows via their own `.claude/project/docs-manifest.md`, scaffolded
 by `/sdlc:init` from `refs/docs-manifest-template.md`.
 
-The current row set ships no generation logic and no runtime manifest consumption — the
-`sync`/`release`/`seed`/`audit`/`distill` `trigger` modes are specified now so a future
-`/sdlc:docs` command can read this file, but no such command exists yet.
+`/sdlc:docs sync` now reads this registry for every `sync`-triggered row (see
+`refs/docs-pipeline.md`) — the `release`/`seed`/`audit`/`distill` `trigger` modes are specified now
+so `/sdlc:docs` can grow into them later, but only `sync` exists today (see Epic NA-50 for the
+rest).
 
 Mirrors the documentary style of `refs/skills-map.yml` (a flat table registry). Do **not**
 abstract a shared registry format between the two files — copy the shape, do not generalize.
@@ -94,3 +95,10 @@ from it.
   MUST have `generation-mode = auto` (deterministic, no narrative synthesis).
 - **Narrative rows are never `auto`.** `tutorial`, `how-to`, `concept`, `integration-guide`,
   `release-notes`, and `migration-guide` MUST each be `draft-for-review` or `manual-only`.
+- **`llms-txt` source-of-truth string is singular.** The literal `source-of-truth` cell text for
+  the `llms-txt` row (`generated pages of all enabled public:yes manifest rows`) is authored in
+  exactly two places in this file — the registry row above and its "Allowed values" mirror in the
+  Registry row schema table — kept in sync by the mirroring rule already stated there. Any other
+  file that needs this fact (`refs/docs-pipeline.md` §8, `commands/docs.md`) references "the
+  `llms-txt` row's `source-of-truth` cell in refs/doc-types.md" rather than restating the literal
+  string, so there is only one string to update when its wording changes.

@@ -1,5 +1,48 @@
 # ai-enablement-engineer — memory
 
+## NA-52 — PR #115 review round 3, 10 accepted findings (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/commands/docs.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `docs/superpowers/plans/NA-52.md`)
+
+- **A load/list asymmetry (skill loaded unconditionally but the `Skills loaded:` return contract
+  lists it conditionally) is fixable two ways, and the deciding factor is which condition is
+  cheaper to state precisely, not which file "feels" like the source of truth.** Here the fix was
+  to make the _load_ conditional (only in Phase 1, only once affected `how-to` rows are resolved)
+  to match the already-conditional _return_ line, rather than the other way around — because the
+  return condition ("a narrative draft was actually produced") was already correct and
+  well-motivated (Phase 2 genuinely never drafts), so loosening it to "unconditional" would have
+  been the wrong direction. When a review finds this shape of asymmetry, check which side already
+  states a correct, well-reasoned condition before picking which side to change.
+- **`plugins/sdlc/scripts/check-agent-skill-preloads.sh` only enforces two structural things — no
+  frontmatter `skills:` key, and one verbatim marker sentence present somewhere in the file — it
+  does NOT enforce the shape (branched vs. merged) of an agent's "Required skills" prose.** This
+  means a "merge 4 restatements of a shared skill list into one canonical statement referenced by
+  the return contract" simplification (the kind finding #10 asked for) is always safe to attempt
+  from the gate's perspective; the actual risk is losing information (e.g. quietly dropping the
+  distinction between an unconditional skill and a conditionally-loaded one), not tripping the
+  gate. Read the gate script itself before assuming a required-skills restructuring needs a
+  "skip and report not-applied" fallback — it's a much narrower contract than the prose describing
+  it might suggest.
+- **A "single source of truth cell, others reference it" fix for a literal string duplicated across
+  files (finding #9) needs the _registry's own self-check section_ to explicitly bless the
+  in-file duplication it still permits (schema-table example mirroring the registry row), or the
+  next reviewer will re-flag the schema-table copy as a 6th restatement site.** Added an explicit
+  self-check bullet naming both in-file locations as the sanctioned mirror and every other file as
+  reference-only — this is the same "precedence rule stated in the guard itself, not just in
+  prose above it" pattern from the NA-51 round-2 memory entry, applied to a duplication guard
+  instead of a gating guard.
+- **A stale "no such command exists yet" claim and a stale "seven sections" count are the same
+  bug shape appearing twice in one PR (doc-types.md's registry intro, the plan's Task 4/AC-coverage
+  references) — once a file ships the thing a sibling doc said didn't exist yet, or a section count
+  changes, grep the WHOLE repo for the old claim/number, not just the line(s) the review named.**
+  Found and fixed a 4th, unflagged occurrence of "seven sections" (the plan's own `Self-review`
+  AC-coverage line) this way — the review only named 3 of the 4 stale references to the same
+  underlying drift.
+- Confirmed `pnpm prettier`/`pnpm exec prettier`/`pnpm nx` all require `node_modules` to actually
+  exist in this repo checkout — a fresh worktree or a checkout that never ran `pnpm install` has
+  none, and `pnpm exec prettier` fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL` (looks like a
+  missing-binary error, not a missing-install one) rather than a clearer "run install first"
+  message. `pnpm install --frozen-lockfile` before the first `prettier`/`nx` invocation in any
+  fresh checkout is cheap insurance against mis-reading that error as something else.
+
 ## NA-51 — PR #113 review round 2, 10 accepted findings (`plugins/sdlc/commands/init.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`)
 
 - **A "gate a new write step on opt-in acceptance" design is incomplete without an explicit

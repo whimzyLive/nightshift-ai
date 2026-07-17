@@ -37,14 +37,15 @@ around the founder-confirmation gate (a dispatched subagent cannot itself pause 
 argument validation above, and the gates below that decide whether `knowledge-engineer` is
 dispatched at all.
 
-1. **Manifest gate (AC5).** Resolve `.claude/project/docs-manifest.md`. Unlike `STORY_BRANCH`
-   resolution (step 2, which always reads `origin` after a fetch), the manifest is read from the
-   **current checkout** — run `/sdlc:docs sync` from an up-to-date `<BASE-BRANCH>` checkout so the
-   manifest reflects the latest merged activation state. If **absent** → **silent no-op**: no
-   branch, no dispatch, no PR, no error, **no stdout** — exit cleanly (exit 0). This is the
-   zero-setup-cost guarantee for repos that declined the `/init` docs opt-in, and is deliberately
-   distinct from a usage STOP (which does print a message). Do not dispatch `knowledge-engineer`
-   in this case.
+1. **Manifest gate (AC5).** Resolve `.claude/project/docs-manifest.md` **checkout-independently**
+   — the same way `STORY_BRANCH` resolution (step 2) always reads `origin` after a fetch — via
+   `git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md` rather than reading the file
+   out of the current working tree, so a stale local checkout never skews which rows are active.
+   If **absent** (the `git show` fails because the path doesn't exist at that ref) → **silent
+   no-op**: no branch, no dispatch, no PR, no error, **no stdout** — exit cleanly (exit 0). This is
+   the zero-setup-cost guarantee for repos that declined the `/init` docs opt-in, and is
+   deliberately distinct from a usage STOP (which does print a message). Do not dispatch
+   `knowledge-engineer` in this case.
 
 2. **Resolve the story branch (v1 diff source).** `sync` never depends on the currently-checked-out
    branch:
@@ -104,24 +105,20 @@ command owns it, exactly as `commands/adr.md` does for the ADR pipeline.
 
 ## Branch/PR naming
 
-Full contract (branch, commit, PR title/base, re-run open-or-update, diff source, control-flow
-tail) is defined once in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow`. In summary:
+- Branch `docs/sync-<STORY-KEY>`; PR title `docs(docs): sync <STORY-KEY>`. Both cut from the
+  **story branch head**, not `<BASE-BRANCH>` — the deterministic regen must read the story
+  branch's changed source.
 
-- Branch: `docs/sync-<STORY-KEY>`, cut from the **story branch head**
-  (`origin/feat/<STORY-KEY>`, fallback `origin/fix/<STORY-KEY>`) — **not** `<BASE-BRANCH>`.
-- Commit: `docs(docs): sync <STORY-KEY> reference docs` (via `conventional-commit`).
-- PR title: `docs(docs): sync <STORY-KEY>`; PR base: `<BASE-BRANCH>` from project-context.
-- Re-run: **open or update** — if `docs/sync-<STORY-KEY>` already exists on `origin`, check it out,
-  `git reset --hard` onto the freshly regenerated state, then `git push --force-with-lease` —
-  never open a duplicate PR.
+Full contract (cut-point detail, commit string, PR base, re-run open-or-update behaviour, diff
+source) is defined once in
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` — this command does
+not re-derive it.
 
 ## `llms.txt` format (v1 decision)
 
-Index-only, grouped by Diátaxis quadrant, generated pages of all enabled `public:yes` manifest
-rows (matching the `refs/doc-types.md` `llms-txt` registry row's `source-of-truth` cell:
-`generated pages of all enabled public:yes manifest rows`). Regenerated every run (AC4), committed
-only if changed (AC6). Full format decision:
+Index-only, grouped by Diátaxis quadrant, content matching the `llms-txt` row's `source-of-truth`
+cell in `refs/doc-types.md` — see that cell rather than this restating it. Regenerated every run
+(AC4), committed only if changed (AC6). Full format decision:
 `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#8-llmstxt-format-v1-decision`.
 
 ## Command control flow
@@ -135,10 +132,9 @@ After the phase-2 PR is raised, drive the review loop to convergence exactly as 
 If the harness cannot nest `/loop` from inside a command, fall back to `ScheduleWakeup` to drive
 `sdlc:loop`'s pass-cycle instead (same effect — the loop is the last thing the session does), then
 let its final pass release. If the command hit a terminal STOP, WARNING, or no-op before a PR was
-raised, release the session directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — this
-covers the manifest-absent silent no-op, the story-branch-missing WARNING, a usage STOP, and a
-clean "nothing changed" no-op alike (all four release without a PR; only the manifest-absent path
-is silent).
+raised, release the session directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — see
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` for exactly which
+pre-PR exit paths this covers.
 
 ## Error handling
 

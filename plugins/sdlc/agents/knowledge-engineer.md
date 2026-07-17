@@ -38,24 +38,26 @@ learnings corpus (distill mode).
 
 Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
-**Which skills are required is branched by which pipeline the dispatch runs**, so an ADR dispatch
-never loads doc-authoring skills and a docs-sync dispatch never loads ADR-authoring skills:
+Both dispatch types load the same three always-on skills — `verification-before-completion`
+(governs the change-gate / idempotence check: confirm a no-source-change re-run yields
+byte-identical output before claiming completion), `gh-cli`, and `conventional-commit` — plus
+exactly one dispatch-specific authoring skill, so an ADR dispatch never loads doc-authoring skills
+and a docs-sync dispatch never loads ADR-authoring skills:
 
-- **ADR dispatch** (seed/distill via `/sdlc:adr`):
-  1. `writing-adrs`
-  2. `verification-before-completion`
-  3. `gh-cli`
-  4. `conventional-commit`
-- **docs-sync dispatch** (via `/sdlc:docs sync`):
-  1. `writing-docs`
-  2. `conventional-commit`
-  3. `gh-cli`
-  4. `verification-before-completion` (governs the change-gate / idempotence check — confirm a
-     no-source-change re-run yields byte-identical output before claiming completion)
+- **ADR dispatch** (seed/distill via `/sdlc:adr`): also load `writing-adrs`, unconditionally, in
+  the same first-turn pass as the three always-on skills above.
+- **docs-sync dispatch** (via `/sdlc:docs sync`): also load `writing-docs`, but only
+  **conditionally** — in Phase 1, and only once you've resolved that at least one `how-to` row is
+  affected this run (docs-pipeline.md §2 step 4 / §3's table). Phase 2 never re-drafts (it writes
+  only what the founder already confirmed, per docs-pipeline.md §2), so it never needs
+  `writing-docs`; a Phase 1 run that resolves zero affected `how-to` rows doesn't either — loading
+  it unconditionally on every docs-sync dispatch would burn context on a skill most dispatches
+  never use.
 
 Load only the branch matching the dispatch that invoked you — do not load `writing-adrs` on a
-docs-sync dispatch, and do not load `writing-docs` on an ADR dispatch. No new tool grants are
-required for either branch — `Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above.
+docs-sync dispatch, and do not load `writing-docs` on an ADR dispatch (or on a docs-sync dispatch
+that resolves no affected `how-to` rows). No new tool grants are required for either branch —
+`Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above.
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
 (e.g. `superpowers:verification-before-completion`, `sdlc:gh-cli`, `sdlc:conventional-commit`,
@@ -173,25 +175,19 @@ and `Skills loaded:` split elsewhere in this file:
 
 ### docs-sync dispatch — branch, memory, commit, return
 
-Branch/commit/PR mechanics are defined once in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` (single source) —
-do not re-derive them; this is a pointer, not a restatement:
+Branch/commit/PR mechanics (branch name + cut point, re-run reset/force-with-lease behaviour,
+commit string, PR title/base) are owned once by
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` — you already read
+that ref before running either phase (see "Pipeline" above). This section is a pointer, not a
+restatement: it names only the two things that are genuinely dispatch-specific here.
 
-1. Check out the `docs/sync-<STORY-KEY>` branch **cut from the story branch head**
-   (`$STORY_BRANCH`, resolved by the command layer before dispatch) — **not** `<BASE-BRANCH>` (the
-   deterministic regen must read the story branch's changed source). If `docs/sync-<STORY-KEY>`
-   already exists on `origin` (re-run), check it out and `git reset --hard` onto the freshly
-   regenerated state instead of branching fresh.
-2. Write the deterministic regen content, the regenerated `llms.txt`, and the founder-confirmed
-   narrative drafts under their manifest-resolved `target-path`s.
-3. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`.
-4. If `git status --porcelain` on the written target paths is non-empty (AC6), stage your changed
-   paths + the memory file, commit via the `conventional-commit` skill (`docs(docs): sync
-<STORY-KEY> reference docs`), then push: a first run pushes and self-raises the PR via `gh` /
-   `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh` (title `docs(docs): sync <STORY-KEY>`, base
-   `<BASE-BRANCH>`); a re-run instead `git push --force-with-lease` to update the existing open PR
-   — never open a duplicate. If `git status --porcelain` is empty, skip commit/push/PR entirely
-   (clean no-op) but still append any memory learning from this dispatch.
+1. Write the deterministic regen content, the regenerated `llms.txt`, and the founder-confirmed
+   narrative drafts under their manifest-resolved `target-path`s, on the branch §7 names (checked
+   out / reset per §7's re-run rule).
+2. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`, then follow
+   §7's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
+   paths is non-empty (AC6); if it's empty, skip commit/push/PR entirely (clean no-op) and still
+   append any memory learning from this dispatch.
 
 ## Completion checklist
 
@@ -219,14 +215,10 @@ Branched by dispatch type — the idempotence gate each checks is different:
 ## `Skills loaded:` return line
 
 Required on every return, per the handoff Return format
-(`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). **Align the listed set with the dispatch
-branch above** — an ADR return must NOT list `writing-docs`, and a docs-sync return must NOT list
-`writing-adrs`:
-
-- **ADR dispatch return** — lists `writing-adrs`, `verification-before-completion`, `gh-cli`,
-  `conventional-commit`, plus any project-tech skill applicable to the task, or the literal `none`
-  if none applied.
-- **docs-sync dispatch return** — lists `writing-docs` (only when a narrative how-to draft was
-  actually produced this dispatch), `conventional-commit`, `gh-cli`,
-  `verification-before-completion`, plus any project-tech skill applicable to the task, or the
-  literal `none` if none applied.
+(`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List exactly what "Required skills (load
+FIRST)" above named for your dispatch branch: the three always-on skills
+(`verification-before-completion`, `gh-cli`, `conventional-commit`), plus `writing-adrs`
+(unconditional) on an ADR return, or `writing-docs` on a docs-sync return **only when a narrative
+how-to draft was actually produced this dispatch** (the same condition that gates loading it,
+above) — plus any project-tech skill applicable to the task, or the literal `none` if none applied.
+An ADR return must NOT list `writing-docs`; a docs-sync return must NOT list `writing-adrs`.
