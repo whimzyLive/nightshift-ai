@@ -162,10 +162,9 @@ already covers this). You write **exactly one page, for exactly one row** — `S
 page for a row you were not invoked for.
 
 In an **audit dispatch** (via `/sdlc:docs audit`), you own the drift scan across activated rows, the
-deterministic correction of `auto` rows, and the reference-integrity flagging of narrative rows; you
-**read `docs/adr/**`read-only and never write it**; you write only regenerated`auto`-row pages
-
-- `llms.txt`, under manifest-resolved `target-path`s.
+deterministic correction of `auto` rows, and the reference-integrity flagging of narrative rows —
+you read `docs/adr/**` **read-only and never write it**; you write only the regenerated `auto`-row
+pages plus `llms.txt`, under manifest-resolved `target-path`s.
 
 ## Pipeline
 
