@@ -1,5 +1,72 @@
 # ai-enablement-engineer — memory
 
+## NA-51 — PR #113 review round 2, 10 accepted findings (`plugins/sdlc/commands/init.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`)
+
+- **A "gate a new write step on opt-in acceptance" design is incomplete without an explicit
+  precedence rule for the case where the gated artifact already exists but this run's answer was
+  Skip (or never asked).** Round 1's fix stated the 4g gate as "accepted this run OR artifact
+  already exists" but never said which wins when a manifest exists AND this run's answer is Skip —
+  QA correctly read that as a live contradiction (Skip's own description said "writes nothing").
+  The fix is a one-sentence precedence rule stated in at least three places that must all agree:
+  the opt-in's own `Skip` bullet, the write-step's own header, and the error/no-op table's first
+  row — "an existing artifact always reaches the merge step regardless of this run's answer; Skip
+  only means don't create one." Any time a review finds a same-file contradiction between two
+  "correct in isolation" bullets, look for the missing precedence rule between them rather than
+  patching either bullet alone.
+- **A prompt that "participates in Step 0's Merge-new-findings schema-backfill loop" is a false
+  claim unless the field is actually a token that loop's own diff step iterates over.** The loop
+  (Step 0 → Merge new findings → step 2) explicitly diffs against
+  `refs/project-context-template.md`'s token/section set — a prompt whose write target is a
+  **different file** (here, `.claude/project/docs-manifest.md`, never `project-context.md`) is
+  structurally invisible to that loop no matter how the prose describes it. The only fix that
+  actually closes the reachability gap is a **new, explicit numbered step** in the Merge flow that
+  checks the artifact's existence directly and re-asks the exact same `AskUserQuestion` — a
+  cross-reference/description change alone ("this participates like any other field") cannot make
+  an unreachable branch reachable. When a spec/plan or a fix instruction says a Step-3 confirm
+  "participates in the merge loop," verify mechanically: does the loop's own diff step actually
+  enumerate this field, or does it only enumerate `project-context-template.md` tokens? If the
+  latter, the field needs its own explicit step, not descriptive prose.
+- **Claiming persistence for a decision with no actual storage location is an "undecidable claim"
+  bug, not a wording nit** — round 1's "Re-init semantics" bullet said a repo is "prompted once when
+  merging" and called it "non-declined," implying some decline state is tracked, when nothing in
+  the design persists a decline of the _opt-in itself_ (only per-row declines inside an _already-
+  existing_ manifest are persisted, via the `<!-- declined: <type> -->` comment convention — a
+  genuinely different, correctly-designed mechanism that must NOT be touched when fixing this).
+  Before writing "prompted once" / "already declined" / any other claim implying persisted memory
+  of a past answer, verify a concrete field, file, or comment convention actually stores that
+  answer between runs — if none exists, the true behavior is "re-asked every time the precondition
+  still holds," not "asked once."
+- Restoring a bare glob (`.claude/.*-plugin-root`) that a nested ` ```markdown ``` ` fenced code
+  block's own prettier "embedded language formatting" had escaped to `.claude/.\*-plugin-root`:
+  wrapping the glob in a backtick code span (`` `.claude/.*-plugin-root` `` ) inside that nested
+  fence is what actually survives — prettier's embedded-markdown formatter escapes bare `*` in
+  prose text (emphasis-ambiguity) but never touches the contents of an inline code span, even one
+  written inside an outer fenced block. Verified stable across two `prettier --write` passes.
+- **A paragraph indented 6 spaces where its sibling paragraphs (same nesting level, same parent
+  bullet) sit at 2 spaces renders as an indented code block**, not as continued list-item prose —
+  CommonMark treats 4+ spaces of indentation beyond the container's own content column as a code
+  block trigger. This is a silent, unflagged-by-prettier defect (proseWrap: preserve doesn't touch
+  indentation, and prettier does not reformat indentation levels within nested list content) — the
+  only way to catch it is to eyeball-compare a paragraph's leading whitespace against its true
+  siblings' whitespace, not just against the immediately preceding line.
+- **When adding an optional free-form prose section to a file whose header comment is itself an
+  HTML `<!-- ... -->` block, never embed another literal `<!-- ... -->` inside that same outer
+  comment's text** — the string `-->` appearing anywhere before the outer comment's real closing
+  `-->` terminates the HTML comment early when any HTML-aware tool parses it, corrupting everything
+  after. Caught this in my own first draft (writing "...unless declined and recorded in a
+  `<!-- declined: <type> -->` comment line..." as prose _inside_ the outer header comment) before
+  committing — the fix is to describe the mechanism in plain words ("recorded — see the Decline
+  record convention below") and never reproduce another HTML comment's literal delimiters inside
+  the text of a comment that's still open.
+- Re-confirmed the NA-25/NA-27/NA-43/NA-51-round-1 lesson about avoiding "This story ships..."
+  phrasing in a permanent plugin artifact — caught myself reintroducing the identical anti-pattern
+  in a _new_ paragraph (the just-added docs-manifest-template.md Voice & format section, "this
+  story ships zero generation logic") immediately after having fixed the same phrasing elsewhere in
+  the same PR round. The instinct to explain "why this doesn't do X yet" by naming the current
+  story is strong and recurring — actively grep any newly-authored paragraph in a permanent
+  artifact for "this story" / "this PR" / "current story" before considering it done, don't rely on
+  having fixed it once already in the same file.
+
 ## NA-51 — doc-type registry + docs-manifest scaffold (`plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`)
 
 - **A `##`/`###` Markdown heading is only the text on its own physical source line — wrapping a

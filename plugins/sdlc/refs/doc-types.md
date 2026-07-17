@@ -35,9 +35,9 @@ Every row carries exactly these 8 columns, in this order:
 1. The **repo-detect output contract** (`refs/repo-detect.md`) — the seven canonical fields:
    `language`, `framework`, `package_manager`, `test_runner`, `typecheck`, `runtime`,
    `commit_scopes`.
-2. The repo's **declared dependency list** — the dependencies read from the root and workspace
-   package manifests (e.g. root `package.json` plus each workspace `package.json`), the same
-   source `refs/skills-map.yml`'s `dep:` conditions already evaluate against.
+2. The repo's **declared dependency list** — the `dependencies` and `devDependencies` keys read
+   from the repo's root `package.json`, the same source `refs/skills-map.yml`'s `dep:` conditions
+   already evaluate against.
 
 Grammar operators:
 
@@ -75,8 +75,12 @@ API-reference row gated on `framework:Hono`) slots in without a schema change.
 ## Registry self-check
 
 This is the **single canonical validation list** for the registry — the author before commit,
-`/init` at scaffold time, and any later `/sdlc:docs` all validate against this section. No other
-section in this file, or in `refs/docs-manifest-template.md`, restates these rules.
+`/init` at scaffold time, and any later `/sdlc:docs` all validate against this section. The
+Registry row schema table's "Allowed values" column above mirrors these same value sets by
+design, for at-a-glance reference while filling a row — keep the two in sync whenever a mode or
+value is added; this section remains the canonical source of truth that the schema table's column
+merely echoes, and no section in this file, or in `refs/docs-manifest-template.md`, may diverge
+from it.
 
 - **No blank cells.** Every row populates all 8 schema columns.
 - **Allowed value sets.** `generation-mode ∈ {auto, draft-for-review, manual-only}`;

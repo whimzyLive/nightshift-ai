@@ -62,11 +62,19 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
      3. **Never touch values already present** — only missing tokens are added; existing values are
         kept verbatim (the detected-value diff from step 3 of this guard may still be offered for
         changed detections, as today).
-     4. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
+     4. **Docs opt-in check.** The docs opt-in is **not** a `refs/project-context-template.md`
+        token, so step 2's template-diff loop cannot surface it — check for it explicitly: if
+        `.claude/project/docs-manifest.md` is **absent**, present the docs opt-in
+        `AskUserQuestion` now (the identical prompt defined in Step 3's "Docs opt-in" section
+        below). Accepting it here satisfies Step 4g's gate for this run, exactly as accepting it
+        during a fresh Step 3 pass would. If the manifest already **exists**, skip this prompt
+        entirely — Step 4g's existing-manifest merge guard runs regardless of any opt-in answer
+        once a manifest exists (see Step 4g and the Docs opt-in section's Re-init semantics).
+     5. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
         (ensure .tmp/ is gitignored), Step 4g (merge `.claude/project/docs-manifest.md` against
-        `refs/doc-types.md` — when the docs opt-in was accepted this run, or when
-        `.claude/project/docs-manifest.md` already exists from a prior acceptance; runs the same
-        existing-manifest merge guard described there), and Step 5.
+        `refs/doc-types.md` — reached when step 4 above accepted the docs opt-in, or when the
+        manifest already existed; runs the same existing-manifest merge guard described there), and
+        Step 5.
 
    - **Refresh skills** → re-fetch the **managed** skills to their latest upstream, then **STOP** —
      no prompts, no other config rewritten. A managed skill is one whose `refs/skills-map.yml` entry
@@ -339,13 +347,13 @@ AskUserQuestion(
   next `/init` "Merge new findings" pass or by hand — the agent's write-scope already covers it
   via the config-driven AI-config surface baseline even before a table row names it explicitly.
 
-      **Migration (the sole documented exception to Step 0's "never touch values already
-      present"):** if `plugins/` or `skills/` already has a workspace→agent row under a
-      **different** owner (e.g. a legacy `platform-engineer` row predating this agent), the opt-in
-      confirmation **reassigns** that row to `ai-enablement-engineer` rather than leaving both a
-      stale row and a new one — one path, one owner is the ownership model's core invariant. This
-      reassignment fires only when the user explicitly confirms this AI-context opt-in prompt; it
-      never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
+  **Migration (the sole documented exception to Step 0's "never touch values already
+  present"):** if `plugins/` or `skills/` already has a workspace→agent row under a
+  **different** owner (e.g. a legacy `platform-engineer` row predating this agent), the opt-in
+  confirmation **reassigns** that row to `ai-enablement-engineer` rather than leaving both a
+  stale row and a new one — one path, one owner is the ownership model's core invariant. This
+  reassignment fires only when the user explicitly confirms this AI-context opt-in prompt; it
+  never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
 
   (b) scaffold `.claude/project/agents/ai-enablement-engineer.md` in Step 4c using
   the **fixed** override shape below (its skill list and owned paths are fixed by the agent
@@ -367,7 +375,7 @@ AskUserQuestion(
   ## Ownership
 
   - owns: plugins/, skills/, .claude/, CLAUDE.md, AGENT.md/AGENTS.md and the AI-config surface (baseline globs ship in the agent definition; this override may add more)
-  - never: .claude/project/project-context.md, .claude/.\*-plugin-root pointers, other agents' memory files
+  - never: .claude/project/project-context.md, `.claude/.*-plugin-root` pointers, other agents' memory files
   - runs after: — · before: —
 
   ## Tech rules
@@ -410,16 +418,21 @@ AskUserQuestion(
 )
 ```
 
-- **Opt in** → Step 4g (below) writes `.claude/project/docs-manifest.md`.
-- **Skip** → Step 4g writes nothing; no manifest file is created.
-- **Re-init semantics** — unlike the fields the Step 0 "Merge new findings" schema-backfill loop
-  discovers by diffing against `refs/project-context-template.md` tokens, this opt-in is **not** a
-  project-context token, so that template-diff loop never surfaces it. Instead, on a
-  Merge-new-findings run a manifest-less, non-declined repo (`.claude/project/docs-manifest.md`
-  absent) is prompted for this opt-in once, keyed on **manifest absence**, not a template token; a
-  repo that already opted in (manifest already present) is never re-prompted, though its manifest
-  still goes through the Step 4g existing-manifest merge guard on every run that reaches Step 4g
-  (see Step 4g below).
+- **Opt in** → Step 4g (below) writes or merges `.claude/project/docs-manifest.md`.
+- **Skip** → Step 4g writes nothing — but **only when no manifest exists yet**. Once
+  `.claude/project/docs-manifest.md` exists (from any prior run), an existing manifest **always**
+  triggers Step 4g's merge behaviour regardless of this run's opt-in answer: Skip means "don't
+  create one," never "stop merging an existing one" — the merge behaviour only _offers_ new rows
+  (each confirmed individually via the per-row merge/confirm flow), so it never writes anything
+  this run's answer didn't separately authorize.
+- **Re-init semantics** — this opt-in is **not** a `refs/project-context-template.md` token, so
+  the Step 0 "Merge new findings" template-diff loop never surfaces it; a dedicated check does
+  instead (see Step 0's merge flow, step 4). Decline is **per-run and deliberately unpersisted** —
+  there is no record of an opt-in decline (unlike the per-row `<!-- declined: … -->` record inside
+  an _existing_ manifest, which Step 4g does honor). A manifest-less repo is therefore re-prompted
+  on **every** (re-)init or merge run for as long as the manifest stays absent. Once a manifest
+  exists, this prompt is no longer asked, and Step 4g's existing-manifest merge guard governs from
+  then on regardless of this run's answer (see Step 4g below).
 
 ## Step 3.5 — Suggest skills and refs based on detected stack
 
@@ -703,10 +716,12 @@ marketplace add` / `install`, and the stub write are all otherwise safe to re-ru
 - If the confirmed install list is empty (no suggestions accepted, no custom skills), this step is a
   no-op — install nothing, write no files.
 
-**4g. `.claude/project/docs-manifest.md`** — executed **only when the docs opt-in was accepted
-this run, or when `.claude/project/docs-manifest.md` already exists from a prior acceptance**
-(the same gate the Step 0 jump list uses). Declining the opt-in with no pre-existing manifest
-writes nothing (no file, no partial content).
+**4g. `.claude/project/docs-manifest.md`** — executed whenever **either** the docs opt-in was
+accepted this run (Step 3, or Step 0's merge-flow docs-opt-in check) **or**
+`.claude/project/docs-manifest.md` already exists from a prior run — an existing manifest always
+reaches this step regardless of this run's opt-in answer (see the Docs opt-in section's Re-init
+semantics). Declining the opt-in **with no pre-existing manifest** writes nothing (no file, no
+partial content).
 
 Step 4g MUST **first detect whether the manifest already exists** — this existing-manifest merge
 guard applies on **every** path that reaches Step 4g, including a full "re-run setup" pass, not
@@ -742,13 +757,14 @@ only the Step 0 "Merge new findings" path:
 
 Error / no-op branches:
 
-| Scenario                                                     | Behaviour                                                                                                                                             |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Docs opt-in declined (Step 3)                                | Write no manifest file. No error.                                                                                                                     |
-| Manifest absent, opt-in accepted                             | Fill from `refs/docs-manifest-template.md` per the "If absent" branch above.                                                                          |
-| Manifest present, new non-declined matching rows exist       | Offer to append them per-row (merge/confirm); keep existing rows verbatim; record any decline in the `<!-- declined: … -->` comment. Never overwrite. |
-| Manifest present, no new (non-declined) rows                 | No-op on the manifest; print it as unchanged.                                                                                                         |
-| `refs/doc-types.md` unreadable or malformed at scaffold time | Surface the failure and **skip** the manifest write — never write a half-filled manifest.                                                             |
+| Scenario                                                                   | Behaviour                                                                                                                                             |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docs opt-in declined (or never asked) and no manifest exists yet           | Write no manifest file. No error — re-prompted on the next (re-)init or merge run per the Docs opt-in section's Re-init semantics.                    |
+| Docs opt-in declined (or not asked) this run but a manifest already exists | Step 4g still runs its existing-manifest merge behaviour (see the rows below) — an existing manifest is never gated on this run's opt-in answer.      |
+| Manifest absent, opt-in accepted                                           | Fill from `refs/docs-manifest-template.md` per the "If absent" branch above.                                                                          |
+| Manifest present, new non-declined matching rows exist                     | Offer to append them per-row (merge/confirm); keep existing rows verbatim; record any decline in the `<!-- declined: … -->` comment. Never overwrite. |
+| Manifest present, no new (non-declined) rows                               | No-op on the manifest; print it as unchanged.                                                                                                         |
+| `refs/doc-types.md` unreadable or malformed at scaffold time               | Surface the failure and **skip** the manifest write — never write a half-filled manifest.                                                             |
 
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 

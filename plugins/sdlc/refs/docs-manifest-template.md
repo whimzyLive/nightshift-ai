@@ -8,15 +8,20 @@ and never inside `refs/project-context-template.md`.
 ## Header comment
 
 The written manifest carries this header comment verbatim (fill `<project name>` from the
-collected Step 3 value):
+collected Step 3 value; on a Merge-new-findings run where Step 3 did not run this pass, use the
+project name already stored in `.claude/project/project-context.md` instead):
 
 ```markdown
 <!--
   docs-manifest.md — scaffolded by /sdlc:init for <project name>.
-  This file activates /sdlc:docs: each row below is one doc type that /sdlc:docs will generate.
-  To deactivate a doc type without losing its row, set enabled = false. Removing a row entirely
-  also deactivates it. This file is declarative activation data only — it carries no generation
-  logic, no schedule, and no runtime directive.
+  This file activates /sdlc:docs: each row in the table below is one doc type that /sdlc:docs
+  will generate. To deactivate a doc type, set enabled = false — that is the stable way to turn
+  it off without losing the row. Deleting a row instead does NOT permanently deactivate it: a
+  future re-init will offer to re-append it unless the offer was previously declined and recorded
+  (see the Decline record convention below). This file may also carry an optional "Voice & format"
+  free-form section below the table (see refs/docs-manifest-template.md) — the row table itself
+  remains 3-column activation data only, never generation logic, a schedule, or a runtime
+  directive.
 -->
 ```
 
@@ -40,6 +45,28 @@ The manifest row table carries **exactly 3 columns**, in this order:
 consumers derive all four from `refs/doc-types.md` at read time. This is the single source of
 truth; none of these four attributes is ever duplicated into the manifest.
 
+## Voice & format (optional, free-form)
+
+Beyond the 3-column row table, the written manifest MAY carry one additional, free-form prose
+section the founder authors by hand, below the table:
+
+```markdown
+## Voice & format
+
+<free-form notes: voice, tone, terminology, and target output format — e.g. "Mintlify MDX with
+this front-matter schema: ...", "second person, no marketing language", repo-specific terminology
+to prefer or avoid>
+```
+
+This section is consumed by `plugins/sdlc/skills/writing-docs/SKILL.md`'s voice/format
+resolution (`.claude/project/docs-manifest.md` is its first-choice source, falling back to
+`.claude/project/project-context.md`, then a stated default). It is **not** part of the
+3-column row-table activation data and is **not** validated by the Registry self-check in
+`refs/doc-types.md` — it is optional prose, present only once a founder has written it.
+`/sdlc:init` never writes or touches this section — the row table above is the only thing
+`/init` fills or merges; this section is populated by hand (or by a future tool), never by
+`/init` itself.
+
 ## Fill rules
 
 - One row per `refs/doc-types.md` row whose `applies-when` matches the detected stack (v1: every
@@ -49,6 +76,8 @@ truth; none of these four attributes is ever duplicated into the manifest.
 - `enabled` defaults to `true` for every newly-written row.
 - `target-path` is pre-filled with the matching registry row's `target-path` default; the
   founder edits it later to point at their real docs tree.
+- `/init` only ever writes or merges the row table (and the header comment) — it never adds,
+  edits, or removes the optional "Voice & format" section; that section is entirely founder-owned.
 
 ## Decline record convention
 
