@@ -67,6 +67,27 @@ resolution (`.claude/project/docs-manifest.md` is its first-choice source, falli
 `/init` fills or merges; this section is populated by hand (or by a future tool), never by
 `/init` itself.
 
+## Additional Jira project keys (optional, free-form)
+
+Beyond the 3-column row table, the written manifest MAY carry one more additional, free-form line
+the founder authors by hand, below the table (and below "Voice & format" if both are present):
+
+```markdown
+## Additional Jira project keys
+
+<comma-separated list of legacy or secondary Jira project keys, e.g.: ET>
+```
+
+Consumed only by `/sdlc:docs release`'s merged-story enumeration
+(`refs/docs-pipeline.md` §10's "Story-key extraction") to widen the set of recognised story-key
+prefixes beyond the single primary key in `.claude/project/project-context.md` — for a repo whose
+history carries commits under more than one Jira project key (most commonly after a Jira project
+rename or a repo merge), so those commits' stories are not silently dropped from the changelog. Not
+part of the 3-column row-table activation data, and not validated by the Registry self-check in
+`refs/doc-types.md`. `/sdlc:init` never writes or touches this section — it is populated by hand,
+same as "Voice & format", and its absence is not an error: `release` simply falls back to the single
+primary project key (or, if that is also absent, a documented-risk loose regex — see §10).
+
 ## Fill rules
 
 - One row per `refs/doc-types.md` row whose `applies-when` matches the detected stack (v1: every
@@ -77,7 +98,8 @@ resolution (`.claude/project/docs-manifest.md` is its first-choice source, falli
 - `target-path` is pre-filled with the matching registry row's `target-path` default; the
   founder edits it later to point at their real docs tree.
 - `/init` only ever writes or merges the row table (and the header comment) — it never adds,
-  edits, or removes the optional "Voice & format" section; that section is entirely founder-owned.
+  edits, or removes the optional "Voice & format" or "Additional Jira project keys" sections; both
+  are entirely founder-owned.
 
 ## Decline record convention
 

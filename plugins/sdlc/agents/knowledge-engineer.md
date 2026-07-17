@@ -7,8 +7,12 @@ description: >-
   behind /sdlc:adr (seed + distill modes) and regenerates docs/adr/index.md
   deterministically from ADR frontmatter. Also runs the /sdlc:docs sync
   pipeline: diff-drives deterministic regeneration of frontmatter-driven
-  reference docs plus llms.txt, and drafts gated how-to refreshes. Triggered
-  manually via /sdlc:adr or /sdlc:docs sync.
+  reference docs plus llms.txt, and drafts gated how-to refreshes. And runs
+  the /sdlc:docs release pipeline: aggregates the stories merged since the
+  last tag into the manifest-enabled subset of changelog, ADR-linked release
+  notes, and a migration-guide stub, then writes the founder-confirmed drafts
+  and regenerates the doc index plus llms.txt. Triggered manually via
+  /sdlc:adr, /sdlc:docs sync, or /sdlc:docs release.
 model: sonnet
 tools: Read, Write, Edit, Bash, Skill, mcp__plugin_claude-mem_mcp-search__observation_search,
   mcp__plugin_claude-mem_mcp-search__get_observations
@@ -38,11 +42,11 @@ learnings corpus (distill mode).
 
 Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
-Both dispatch types load the same three always-on skills — `verification-before-completion`
+All three dispatch types load the same three always-on skills — `verification-before-completion`
 (governs the change-gate / idempotence check: confirm a no-source-change re-run yields
 byte-identical output before claiming completion), `gh-cli`, and `conventional-commit` — plus
 exactly one dispatch-specific authoring skill, so an ADR dispatch never loads doc-authoring skills
-and a docs-sync dispatch never loads ADR-authoring skills:
+and a docs dispatch never loads ADR-authoring skills:
 
 - **ADR dispatch** (seed/distill via `/sdlc:adr`): also load `writing-adrs`, unconditionally, in
   the same first-turn pass as the three always-on skills above.
@@ -53,11 +57,21 @@ and a docs-sync dispatch never loads ADR-authoring skills:
   `writing-docs`; a Phase 1 run that resolves zero affected `how-to` rows doesn't either — loading
   it unconditionally on every docs-sync dispatch would burn context on a skill most dispatches
   never use.
+- **release dispatch** (via `/sdlc:docs release`): also load `writing-docs`, **unconditionally in
+  Phase 1**. **Do NOT inherit the docs-sync bullet's condition above** — that condition is
+  sync-scoped: it keys on `sync`-triggered `how-to` row affectedness, which a release run never
+  computes and which resolves to **zero rows** on a release dispatch. Inheriting it would leave a
+  release Phase 1 drafting release notes and the migration stub with **no Diátaxis template
+  loaded**. A release Phase 1 always drafts at least one artifact that maps onto a `writing-docs`
+  quadrant template (`ENABLED_ROWS` is non-empty by the command-layer gate, and all three release
+  rows — reference / explanation / how-to — are quadrant-templated). Like `sync`, release **Phase 2
+  never needs it** — it writes only what the founder already confirmed.
 
 Load only the branch matching the dispatch that invoked you — do not load `writing-adrs` on a
-docs-sync dispatch, and do not load `writing-docs` on an ADR dispatch (or on a docs-sync dispatch
-that resolves no affected `how-to` rows). No new tool grants are required for either branch —
-`Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above.
+docs-sync or release dispatch, and do not load `writing-docs` on an ADR dispatch (or on a docs-sync
+dispatch that resolves no affected `how-to` rows, or on a release **Phase 2**). No new tool grants
+are required for any branch — `Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above;
+the claude-mem MCP tools are **not** used by `release`.
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
 (e.g. `superpowers:verification-before-completion`, `sdlc:gh-cli`, `sdlc:conventional-commit`,
@@ -100,10 +114,18 @@ how-to refreshes, writing under the manifest's resolved `target-path`s (and, whe
 changes in this SDLC repo, only within the `ai-enablement-engineer`-owned surface — the Active-guard
 scope note above already covers this).
 
+In a **release dispatch** (via `/sdlc:docs release`), you own the release pipeline: you aggregate
+the stories merged since the last tag, draft the `ENABLED_ROWS` subset of the changelog entry +
+ADR-linked release notes + migration-guide stub (Phase 1), and — on founder-confirmed content —
+write them and deterministically regenerate the doc index + `llms.txt` (Phase 2), writing under the
+manifest's resolved `target-path`s (and, when authoring plugin changes in this SDLC repo, only
+within the `ai-enablement-engineer`-owned surface — the Active-guard scope note above already covers
+this). You never draft a row that is not in `ENABLED_ROWS`, and you never write a page for one.
+
 ## Pipeline
 
-You run one of two pipelines, selected by which command dispatched you. Neither is re-inlined
-here — both are defined once in their own ref, and this agent only summarizes and links to them:
+You run one of three pipelines, selected by which command dispatched you. None is re-inlined
+here — each is defined once in its own ref, and this agent only summarizes and links to them:
 
 - **ADR dispatch** (via `/sdlc:adr`, seed or distill mode) — the full procedure (the two-phase
   dispatch split, the distill evidence protocol, the promotion criteria, the `shared.md` audience
@@ -115,6 +137,11 @@ here — both are defined once in their own ref, and this agent only summarizes 
   refresh convention, and the no-op/change-gate semantics) is defined once in
   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` (single source of truth). Read it before running
   either phase.
+- **release dispatch** (via `/sdlc:docs release`) — the full procedure (merged-story enumeration,
+  changelog aggregation + upsert, ADR-link resolution, the release artifact set, branch/PR control
+  flow, and the no-op/idempotence contract) is defined once in
+  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§10–14** (single source of truth). Read it before
+  running either phase. **Do not re-inline it.**
 
 ### ADR dispatch — in summary
 
@@ -147,10 +174,30 @@ You run in one of two dispatch phases per invocation:
   out the branch cut from the story branch head, write everything, then commit/push/open-or-update
   the PR — but only if content changed (AC6).
 
-**The founder-confirmation gate between the two phases is NOT yours to run, in either pipeline.**
-It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your phase-1
-return and your phase-2 dispatch — a dispatched agent cannot pause for interactive human input, so
-the command owns presenting the drafts/deletions and waiting for the founder's confirmation.
+### release dispatch — in summary
+
+You run in one of two dispatch phases per invocation:
+
+- **Phase 1 (compute & draft, writes nothing)** — you receive `VERSION`, `ENABLED_ROWS`, the resolved
+  commit range, the merged-story key set (each key with its `(subject, body)` records), and
+  `origin/<BASE-BRANCH>`. Draft **only** the artifacts whose row is in `ENABLED_ROWS`, resolve each
+  story's motivating ADR (omit the link when there is none — never fabricate), and return the drafts
+  you actually produced, **each labelled with its row**, plus the merged-story set and ADR-link map.
+  **Write nothing to disk.**
+- **Phase 2 (write confirmed, fresh dispatch)** — a fresh dispatch with no memory of Phase 1 or the
+  gate: the command hands you `VERSION`, `ENABLED_ROWS`, and the founder-confirmed drafts
+  **verbatim**. Check out the release branch per §13 (**at its remote head** on a re-run — never
+  `reset --hard`, never force-push), write the confirmed content for `ENABLED_ROWS` **only**, apply
+  §11's changelog upsert, regenerate the doc index + `llms.txt` **only if the `llms-txt` row is
+  itself present and enabled in the manifest — check it independently of `ENABLED_ROWS`, which
+  covers only the three release rows** (§14), then commit (with the `Release-Generated: <VERSION>`
+  trailer) / push / open-or-update the PR — **only if content changed**.
+
+**The founder-confirmation gate between the two phases is NOT yours to run, in any of the three
+pipelines.** It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your
+phase-1 return and your phase-2 dispatch — a dispatched agent cannot pause for interactive human
+input, so the command owns presenting the drafts/deletions and waiting for the founder's
+confirmation.
 
 ## Branch, memory, commit, return
 
@@ -189,6 +236,24 @@ restatement: it names only the two things that are genuinely dispatch-specific h
    paths is non-empty (AC6); if it's empty, skip commit/push/PR entirely (clean no-op) and still
    append any memory learning from this dispatch.
 
+### release dispatch — branch, memory, commit, return
+
+Branch/commit/PR mechanics (branch name + cut point from `origin/<BASE-BRANCH>`, the
+`Release-Generated:` trailer, the local-branch precondition, both re-run guards, PR title/base) are
+owned once by `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow`
+— you already read it before running either phase. This section is a pointer, not a restatement.
+
+1. Write the founder-confirmed drafts for `ENABLED_ROWS` **only**, plus the regenerated doc index,
+   under their manifest-resolved `target-path`s, on the branch §13 names (checked out per §13's
+   re-run rule — **at the remote head; never reset, never force-push**). Write `llms.txt` **only if
+   its own manifest row is present and enabled** (§14) — it is a `sync`-triggered row, not a member
+   of `ENABLED_ROWS`, so its enabled state is never inferred from that set; if disabled or absent,
+   do not write or touch `llms.txt` at all this dispatch.
+2. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`, then follow
+   §13's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
+   paths is non-empty; if it's empty, skip commit/push/PR entirely (clean no-op) and still append any
+   memory learning from this dispatch.
+
 ## Completion checklist
 
 Branched by dispatch type — the idempotence gate each checks is different:
@@ -211,14 +276,32 @@ Branched by dispatch type — the idempotence gate each checks is different:
   2. Confirm every affected `how-to` page you wrote was a founder-confirmed draft (never an
      un-confirmed narrative write), and that every written page landed at its manifest-resolved
      `target-path`.
+- **release dispatch:**
+  1. Run the consumer repo's quality-gate commands from `.claude/project/project-context.md` if your
+     write touched a gated path (plugin-authoring under `plugins/**`). The idempotence gate is
+     `refs/docs-pipeline.md` §14's contract — confirm that re-running the aggregation over the same
+     range with the same confirmed content yields byte-identical content for every enabled row.
+  2. Confirm every page you wrote belongs to a row in `ENABLED_ROWS` (never a disabled row), that
+     every written page landed at its manifest-resolved `target-path` and carries `title` +
+     `description` frontmatter, that the changelog was **upserted** (never prepended a duplicate
+     `## <VERSION>`), and that you neither reset nor force-pushed the branch.
 
 ## `Skills loaded:` return line
 
 Required on every return, per the handoff Return format
 (`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List exactly what "Required skills (load
 FIRST)" above named for your dispatch branch: the three always-on skills
-(`verification-before-completion`, `gh-cli`, `conventional-commit`), plus `writing-adrs`
-(unconditional) on an ADR return, or `writing-docs` on a docs-sync return **only when a narrative
-how-to draft was actually produced this dispatch** (the same condition that gates loading it,
-above) — plus any project-tech skill applicable to the task, or the literal `none` if none applied.
-An ADR return must NOT list `writing-docs`; a docs-sync return must NOT list `writing-adrs`.
+(`verification-before-completion`, `gh-cli`, `conventional-commit`), plus —
+
+- **ADR return:** `writing-adrs` (unconditional).
+- **docs-sync return:** `writing-docs` **only when a narrative how-to draft was actually produced
+  this dispatch** (the same condition that gates loading it, above).
+- **release Phase-1 return:** `writing-docs`, `conventional-commit`, `gh-cli`,
+  `verification-before-completion` — `writing-docs` is listed **unconditionally**, because a release
+  Phase 1 always loads it (the docs-sync "narrative draft produced" condition does **not** apply to a
+  release return).
+- **release Phase-2 return:** the three always-on skills only — **no `writing-docs`**, because
+  Phase 2 never drafts.
+
+— plus any project-tech skill applicable to the task, or the literal `none` if none applied. An ADR
+return must NOT list `writing-docs`; a docs-sync or release return must NOT list `writing-adrs`.
