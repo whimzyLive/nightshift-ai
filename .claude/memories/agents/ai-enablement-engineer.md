@@ -1,5 +1,55 @@
 # ai-enablement-engineer — memory
 
+## NA-51 — doc-type registry + docs-manifest scaffold (`plugins/sdlc/refs/doc-types.md`,
+
+`plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`)
+
+- **`prettier --write` silently treats any path outside the repo, or under a `.gitignore`d
+  directory (e.g. this repo's own `.tmp/`), as "ignored" and leaves it byte-for-byte unchanged —
+  `prettier --file-info <path>` reports `{"ignored": true, "inferredParser": null}` for both
+  cases with zero error output from `--write`.** This makes the established "verify in a scratch
+  copy, run `--write` twice, confirm idempotent" protocol from prior NA-25/NA-27/NA-43 memory
+  entries **silently useless** if the scratch copy lives outside the repo (e.g. this session's own
+  `/private/tmp/.../scratchpad`) or under `.tmp/` — every "STABLE" result from such a copy is a
+  false negative, not evidence of anything. The scratch-verification protocol only produces a real
+  signal when the copy sits at a real, non-ignored path inside the repo (a stray file directly
+  under `plugins/sdlc/refs/`, or the real target path itself with `git checkout --` as the
+  reset/undo mechanism instead of a tmp copy). Always confirm with
+  `prettier --file-info <path>` that `ignored: false` before trusting any stability result from
+  that path.
+- Discovered (via the above, once verification was redone against the real target path) that
+  `plugins/sdlc/commands/init.md`'s **pre-existing, already-committed** content is itself not
+  `prettier --write`-idempotent: a `git checkout --` fresh copy of `HEAD`, formatted with zero
+  edits of mine, still produces ~22 reformatting hunks (GFM table column-padding, `*em*` →
+  `_em_` conversion, and one genuine structural defect — the Step 0 "Refresh skills" numbered
+  sub-list, nested 4 levels deep inside an outer numbered list → bulleted option → nested numbered
+  "Steps:" list → wrapped continuation line, loses its list-ness and a code-like inline token gets
+  dedented to column 0 mid-item). This is **latent repo drift unrelated to this story** — proven by
+  reproducing it against an untouched `git checkout --` copy — not something my edits introduced.
+  Attempting to fix it (adding blank lines between the numbered items) only changed which pass it
+  broke on (pass 1 vs pass 2) and never reached a genuinely stable state, because the underlying
+  4-level nesting is what's fragile, not the blank-line spacing. Lesson: when a pre-commit
+  `prettier --write` hook is unavoidable (any edit to a file forces the WHOLE file through it), and
+  an unrelated pre-existing section of that file is already non-idempotent, don't spend the story's
+  time trying to fully stabilize content the story didn't ask you to touch — verify with a
+  `git checkout --` sanity check that the instability predates your edit, leave that section
+  byte-identical to `HEAD` (don't add a speculative "fix" that doesn't actually fix it), and confirm
+  instead that _your own_ new content (checked at a shallower nesting depth — a single bullet or a
+  single nested numbered list under a `##`/`###` heading, not 4 levels deep) formats cleanly and
+  stays coherent after the one prettier pass that will actually run at commit time.
+- The `plugins/sdlc/skills/skill-creator/scripts/quick_validate.py` script hard-requires a
+  `SKILL.md` file (prints `"SKILL.md not found"` and exits 0 for any other filename) — it cannot
+  validate a command file's frontmatter. For a story that only touches `commands/*.md` frontmatter,
+  the correct fallback (per this story's own plan) is `head -12 <file>` plus a manual check that the
+  `---`-delimited block still parses as a single-key `description` scalar — there is no other
+  bundled validator for command frontmatter in this plugin.
+- A markdown table's header row (`| type | quadrant | ... |`) is not stable to grep for by its raw
+  literal spacing once `prettier --write` has column-padded it — the padding pass inserts
+  variable-width spaces between the pipe and each header word. Match structurally instead
+  (`line.startswith("| type") and "quadrant" in line`), not by the exact original spacing, in any
+  script that locates a registry/manifest table programmatically (self-check scripts, CI lint, a
+  future `/sdlc:docs` generator reading `refs/doc-types.md`).
+
 ## NA-58 — QA fix round on commit 9786198 (`plugins/sdlc/skills/writing-docs`)
 
 - Wrote a skill description for `writing-docs` at 1162 chars without ever checking it against the
