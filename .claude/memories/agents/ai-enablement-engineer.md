@@ -26,15 +26,24 @@ by grepping the finished file for`§§15` alone: exactly one hit, at the correct
   whole file for the literal word "three" (or whatever cardinal the pre-change state used) before
   considering an Nth-branch addition complete, don't rely on the plan enumerating every site.
 - **`plugins/sdlc/.claude-plugin/plugin.json`'s "every commit shipping new content bumps the
-  version" convention (established in the NA-58 memory entry below) was silently NOT followed by
-  NA-53** (`git show <every NA-53 commit> --stat | grep plugin.json` → no hits across all of NA-53's
-  commits, despite NA-53 shipping a full new release-mode dispatch branch) — confirmed via
-  `git log -p --follow -- plugins/sdlc/.claude-plugin/plugin.json`, which shows the version frozen at
-  `0.36.0` since NA-52's last commit. Neither NA-54's plan nor spec calls for a version bump either.
-  Followed the more recent precedent (no bump) rather than resurrecting the older NA-58-era
-  convention unprompted, since bumping unilaterally when two sibling stories in the same epic didn't
-  would itself be an inconsistency — but this is worth a founder decision (resume the convention, or
-  formally drop it) rather than silently letting future agents guess which precedent wins.
+  version" convention (stated as a hard rule in this same file's NA-58 entry below: "every prior
+  commit shipping new content under `plugins/sdlc/` bumps `plugin.json`'s version in the same
+  commit … pinned consumers won't see the new skill or the agent's updated instructions otherwise")
+  was silently NOT followed by NA-53** (`git show <every NA-53 commit> --stat | grep plugin.json` →
+  no hits across all of NA-53's commits, despite NA-53 shipping a full new release-mode dispatch
+  branch) — confirmed via `git log -p --follow -- plugins/sdlc/.claude-plugin/plugin.json`, which
+  showed the version frozen at `0.36.0` since NA-52's last commit. **My first-round mistake:** I
+  read that unbumped gap as a "more recent precedent" and deliberately matched it (no bump for
+  NA-54 either), reasoning that resurrecting an unfollowed convention unilaterally would itself be
+  an inconsistency. **That reasoning was wrong** — a documented hard rule that one sibling story
+  silently skipped is a **known gap in that story**, not a new counter-rule superseding the
+  original. NA-54 ships a whole new `seed` mode (unambiguously new content, exactly the case the
+  rule was written for); a consumer pinned at `0.36.0` would silently never receive it. Fixed:
+  bumped `0.36.0` → `0.37.0` (minor — new backward-compatible feature) in the same PR round this
+  memory correction landed in. **Lesson for any future story that finds a documented hard rule
+  unfollowed by a recent sibling:** the rule wins; treat the sibling's gap as a defect to flag
+  (and, ideally, backfill), never as a new precedent to extend. Silently matching an unfollowed
+  rule compounds the drift instead of surfacing it.
 - The `tr '\n' ' ' | tr -s ' '` (flatten-and-squeeze) idiom the plan mandated for every prose-spanning
   verification grep held up in practice across all of Tasks 2/4/5 — every squeezed assertion matched
   on the first attempt; the plain `tr '\n' ' '` trap the plan warned about (indented continuation

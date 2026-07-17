@@ -18,8 +18,8 @@ scope note in the agent's First steps.
 
 ### Manifest gate (shared by sync, release, and seed)
 
-Both modes apply this identical gate at the **command layer**, before any dispatch — defined once
-here; `commands/docs.md` points at it rather than re-deriving it. Resolve
+All three modes apply this identical gate at the **command layer**, before any dispatch — defined
+once here; `commands/docs.md` points at it rather than re-deriving it. Resolve
 `.claude/project/docs-manifest.md` **checkout-independently** — never the working tree, so a stale
 local checkout never skews which rows are active — but only **after** the base ref itself is
 confirmed to resolve. A bare `git show origin/<BASE-BRANCH>:<path>` failure is otherwise ambiguous

@@ -138,14 +138,19 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    enumerating the valid set:
 
    ```text
-   unknown seed type "<type>" — valid types: concept, tutorial, integration-guide, how-to
+   unknown seed type "<type>" — valid types: <comma-separated resolved SEED_TYPES>
    (derived from the seed-triggered rows of refs/doc-types.md)
    ```
 
    `SEED_TYPES` is resolved **at read time** from `refs/doc-types.md`'s `trigger` cells, minus `adr`
    — see `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §15. The enumerated list in this message is
    **rendered from the resolved `SEED_TYPES`**, never typed as a literal — otherwise it becomes the
-   hardcoded copy the derivation rule exists to avoid.
+   hardcoded copy the derivation rule exists to avoid. **This file is `command-reference`
+   source-of-truth, published verbatim by `sync`** (`refs/doc-types.md`'s `command-reference` row),
+   so the placeholder above is deliberate, not merely illustrative — a literal value here would ship
+   stale reference copy the moment a registry `trigger` cell changes. As of this writing that
+   placeholder resolves to `concept, tutorial, integration-guide, how-to` (shown for the reader's
+   convenience only; never copy this list back into the template above).
 
 10. **`seed` `<topic>`, when supplied, is validated and normalised here — at the ladder, before any
     gate.** The slugify rule and its **three** reachable STOPs (empty / >80 chars / reserved page id)
@@ -426,9 +431,13 @@ After the phase-2 PR is raised, drive the review loop to convergence exactly as 
 If the harness cannot nest `/loop` from inside a command, fall back to `ScheduleWakeup` to drive
 `sdlc:loop`'s pass-cycle instead (same effect — the loop is the last thing the session does), then
 let its final pass release. If the command hit a terminal STOP, WARNING, or no-op before a PR was
-raised, release the session directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — see
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` for exactly which
-pre-PR exit paths this covers.
+raised, release the session directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — for
+exactly which pre-PR exit paths this covers, see the invoked mode's own control-flow tail:
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` for `sync`,
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow` for
+`release`, or `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#18-seed-mode--branch--pr--control-flow`
+for `seed` — each lists a different pre-PR exit set (`sync`'s WARNING/no-op pair is not `release`'s
+or `seed`'s no-op/STOP set).
 
 ## Error handling
 
@@ -456,7 +465,7 @@ pre-PR exit paths this covers.
 | Repo has no tags yet (full clone)                                                                               | Not an error — range is the **single-ended** `origin/<BASE-BRANCH>` (full history, root inclusive).                                                                                                                                                                                                                           |
 | **Shallow clone**                                                                                               | Surface and STOP (`run: git fetch --unshallow`) — caught by the **positive** `git rev-parse --is-shallow-repository` pre-check, because a shallow clone with unreachable tags emits the _identical_ `No names found` text as a genuine first release.                                                                         |
 | `git fetch` fails, or `origin/<BASE-BRANCH>` will not resolve                                                   | Surface and STOP — resolved **before the manifest gate** (never mistaken for "manifest absent") and again **before** `git describe` (never mistaken for "no tags yet").                                                                                                                                                       |
-| Manifest present but the `llms-txt` row is disabled or absent                                                   | Not an error — `llms.txt` is a `sync`-triggered row, not part of `ENABLED_ROWS`; `release` independently checks its enabled state and does not write or touch it this run if disabled/absent. Any existing `llms.txt` is left as-is.                                                                                          |
+| Manifest present but the `llms-txt` row is disabled or absent (`release` **or** `seed`)                         | Not an error — `llms.txt` is a `sync`-triggered row, never a member of `ENABLED_ROWS` or the row `seed` was invoked for; both modes independently check its enabled state and do not write or touch it this run if disabled/absent. Any existing `llms.txt` is left as-is.                                                    |
 | `git describe --tags` fails with anything other than `No names found`                                           | Surface and STOP. `No names found` is the **only** fallthrough text, trusted only because the shallow pre-check already ran. `No tags can describe` is deliberately **not** matched.                                                                                                                                          |
 | `git log` failure                                                                                               | Surface and STOP — never silently release an empty or partial range.                                                                                                                                                                                                                                                          |
 | A commit body mentions `BREAKING CHANGE:` in prose rather than as a footer                                      | **Not** breaking — the test is line-anchored (`^BREAKING[ -]CHANGE:`), never a substring search.                                                                                                                                                                                                                              |
@@ -487,7 +496,6 @@ pre-PR exit paths this covers.
 | Founder omits `source:` on a seeded `how-to` / `integration-guide`                                              | Not an error — the key is **omitted entirely** (never written empty). Per §5 the page is simply never auto-refreshed. `seed` never infers globs.                                                                                                                                                                              |
 | claude-mem tools unavailable                                                                                    | **Never a halt for `seed`** — phase 1 proceeds without corpus enrichment and says so at the gate. (Contrast `distill`, which halts: the corpus is `seed`'s enrichment but `distill`'s entire input.)                                                                                                                          |
 | `<type>` is `tutorial` and the corpus is available                                                              | Not consulted — `tutorial`'s registry `source-of-truth` is `founder-authored` only.                                                                                                                                                                                                                                           |
-| Manifest present but the `llms-txt` row is disabled or absent                                                   | Not an error — checked **independently** of the row `seed` was invoked for. Phase 2 does not write or touch `llms.txt` this run; any existing file is left exactly as-is.                                                                                                                                                     |
 | No section index page exists at `SEED_ROW`'s `target-path`                                                      | Not an error — `llms.txt` is the sole index; no separate section index is created. The existence test reads the **pre-write** tree, so a page this run wrote can never satisfy it.                                                                                                                                            |
 | Re-run: branch carries **out-of-pipeline** edits to generated pages (no trailer)                                | **STOP at step 5**, before the founder authors — surface the paths and the PR number. Never overwritten. The scanned path set is `PAGE` **plus** `llms.txt` (when enabled) **plus** any regenerated section index page.                                                                                                       |
 | A guard condition first becomes true **while the founder is authoring** (TOCTOU)                                | Phase 2 **MUST** re-check and STOP — but **MUST preserve the confirmed content** (session temp dir, path surfaced in the STOP), never discard it. The re-check is **mandatory, not optional**.                                                                                                                                |
