@@ -1,5 +1,64 @@
 # ai-enablement-engineer — memory
 
+## NA-62 — Prettier fixed-point gate for plugin docs, Phase A (`plugins/**/*.md` sweep + `check-plugin-docs-format.sh`)
+
+- **A single-write quad-fence delta triage (`before=grep -c…; write; after=grep -c…`) can classify a
+  file "benign" while it is actually a SECOND-write shatter — the exact same NA-56 landmine shape,
+  just one `--write` pass further downstream.** `plugins/sdlc/commands/plan.md` passed the plan's own
+  triage script clean (single write introduced no quad fence) and was bulk-written along with the
+  other 41 benign files. But the aggregate `prettier --check` run immediately afterward (Task 1 Step
+  4 — testing `format(current) == current`, i.e., genuinely a **second** write from the file's
+  post-sweep state) flagged it alone as still not a fixed point. A manual second `--write` on it
+  confirmed why: the first write had already re-fenced part of its `acli --body` block (indented
+  under a numbered list item 11, with an embedded blank line in the quoted body — same NA-56 shape as
+  `commands/spec.md`), producing an intermediate state that was itself unstable; the SECOND write is
+  what actually shattered it to quad backticks. **The plan's own explicit escape hatch fired
+  correctly** ("If SHATTER lists MORE than spec.md, STOP — hand each extra file to Task 2's manual
+  technique too") — the aggregate post-write `--check` step is what surfaced it, not the single-write
+  triage. Lesson: treat the plan's pre-triage as a snapshot, but trust the aggregate `--check` after
+  the bulk write as the real gate — if ANY file in the "benign" bulk-write set fails that aggregate
+  check, don't debug it as a fluke; assume it's a second-pass shatter of the same landmine shape and
+  revert + hand-fix it exactly like the plan's known shatter file, using the already-stable sibling
+  pattern elsewhere in the same plugin (`auto.md`/`impl.md`'s `acli --body` blocks: blank line before
+  a column-0 fence, fence + body at column 0, blank line after, list numbering continues normally)
+  as the reference fixed form rather than reinventing one.
+- **The plan's literal wrapper-script content (`shopt -s globstar nullglob; files=(plugins/**/_.md)`)
+fails outright on macOS's stock `/bin/bash`(3.2.57)** —`globstar`was introduced in bash 4.0, and
+Apple has shipped 3.2 (its last GPLv2 release) as the default`/bin/bash`for over a decade; both`bash script.sh`and`env bash`resolve to it here with no newer bash anywhere in`PATH`. Running
+the plan's script verbatim printed two `shopt: globstar: invalid shell option name`errors to
+stderr on every invocation — the gate still happened to exit correctly (prettier's own quoted glob
+did the real check regardless), but the fail-fast empty-glob guard itself was silently broken
+(falls through with`nullglob`never applied either, since bash aborts the whole`shopt -s a b`
+command on the first invalid name — verified by testing the guard against an empty-`.md`directory
+copy, which failed to fire before the fix and printed "FAILED — no ... files found" correctly
+after). Fixed by swapping to`find plugins -type f -name '_.md' | wc -l`for the empty-set count —
+no bash-version dependency, behavior otherwise identical. The sibling script`check-agent-skill-preloads.sh` never hit this because its own glob is single-level
+(`"$agents_dir"/_.md`, no `**`), so it only ever needed plain `nullglob`. **Any future
+  plugins/sdlc/scripts/_.sh script that needs a recursive glob should default to `find`, not
+  `shopt -s globstar`, unless bash>=4 on every target shell (including contributor macOS laptops) is
+  independently confirmed\*\* — a CI-only script would mask this, since GitHub's Ubuntu runners ship a
+  new-enough bash; the failure only surfaces locally, which is exactly where this agent's own
+  verification steps run.
+- Re-confirmed (again) the in-tree triage protocol (write real file → diff/grep → `git checkout --`
+  restore) from the NA-56 lesson: 43 files flagged today (spec cited 44 at spec-time — one drifted
+  out on this branch), 1 shatter reconfirmed on the plan's own pre-classified single-write pass
+  (`commands/spec.md`) plus the 1 second-pass shatter this round discovered (`commands/plan.md`) —
+  neither the plan's count nor its triage method is a ceiling; both explicitly say so and both were
+  exercised for real this round, not just as a hypothetical caveat.
+- Confirmed the RTK-masking lesson does NOT extend to script-internal `pnpm exec prettier` calls
+  (only interactive shell commands typed directly appear to be rewritten by the RTK hook) — invoking
+  `check-plugin-docs-format.sh` directly via `bash` produced prettier's real native
+  `[warn] <file>` / `Checking formatting...` output on both the clean-pass and the corrupted-probe
+  runs, not RTK's generic "All files formatted correctly" mask. Still used the raw
+  `./node_modules/.bin/prettier` binary for all direct ad-hoc verification commands per the standing
+  rule; only the wrapper script's own internal `pnpm exec` call was left as specified (CI has no RTK
+  either way).
+- The pre-commit hook (lint-staged) itself runs `prettier --write --ignore-unknown` on every staged
+  file at commit time — this is the exact re-write-on-commit mechanism the whole NA-62 story defends
+  against, so it is not safe to assume a clean pre-commit-hook exit means nothing regressed; verified
+  after each of this story's 3 commits that the full-tree `--check` was still green and the
+  quad-backtick census was still exactly 4 post-commit, not just pre-commit.
+
 ## NA-61 — PR #129 review round: unfilled `TODO —` placeholder defeated the skip-and-surface net (`plugins/sdlc/skills/writing-docs/SKILL.md`, `plugins/sdlc/refs/docs-pipeline.md`)
 
 - **A "presence-only" guard and a "the field is now guaranteed present" story combine into a
