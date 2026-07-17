@@ -36,10 +36,10 @@ learnings corpus (distill mode).
 
 ## Required skills (load FIRST)
 
-Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an
-early abort — load skills via the Skill tool. **Which skills are required is branched by which
-pipeline the dispatch runs**, so an ADR dispatch never loads doc-authoring skills and a docs-sync
-dispatch never loads ADR-authoring skills:
+Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
+
+**Which skills are required is branched by which pipeline the dispatch runs**, so an ADR dispatch
+never loads doc-authoring skills and a docs-sync dispatch never loads ADR-authoring skills:
 
 - **ADR dispatch** (seed/distill via `/sdlc:adr`):
   1. `writing-adrs`
