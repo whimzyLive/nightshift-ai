@@ -64,7 +64,9 @@ loads doc-authoring skills and a docs dispatch never loads ADR-authoring skills:
   only what the founder already confirmed, per docs-pipeline.md §2), so it never needs
   `writing-docs`; a Phase 1 run that resolves zero affected `how-to` rows doesn't either — loading
   it unconditionally on every docs-sync dispatch would burn context on a skill most dispatches
-  never use.
+  never use. (This condition is identical on the post-QA inline variant — `writing-docs` loads only
+  when the variant's story-branch diff affects a `how-to` row; the three always-on skills always
+  load.)
 - **release dispatch** (via `/sdlc:docs release`): also load `writing-docs`, **unconditionally in
   Phase 1**. **Do NOT inherit the docs-sync bullet's condition above** — that condition is
   sync-scoped: it keys on `sync`-triggered `how-to` row affectedness, which a release run never
@@ -214,16 +216,31 @@ You run in one of two dispatch phases per invocation:
 
 You run in one of two dispatch phases per invocation:
 
-- **Phase 1 (compute & draft, writes nothing)** — resolve the manifest, resolve the story branch,
-  compute `CHANGED_FILES` + `CHANGED_DIFF`, resolve affected rows, produce deterministic regen
-  content for the `auto` rows + `llms.txt`, draft narrative how-to refreshes via `writing-docs`,
-  and return the regen summary, the deterministic content, and the narrative drafts to the command
-  layer.
+- **Phase 1 (compute & draft, writes nothing)** — the command layer hands you either the story
+  branch (the common case — you compute `CHANGED_FILES`/`CHANGED_DIFF` yourself) **or**, on the
+  merged-commit path (story branch absent), a precomputed `CHANGED_FILES`/`CHANGED_DIFF` pair plus
+  `REGEN_TREE_REF` — use whichever you're handed **verbatim** (`refs/docs-pipeline.md` §2 steps 2–3;
+  never re-derive one from the other). Resolve the manifest, resolve affected rows, produce
+  deterministic regen content for the `auto` rows + `llms.txt` (reading source content from
+  `REGEN_TREE_REF`), draft narrative how-to refreshes via `writing-docs`, and return the regen
+  summary, the deterministic content, and the narrative drafts to the command layer.
 - **Phase 2 (write confirmed, fresh dispatch)** — a fresh dispatch with no memory of phase 1 or the
   gate: the command hands you the deterministic content and the founder-confirmed narrative drafts
   **verbatim** (inline or via `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` temp files by path). Check
-  out the branch cut from the story branch head, write everything, then commit/push/open-or-update
-  the PR — but only if content changed (AC6).
+  out the branch cut from `REGEN_TREE_REF` (the story branch head when present, or
+  `origin/<BASE-BRANCH>` on the merged-commit path — `refs/docs-pipeline.md` §2 step 8), write
+  everything, then commit/push/open-or-update the PR — but only if content changed (AC6).
+- **Post-QA inline variant (dispatched by the Principal Engineer playbook Step 6.5, via `/impl` /
+  `/auto`)** — a **single** dispatch, no phase-1/phase-2 split and **no** founder-confirm gate
+  (`refs/docs-pipeline.md` §25). The orchestrator hands you the live `$WORKTREE` (already checked out
+  at `<BRANCH_PREFIX>/<STORY-KEY>`), `$NX_CACHE_DIRECTORY`, the story key, and the
+  **story-branch-vs-base** diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>`, §26).
+  You do **not** check out or cut any branch. In one pass you compute **and** write the deterministic
+  regen for the `auto` rows + `llms.txt` **and** the narrative how-to refreshes (un-gated — the impl
+  PR is the review). You **commit** the docs changes via `conventional-commit` onto the story branch
+  and return — you **never push, never open or update a PR** (the orchestrator pushes; Step 7 folds
+  your commit into the impl PR). Honour the change-gate exactly as §6: if `git status --porcelain` on
+  the written target paths is empty, make **no** commit and return cleanly.
 
 ### release dispatch — in summary
 
@@ -315,6 +332,15 @@ restatement: it names only the two things that are genuinely dispatch-specific h
    §7's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
    paths is non-empty (AC6); if it's empty, skip commit/push/PR entirely (clean no-op) and still
    append any memory learning from this dispatch.
+
+**Post-QA inline variant (§25) — override.** On this variant the §7 branch/reset/PR mechanics do
+**not** apply: you write in the handed `$WORKTREE` on `<BRANCH_PREFIX>/<STORY-KEY>` (no
+`docs/sync-<KEY>` branch, no checkout, no reset/force-with-lease), commit the deterministic regen +
+`llms.txt` + confirmed-less narrative drafts under their manifest-resolved `target-path`s via
+`conventional-commit`, append any learning to `.claude/memories/agents/knowledge-engineer.md`, and
+**return** — the orchestrator pushes and the impl PR (Step 7) carries the commit. **Never push,
+never raise or update a PR** on this variant. If the change-gate leaves nothing to commit, return
+cleanly with no commit. Your `Skills loaded:` return follows the docs-sync rule below.
 
 ### release dispatch — branch, memory, commit, return
 
@@ -432,7 +458,9 @@ FIRST)" above named for your dispatch branch: the three always-on skills
 
 - **ADR return:** `writing-adrs` (unconditional).
 - **docs-sync return:** `writing-docs` **only when a narrative how-to draft was actually produced
-  this dispatch** (the same condition that gates loading it, above).
+  this dispatch** (the same condition that gates loading it, above). The same rule applies to the
+  post-QA inline variant: list `writing-docs` only if a how-to draft was actually produced this
+  pass; otherwise the three always-on skills only.
 - **release Phase-1 return:** `writing-docs`, `conventional-commit`, `gh-cli`,
   `verification-before-completion` — `writing-docs` is listed **unconditionally**, because a release
   Phase 1 always loads it (the docs-sync "narrative draft produced" condition does **not** apply to a

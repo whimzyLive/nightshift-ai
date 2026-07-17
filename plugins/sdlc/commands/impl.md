@@ -57,8 +57,11 @@ the Principal Engineer role directly.
    harness isolation) → per-phase push/verify (with a machine-checked primary-checkout guard) →
    **hand off to the QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`, run
    inline: code-review loop until clean → memory writes → quality gate → AC/plan verification) →
-   PR on a `clean` QA verdict, then tear down the worktree. Dispatch domain agents and the QA loop
-   with the `Agent` tool from THIS session. Capture the PR URL it produces as `IMPL_PR_URL`.
+   **post-QA docs sync** (playbook Step 6.5 — on a `clean` verdict, before the PR: regenerates the
+   manifest-activated docs on the story branch so they fold into the same PR; a docs-content failure
+   WARNs and does not block, a workspace-integrity failure STOPs) → PR on a `clean` QA verdict, then
+   tear down the worktree. Dispatch domain agents and the QA loop with the `Agent` tool from THIS
+   session. Capture the PR URL it produces as `IMPL_PR_URL`.
 5. When the playbook completes, comment the PR on the story (use the real captured URL — a full
    `https://github.com/...`, never a placeholder):
 

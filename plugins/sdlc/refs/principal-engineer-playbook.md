@@ -478,6 +478,58 @@ Status: clean | blocked
   pasted), and confirmed every AC is evidenced — do not repeat that work; carry QA's verdict
   fields into your final report.
 
+## Step 6.5 — Post-QA docs sync (on a clean QA verdict, before the PR)
+
+Reached **only** after Step 6 returns `Status: clean` (a `Status: blocked` QA verdict already STOPped
+the run at Step 6 — Step 6.5 never runs; AC5). The story branch `<BRANCH_PREFIX>/<STORY-KEY>` is
+pushed and **unmerged**, and its `$WORKTREE` is still provisioned (teardown is Step 7), so the docs
+commit lands on the branch **before** the PR opens — folding into the same impl PR (AC2). This wires
+the existing `sync` in via its **inline post-QA dispatch variant**
+(`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §25); the diff source is **story-branch-vs-base**
+(§26), passed explicitly.
+
+**Manifest gate (AC4).** Resolve `.claude/project/docs-manifest.md` checkout-independently
+(`git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md`). If **absent** → **clean no-op**:
+do not dispatch, no warning, no report line — the repo opted out of docs. Proceed to Step 7
+unchanged. This is a no-op, **not** a failure.
+
+**Primary-checkout guard — reuse Step 5's machine check verbatim.** Before dispatching, snapshot the
+primary checkout (`PRIMARY_HEAD` + `PRIMARY_CLEAN_BEFORE`, exactly as Step 5). Dispatch the
+`knowledge-engineer` post-QA variant, handing it — like every Step 4 / QA-Step-3 dispatch — the live
+`$WORKTREE` (at `<BRANCH_PREFIX>/<STORY-KEY>`), `$NX_CACHE_DIRECTORY`, the story key, and the
+story-branch-vs-base diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>`). The agent
+**commits only** (no push, no PR); **you** push from `$WORKTREE` and re-run Step 5's assertions.
+
+Classify the outcome into **exactly four** buckets (do not collapse them):
+
+| Outcome at Step 6.5                                                                                                                                                                                                              | Class                         | Behaviour                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/project/docs-manifest.md` **absent**                                                                                                                                                                                    | **no-op (AC4)**               | No dispatch. Proceed to Step 7 unchanged. No warning, no report line.                                                                                                                                                                               |
+| Manifest present; regen byte-identical **and** no `how-to` affected (change-gate, §6)                                                                                                                                            | **no-op**                     | Agent makes no commit (`git status --porcelain` empty on written paths). Proceed to Step 7. Step 8 report notes `Docs sync: no changes`. Not a failure.                                                                                             |
+| Manifest present; **docs-content failure** — regen error, docs-commit push failure, or the agent returns `Status: blocked`                                                                                                       | **failure (loud, non-block)** | **WARN, do not block.** Emit a distinct `WARNING: post-QA docs sync failed …`. **Still proceed to Step 7 and open the impl PR** (without the docs commit). The Step 8 report carries a `Docs sync:` line naming the failure + the recovery pointer. |
+| **Workspace-integrity failure** — the dispatch moved the **primary checkout's HEAD**, or its `git status --porcelain` no longer matches the pre-dispatch snapshot, or `$WORKTREE` is left with stray uncommitted/untracked files | **failure (hard STOP)**       | **STOP the run**, same shape as Step 5's guard. Do **not** open the impl PR while the primary checkout is corrupted, or while `$WORKTREE` carries an unattributable stray. Surface the exact violation.                                             |
+
+**Why the split (state it inline so a later edit does not blanket-downgrade or blanket-STOP):**
+
+- A **docs-content** miss is **recoverable by construction** — the code branch is untouched and
+  `/sdlc:docs sync <STORY-KEY>` (now backed by the merged-commit source this story adds, §26)
+  regenerates the docs after merge. Blocking a QA-clean, about-to-ship implementation PR over a docs
+  regeneration hiccup would invert the story's value. Loud-but-non-blocking + a working recovery path
+  is the balance.
+- A **workspace-integrity** failure is **not** recoverable-by-construction — a mutated/dirty primary
+  checkout or a stray commit on the wrong branch outlives this run and breaks the next branch
+  operation / the next epic child. The recovery argument that justifies the docs-content WARN does
+  **not** exist here, so it must not be stretched to cover it. The primary-checkout guard stays a
+  **STOP**, identical to Step 5.
+
+**`Status: blocked` from the post-QA `knowledge-engineer` dispatch is a docs-content WARNING here —
+NOT a run STOP.** This is the **one** place an in-playbook agent `blocked` does not halt the run
+(contrast Step 5 / Step 6, where `blocked` = STOP). A primary-checkout violation is detected by the
+machine guard **independently of the agent's returned `Status`** and still STOPs.
+
+Then proceed to Step 7 (unless a workspace-integrity STOP fired). The docs commit, when made, is the
+last commit before the PR opens.
+
 ## Step 7 — Create the PR (only after QA returns `clean`)
 
 Only after Step 6 returns `Status: clean`:
@@ -532,13 +584,17 @@ before dispatching its next fix agent.
 
 ## Step 8 — Final report (to the caller / user)
 
-Carry the QA verdict fields (Step 6) into the report — do not re-derive them.
+Carry the QA verdict fields (Step 6) into the report — do not re-derive them. The `Docs sync:` line
+reports Step 6.5's outcome: `no changes` / `committed` on the two no-op-or-success paths, the
+`WARN … recover with /sdlc:docs sync <STORY-KEY>` wording on a docs-content failure, and
+`skipped (no docs manifest)` when the manifest was absent.
 
 ```
 ## <Feature|Fix>: <name>  (Branch: <BRANCH_PREFIX>/<STORY-KEY>)   # "Fix" on the defect path, "Feature" otherwise
 ### Phases: <agents that ran + one-line summaries>
 ### QA: rounds <N>; fixed <Critical/Important list>; minor noted <list>; ACs <met — all N evidenced>
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
+### Docs sync: <no changes | committed on the branch | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
 ### Status: all phases complete, QA verdict clean, gate passed, PR ready.
 ```

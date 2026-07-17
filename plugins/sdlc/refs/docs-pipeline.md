@@ -2,8 +2,8 @@
 
 Shared resolve → diff → regen → draft → founder-confirm → write → commit/PR protocol for
 `/sdlc:docs sync` (§§2–8), `/sdlc:docs release` (§§10–14), `/sdlc:docs seed` (§§15–19), and
-`/sdlc:docs audit` (§§20–24), referenced by both `agents/knowledge-engineer.md` and `commands/docs.md`
-so the
+`/sdlc:docs audit` (§§20–24); the post-QA inline-sync wiring (the variant + dual diff source) lives
+in §§25–26. Referenced by both `agents/knowledge-engineer.md` and `commands/docs.md` so the
 contract lives in exactly one place. Neither file re-inlines this logic — both summarize and link
 back here. Mirrors `refs/adr-pipeline.md`'s shape (copy the skeleton; do not abstract a shared ref
 between the two — same "copy the shape, do not generalize" rule `doc-types.md` and Epic NA-50 both
@@ -58,18 +58,33 @@ same split `refs/adr-pipeline.md` §2 and `/sdlc:analyze`'s scan-then-apply flow
 
 1. Resolve `.claude/project/docs-manifest.md`. (The command layer already gated on its presence
    before dispatching — see §6 — so phase 1 always has a manifest to read.)
-2. Resolve `STORY_BRANCH` — `git fetch origin --quiet`, then `origin/feat/<STORY-KEY>` preferred,
-   `origin/fix/<STORY-KEY>` fallback. (The command layer already resolved this before dispatching —
-   see §7 — so phase 1 receives `STORY_BRANCH` as an input, it does not re-resolve it.)
-3. Compute `CHANGED_FILES` (`git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH"`) and
-   `CHANGED_DIFF` (`git diff "origin/<BASE-BRANCH>...$STORY_BRANCH"`) — both from the same
-   three-dot range, against the **remote-tracking** base ref (see §7) — never the bare local
-   `<BASE-BRANCH>`, whose local checkout may be stale relative to `origin`.
+2. **Resolve the diff source and `REGEN_TREE_REF`.** The command layer resolves
+   [§26's selection rule](#26-dual-diff-source--selection-rule) **before** dispatching and hands
+   phase 1 exactly one of the following two shapes — phase 1 never re-runs the selection itself:
+   - **`STORY_BRANCH` resolved** (the common case, including every post-QA dispatch — §25) — the
+     command layer passes `STORY_BRANCH` (`git fetch origin --quiet`, then
+     `origin/feat/<STORY-KEY>` preferred, `origin/fix/<STORY-KEY>` fallback, per §7); phase 1 does
+     **not** re-resolve it. `REGEN_TREE_REF` = `$STORY_BRANCH`.
+   - **`STORY_BRANCH` absent — merged-commit source selected** (§26, standalone `sync` only) — the
+     command layer instead passes phase 1 **precomputed** `CHANGED_FILES` / `CHANGED_DIFF` (already
+     derived from the merged commit(s)' `<sha>^..<sha>` range, or the union across matches, per §26)
+     and `REGEN_TREE_REF` = `origin/<BASE-BRANCH>` — post-merge, base HEAD already contains the
+     landed commit(s), so it is both the tree the deterministic regen reads from (step 5) and the
+     tree Phase 2 checks out from (step 8). `STORY_BRANCH` stays empty in this shape.
+3. **`CHANGED_FILES` / `CHANGED_DIFF`.**
+   - **Precomputed values were passed** (previous step, merged-commit shape) → use them
+     **verbatim**; do **not** recompute — there is no `$STORY_BRANCH` to diff against.
+   - **Otherwise** (the common `STORY_BRANCH`-present shape) → compute
+     `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and
+     `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")` — both from the same
+     three-dot range, against the **remote-tracking** base ref (see §7) — never the bare local
+     `<BASE-BRANCH>`, whose local checkout may be stale relative to `origin`.
 4. Resolve affected rows against the [source-of-truth map](#3-deterministic-regen-algorithm) — for
    each **enabled** manifest row whose registry `trigger` contains `sync`, determine whether it is
    affected per its keying kind (path / content / always).
-5. For each affected `auto` row, produce the deterministic regen content (see §3). `llms-txt`
-   regenerates every run (AC4).
+5. For each affected `auto` row, produce the deterministic regen content (see §3), reading each
+   file's current content from `REGEN_TREE_REF` (step 2 — `git show $REGEN_TREE_REF:<path>` per
+   file, no full checkout needed in phase 1). `llms-txt` regenerates every run (AC4).
 6. For each affected `how-to` row, draft a refresh of the how-to page(s) whose `source:`
    frontmatter intersects `CHANGED_FILES` (see §5), using the `writing-docs` skill.
 7. Return to the command layer: the deterministic regen summary + content, the `llms.txt` content,
@@ -91,8 +106,9 @@ narrative drafts **verbatim** (including any founder edits), inline in the dispa
 session temp-dir files passed by path (per `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh`, the same
 pattern `refs/adr-pipeline.md` §2 uses). Phase 2 writes what the founder saw; it never re-drafts.
 
-8. Check out a branch cut from the **story branch head** (`$STORY_BRANCH`, not `<BASE-BRANCH>` —
-   see §7) — the tree must contain the changed source the regen read.
+8. Check out a branch cut from **`REGEN_TREE_REF`** (step 2 — the **story branch head**
+   `$STORY_BRANCH` when present, or `origin/<BASE-BRANCH>` on the merged-commit path; never the
+   bare local `<BASE-BRANCH>` — see §7) — the tree must contain the changed source the regen read.
 9. Write the deterministic regen content, the regenerated `llms.txt`, and the founder-confirmed
    narrative drafts, each under its manifest-resolved `target-path`.
 10. If `git status --porcelain` on the written target paths is **empty** (deterministic output was
@@ -179,10 +195,13 @@ inconsistently between this ref and the how-to template it governs:
   — the command layer never dispatches `knowledge-engineer` when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks — phase 1 is never invoked in this case.
-- **Story-branch-missing WARNING, never a silent success.** If neither `origin/feat/<STORY-KEY>`
-  nor `origin/fix/<STORY-KEY>` exists, the command layer emits the explicit WARNING (see
-  `commands/docs.md`) and exits — never a silent clean exit that could read as "docs already
-  current." v1 sync is branch-diff-only; post-merge sync is deferred to NA-56.
+- **Story-branch-missing → merged-commit source, never a silent success.** If neither
+  `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists, standalone `sync` selects the
+  **merged-commit** diff source ([§26](#26-dual-diff-source--selection-rule)) — it locates the
+  landed commit(s) for `<STORY-KEY>` on `origin/<BASE-BRANCH>` and diffs the merged range. A genuine
+  zero-match STOPs with an explicit error (§26); it is never a silent clean exit that reads as "docs
+  already current." The post-QA phase (§25) never hits this branch — its story branch is always
+  present.
 - **Commit/PR only on actual content change (AC6).** Phase 2 step 10 (§2) is the single point that
   decides this: an empty `git status --porcelain` on the written target paths means no commit, no
   PR — a clean, deterministic re-run is a no-op by construction.
@@ -193,16 +212,16 @@ inconsistently between this ref and the how-to template it governs:
 
 ## 7. Branch / PR naming + control flow
 
-| Item              | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Branch            | `docs/sync-<STORY-KEY>`, cut from the **story branch head** (`origin/feat/<STORY-KEY>`, fallback `origin/fix/<STORY-KEY>`) — **not** `<BASE-BRANCH>`. The story branch carries the changed source the deterministic regen must read; branching off base would regenerate from a tree missing those changes.                                                                                                                                                                                                                    |
-| Commit            | `docs(docs): sync <STORY-KEY> reference docs` (via `conventional-commit`)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| PR title          | `docs(docs): sync <STORY-KEY>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| PR base           | `<BASE-BRANCH>` from project-context (never assume `main`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Diff source (v1)  | `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")`, both from the same `origin/<BASE-BRANCH>...$STORY_BRANCH` three-dot range, against the **remote-tracking** base ref (checkout-independent — a stale local base never skews the diff), after `git fetch origin --quiet`. Dual diff-source selection (story-branch-vs-develop **vs** merged-commit) is out of scope — deferred to NA-56.                                   |
-| First-run PR      | Create the branch, commit, push, open the PR (`gh pr create`) against `<BASE-BRANCH>`.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Re-run behaviour  | **Open or update** (AC6): before creating, check whether `docs/sync-<STORY-KEY>` already exists on `origin` (`git rev-parse --verify origin/docs/sync-<STORY-KEY>` / `gh pr list --head docs/sync-<STORY-KEY>`). If it does → check it out, **`git reset --hard` onto the freshly regenerated state** (the branch content is fully derived, so a hard reset is safe and keeps history clean), then **`git push --force-with-lease`** to update the existing open PR — never open a duplicate PR.                               |
-| Control-flow tail | Mirror `commands/adr.md`: after the PR is raised, drive the review loop to convergence via `/loop /sdlc:loop <PR_URL>` (falling back to `ScheduleWakeup` if the harness cannot nest `/loop`). If the run ended **before** any PR, release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — this covers the manifest-absent silent no-op, the story-branch-missing WARNING, a usage STOP, and a clean "nothing changed" no-op alike (all four release without a PR; only the manifest-absent path is silent). |
+| Item              | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch            | `docs/sync-<STORY-KEY>`, cut from `REGEN_TREE_REF` (§2 step 2) — the **story branch head** (`origin/feat/<STORY-KEY>`, fallback `origin/fix/<STORY-KEY>`) when present, or `origin/<BASE-BRANCH>` on the **merged-commit** path (§26, story branch absent) — never a bare local branch. `REGEN_TREE_REF` carries the changed source the deterministic regen must read; branching off a tree missing those changes would regenerate stale content.                                                                                                                                                                                                                                                                |
+| Commit            | `docs(docs): sync <STORY-KEY> reference docs` (via `conventional-commit`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| PR title          | `docs(docs): sync <STORY-KEY>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| PR base           | `<BASE-BRANCH>` from project-context (never assume `main`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Diff source       | Two sources, selected per [§26](#26-dual-diff-source--selection-rule) — **story-branch-vs-base**: `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")`, both from the same three-dot range, against the **remote-tracking** base ref (checkout-independent — a stale local base never skews the diff), after `git fetch origin --quiet`; or **merged-commit** (§26) when the story branch is absent. Standalone `sync` selects whichever §26 resolves; the post-QA phase (§25) always passes story-branch-vs-base explicitly.                                                                                    |
+| First-run PR      | Create the branch, commit, push, open the PR (`gh pr create`) against `<BASE-BRANCH>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Re-run behaviour  | **Open or update** (AC6): before creating, check whether `docs/sync-<STORY-KEY>` already exists on `origin` (`git rev-parse --verify origin/docs/sync-<STORY-KEY>` / `gh pr list --head docs/sync-<STORY-KEY>`). If it does → check it out, **`git reset --hard` onto the freshly regenerated state** (the branch content is fully derived, so a hard reset is safe and keeps history clean), then **`git push --force-with-lease`** to update the existing open PR — never open a duplicate PR.                                                                                                                                                                                                                 |
+| Control-flow tail | Mirror `commands/adr.md`: after the PR is raised, drive the review loop to convergence via `/loop /sdlc:loop <PR_URL>` (falling back to `ScheduleWakeup` if the harness cannot nest `/loop`). If the run ended **before** any PR — the manifest-absent silent no-op, a usage STOP, the merged-commit **zero-match STOP** (§26 — the story branch is absent **and** no landed commit carries the key), or a clean "nothing changed" no-op — release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh`; only the manifest-absent path is silent. A **merged-commit match** (§26) regenerates and proceeds to a PR like the story-branch-present case — it is no longer a release-without-a-PR path. |
 
 ## 8. llms.txt format (v1 decision)
 
@@ -1292,3 +1311,94 @@ does NOT add one**, because it would flag nearly every existing narrative page (
 defect, not per-page drift). A follow-up story (NA-61) adds `description:` (and an ADR-reference key)
 to the templates at source; `audit` adopts skip-and-surface and does not teach itself to flag a gap
 the templates guarantee.
+
+## 25. Post-QA inline dispatch variant
+
+`sync` composes into a run that **already owns** a story branch + one PR — the Principal Engineer
+playbook's **Step 6.5**, fired after QA returns `clean` and before the PR is opened. Standalone
+`sync` (§7) is **wrong** for that context: it cuts its own `docs/sync-<KEY>` branch, runs a
+founder-confirm gate, and raises its own PR. This **inline post-QA variant** keeps the regen but
+strips the standalone control flow. Its **four** divergences from standalone `sync`, each with the
+reason it exists:
+
+1. **No `docs/sync-<KEY>` branch — writes on the story branch in `$WORKTREE`.** The orchestrator
+   hands the agent the live `$WORKTREE` (checked out at `<BRANCH_PREFIX>/<STORY-KEY>`) and
+   `$NX_CACHE_DIRECTORY`, exactly as Step 4 / QA-Step-3 domain dispatches do. The agent does **not**
+   check out or cut any branch. _Reason:_ docs must land on the impl branch (AC2); a separate branch
+   would need a separate PR.
+2. **Single dispatch, no founder-confirm gate.** The two-phase compute→gate→write split (§2) exists
+   only to host the founder-confirm gate across a dispatch boundary. AC2 removes that gate — PR
+   review is the sign-off — so the variant is a **single dispatch** that computes **and** writes the
+   deterministic regen + `llms.txt` **and** the narrative how-to refreshes in one pass. The how-to
+   drafts are written un-gated and reviewed in the impl PR. _Reason:_ a dispatched subagent cannot
+   pause for interactive input; with the gate removed there is nothing to split across, and the
+   human review moves to the PR.
+3. **Commit-only; the orchestrator pushes.** The agent commits the docs changes via
+   `conventional-commit` onto `<BRANCH_PREFIX>/<STORY-KEY>` and returns; the orchestrator pushes and
+   runs the same push / primary-checkout guard as playbook Step 5. _Reason:_ matches the
+   `domain-agent-handoff.md` "agent commits, orchestrator pushes" contract every in-playbook
+   dispatch obeys — the agent's self-raise-PR behaviour applies only to **standalone**
+   `/sdlc:docs`/`/sdlc:adr`.
+4. **Raises no PR.** Step 7 folds the docs commit into the impl PR. _Reason:_ AC2.
+
+**Diff source handed in, not resolved here.** The playbook passes the **story-branch-vs-base** source
+explicitly — `origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>` (§26) — because at Step 6.5 the
+branch always exists. The variant never runs §26's merged-commit selection.
+
+**Everything else is §§1–6, verbatim.** The deterministic regen algorithm (§3), the `source:` how-to
+convention (§5), the affected-row resolution (§3), the manifest gate (§1), and the change-gate
+(commit only if `git status --porcelain` on the written target paths is non-empty, §6) are
+**unchanged** — the variant reuses them and never restates them. A no-source-change re-run commits
+nothing. The failure classification (which failures WARN vs STOP) is a **playbook-layer** decision —
+see `refs/principal-engineer-playbook.md` Step 6.5; this ref defines only the dispatch shape.
+
+## 26. Dual diff source + selection rule
+
+`sync` derives `CHANGED_FILES` / `CHANGED_DIFF` from one of **two** sources, so it works both before
+and after the story branch merges:
+
+| Diff source                                | `CHANGED_FILES` / `CHANGED_DIFF` derivation                                                                                               | Used when                                                                                                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **story-branch-vs-base** (existing, NA-52) | `git diff [--name-only] "origin/<BASE-BRANCH>...$STORY_BRANCH"` — three-dot range, remote-tracking base, after `git fetch origin --quiet` | The story branch **exists on origin** (`origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>`). The **post-QA phase (§25) always selects this** — the branch is present and unmerged. |
+| **merged-commit** (NEW, this story)        | Locate the commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>`, then `git diff [--name-only] "<sha>^..<sha>"` (see below)          | The story branch is **absent on origin** — a post-merge (squash-merged, branch deleted) or never-branched standalone `sync`.                                                         |
+
+### Selection rule (deterministic, no ambient input)
+
+1. Resolve `STORY_BRANCH` (§2 step 2 / `commands/docs.md` step 2): `origin/feat/<STORY-KEY>`
+   preferred, `origin/fix/<STORY-KEY>` fallback.
+2. **`STORY_BRANCH` resolved** → **story-branch-vs-base** source (unchanged v1 behaviour).
+3. **Neither branch exists on origin** → **merged-commit** source (this replaces the former
+   WARNING-and-exit stub).
+
+The **post-QA phase (§25)** never reaches step 3 — it passes story-branch-vs-base explicitly.
+
+### Merged-commit source — precise definition
+
+The story branch is gone, so the diff comes from the landed commit(s) on base:
+
+1. **Locate** the commit(s) on `origin/<BASE-BRANCH>` whose subject **or** body carries
+   `<STORY-KEY>`, using the **`PROJECT_KEYS`-scoped alternation regex** from
+   [§10's Story-key extraction](#story-key-extraction) (`\b(?:KEY1|KEY2|…)-[0-9]+\b`) — **never** the
+   loose `[A-Z][A-Z0-9]*-[0-9]+` matcher (it false-positives on `UTF-8`, `SHA-1`, per §10). Scan
+   `git log origin/<BASE-BRANCH>` after `git fetch origin --quiet`.
+2. **Diff derivation.** This repo squash-merges (`gh pr merge --squash`), so a story lands as a
+   **single** commit with **one** parent: `CHANGED_FILES=$(git diff --name-only "<sha>^..<sha>")`,
+   `CHANGED_DIFF=$(git diff "<sha>^..<sha>")`. For a true merge commit (two parents) use the
+   first-parent form `"<sha>^1..<sha>"`.
+3. **Zero commits match** `<STORY-KEY>` on base → **STOP with an explicit error**
+   (`cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`),
+   never a silent no-op. "The branch is gone AND no landed commit references the key" is a real
+   failure and must be visible, not collapsed into the benign "docs already current" path.
+4. **Multiple commits match** (the story landed across several merges — e.g. a follow-up fix) → diff
+   the **union** of each matching commit's `<sha>^..<sha>` file/hunk set, mirroring §10's
+   "de-duplicated union across records".
+
+`git fetch` failure, or an unresolvable `origin/<BASE-BRANCH>`, is a **STOP** on this path — exactly
+as the shared manifest gate (§1's base-ref pre-check) already requires; never a fallthrough to
+"no diff".
+
+> **Underspecified — decision recorded (Open Question #1, adopted).** The spec flags the
+> multiple-merged-commits case as the one genuinely ambiguous sub-point. The adopted default (above)
+> is the **union** of each matching commit's `<sha>^..<sha>` set, mirroring §10's union discipline —
+> deterministic and complete. The alternative (most-recent commit only) risks missing files an
+> earlier commit changed. If a reviewer prefers most-recent-only, change §26 step 4 and note it.

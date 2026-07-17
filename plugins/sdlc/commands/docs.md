@@ -204,18 +204,36 @@ dispatched at all.
    done
    ```
 
-   - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → emit the explicit
-     WARNING (never a silent clean exit that reads as success):
-     `WARNING: no story branch (feat|fix)/<STORY-KEY> found on origin. v1 sync is branch-diff-only; post-merge sync (diffing the merged commit range) is deferred to NA-56. Nothing regenerated.`
-     — then exit. Do not dispatch `knowledge-engineer` in this case.
+   - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → select the
+     **merged-commit** diff source per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#26-dual-diff-source--selection-rule`: locate the
+     commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>` (the `PROJECT_KEYS`-scoped regex from
+     §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
+     (`<sha>^..<sha>`, or the union across matches). **Zero commits carry the key** → STOP with
+     `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`
+     (never a silent no-op). `git fetch` failure / unresolvable `origin/<BASE-BRANCH>` → STOP.
+     `STORY_BRANCH` stays empty; set `REGEN_TREE_REF=origin/<BASE-BRANCH>`
+     (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#2-two-phase-dispatch-split-across-the-confirmation-boundary`
+     step 2 — base HEAD already contains the landed commit(s), so it is the tree the regen reads
+     from and the tree Phase 2 checks out from).
 
-3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it
-   `STORY_BRANCH`, `origin/<BASE-BRANCH>` (the **remote-tracking** base ref from project-context,
-   not the bare local branch name — a stale local checkout must never skew the diff), and the story
-   key. Per `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2/§3, phase 1 computes `CHANGED_FILES` +
-   `CHANGED_DIFF` from `origin/<BASE-BRANCH>...$STORY_BRANCH`, resolves affected rows, produces the
-   deterministic regen content for the `auto` rows + `llms.txt`, drafts narrative how-to refreshes
-   via `writing-docs`, and returns all of it to this command layer.
+3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).**
+   - **`STORY_BRANCH` resolved** (the common case) → pass `STORY_BRANCH`, `origin/<BASE-BRANCH>`
+     (the **remote-tracking** base ref from project-context, not the bare local branch name — a
+     stale local checkout must never skew the diff), and the story key. Per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2 step 3, phase 1 **computes**
+     `CHANGED_FILES`/`CHANGED_DIFF` from `origin/<BASE-BRANCH>...$STORY_BRANCH` itself;
+     `REGEN_TREE_REF=$STORY_BRANCH` (§2 step 2).
+   - **`STORY_BRANCH` empty — merged-commit path selected** (previous step) → pass the
+     **precomputed** `CHANGED_FILES`/`CHANGED_DIFF` (already derived from the merged range above)
+     and `REGEN_TREE_REF=origin/<BASE-BRANCH>` instead. Per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2 step 3, phase 1 uses these **verbatim** — it
+     does **not** recompute from `$STORY_BRANCH` (there is none to diff against). This is the fix
+     that makes the merged-commit path actually regenerate — a bare `STORY_BRANCH`-only dispatch
+     here would diff against nothing and silently no-op.
+   - In both shapes, phase 1 resolves affected rows, produces the deterministic regen content for
+     the `auto` rows + `llms.txt` (reading source content from `REGEN_TREE_REF`, §2 step 5), drafts
+     narrative how-to refreshes via `writing-docs`, and returns all of it to this command layer.
 
 4. **Founder-confirmation gate (command layer, in-session, between the two dispatches):**
    - Present the deterministic regen summary (informational — auto rows are not gated; they were
@@ -229,11 +247,12 @@ dispatched at all.
 5. **Dispatch `knowledge-engineer` Phase 2 (write confirmed, fresh dispatch).** Hand it the
    deterministic content **and** the founder-confirmed narrative drafts **verbatim** (inline or via
    session temp-dir files referenced by path, per `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh`) —
-   never re-derived. Phase 2 checks out the branch (see Branch/PR naming below, cut from the story
-   branch head, not `<BASE-BRANCH>`), writes the deterministic regen + `llms.txt` + confirmed
-   narrative drafts under their manifest-resolved `target-path`s, then — **only if content
-   changed** (`git status --porcelain` on the written target paths is non-empty, AC6) — commits via
-   `conventional-commit`, pushes, and opens or updates the sync PR.
+   never re-derived. Phase 2 checks out the branch (see Branch/PR naming below, cut from
+   `REGEN_TREE_REF` — the story branch head when present, or `origin/<BASE-BRANCH>` on the
+   merged-commit path; never a bare local `<BASE-BRANCH>`), writes the deterministic regen +
+   `llms.txt` + confirmed narrative drafts under their manifest-resolved `target-path`s, then —
+   **only if content changed** (`git status --porcelain` on the written target paths is non-empty,
+   AC6) — commits via `conventional-commit`, pushes, and opens or updates the sync PR.
 
 6. **Write + PR only on change (AC6).** If, after writing, `git status --porcelain` on the target
    paths is **empty** (deterministic output was byte-identical and no narrative draft was
@@ -501,7 +520,9 @@ or `seed`'s no-op/STOP set).
 | Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | Recognised future-mode token (`distill` only, after the strike)                                                 | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error. **`audit` is no longer in this set.**                                                                                                                                                                                                      |
-| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-56); exit **without** a silent success.                                                                                                                                                                                                          |
+| `sync`, no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>`, merged commit **found** on base               | Select the **merged-commit** diff source (§26) — diff `<sha>^..<sha>` (union across matches) and regenerate.                                                                                                                                                                                                                  |
+| `sync`, no story branch, **zero** commits carry `<STORY-KEY>` on base                                           | **STOP** — `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`. Never a silent no-op.                                                                                                                                                                                                   |
+| `sync`, no story branch, `git fetch` fails / `origin/<BASE-BRANCH>` unresolvable                                | **STOP** (shared with §1's base-ref pre-check) — never a fallthrough to "no diff".                                                                                                                                                                                                                                            |
 | `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                                                                                                      |
 | Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                                                                                         |
 | Deterministic regen produced byte-identical output and no narrative draft confirmed                             | No commit, no PR (AC6) — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                              |
