@@ -16,6 +16,35 @@ silent, `.claude/project/project-context.md`. In this SDLC repo itself, a plugin
 (touching `plugins/**`) stays within the `ai-enablement-engineer` write-scope — see the Active-guard
 scope note in the agent's First steps.
 
+### Manifest gate (shared by sync and release)
+
+Both modes apply this identical gate at the **command layer**, before any dispatch — defined once
+here; `commands/docs.md` points at it rather than re-deriving it. Resolve
+`.claude/project/docs-manifest.md` **checkout-independently** — never the working tree, so a stale
+local checkout never skews which rows are active — but only **after** the base ref itself is
+confirmed to resolve. A bare `git show origin/<BASE-BRANCH>:<path>` failure is otherwise ambiguous
+between two very different causes: the path genuinely doesn't exist at that ref (manifest absent —
+the intended silent no-op), or the **ref itself** doesn't resolve (a fresh/shallow CI clone that
+hasn't fetched `<BASE-BRANCH>` yet, or `<BASE-BRANCH>` renamed/deleted on `origin`) — the latter
+must **STOP**, never silently read as absent, or a fully opted-in repo carrying a real manifest gets
+a silent no-op that reports success while generating nothing.
+
+```bash
+git fetch origin --quiet || STOP "git fetch failed"
+git rev-parse --verify --quiet "origin/<BASE-BRANCH>^{commit}" >/dev/null \
+  || STOP "cannot resolve origin/<BASE-BRANCH>"
+
+git show "origin/<BASE-BRANCH>:.claude/project/docs-manifest.md" >/dev/null 2>&1
+```
+
+- **`git show` succeeds** → the manifest exists; proceed into the invoking mode's own steps.
+- **`git show` fails** → now unambiguous, because the ref above already resolved — the failure means
+  the **path** doesn't exist at that (known-good) ref, i.e. genuine manifest absence → **silent
+  no-op**: no branch, no dispatch, no PR, no error, **no stdout**, exit 0 (AC5 for `sync`, AC6 for
+  `release`). This is the zero-setup-cost guarantee for repos that declined the `/init` docs opt-in,
+  deliberately distinct from a usage STOP (which does print a message). Do not dispatch
+  `knowledge-engineer` in this case.
+
 ## 2. Two-phase dispatch (split across the confirmation boundary)
 
 A dispatched subagent runs to completion and returns — it cannot pause for interactive human
@@ -144,10 +173,10 @@ inconsistently between this ref and the how-to template it governs:
 
 ## 6. No-op / change-gate semantics
 
-- **Manifest-absent silent no-op (AC5).** If `.claude/project/docs-manifest.md` is absent, the
-  command layer never dispatches `knowledge-engineer` at all — no branch, no dispatch, no PR, no
-  error, **no stdout**, exit 0. This is a command-layer gate (`commands/docs.md`), not something
-  phase 1 checks — phase 1 is never invoked in this case.
+- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-and-release)
+  — the command layer never dispatches `knowledge-engineer` when that gate finds the manifest
+  genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
+  itself won't resolve. Not something phase 1 checks — phase 1 is never invoked in this case.
 - **Story-branch-missing WARNING, never a silent success.** If neither `origin/feat/<STORY-KEY>`
   nor `origin/fix/<STORY-KEY>` exists, the command layer emits the explicit WARNING (see
   `commands/docs.md`) and exits — never a silent clean exit that could read as "docs already
@@ -275,17 +304,40 @@ exactly 2 fields is malformed — surface it and STOP rather than guessing at fi
 For each record, extract Jira story keys from **subject and body**, then take the de-duplicated
 union across records. Each key retains the `(subject, body)` of the record(s) that carried it.
 
-**Scope the regex to the consumer's Jira project key** — resolve `<PROJECT-KEY>` from
-`.claude/project/project-context.md` ("Jira project key") and match:
+**Scope the regex to the consumer's Jira project key(s) — a set, not a single key.** Resolve
+`PROJECT_KEYS`:
+
+1. The **primary** key: `.claude/project/project-context.md`'s "Jira project key".
+2. Any **additional** keys: `.claude/project/docs-manifest.md`'s optional "Additional Jira project
+   keys" field (see `refs/docs-manifest-template.md`) — a comma-separated list of legacy or
+   secondary project keys whose commits should also be recognised (e.g. a repo migrated from an old
+   Jira project key to a new one still carries old-key references in its history that must not be
+   silently dropped from the changelog).
+
+`PROJECT_KEYS` is the union of both. Build the regex as an alternation over the set, still anchored
+so it cannot degrade into the unscoped form:
 
 ```text
-\b<PROJECT-KEY>-[0-9]+\b
+\b(?:KEY1|KEY2|...)-[0-9]+\b
 ```
 
-A bare `[A-Z][A-Z0-9]*-[0-9]+` is **too loose** and false-positives on ordinary prose — `UTF-8`,
-`RFC-2119`, `SHA-1`, `ISO-8601`, and `AES-256` all match it, each of which would emit a bogus
-`UTF-8 — <summary>` changelog line. If project-context carries no Jira project key, fall back to the
-loose regex and note the risk in the gate output — never silently emit unfiltered matches.
+**Why a set, not one key.** An earlier version of this rule scoped to a single primary key. That
+closes the false-positive defect below, but **regresses on any multi-project repo**: a repo whose
+history carries both a current key (e.g. `NA-*`) and a legacy key from before a Jira project rename
+(e.g. `ET-*`) would silently drop every commit whose only key is the legacy one from the merged-story
+set — the founder-confirm gate then presents a changelog that omits shipped stories, and the PR
+merges it, with nothing surfacing the gap. This repo is itself such a case (its own history carries
+both `NA-*` and `ET-*` keys). A key **set** — primary plus any additional keys the founder configures
+— fixes this without reopening the false-positive hole, because every key in the set is still an
+exact, configured literal, never a generic pattern.
+
+A bare `[A-Z][A-Z0-9]*-[0-9]+` (matching **any** uppercase-alnum-dash-digits token, not a configured
+key) is **too loose** and false-positives on ordinary prose — `UTF-8`, `RFC-2119`, `SHA-1`,
+`ISO-8601`, and `AES-256` all match it, each of which would emit a bogus `UTF-8 — <summary>`
+changelog line. If `PROJECT_KEYS` is empty (project-context carries no Jira project key and the
+manifest lists no additional keys), fall back to the loose regex and note the risk in the gate
+output — never silently emit unfiltered matches. If `PROJECT_KEYS` is non-empty, always use the
+alternation above — even when it resolves to a single key — never the loose regex.
 
 **"Most recent" is well-defined:** `git log` emits newest-first by default, so for a key appearing in
 several records, the **first** record encountered is its most recent commit. Do not add `--reverse`
@@ -325,6 +377,14 @@ call and **no network call** is needed.
   order **Breaking → Added → Changed → Fixed**, omitting empty sections. Within a section, sort story
   lines by key — project prefix lexicographically, then the numeric suffix **numerically** (so
   `NA-9` precedes `NA-53`, which a plain string sort gets wrong). Line shape: `<KEY> — <summary>`.
+- **Each change-type bucket is a `###` sub-heading** (`### Breaking`, `### Added`, `### Changed`,
+  `### Fixed`) — one level below the `## <VERSION>` section heading, never `## `. This is
+  load-bearing for the upsert boundary below: that boundary terminates at the next `## ` heading, so
+  a bucket pinned at `## ` instead of `### ` would prematurely end the section at its own first
+  bucket — the upsert would then insert each re-run's fresh content **above** the stale remainder
+  instead of replacing it, the changelog would accumulate duplicate `### Added`/`### Fixed` blocks
+  under one `## <VERSION>`, and `git status --porcelain` would be non-empty on every re-run even
+  with no new merged stories — breaking §14's "re-run with no new stories commits nothing" claim.
 - **Never fabricate.** The changelog emits exactly what the commits support — no inferred prose, no
   invented summaries. A bare-key line is never emitted, because the fallbacks above always resolve
   both fields.
@@ -333,14 +393,26 @@ call and **no network call** is needed.
 
 The `changelog` row's `target-path` (registry default `docs/changelog/`) holds a **single cumulative
 file**, `index.md` (Keep-a-Changelog style, newest-first). If it does not exist, phase 2 creates it
-with this preamble, then applies the upsert below:
+with this preamble — **including frontmatter**, per §12's "every written release page MUST carry
+`title` + `description`" rule, which applies to this page too — then applies the upsert below:
 
 ```markdown
+---
+title: Changelog
+description: All notable changes to this project, generated by /sdlc:docs release.
+---
+
 # Changelog
 
 All notable changes to this project are documented in this file. Generated by
 `/sdlc:docs release <version>`; each release upserts its own `## <VERSION>` section.
 ```
+
+Omitting the frontmatter here would silently break §14's `llms.txt` regen, which derives every
+entry's `title`/`description` from page frontmatter: since this preamble is written **once** and
+never revisited (the upsert boundary below explicitly never touches it), a missing frontmatter
+block would either drop the changelog from `llms.txt` forever, or make the regen STOP on a page it
+expects to carry frontmatter — after the founder has already confirmed the release content.
 
 ### Upsert rule
 
@@ -359,7 +431,9 @@ Maintained by **upsert**, not unconditional prepend. A prepend-only rule contrad
    preserving newest-first ordering.
 
 The upsert boundary is the `## <VERSION>` heading and everything up to (not including) the next
-`## ` heading or EOF. The file's preamble is never touched.
+`## ` heading or EOF — **including** the `### `-level change-type sub-headings inside it, which are
+section body, not section boundaries (see "Deterministic ordering" above; change-type buckets MUST
+use `### `, never `## `, or the boundary detection breaks). The file's preamble is never touched.
 
 ## 12. Release mode — ADR-link resolution + artifact set
 
@@ -433,18 +507,18 @@ later `sync`).
 > `reset --hard` and force-push are therefore **prohibited** on release paths. Re-run convergence
 > comes from idempotence, not from rewriting history.
 
-| Item                      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Branch                    | `docs/release-<VERSION>` (the **normalised** version — `1.4.0` and `v1.4.0` resolve to the same branch, never two), cut from the **base branch head** (`origin/<BASE-BRANCH>`) — **not** a story branch. Release aggregates work already merged to base, so the base tree is the correct source.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Commit                    | `docs(docs): release <VERSION>` (via `conventional-commit`), carrying the trailer `Release-Generated: <VERSION>`. **The trailer is load-bearing**, not decoration: it is the only reliable marker of "this pipeline wrote this commit", and both guards below key on it. Subject-matching is not a substitute.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| PR title                  | `docs(docs): release <VERSION>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| PR base                   | `<BASE-BRANCH>` from project-context (never assume `main`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Local-branch precondition | Applies on **every** path, first-run and re-run alike, checked **before** either. If a **local** `docs/release-<VERSION>` exists holding commits not reachable from `origin/docs/release-<VERSION>` (or, when no such remote exists, any commits at all beyond `origin/<BASE-BRANCH>`) → **STOP**: `local branch docs/release-<VERSION> has unpushed commits; push, drop, or rename it, then re-run.` Never `checkout -B` over it. Hoisted out of the re-run rows deliberately: the first-run path is defined by the branch being absent **on `origin`**, which says nothing about a local branch of the same name.                                                                                                                                           |
-| First-run PR              | No remote branch (`git rev-parse --verify origin/docs/release-<VERSION>` fails) → after the precondition passes, create the branch from `origin/<BASE-BRANCH>` head, write, commit, push, open the PR against `<BASE-BRANCH>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Re-run behaviour          | **Open or update; the branch's commits are never rewritten.** If the branch exists on `origin` → `git fetch origin`, run the precondition + **both guards**, then check it out **at its remote head**: `git checkout -B docs/release-<VERSION> origin/docs/release-<VERSION>` — **the single normative flow**. Write the regenerated content **on top** as a new commit and `git push` (plain fast-forward). A re-run with nothing to change produces **no commit, no push, no duplicate PR**.                                                                                                                                                                                                                                                                |
-| Re-run history guard      | The **one forbidden path**: no re-run may reset the branch onto regenerated state, force-push it (`--force` / `--force-with-lease`), or discard any commit reachable from `origin/docs/release-<VERSION>`. A reset-to-regenerated + `--force-with-lease` would _succeed_ (the local ref was just fetched) and silently revert the PR to unreviewed content. Checking out at the remote head does none of these — it adopts the remote's commits rather than replacing them.                                                                                                                                                                                                                                                                                   |
-| Re-run content guard      | Preserving commits protects **history**; this guard protects **content**. Before writing, find commits on the branch (relative to `origin/<BASE-BRANCH>`) that touch the `ENABLED_ROWS` target-paths and **lack the `Release-Generated: <VERSION>` trailer** — i.e. out-of-pipeline edits to generated pages. If any → **STOP**: `branch docs/release-<VERSION> carries edits to generated pages (<paths>) that this pipeline did not write; re-running would overwrite them — merge or close PR #<n>, or drop those edits, then re-run.` Necessary because phase 2 writes confirmed drafts **verbatim** and §11's upsert replaces the section body unconditionally. Trailer-bearing commits, and commits touching **other** paths, do not trip it — proceed. |
-| Control-flow tail         | Mirror §7 / `commands/adr.md`: after the PR is raised, drive the review loop via `/loop /sdlc:loop <PR_URL>` (falling back to `ScheduleWakeup` if the harness cannot nest `/loop`). If the run ended **before** any PR (manifest-absent silent no-op, no-row-enabled no-op, no-stories-merged no-op, an invalid-version STOP, or a precondition/guard STOP), release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — only the manifest-absent path is silent.                                                                                                                                                                                                                                                                              |
+| Item                      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch                    | `docs/release-<VERSION>` (the **normalised** version — `1.4.0` and `v1.4.0` resolve to the same branch, never two), cut from the **base branch head** (`origin/<BASE-BRANCH>`) — **not** a story branch. Release aggregates work already merged to base, so the base tree is the correct source.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Commit                    | `docs(docs): release <VERSION>` (via `conventional-commit`), carrying the trailer `Release-Generated: <VERSION>`. **The trailer is load-bearing**, not decoration: it is the only reliable marker of "this pipeline wrote this commit", and both guards below key on it. Subject-matching is not a substitute.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| PR title                  | `docs(docs): release <VERSION>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| PR base                   | `<BASE-BRANCH>` from project-context (never assume `main`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Local-branch precondition | Applies on **every** path, first-run and re-run alike, checked **before** either. If a **local** `docs/release-<VERSION>` exists holding commits not reachable from `origin/docs/release-<VERSION>` (or, when no such remote exists, any commits at all beyond `origin/<BASE-BRANCH>`) → **STOP**: `local branch docs/release-<VERSION> has unpushed commits; push, drop, or rename it, then re-run.` Never `checkout -B` over it. Hoisted out of the re-run rows deliberately: the first-run path is defined by the branch being absent **on `origin`**, which says nothing about a local branch of the same name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| First-run PR              | No remote branch (`git rev-parse --verify origin/docs/release-<VERSION>` fails) → after the precondition passes, create the branch from `origin/<BASE-BRANCH>` head, write, commit, push, open the PR against `<BASE-BRANCH>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Re-run behaviour          | **Open or update; the branch's commits are never rewritten.** If the branch exists on `origin` → `git fetch origin`, run the precondition + **both guards**, then check it out **at its remote head**: `git checkout -B docs/release-<VERSION> origin/docs/release-<VERSION>` — **the single normative flow**. Write the regenerated content **on top** as a new commit and `git push` (plain fast-forward). A re-run with nothing to change produces **no commit, no push, no duplicate PR**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Re-run history guard      | The **one forbidden path**: no re-run may reset the branch onto regenerated state, force-push it (`--force` / `--force-with-lease`), or discard any commit reachable from `origin/docs/release-<VERSION>`. A reset-to-regenerated + `--force-with-lease` would _succeed_ (the local ref was just fetched) and silently revert the PR to unreviewed content. Checking out at the remote head does none of these — it adopts the remote's commits rather than replacing them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Re-run content guard      | Preserving commits protects **history**; this guard protects **content**. Before writing, find commits on the branch (relative to `origin/<BASE-BRANCH>`) that touch **any path phase 2 writes this run** and **lack the `Release-Generated: <VERSION>` trailer** — i.e. out-of-pipeline edits to generated pages. This path set is **not** just the `ENABLED_ROWS` target-paths: phase 2 also unconditionally rewrites `llms.txt` (when §14 determines its row is enabled) and, per §14's "doc index" bullet, any existing `release-notes`/`migration-guides` section index page it regenerates — a `/sdlc:loop` review-fix or founder edit to either of those is exactly the kind of out-of-pipeline content this guard exists to protect, and scoping the scan to `ENABLED_ROWS` alone would silently destroy it with no STOP. If any qualifying path is found → **STOP**: `branch docs/release-<VERSION> carries edits to generated pages (<paths>) that this pipeline did not write; re-running would overwrite them — merge or close PR #<n>, or drop those edits, then re-run.` Necessary because phase 2 writes confirmed drafts **verbatim** and §11's upsert replaces the section body unconditionally. Trailer-bearing commits, and commits touching **other** paths, do not trip it — proceed. |
+| Control-flow tail         | Mirror §7 / `commands/adr.md`: after the PR is raised, drive the review loop via `/loop /sdlc:loop <PR_URL>` (falling back to `ScheduleWakeup` if the harness cannot nest `/loop`). If the run ended **before** any PR (manifest-absent silent no-op, no-row-enabled no-op, no-stories-merged no-op, an invalid-version STOP, or a precondition/guard STOP), release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — only the manifest-absent path is silent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ### Where edits live, and what a re-run does to them
 
@@ -460,10 +534,11 @@ edits (re-derived by design), but it must not be mistaken for _preserving_ them.
 
 ## 14. Release mode — no-op / change-gate semantics
 
-- **Manifest-absent silent no-op.** If `.claude/project/docs-manifest.md` is absent at
-  `origin/<BASE-BRANCH>`, the command layer never dispatches — no branch, no dispatch, no PR, no
-  error, **no stdout**, exit 0. A command-layer gate (`commands/docs.md`), not something phase 1
-  checks. The zero-setup-cost guarantee for repos that declined the `/init` docs opt-in.
+- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-and-release)
+  (shared with `sync`) — the command layer never dispatches when that gate finds the manifest
+  genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
+  itself won't resolve. Not something phase 1 checks. The zero-setup-cost guarantee for repos that
+  declined the `/init` docs opt-in.
 - **No release row enabled → clean no-op.** Print `no release-triggered doc types enabled in
 docs-manifest.md — nothing to generate` and exit without a PR. **Informational, not silent** — the
   manifest exists, so the founder opted in; a fully-disabled release surface is worth surfacing
@@ -504,8 +579,17 @@ untouched — see §13's "Where edits live". Five things are load-bearing; none 
 After the confirmed narrative writes, phase 2 deterministically regenerates the doc index and
 `llms.txt` — the un-gated half of the run (the same "auto rows are un-gated" discipline `sync` applies):
 
-- **`llms.txt`** — reuse §8's algorithm verbatim: index-only, grouping the generated pages of every
-  enabled `public: yes` row by Diátaxis quadrant, each entry a `title — one-line description —
+- **`llms.txt`** — **only if the `llms-txt` row is present and enabled in the manifest.** `llms-txt`
+  is a `sync`-triggered row, not a `release`-triggered one, so it is **not** a member of
+  `ENABLED_ROWS` (`commands/docs.md`'s Enabled-row gate covers only the three release rows) —
+  release must independently re-check the manifest's `llms-txt` row state before touching this
+  file. Absence is
+  never inferred as enabled, the same discipline as `ENABLED_ROWS`'s row-absence rule: a founder who
+  declined `llms-txt` at `/init` (row absent, per `docs.md`'s "Absent is never default-on" rule)
+  must never have it written or overwritten by a `release` run either. If disabled or absent, phase 2
+  does not write or touch `llms.txt` at all this run — any existing file is left exactly as-is. When
+  it **is** enabled: reuse §8's algorithm verbatim — index-only, grouping the generated pages of
+  every enabled `public: yes` row by Diátaxis quadrant, each entry a `title — one-line description —
 relative link` derived from page frontmatter (§12 specifies the frontmatter release pages emit).
   The newly written release pages now appear in it. Idempotent; committed only if changed.
 - **The doc index** — for the `changelog` target-path, the cumulative file **is** the index of

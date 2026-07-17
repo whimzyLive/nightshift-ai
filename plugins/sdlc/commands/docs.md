@@ -37,14 +37,26 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    branch/ref — same discipline, different regex:
 
    ```text
-   raw token must match:  ^v?[0-9A-Za-z][0-9A-Za-z.]*(-[0-9A-Za-z.]+)*$
-   normalise:             strip a single leading "v"  →  VERSION
+   raw token must match:  ^[vV]?[0-9A-Za-z][0-9A-Za-z.]*(-[0-9A-Za-z.]+)*-?$
+   normalise:             strip a single leading "v" or "V"  →  VERSION
    VERSION must additionally satisfy, or the run STOPs:
      - non-empty
      - contains no ".."
      - does not end in "." or "-"
      - does not end in ".lock"
    ```
+
+   **The trailing `-?` is deliberate, not a stray permissiveness.** Without it, a token ending in a
+   bare `-` (e.g. `1.4-`) fails the regex **outright** — the `(-[0-9A-Za-z.]+)*` group requires at
+   least one character after every `-`, so a trailing `-` has nothing to consume and the whole match
+   fails — meaning it never reaches the "ends in '-'" check below and instead surfaces the generic
+   "fails the token regex" message, which is **inaccurate** for this input (`1.4-` genuinely is only
+   letters, digits, and `-`; verified: `1.4-` rejects at the regex while `1.4.` and `1..4` pass it and
+   reach their specific checks). The trailing `-?` lets a bare trailing dash pass the character-class
+   check so it is caught by the **specific**, correctly-worded "ends in '-'" STOP instead — the same
+   fix shape as the `.lock` case below (widen the regex so the specific rule, not the generic one,
+   catches it). It does not loosen anything else: `1--2` (an interior double-dash) still fails,
+   because the repeated group still requires ≥1 character after each non-trailing `-`.
 
    Each failure is a **usage STOP** raised **before** any branch, dispatch, draft, or founder gate —
    a caller passing `release ../../oops` is rejected at the ladder, never after the founder has
@@ -61,7 +73,7 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    ends in ".lock"         → invalid version "<raw>" — must not end in ".lock" (git refuses the
                              branch ref docs/release-<VERSION>)
    empty after normalising → invalid version "<raw>" — version is empty after stripping the
-                             leading "v"
+                             leading "v" or "V"
    ```
 
    - **The `.lock` rule is `VERSION.endswith(".lock")` — NOT a per-dot-component test.** Git's
@@ -72,16 +84,27 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
      dots), so such a rule rejects nothing and `1.4.lock` would reach `git checkout` and fail there —
      after the founder had confirmed drafts. Verified:
      `git check-ref-format --branch docs/release-1.4.lock` → `fatal: not a valid branch name`.
-   - **Normalisation is identity-forming, not cosmetic.** `1.4.0` and `v1.4.0` normalise to the
-     **same** `VERSION` and therefore the same branch, PR, changelog section, and pages. Without it
-     the two spellings produce a duplicate branch, a duplicate PR (the re-run dedupe keys on branch
-     name), a duplicate changelog section, and duplicate pages.
+   - **Normalisation is identity-forming, not cosmetic.** `1.4.0`, `v1.4.0`, and `V1.4.0` all
+     normalise to the **same** `VERSION` and therefore the same branch, PR, changelog section, and
+     pages. The strip is **case-insensitive on this one leading character only** (`v` or `V`) —
+     without it, `V1.4.0` would keep its `V` (the token regex's general `[0-9A-Za-z]` class accepts
+     an uppercase `V` as an ordinary body character, same as any other alnum, so it is never rejected;
+     only the strip step decides whether it is treated as the marker), forking a **second** branch
+     (`docs/release-V1.4.0` alongside `docs/release-1.4.0`), a second open PR for the same version
+     (the re-run dedupe keys on branch name, and these are two different names), a duplicate
+     `## V1.4.0` changelog section, and duplicate release-notes/migration-guide pages — precisely the
+     outcome this bullet exists to prevent.
    - **`VERSION` (normalised), not the raw token, is used everywhere downstream** — branch, PR title,
      commit string, page ids, changelog heading, no-op notices. The raw token is echoed **only** in
      the STOP messages above.
-   - **Case is significant and deliberately not folded.** `1.4.0-RC1` and `1.4.0-rc1` are distinct
-     `VERSION`s → distinct branches and page ids, which **collide** on a case-insensitive filesystem
-     (macOS default). Folding would break legitimately case-distinct labels; v1 accepts the collision.
+   - **Case is significant and deliberately not folded — but only past the single leading marker
+     character.** The leading-`v`/`V` strip above is the **one** case-insensitive step; everything
+     after it keeps its case exactly as typed. `1.4.0-RC1` and `1.4.0-rc1` are distinct `VERSION`s →
+     distinct branches and page ids, which **collide** on a case-insensitive filesystem (macOS
+     default). Folding the rest of the token would break legitimately case-distinct labels; v1
+     accepts that collision while still closing the `V1.4.0`/`v1.4.0` split above — the two rules
+     are not in tension: one governs the optional single-character prefix marker, the other governs
+     the version body after it.
    - Beyond token safety, `<VERSION>` is **not** hard-validated against semver — a date-based label
      (e.g. `2026.07.1`) passes.
 
@@ -94,21 +117,18 @@ around the founder-confirmation gate (a dispatched subagent cannot itself pause 
 argument validation above, and the gates below that decide whether `knowledge-engineer` is
 dispatched at all.
 
-1. **Manifest gate (AC5).** Resolve `.claude/project/docs-manifest.md` **checkout-independently**
-   — the same way `STORY_BRANCH` resolution (step 2) always reads `origin` after a fetch — via
-   `git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md` rather than reading the file
-   out of the current working tree, so a stale local checkout never skews which rows are active.
-   If **absent** (the `git show` fails because the path doesn't exist at that ref) → **silent
-   no-op**: no branch, no dispatch, no PR, no error, **no stdout** — exit cleanly (exit 0). This is
-   the zero-setup-cost guarantee for repos that declined the `/init` docs opt-in, and is
-   deliberately distinct from a usage STOP (which does print a message). Do not dispatch
-   `knowledge-engineer` in this case.
+1. **Manifest gate (AC5).** Shared with `release` — defined **once** in
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-and-release` (the
+   base-ref resolution pre-check that runs **before** the manifest read — an unresolvable
+   `origin/<BASE-BRANCH>` is a STOP, never mistaken for "manifest absent" — then the
+   checkout-independent `git show`, then the silent no-op on genuine absence). This command does not
+   re-derive it; the gate's `git fetch origin --quiet` also covers step 2 below, so that step does
+   not fetch again.
 
 2. **Resolve the story branch (v1 diff source).** `sync` never depends on the currently-checked-out
-   branch:
+   branch. The Manifest gate above already fetched `origin`, so this step does not fetch again:
 
    ```bash
-   git fetch origin --quiet
    # Resolve the story branch: feat/<STORY-KEY> preferred, fix/<STORY-KEY> fallback.
    STORY_BRANCH=""
    for cand in "feat/<STORY-KEY>" "fix/<STORY-KEY>"; do
@@ -160,10 +180,12 @@ procedure — enumeration, aggregation, upsert, ADR-link resolution, branch/PR c
 semantics — is defined once in that ref's **§§10–14**. This command owns only the gates below, the
 argument validation above, and the founder-confirm gate between the two dispatches.
 
-1. **Manifest gate.** Resolve `.claude/project/docs-manifest.md` **checkout-independently** via
-   `git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md` — never the working tree, so a
-   stale local checkout never skews which rows are active. If **absent** → **silent no-op**: no
-   branch, no dispatch, no PR, no error, **no stdout**, exit 0. Do not dispatch `knowledge-engineer`.
+1. **Manifest gate (AC6).** Shared with `sync` — same pointer, same mechanics: see step 1 of the
+   `sync` procedure above,
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-and-release`. The
+   base-ref resolution pre-check runs first (an unresolvable `origin/<BASE-BRANCH>` STOPs — it is
+   never mistaken for "manifest absent"), then the checkout-independent `git show`, then the silent
+   no-op on genuine absence. Do not dispatch `knowledge-engineer` on either exit path.
 
 2. **Enabled-row gate — resolve `ENABLED_ROWS` once, then thread it everywhere.** From the manifest,
    resolve which of the three `release`-triggered registry rows (`changelog`, `release-notes`,
@@ -188,8 +210,9 @@ argument validation above, and the founder-confirm gate between the two dispatch
 3. **Resolve the last tag and the merged-story set.** Per `refs/docs-pipeline.md` §10 — the base-ref
    pre-check, the **positive shallow-clone pre-check**, the `No names found`-only fallthrough, the
    **single-ended** no-tags range, the RS/US delimited `git log` format and its parse rules, and the
-   project-key-scoped story-key regex. Every git failure is a **STOP**, never a silent fallthrough.
-   **No stories merged** → clean no-op with §14's two notice wordings (never an empty interpolation).
+   story-key regex scoped to the `PROJECT_KEYS` set (primary key + manifest-configured additional
+   keys). Every git failure is a **STOP**, never a silent fallthrough. **No stories merged** → clean
+   no-op with §14's two notice wordings (never an empty interpolation).
 
 4. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it `VERSION`,
    `ENABLED_ROWS`, the resolved commit range, the merged-story key set (each key with its
@@ -225,13 +248,10 @@ argument validation above, and the founder-confirm gate between the two dispatch
 - Branch `docs/release-<VERSION>`; PR title `docs(docs): release <VERSION>`. Cut from the **base
   branch head** (`origin/<BASE-BRANCH>`), **not** a story branch — release aggregates work already
   merged to base.
-- **A re-run never rewrites the branch's commits**: no `reset --hard` onto regenerated state, no
-  force-push. This **diverges deliberately from `sync`'s §7** (which does reset + force-with-lease,
-  safe there because a sync branch is fully derived). A release branch carries `/sdlc:loop` review-fix
-  commits, so rewriting it would silently revert the PR to unreviewed content.
 
 Full contract (cut point, commit string + trailer, PR base, local-branch precondition, both re-run
-guards, control-flow tail) is defined once in
+guards — including the prohibition on `reset --hard` / force-push, a deliberate divergence from §7
+— and the control-flow tail) is defined once in
 `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow` — this
 command does not re-derive it.
 
@@ -301,7 +321,8 @@ pre-PR exit paths this covers.
 | No stories merged in the range, no tags exist                                                                   | Clean no-op — `no stories merged since the start of history — nothing to release` (never an empty interpolation).                                                                                                                                     |
 | Repo has no tags yet (full clone)                                                                               | Not an error — range is the **single-ended** `origin/<BASE-BRANCH>` (full history, root inclusive).                                                                                                                                                   |
 | **Shallow clone**                                                                                               | Surface and STOP (`run: git fetch --unshallow`) — caught by the **positive** `git rev-parse --is-shallow-repository` pre-check, because a shallow clone with unreachable tags emits the _identical_ `No names found` text as a genuine first release. |
-| `git fetch` fails, or `origin/<BASE-BRANCH>` will not resolve                                                   | Surface and STOP — resolved **before** `git describe`, so it can never be mistaken for "no tags yet".                                                                                                                                                 |
+| `git fetch` fails, or `origin/<BASE-BRANCH>` will not resolve                                                   | Surface and STOP — resolved **before the manifest gate** (never mistaken for "manifest absent") and again **before** `git describe` (never mistaken for "no tags yet").                                                                               |
+| Manifest present but the `llms-txt` row is disabled or absent                                                   | Not an error — `llms.txt` is a `sync`-triggered row, not part of `ENABLED_ROWS`; `release` independently checks its enabled state and does not write or touch it this run if disabled/absent. Any existing `llms.txt` is left as-is.                  |
 | `git describe --tags` fails with anything other than `No names found`                                           | Surface and STOP. `No names found` is the **only** fallthrough text, trusted only because the shallow pre-check already ran. `No tags can describe` is deliberately **not** matched.                                                                  |
 | `git log` failure                                                                                               | Surface and STOP — never silently release an empty or partial range.                                                                                                                                                                                  |
 | A commit body mentions `BREAKING CHANGE:` in prose rather than as a footer                                      | **Not** breaking — the test is line-anchored (`^BREAKING[ -]CHANGE:`), never a substring search.                                                                                                                                                      |
