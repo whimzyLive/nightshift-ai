@@ -64,20 +64,23 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         changed detections, as today).
      4. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
         (ensure .tmp/ is gitignored), Step 4g (merge `.claude/project/docs-manifest.md` against
-        `refs/doc-types.md` — only when the docs opt-in was accepted; runs the same
+        `refs/doc-types.md` — when the docs opt-in was accepted this run, or when
+        `.claude/project/docs-manifest.md` already exists from a prior acceptance; runs the same
         existing-manifest merge guard described there), and Step 5.
 
    - **Refresh skills** → re-fetch the **managed** skills to their latest upstream, then **STOP** —
      no prompts, no other config rewritten. A managed skill is one whose `refs/skills-map.yml` entry
      declares a `source` or `plugin`; scaffolded stubs and custom skills (no source) are user-owned and
-     left untouched. Steps: 1. Read `.claude/project/skills.json` for the installed skill list. 2. Group the installed managed skills by their `refs/skills-map.yml` entry and **run Step 4f in
+     left untouched. First, read `.claude/project/skills.json` for the installed skill list. Then
+     group the installed managed skills by their `refs/skills-map.yml` entry and **run Step 4f in
      refresh mode** (see Step 4f): a `source` skill is cleanly replaced via stage-then-swap (download
      the latest upstream into a temp dir, then swap it into `.claude/skills/<name>/` only on success
      — never delete before a fetch that may fail), cloning each shared source repo once; a `plugin`
-     skill is updated via `claude plugin marketplace add` then `claude plugin update
-<plugin>@<marketplace> --scope project`; a sourceless skill is skipped. 3. Leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
-     untouched. Print a summary of which skills were refreshed (and which were skipped as
-     user-owned), then run the Final action release. Do **not** continue to Steps 1–5.
+     skill is updated via `claude plugin marketplace add` then
+     `claude plugin update <plugin>@<marketplace> --scope project`; a sourceless skill is skipped.
+     Finally, leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
+     untouched, print a summary of which skills were refreshed (and which were skipped as
+     user-owned), then run the Final action release — do **not** continue to Steps 1–5.
    - **Re-run full setup** → continue to Step 1 with all existing values offered as pre-filled
      defaults in each prompt.
 
@@ -409,11 +412,14 @@ AskUserQuestion(
 
 - **Opt in** → Step 4g (below) writes `.claude/project/docs-manifest.md`.
 - **Skip** → Step 4g writes nothing; no manifest file is created.
-- **Re-init semantics** — this prompt participates in the Step 0 "Merge new findings"
-  schema-backfill exactly like any other Step 3 field: a repo with no manifest is prompted once
-  when merging; a repo that already opted in (manifest already present) is never re-prompted for
-  this confirm, though its manifest still goes through the Step 4g existing-manifest merge guard
-  on every run that reaches Step 4g (see Step 4g below).
+- **Re-init semantics** — unlike the fields the Step 0 "Merge new findings" schema-backfill loop
+  discovers by diffing against `refs/project-context-template.md` tokens, this opt-in is **not** a
+  project-context token, so that template-diff loop never surfaces it. Instead, on a
+  Merge-new-findings run a manifest-less, non-declined repo (`.claude/project/docs-manifest.md`
+  absent) is prompted for this opt-in once, keyed on **manifest absence**, not a template token; a
+  repo that already opted in (manifest already present) is never re-prompted, though its manifest
+  still goes through the Step 4g existing-manifest merge guard on every run that reaches Step 4g
+  (see Step 4g below).
 
 ## Step 3.5 — Suggest skills and refs based on detected stack
 
@@ -697,8 +703,10 @@ marketplace add` / `install`, and the stub write are all otherwise safe to re-ru
 - If the confirmed install list is empty (no suggestions accepted, no custom skills), this step is a
   no-op — install nothing, write no files.
 
-**4g. `.claude/project/docs-manifest.md`** — executed **only when the docs opt-in (Step 3) was
-accepted**. Declining the opt-in writes nothing (no file, no partial content).
+**4g. `.claude/project/docs-manifest.md`** — executed **only when the docs opt-in was accepted
+this run, or when `.claude/project/docs-manifest.md` already exists from a prior acceptance**
+(the same gate the Step 0 jump list uses). Declining the opt-in with no pre-existing manifest
+writes nothing (no file, no partial content).
 
 Step 4g MUST **first detect whether the manifest already exists** — this existing-manifest merge
 guard applies on **every** path that reaches Step 4g, including a full "re-run setup" pass, not

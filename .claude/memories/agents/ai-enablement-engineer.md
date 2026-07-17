@@ -1,42 +1,54 @@
 # ai-enablement-engineer — memory
 
-## NA-51 — doc-type registry + docs-manifest scaffold (`plugins/sdlc/refs/doc-types.md`,
+## NA-51 — doc-type registry + docs-manifest scaffold (`plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`)
 
-`plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`)
-
+- **A `##`/`###` Markdown heading is only the text on its own physical source line — wrapping a
+  long heading across two physical lines (no leading `##` on the second line) does NOT continue
+  the heading; it silently truncates the heading to line 1's text and turns line 2 into a
+  freestanding paragraph directly underneath.** `prettier --write` (`proseWrap: preserve` in this
+  repo) does **not** rejoin it for you, so this is a self-inflicted, `prettier`-invisible defect —
+  it happened to THIS memory file's own previous NA-51 entry in the prior round, corrupting its own
+  section heading. Never manually wrap a heading line; if it is long, let it stay long as one
+  physical line.
 - **`prettier --write` silently treats any path outside the repo, or under a `.gitignore`d
   directory (e.g. this repo's own `.tmp/`), as "ignored" and leaves it byte-for-byte unchanged —
   `prettier --file-info <path>` reports `{"ignored": true, "inferredParser": null}` for both
   cases with zero error output from `--write`.** This makes the established "verify in a scratch
   copy, run `--write` twice, confirm idempotent" protocol from prior NA-25/NA-27/NA-43 memory
-  entries **silently useless** if the scratch copy lives outside the repo (e.g. this session's own
-  `/private/tmp/.../scratchpad`) or under `.tmp/` — every "STABLE" result from such a copy is a
-  false negative, not evidence of anything. The scratch-verification protocol only produces a real
-  signal when the copy sits at a real, non-ignored path inside the repo (a stray file directly
-  under `plugins/sdlc/refs/`, or the real target path itself with `git checkout --` as the
-  reset/undo mechanism instead of a tmp copy). Always confirm with
-  `prettier --file-info <path>` that `ignored: false` before trusting any stability result from
-  that path.
-- Discovered (via the above, once verification was redone against the real target path) that
-  `plugins/sdlc/commands/init.md`'s **pre-existing, already-committed** content is itself not
-  `prettier --write`-idempotent: a `git checkout --` fresh copy of `HEAD`, formatted with zero
-  edits of mine, still produces ~22 reformatting hunks (GFM table column-padding, `*em*` →
-  `_em_` conversion, and one genuine structural defect — the Step 0 "Refresh skills" numbered
-  sub-list, nested 4 levels deep inside an outer numbered list → bulleted option → nested numbered
-  "Steps:" list → wrapped continuation line, loses its list-ness and a code-like inline token gets
-  dedented to column 0 mid-item). This is **latent repo drift unrelated to this story** — proven by
-  reproducing it against an untouched `git checkout --` copy — not something my edits introduced.
-  Attempting to fix it (adding blank lines between the numbered items) only changed which pass it
-  broke on (pass 1 vs pass 2) and never reached a genuinely stable state, because the underlying
-  4-level nesting is what's fragile, not the blank-line spacing. Lesson: when a pre-commit
-  `prettier --write` hook is unavoidable (any edit to a file forces the WHOLE file through it), and
-  an unrelated pre-existing section of that file is already non-idempotent, don't spend the story's
-  time trying to fully stabilize content the story didn't ask you to touch — verify with a
-  `git checkout --` sanity check that the instability predates your edit, leave that section
-  byte-identical to `HEAD` (don't add a speculative "fix" that doesn't actually fix it), and confirm
-  instead that _your own_ new content (checked at a shallower nesting depth — a single bullet or a
-  single nested numbered list under a `##`/`###` heading, not 4 levels deep) formats cleanly and
-  stays coherent after the one prettier pass that will actually run at commit time.
+  entries **silently useless** if the scratch copy lives outside the repo (e.g. a session tmp
+  scratchpad) or under `.tmp/` — every "STABLE" result from such a copy is a false negative, not
+  evidence of anything. The protocol only produces a real signal when the copy sits at a real,
+  non-ignored path inside the repo, or is the real target path itself (reset with `git checkout --`
+  instead of a tmp copy). Always confirm with `prettier --file-info <path>` that `ignored: false`
+  before trusting any stability result from that path.
+- **Correction to this file's own prior-round entry, which reached the wrong conclusion and shipped
+  a QA-caught defect.** `plugins/sdlc/commands/init.md`'s Step 0 "Refresh skills" numbered sub-list
+  (nested inside an outer numbered list → bulleted option → nested numbered "Steps:" list) is
+  genuinely `prettier --write`-non-idempotent even on an untouched `git checkout --` copy — that
+  part of the prior diagnosis was correct, and it IS pre-existing repo drift, not something this
+  story's edits introduced. But the prior round's response — decide it's "out of scope", leave the
+  section untouched, and let the pre-commit hook's mandatory reformat produce and commit whatever
+  mangled form it emits (a collapsed run-on list with a code span `` `claude plugin update
+<plugin>@<marketplace> --scope project` `` split across two physical lines, dedenting the second
+  line to column 0) — was wrong: QA correctly flagged the committed, rendered defect regardless of
+  whose commit introduced the _cause_. "Pre-existing instability I didn't cause" is not a reason to
+  ship a broken rendering; the fix obligation travels with whoever's commit is the one that actually
+  contains the mangled text on disk. **The real fix was cheap and root-caused correctly on the
+  second attempt:** the failure was never really about nesting depth alone — it was a **code span
+  split across a hand-wrapped physical line** (`` `claude plugin update\n<plugin>@<marketplace>
+--scope project` `` — the exact CommonMark hazard already documented in the NA-7 gtm memory entry:
+  a code span's embedded line break renders as a literal space, and remark's paragraph reflow
+  around it inside deep list nesting is what actually broke). Flattening the nested "Steps:" ordered
+  list into plain prose sentences ("First, ... Then ... Finally, ...") — dropping the nesting from
+  3 list levels to 2 — **and** moving the multi-backtick code span onto a single unwrapped physical
+  line together fixed it completely: the file went from ~22 non-idempotent hunks (many pre-existing
+  and unrelated to this defect, e.g. GFM table column-padding, `*em*`→`_em_` conversion) to fully
+  `prettier --write`-stable on the very first pass (pre-format bytes == post-format bytes,
+  confirmed via `diff`). Lesson: when a "pre-existing, not my fault" defect is flagged in review on
+  a file your commit touches, don't defer to "out of scope" — try the actual root cause (search for
+  a split code span or other CommonMark hazard near the corruption site) before concluding it's
+  unfixably fragile; the nesting-depth framing was a red herring that led to giving up too early the
+  first time.
 - The `plugins/sdlc/skills/skill-creator/scripts/quick_validate.py` script hard-requires a
   `SKILL.md` file (prints `"SKILL.md not found"` and exits 0 for any other filename) — it cannot
   validate a command file's frontmatter. For a story that only touches `commands/*.md` frontmatter,
@@ -49,6 +61,20 @@
   (`line.startswith("| type") and "quadrant" in line`), not by the exact original spacing, in any
   script that locates a registry/manifest table programmatically (self-check scripts, CI lint, a
   future `/sdlc:docs` generator reading `refs/doc-types.md`).
+- **Gating a new opt-in prompt/write-step ("only when X was accepted") is not enough when the same
+  command has an existing bypass path that skips the step where X is normally asked.** `init.md`'s
+  Step 0 "Merge new findings" guard jumps straight to Steps 4b/4d/4e (and now 4g) without re-running
+  all of Step 3 — it only re-asks fields discovered via a template-token diff against
+  `refs/project-context-template.md`. A brand-new Step 3 `AskUserQuestion` that is **not** a
+  project-context token (this story's docs opt-in) is therefore unreachable on a Merge run under a
+  naive "gate 4g on Step 3 acceptance" rule — QA caught this as an AC5 reachability gap, not merely
+  a wording nit. Fix pattern for any future Step-3-adjacent opt-in: gate the downstream write step
+  on "(accepted this run) OR (its artifact already exists from a prior run)", and explicitly state,
+  next to the opt-in's own re-init-semantics prose, that a Merge run re-prompts it keyed on **the
+  artifact's absence**, not on appearing in the template-token diff loop. Whenever a spec/plan adds
+  a Step-3 confirm that writes a file outside `project-context.md` itself, check by hand whether
+  Step 0's merge-bypass path can actually reach that confirm — don't assume "it's a normal Step 3
+  field" without tracing the bypass.
 
 ## NA-58 — QA fix round on commit 9786198 (`plugins/sdlc/skills/writing-docs`)
 

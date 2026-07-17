@@ -6,10 +6,9 @@ explanation), plus a `meta` quadrant for cross-cutting artifacts. Consumer repos
 file directly — they activate rows via their own `.claude/project/docs-manifest.md`, scaffolded
 by `/sdlc:init` from `refs/docs-manifest-template.md`.
 
-This story ships the registry and the opt-in manifest scaffold only. There is zero generation
-logic here and zero runtime manifest consumption — the `sync`/`release`/`seed`/`audit`/`distill`
-`trigger` modes are specified now so a future `/sdlc:docs` command can read this file, but no
-such command exists yet.
+The current row set ships no generation logic and no runtime manifest consumption — the
+`sync`/`release`/`seed`/`audit`/`distill` `trigger` modes are specified now so a future
+`/sdlc:docs` command can read this file, but no such command exists yet.
 
 Mirrors the documentary style of `refs/skills-map.yml` (a flat table registry). Do **not**
 abstract a shared registry format between the two files — copy the shape, do not generalize.
@@ -49,8 +48,8 @@ Grammar operators:
 - `dep:<pkg>` — matches when `<pkg>` appears in the declared dependency list (input 2), same
   semantics as `refs/skills-map.yml`'s `dep:` condition.
 
-For this story every shipped row uses `applies-when = always` — the 15 mandatory doc types below
-are all stack-agnostic. The grammar is specified now so a future stack-specific row (e.g. an
+Every row currently ships with `applies-when = always` — the 15 mandatory doc types below are all
+stack-agnostic. The grammar is specified now so a future stack-specific row (e.g. an
 API-reference row gated on `framework:Hono`) slots in without a schema change.
 
 ## Rows
