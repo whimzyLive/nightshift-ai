@@ -67,3 +67,10 @@
 **Root causes:** two-phase dispatch designed without an explicit data handoff contract; docs updated for the new rule but not the old rule's absolutist wording; uniqueness schemes (numbers, date branches) designed single-writer; guard scope stated ambiguously ("both appends").
 **Preventions:** every cross-dispatch boundary needs an explicit payload contract (what, verbatim, via which channel); when adding exception N, grep for "only" claims about exceptions 1..N-1; any generated identifier needs a collision rule; guards state their exact scope per append site.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-17 — Story NA-58
+
+**Issues found:** 1 Critical — writing-docs SKILL.md frontmatter description exceeded the 1024-char validator limit (1162 chars); runtime truncation would have dropped the parameterization clause, undermining AC-1 signal and skill triggering. 1 Minor — garbled ADR-index parenthetical in the explanation template.
+**Root causes:** description authored for completeness without running the plugin's own vendored validator (`skill-creator/scripts/quick_validate.py`); a sentence duplicated the body's "When to Use" section.
+**Preventions:** run `quick_validate.py` on any new/edited plugin skill before committing; keep frontmatter descriptions ~800 chars like sibling skills; never duplicate body sections into the description.
+**Domains affected:** ai-enablement-engineer
