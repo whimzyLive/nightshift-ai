@@ -204,10 +204,16 @@ dispatched at all.
    done
    ```
 
-   - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → emit the explicit
-     WARNING (never a silent clean exit that reads as success):
-     `WARNING: no story branch (feat|fix)/<STORY-KEY> found on origin. v1 sync is branch-diff-only; post-merge sync (diffing the merged commit range) is deferred to NA-56. Nothing regenerated.`
-     — then exit. Do not dispatch `knowledge-engineer` in this case.
+   - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → select the
+     **merged-commit** diff source per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#26-dual-diff-source--selection-rule`: locate the
+     commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>` (the `PROJECT_KEYS`-scoped regex from
+     §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
+     (`<sha>^..<sha>`, or the union across matches). **Zero commits carry the key** → STOP with
+     `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`
+     (never a silent no-op). `git fetch` failure / unresolvable `origin/<BASE-BRANCH>` → STOP. Then
+     dispatch `knowledge-engineer` Phase 1 with the merged-commit-derived diff instead of
+     `$STORY_BRANCH`.
 
 3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it
    `STORY_BRANCH`, `origin/<BASE-BRANCH>` (the **remote-tracking** base ref from project-context,
@@ -501,7 +507,9 @@ or `seed`'s no-op/STOP set).
 | Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | Recognised future-mode token (`distill` only, after the strike)                                                 | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error. **`audit` is no longer in this set.**                                                                                                                                                                                                      |
-| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-56); exit **without** a silent success.                                                                                                                                                                                                          |
+| `sync`, no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>`, merged commit **found** on base               | Select the **merged-commit** diff source (§26) — diff `<sha>^..<sha>` (union across matches) and regenerate.                                                                                                                                                                                                                  |
+| `sync`, no story branch, **zero** commits carry `<STORY-KEY>` on base                                           | **STOP** — `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`. Never a silent no-op.                                                                                                                                                                                                   |
+| `sync`, no story branch, `git fetch` fails / `origin/<BASE-BRANCH>` unresolvable                                | **STOP** (shared with §1's base-ref pre-check) — never a fallthrough to "no diff".                                                                                                                                                                                                                                            |
 | `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                                                                                                      |
 | Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                                                                                         |
 | Deterministic regen produced byte-identical output and no narrative draft confirmed                             | No commit, no PR (AC6) — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                              |
