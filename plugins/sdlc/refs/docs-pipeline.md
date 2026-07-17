@@ -1043,12 +1043,13 @@ description: <one line, used verbatim as the llms.txt description>
 ---
 ```
 
-**This is a real gap in the templates, not a restatement of an existing rule.** Verified by
-inspection of `writing-docs/SKILL.md`: the **How-to guide template** is the only one that emits
-frontmatter (`title` + the `source:` glob list); the **Tutorial**, **Reference**, and
-**Explanation** templates emit **no frontmatter block at all**, and **none of the four** emits
-`description:`. Three of `seed`'s four types would, template-faithfully, produce a page with no
-frontmatter whatsoever.
+**As of NA-61 the `writing-docs` templates emit this frontmatter** — all four Diátaxis templates
+(Tutorial, How-to, Reference, Explanation) now carry `title:` + `description:` (bracket-free `TODO —`
+scalars the author fills) + `related-adrs: []`. A page authored from a current template therefore
+satisfies this requirement by construction. The seed layer still **validates** it at the
+founder-confirm gate (below) rather than assuming it, because a **legacy or hand-authored** page — or
+one written before NA-61 — may still lack it; the requirement is enforced on the page `seed` writes,
+not waived.
 
 The consequence: §8's `llms.txt` regen derives every entry from the page's frontmatter
 (`title — one-line description — relative link`). A seeded page with no frontmatter either **drops
@@ -1189,10 +1190,14 @@ apply):
   frontmatter. The newly seeded page appears in it. Idempotent; committed only if changed.
 
 - **Frontmatter-less pages the regen encounters are SKIPPED, never fatal, and never fabricated.**
-  This story mandates frontmatter on the **page it writes**, but §8's algorithm reads frontmatter
-  from **every** enabled `public: yes` page in the tree — and the templates emit none, so pages
-  written before this rule existed (a hand-authored tutorial, a `sync`-drafted how-to) may well lack
-  it. That exposure is pre-existing and shared with `sync`/`release`; `seed` merely walks into it.
+  This story mandates frontmatter on the **page it writes**, and §8's algorithm reads frontmatter
+  from **every** enabled `public: yes` page in the tree. As of NA-61 the `writing-docs` templates
+  emit `title`/`description`, so a page authored from a current template carries it — **but the
+  regen cannot tell a template-produced page from a legacy one at regen time** (there is no origin
+  marker, and an age heuristic would be forbidden ambient input). So this skip stays **universal**;
+  it simply fires **rarely** now — only for a legacy or hand-authored page (or one predating NA-61)
+  that lacks frontmatter. Do not remove it: legacy pages still depend on it. That exposure is
+  pre-existing and shared with `sync`/`release`; `seed` merely walks into it.
   - A page missing `title`/`description` is **omitted from `llms.txt`** and its path **surfaced in
     the phase-2 output and the PR body**. Loud, not silent.
   - It is **never a STOP.** A STOP mid-phase-2 would **tear the write** — the founder's page
@@ -1318,16 +1323,42 @@ includes `changelog`, `release-notes`, `migration-guide`, `tutorial`, `how-to`, 
   as potentially stale — the same signal `sync` uses to draft a refresh, but surfacing pages `sync`'s
   branch-scoping never reached. A `source:`-less page is **not** flagged (§5's opt-in boundary).
 - **Referenced-ADR drift (AC4).** A page that **declares an ADR reference** — an inline link to
-  `docs/adr/NNNN-*` or an explicit ADR-reference frontmatter key — whose referenced ADR has commits
-  newer than the page is flagged **as "the doc diverges from the ADR"**. The ADR is source of truth;
-  **the direction is fixed and `audit` never proposes the reverse.** It reads `docs/adr/**`
-  **read-only** and **never writes `docs/adr/`** (the `adr` row is `public: no` — `audit` is a
-  _public-docs_ accuracy tool). A page with **no** declared ADR reference is **never attributed** to
-  an ADR — the association is never fabricated. **Reliability caveat:** the current `writing-docs`
-  templates emit no ADR-reference key, so this flag fires only for pages carrying an inline
-  `docs/adr/NNNN-*` link by convention — see the OQ carry-over in §24.
+  `docs/adr/NNNN-*` **or a non-empty `related-adrs:` frontmatter key** (a YAML list of
+  repo-root-relative `docs/adr/NNNN-*.md` paths, resolved **identically** to the inline-link form —
+  audit needs no number→file mapping) — whose referenced ADR has commits newer than the page is
+  flagged **as "the doc diverges from the ADR"**. The ADR is source of truth; **the direction is
+  fixed and `audit` never proposes the reverse.** It reads `docs/adr/**` **read-only** and **never
+  writes `docs/adr/`** (the `adr` row is `public: no` — `audit` is a _public-docs_ accuracy tool). A
+  page with **no** declared ADR reference is **never attributed** to an ADR — the association is
+  never fabricated.
+
+  **Reliability caveat (OR-semantics — empty ≠ "no ADR").** As of NA-61 all four `writing-docs`
+  templates emit a `related-adrs:` key, defaulting to `[]`. The flag is an **OR** over two arms: it
+  fires for a page that **opted in** — an inline `docs/adr/…` link **OR** a **non-empty**
+  `related-adrs:`. A template-produced page left at the empty `[]` default is **not** flagged via the
+  key (it opted out) — an empty/absent `related-adrs:` means "the frontmatter arm is silent," so audit
+  **falls through to the inline-link arm**; it never means "this page has no ADR." A page carrying an
+  inline `docs/adr/…` link but a default-empty key therefore **keeps** the detection it had before
+  NA-61 (no regression). Do **not** read this as "the flag is now reliable for every template page" —
+  a page at the `[]` default is not audited via the key.
+
 - **Dangling code reference.** A page referencing a repo-relative code path that no longer exists at
   the base ref is flagged. Deterministic (path-existence check), never a semantic guess.
+- **Dangling `related-adrs:` path.** A `docs/adr/…` path listed in `related-adrs:` that does **not**
+  resolve to an existing `docs/adr/*.md` file at the base ref is flagged as **dangling** — a
+  path-existence check (the same primitive as the dangling code-reference check above, extended to the
+  ADR arm). This is **distinct** from the newer-commits drift check: a non-existent ADR has **no**
+  commits, so the drift check (`git log` on the path → empty) **silently passes**; without this
+  separate existence check a typo'd or deleted `docs/adr/` path would permanently advertise a phantom
+  ADR audit never catches.
+
+**No narrative `title`/`description` presence flag (re-homed from §24).** `audit` does **not** add a
+flag for a narrative page that lacks `title`/`description` frontmatter. Even though NA-61's templates
+now emit both, the regen cannot distinguish a template-produced page from a legacy one, so such a
+flag would fire on nearly every legacy/hand-authored page — a **template-source defect, not per-page
+drift**. Frontmatter-less pages are handled by §19's skip-and-surface, **not** by a drift flag. (This
+decision was previously recorded in §24's OQ carry-over; it is re-homed here so it is not lost when
+that now-resolved carry-over is retired.)
 
 **Pure narrative divergence with no verifiable anchor is deliberately NOT audited in v1** — detecting
 that hand-authored prose has semantically drifted from an ADR requires an LLM judgment that is
@@ -1397,15 +1428,13 @@ lesson).
   a narrative fix is forbidden. **(OQ, §Open-Questions in the spec: stdout report, no PR, for v1.)**
 - **default, no drift of either tier** → report clean, open nothing (AC2).
 
-### OQ carry-over — `audit` checks for frontmatter the templates do not emit
+### Frontmatter-in-templates (resolved by NA-61)
 
-The `writing-docs` templates emit no `description:` frontmatter (three of four emit no frontmatter
-block). This is in `audit`'s path twice: (1) the `llms.txt` regen (§21) — handled by §19's
-**skip-and-surface**, never a STOP; (2) a hypothetical narrative frontmatter-presence flag — **v1
-does NOT add one**, because it would flag nearly every existing narrative page (a template-source
-defect, not per-page drift). A follow-up story (NA-61) adds `description:` (and an ADR-reference key)
-to the templates at source; `audit` adopts skip-and-surface and does not teach itself to flag a gap
-the templates guarantee.
+NA-61 landed: all four `writing-docs` templates now emit `title:` + `description:` +
+`related-adrs:`. The two former carry-overs are resolved and homed elsewhere — the `llms.txt`
+frontmatter-less-page handling is §19's (now-rare, still-universal) skip-and-surface, and the decision
+**not** to add a narrative `title`/`description` presence flag is recorded in §22. Nothing further is
+carried here.
 
 ## 25. Post-QA inline dispatch variant
 
