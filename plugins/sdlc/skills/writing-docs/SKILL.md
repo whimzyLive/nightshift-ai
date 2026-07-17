@@ -170,6 +170,13 @@ along the way.]
 ### How-to guide template
 
 ```markdown
+---
+title: [specific, real-world goal, matching the H1 below]
+# source: repo-root-relative globs; changes to these files make /sdlc:docs sync draft a refresh of this page. Omit to opt out.
+source:
+  - [repo-root-relative glob, e.g. plugins/sdlc/commands/loop.md]
+---
+
 # How to [specific, real-world goal]
 
 [One sentence naming the problem/goal this guide solves — not what tool it uses.]

@@ -1,5 +1,48 @@
 # ai-enablement-engineer — memory
 
+## NA-52 — PR #115 review round 3, 10 accepted findings (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/commands/docs.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `docs/superpowers/plans/NA-52.md`)
+
+- **A load/list asymmetry (skill loaded unconditionally but the `Skills loaded:` return contract
+  lists it conditionally) is fixable two ways, and the deciding factor is which condition is
+  cheaper to state precisely, not which file "feels" like the source of truth.** Here the fix was
+  to make the _load_ conditional (only in Phase 1, only once affected `how-to` rows are resolved)
+  to match the already-conditional _return_ line, rather than the other way around — because the
+  return condition ("a narrative draft was actually produced") was already correct and
+  well-motivated (Phase 2 genuinely never drafts), so loosening it to "unconditional" would have
+  been the wrong direction. When a review finds this shape of asymmetry, check which side already
+  states a correct, well-reasoned condition before picking which side to change.
+- **`plugins/sdlc/scripts/check-agent-skill-preloads.sh` only enforces two structural things — no
+  frontmatter `skills:` key, and one verbatim marker sentence present somewhere in the file — it
+  does NOT enforce the shape (branched vs. merged) of an agent's "Required skills" prose.** This
+  means a "merge 4 restatements of a shared skill list into one canonical statement referenced by
+  the return contract" simplification (the kind finding #10 asked for) is always safe to attempt
+  from the gate's perspective; the actual risk is losing information (e.g. quietly dropping the
+  distinction between an unconditional skill and a conditionally-loaded one), not tripping the
+  gate. Read the gate script itself before assuming a required-skills restructuring needs a
+  "skip and report not-applied" fallback — it's a much narrower contract than the prose describing
+  it might suggest.
+- **A "single source of truth cell, others reference it" fix for a literal string duplicated across
+  files (finding #9) needs the _registry's own self-check section_ to explicitly bless the
+  in-file duplication it still permits (schema-table example mirroring the registry row), or the
+  next reviewer will re-flag the schema-table copy as a 6th restatement site.** Added an explicit
+  self-check bullet naming both in-file locations as the sanctioned mirror and every other file as
+  reference-only — this is the same "precedence rule stated in the guard itself, not just in
+  prose above it" pattern from the NA-51 round-2 memory entry, applied to a duplication guard
+  instead of a gating guard.
+- **A stale "no such command exists yet" claim and a stale "seven sections" count are the same
+  bug shape appearing twice in one PR (doc-types.md's registry intro, the plan's Task 4/AC-coverage
+  references) — once a file ships the thing a sibling doc said didn't exist yet, or a section count
+  changes, grep the WHOLE repo for the old claim/number, not just the line(s) the review named.**
+  Found and fixed a 4th, unflagged occurrence of "seven sections" (the plan's own `Self-review`
+  AC-coverage line) this way — the review only named 3 of the 4 stale references to the same
+  underlying drift.
+- Confirmed `pnpm prettier`/`pnpm exec prettier`/`pnpm nx` all require `node_modules` to actually
+  exist in this repo checkout — a fresh worktree or a checkout that never ran `pnpm install` has
+  none, and `pnpm exec prettier` fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL` (looks like a
+  missing-binary error, not a missing-install one) rather than a clearer "run install first"
+  message. `pnpm install --frozen-lockfile` before the first `prettier`/`nx` invocation in any
+  fresh checkout is cheap insurance against mis-reading that error as something else.
+
 ## NA-51 — PR #113 review round 2, 10 accepted findings (`plugins/sdlc/commands/init.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`)
 
 - **A "gate a new write step on opt-in acceptance" design is incomplete without an explicit
@@ -1212,3 +1255,75 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
 **Pitfalls:**
 
 - Command mode tables covering only disjoint flag cases leave combined inputs (flag + free text) implementation-defined; add a row or an explicit STOP.
+
+## 2026-07-17 — Story NA-52 — `/sdlc:docs sync` command + `refs/docs-pipeline.md`
+
+- A "registry self-check" grep gate across multiple files (here: `doc-types.md` +
+  `docs-pipeline.md` + `docs.md` all restating the same `llms-txt` `source-of-truth` string
+  verbatim) breaks silently when prettier reflows one of the restatements across a Markdown line
+  wrap — the phrase was present and byte-correct in the source, but split mid-string across two
+  lines by prose wrapping, so a single-line `grep -n "<phrase>"` reported only 2/3 files instead of
+  3/3 until the sentence was restructured to keep the exact phrase on one physical line. Any
+  cross-file verbatim-string verification gate needs the asserted string kept on one line at every
+  restatement site, not just written correctly — re-run the grep after `prettier --write`, not
+  before, since prettier is what can introduce the wrap.
+- Extending an existing dual-purpose agent (`knowledge-engineer`, already serving `/sdlc:adr`) with
+  a second, structurally-parallel pipeline is a "branch every shared section, don't add a global
+  one" exercise: the required-skills list, the `Skills loaded:` return-line contract, and the
+  Pipeline section all needed the same shape — one bullet/paragraph per dispatch type, explicit
+  that each type's skill set must NOT include the other type's skill (`writing-adrs` vs
+  `writing-docs`) — rather than a single merged list with a footnote. Mirrors the NA-43/NA-44
+  memory-conflict-exception pattern (promote the shared concept to a named, enumerated split point)
+  but applied to agent dispatch-type branching instead of memory-write exceptions.
+- `refs/docs-pipeline.md` mirrors `refs/adr-pipeline.md`'s two-phase-dispatch skeleton almost
+  exactly (phase 1 writes nothing and returns; founder-confirm gate lives at the command layer;
+  phase 2 is a fresh dispatch that writes only what it was handed verbatim) — but the _branch cut
+  point_ differs in a way worth calling out explicitly rather than leaving implicit: ADR branches
+  cut from `<BASE-BRANCH>` (a brand-new decision record has no source-of-truth dependency on any
+  other branch's tree), while docs-sync branches cut from the **story branch head**, because the
+  deterministic regen algorithm reads the changed source files themselves — branching off base
+  would regenerate from a tree that's missing the very changes the sync is supposed to reflect.
+  When mirroring a pipeline skeleton for a new command, check whether the new command's write step
+  actually needs to read repo state the base branch wouldn't contain before copying the base-branch
+  cut-point verbatim.
+- The plan's Task 5 Step 4 said "Error Handling table verbatim from the spec (nine scenarios)" but
+  the spec's actual table has eleven rows — trusted the spec (the binding contract, explicitly
+  named as such in the dispatch prompt) over the plan's parenthetical count and copied all eleven
+  rows verbatim rather than trimming to match the plan's stated count. When a plan's descriptive
+  aside about a spec artifact (a row count, a section count) conflicts with the spec itself, the
+  spec wins — the aside is likely just an inaccurate paraphrase, not a scope instruction to drop
+  rows.
+- `skill-creator`'s `scripts/quick_validate.py` lives inside _this repo's_ installed
+  `plugins/sdlc/skills/skill-creator/` tree (not a separate globally-cached plugin location) —
+  running it against an edited skill is `python3 plugins/sdlc/skills/skill-creator/scripts/quick_validate.py plugins/sdlc/skills/<name>`
+  from the repo root. Useful to know for any future skill edit needing the "run quick_validate"
+  verification step without re-deriving where the script lives.
+
+## 2026-07-17 — Story NA-52 — QA round 1 fix
+
+- The first-pass "branch every shared section" work on `knowledge-engineer.md` (see the entry
+  above) still missed two sections that needed the same ADR-vs-docs-sync split: "Branch, memory,
+  commit, return" and the "Completion checklist" — both still read as ADR-only prose (the branch
+  section's step 1 literally said "off `<BASE-BRANCH>`", directly contradicting
+  `docs-pipeline.md` §7's story-branch-head cut point for docs-sync). A "branch every shared
+  section" sweep needs to be a literal grep for every `##`/`###` heading in the file, not a
+  from-memory list of "the sections I already knew needed it" — the two I'd already branched
+  (required-skills, `Skills loaded:` return line, Pipeline) were the ones explicitly named in the
+  dispatch prompt's task steps; the two QA caught were downstream sections whose ADR-only content
+  only became wrong _because_ of the upstream branching, not sections the original task list named.
+- `git diff --name-only "<BASE-BRANCH>...$STORY_BRANCH"` (bare local branch name on the left side
+  of a three-dot range) is checkout-dependent in a way that's easy to miss when writing the
+  contract from the spec's own bash snippet — the spec's own example used the bare form. QA's fix
+  was `origin/<BASE-BRANCH>...$STORY_BRANCH` (remote-tracking on both sides) since `sync` already
+  fetches (`git fetch origin --quiet`) before resolving `STORY_BRANCH` as an `origin/*` ref — using
+  a bare local base ref right after that fetch is inconsistent (one side of the diff is guaranteed
+  fresh, the other isn't) and silently wrong if the invoking checkout's local `<BASE-BRANCH>` is
+  stale. When a spec's own worked bash example mixes a fetched remote ref with a bare local one in
+  the same diff command, don't copy it verbatim — normalize both sides to the same freshness
+  guarantee.
+- Prettier's per-file reflow can shift a fix's target line numbers between "what I read" and "what
+  actually gets committed" (table column realignment shifted `doc-types.md`'s Registry rows table
+  by one line after the `source-of-truth` schema-cell edit). Re-read line numbers from a Read call
+  after any earlier edit in the same file before doing a second targeted edit later in the same
+  session, rather than trusting line numbers cited in a review finding against the pre-prettier
+  draft.

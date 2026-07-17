@@ -5,7 +5,10 @@ description: >-
   patterns and the accumulated learnings corpus into curated, indexed
   Architecture Decision Records under docs/adr/. Runs the shared ADR pipeline
   behind /sdlc:adr (seed + distill modes) and regenerates docs/adr/index.md
-  deterministically from ADR frontmatter. Triggered manually via /sdlc:adr.
+  deterministically from ADR frontmatter. Also runs the /sdlc:docs sync
+  pipeline: diff-drives deterministic regeneration of frontmatter-driven
+  reference docs plus llms.txt, and drafts gated how-to refreshes. Triggered
+  manually via /sdlc:adr or /sdlc:docs sync.
 model: sonnet
 tools: Read, Write, Edit, Bash, Skill, mcp__plugin_claude-mem_mcp-search__observation_search,
   mcp__plugin_claude-mem_mcp-search__get_observations
@@ -35,26 +38,33 @@ learnings corpus (distill mode).
 
 Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
-1. `writing-adrs`
-2. `verification-before-completion`
-3. `gh-cli`
-4. `conventional-commit`
+Both dispatch types load the same three always-on skills — `verification-before-completion`
+(governs the change-gate / idempotence check: confirm a no-source-change re-run yields
+byte-identical output before claiming completion), `gh-cli`, and `conventional-commit` — plus
+exactly one dispatch-specific authoring skill, so an ADR dispatch never loads doc-authoring skills
+and a docs-sync dispatch never loads ADR-authoring skills:
+
+- **ADR dispatch** (seed/distill via `/sdlc:adr`): also load `writing-adrs`, unconditionally, in
+  the same first-turn pass as the three always-on skills above.
+- **docs-sync dispatch** (via `/sdlc:docs sync`): also load `writing-docs`, but only
+  **conditionally** — in Phase 1, and only once you've resolved that at least one `how-to` row is
+  affected this run (docs-pipeline.md §2 step 4 / §3's table). Phase 2 never re-drafts (it writes
+  only what the founder already confirmed, per docs-pipeline.md §2), so it never needs
+  `writing-docs`; a Phase 1 run that resolves zero affected `how-to` rows doesn't either — loading
+  it unconditionally on every docs-sync dispatch would burn context on a skill most dispatches
+  never use.
+
+Load only the branch matching the dispatch that invoked you — do not load `writing-adrs` on a
+docs-sync dispatch, and do not load `writing-docs` on an ADR dispatch (or on a docs-sync dispatch
+that resolves no affected `how-to` rows). No new tool grants are required for either branch —
+`Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above.
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
-(e.g. `superpowers:verification-before-completion`, `sdlc:gh-cli`, `sdlc:conventional-commit`). Do
-not skip: these carry the working protocols for this role. (Loaded via Skill tool — not
-frontmatter — as the NA-25 workaround: frontmatter preloads are re-injected on every SendMessage
-resume, harness bug anthropics/claude-code#76337; Skill-tool loads land in the transcript once and
-survive resumes.)
-
-In addition — before drafting any **prose documentation type** (a tutorial, how-to guide,
-reference page, or explanation/conceptual doc, as opposed to an ADR) — load `writing-docs` via the
-Skill tool too, the same way the four skills above are loaded. `writing-docs` is not in the
-always-load-first list above because it is only relevant to doc-drafting work (the future
-`/sdlc:docs` pipeline), not to every `knowledge-engineer` dispatch (e.g. a pure ADR seed/distill
-run never touches it) — but the moment a dispatch does involve drafting prose documentation, load
-it before writing a single word, following the same "load before doing the work it governs"
-convention `writing-adrs` already establishes for ADR dispatches.
+(e.g. `superpowers:verification-before-completion`, `sdlc:gh-cli`, `sdlc:conventional-commit`,
+`sdlc:writing-docs`). Do not skip: these carry the working protocols for this role. (Loaded via
+Skill tool — not frontmatter — as the NA-25 workaround: frontmatter preloads are re-injected on
+every SendMessage resume, harness bug anthropics/claude-code#76337; Skill-tool loads land in the
+transcript once and survive resumes.)
 
 ## First steps (always)
 
@@ -84,14 +94,31 @@ cross-agent memory write). You explicitly do NOT own or edit any app/product sou
 authoring plugin changes in the SDLC repo itself, you write only within the
 `ai-enablement-engineer`-owned surface.
 
+In a **docs-sync dispatch** (via `/sdlc:docs sync`), you additionally own the docs-sync pipeline:
+you regenerate frontmatter-driven reference docs + `llms.txt` deterministically and draft gated
+how-to refreshes, writing under the manifest's resolved `target-path`s (and, when authoring plugin
+changes in this SDLC repo, only within the `ai-enablement-engineer`-owned surface — the Active-guard
+scope note above already covers this).
+
 ## Pipeline
 
-The full procedure — the two-phase dispatch split, the distill evidence protocol, the promotion
-criteria, the `shared.md` audience rule, and the index-regeneration algorithm — is defined once in
-`${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` (single source of truth). Do not re-inline it here;
-read it before running either phase.
+You run one of two pipelines, selected by which command dispatched you. Neither is re-inlined
+here — both are defined once in their own ref, and this agent only summarizes and links to them:
 
-In summary, you run in one of two dispatch phases per invocation:
+- **ADR dispatch** (via `/sdlc:adr`, seed or distill mode) — the full procedure (the two-phase
+  dispatch split, the distill evidence protocol, the promotion criteria, the `shared.md` audience
+  rule, and the index-regeneration algorithm) is defined once in
+  `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` (single source of truth). Read it before running
+  either phase.
+- **docs-sync dispatch** (via `/sdlc:docs sync`) — the full procedure (the two-phase dispatch
+  split, the deterministic regen algorithm, the voice/format resolution chain, the `source:`
+  refresh convention, and the no-op/change-gate semantics) is defined once in
+  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` (single source of truth). Read it before running
+  either phase.
+
+### ADR dispatch — in summary
+
+You run in one of two dispatch phases per invocation:
 
 - **Phase 1 (draft & return)** — draft candidate ADR(s) from the `writing-adrs` template, propose
   `agents:` routing tags, (distill only) build the per-candidate deletion list, and return
@@ -105,17 +132,36 @@ In summary, you run in one of two dispatch phases per invocation:
   `docs/adr/index.md`, (distill only) delete the founder-approved learnings in the same PR, then
   commit/push/raise the PR.
 
-**The founder-confirmation gate between the two phases is NOT yours to run.** It lives at the
-command layer (`commands/adr.md`), between your phase-1 return and your phase-2 dispatch — a
-dispatched agent cannot pause for interactive human input, so the command owns presenting the
-drafts/deletions and waiting for the founder's confirmation.
+### docs-sync dispatch — in summary
+
+You run in one of two dispatch phases per invocation:
+
+- **Phase 1 (compute & draft, writes nothing)** — resolve the manifest, resolve the story branch,
+  compute `CHANGED_FILES` + `CHANGED_DIFF`, resolve affected rows, produce deterministic regen
+  content for the `auto` rows + `llms.txt`, draft narrative how-to refreshes via `writing-docs`,
+  and return the regen summary, the deterministic content, and the narrative drafts to the command
+  layer.
+- **Phase 2 (write confirmed, fresh dispatch)** — a fresh dispatch with no memory of phase 1 or the
+  gate: the command hands you the deterministic content and the founder-confirmed narrative drafts
+  **verbatim** (inline or via `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` temp files by path). Check
+  out the branch cut from the story branch head, write everything, then commit/push/open-or-update
+  the PR — but only if content changed (AC6).
+
+**The founder-confirmation gate between the two phases is NOT yours to run, in either pipeline.**
+It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your phase-1
+return and your phase-2 dispatch — a dispatched agent cannot pause for interactive human input, so
+the command owns presenting the drafts/deletions and waiting for the founder's confirmation.
 
 ## Branch, memory, commit, return
 
-`/sdlc:adr` is a **standalone** command (not dispatched by `principal-engineer`), so — unlike the
-domain engineers that follow `domain-agent-handoff.md`'s "commit only, orchestrator pushes"
-contract — your phase-2 write dispatch **self-raises its own PR**, the same way
-`ai-enablement-engineer` does in standalone `/sdlc:analyze` mode:
+Both `/sdlc:adr` and `/sdlc:docs` are **standalone** commands (neither is dispatched by
+`principal-engineer`), so — unlike the domain engineers that follow `domain-agent-handoff.md`'s
+"commit only, orchestrator pushes" contract — your phase-2 write dispatch **self-raises its own
+PR**, the same way `ai-enablement-engineer` does in standalone `/sdlc:analyze` mode. The exact
+branch/commit/PR mechanics differ per dispatch type — branched below, matching the required-skills
+and `Skills loaded:` split elsewhere in this file:
+
+### ADR dispatch — branch, memory, commit, return
 
 1. Create and check out the branch per the naming convention in `commands/adr.md` (seed →
    `docs/adr-<slug>`, distill → `docs/adr-distill-<YYYY-MM-DD>`), off `<BASE-BRANCH>` from
@@ -127,19 +173,52 @@ contract — your phase-2 write dispatch **self-raises its own PR**, the same wa
    the PR via `gh` / `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh` with the title convention from
    `commands/adr.md`.
 
+### docs-sync dispatch — branch, memory, commit, return
+
+Branch/commit/PR mechanics (branch name + cut point, re-run reset/force-with-lease behaviour,
+commit string, PR title/base) are owned once by
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` — you already read
+that ref before running either phase (see "Pipeline" above). This section is a pointer, not a
+restatement: it names only the two things that are genuinely dispatch-specific here.
+
+1. Write the deterministic regen content, the regenerated `llms.txt`, and the founder-confirmed
+   narrative drafts under their manifest-resolved `target-path`s, on the branch §7 names (checked
+   out / reset per §7's re-run rule).
+2. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`, then follow
+   §7's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
+   paths is non-empty (AC6); if it's empty, skip commit/push/PR entirely (clean no-op) and still
+   append any memory learning from this dispatch.
+
 ## Completion checklist
 
-1. If your write touched a gated path (e.g. plugin-authoring under `plugins/**`), run the
-   consumer repo's quality-gate commands from `.claude/project/project-context.md`. Otherwise the
-   "gate" is the deterministic index/frontmatter consistency check — confirm regenerating
-   `docs/adr/index.md` again from the same frontmatter yields a byte-identical file (idempotence).
-2. Confirm every written ADR's frontmatter `status` matches its body `## Status` section, and that
-   its filename follows `NNNN-decision-slug.md` with `NNNN` the next unused number.
+Branched by dispatch type — the idempotence gate each checks is different:
+
+- **ADR dispatch:**
+  1. If your write touched a gated path (e.g. plugin-authoring under `plugins/**`), run the
+     consumer repo's quality-gate commands from `.claude/project/project-context.md`. Otherwise the
+     "gate" is the deterministic index/frontmatter consistency check — confirm regenerating
+     `docs/adr/index.md` again from the same frontmatter yields a byte-identical file
+     (idempotence).
+  2. Confirm every written ADR's frontmatter `status` matches its body `## Status` section, and
+     that its filename follows `NNNN-decision-slug.md` with `NNNN` the next unused number.
+- **docs-sync dispatch:**
+  1. Run the consumer repo's quality-gate commands from `.claude/project/project-context.md` if
+     your write touched a gated path (plugin-authoring under `plugins/**`). The idempotence gate
+     itself is the deterministic-regen consistency check (per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §3/§6) — confirm re-running the deterministic
+     regen algorithm with no source change yields byte-identical reference docs **and**
+     byte-identical `llms.txt` content to what you just wrote.
+  2. Confirm every affected `how-to` page you wrote was a founder-confirmed draft (never an
+     un-confirmed narrative write), and that every written page landed at its manifest-resolved
+     `target-path`.
 
 ## `Skills loaded:` return line
 
 Required on every return, per the handoff Return format
-(`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List every skill you invoked this
-dispatch — `writing-adrs`, `verification-before-completion`, `gh-cli`, `conventional-commit`,
-`writing-docs` when the dispatch drafted prose documentation, and any project-tech skill
-applicable to the task — or the literal `none` if none applied.
+(`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List exactly what "Required skills (load
+FIRST)" above named for your dispatch branch: the three always-on skills
+(`verification-before-completion`, `gh-cli`, `conventional-commit`), plus `writing-adrs`
+(unconditional) on an ADR return, or `writing-docs` on a docs-sync return **only when a narrative
+how-to draft was actually produced this dispatch** (the same condition that gates loading it,
+above) — plus any project-tech skill applicable to the task, or the literal `none` if none applied.
+An ADR return must NOT list `writing-docs`; a docs-sync return must NOT list `writing-adrs`.
