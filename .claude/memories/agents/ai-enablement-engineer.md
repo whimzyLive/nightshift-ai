@@ -1,5 +1,67 @@
 # ai-enablement-engineer — memory
 
+## NA-58 — `writing-docs` skill for the future `/sdlc:docs` pipeline (`plugins/sdlc/skills`, `plugins/sdlc/agents/knowledge-engineer.md`)
+
+- Same "ship the skill ahead of its own consumer" shape as NA-44's `writing-adrs`, but this time a
+  live consumer (`knowledge-engineer.md`) already exists, since NA-43 landed it — so unlike NA-44,
+  this story DOES touch the agent file: added `writing-docs` as a conditional (not always-load)
+  Skill-tool load, worded "before drafting any prose documentation type" rather than folded into
+  the unconditional "Required skills (load FIRST)" numbered list, because a pure ADR seed/distill
+  dispatch never touches docs and shouldn't be forced to load a skill it won't use. Also extended
+  the `Skills loaded:` return-line prose to name `writing-docs` as conditional, mirroring how the
+  four always-loaded skills are named there unconditionally.
+- Fetched all five relevant Diátaxis canon pages in full (`/`, `/tutorials/`, `/how-to-guides/`,
+  `/reference/`, `/explanation/`, `/compass/`) via `curl -sL` + an inline Python HTML-strip, same
+  approach NA-44 used for its ADR canon sources — this session's tool list again only exposed
+  Read/Write/Edit/Bash/Skill, no context-mode MCP fetch/index tools were actually callable despite
+  the dispatch prompt's context-mode banner, so Bash `curl` was the only usable option.
+- A skill frontmatter `description:` field containing a URL followed by a colon-space sequence
+  (e.g. `(https://diataxis.fr/): every document` — the colon sits between the URL's closing
+  paren and the next word, not inside the URL itself) breaks a plain-scalar YAML parse with
+  "mapping values are not allowed here," even though the `://` inside the URL itself is harmless.
+  `://` never breaks a plain scalar (no space after the colon); any OTHER bare `: ` later in the
+  same unquoted scalar does. Fix: rephrase to avoid the colon-space (here, swapped to an em dash —
+  "(see https://diataxis.fr/) — every document…") rather than quoting the whole description block,
+  since every sibling skill/agent description in this plugin uses an unquoted plain scalar and
+  mixing styles would be inconsistent. Always parse a new/edited skill's frontmatter with a real
+  YAML loader (`python3 -c "import yaml; yaml.safe_load(...)"`) before committing — visual
+  inspection of a long description line does not reliably catch this.
+- Confirmed via `git show f4250c4 --stat` (NA-44's own commit) that adding a net-new plugin-bundled
+  skill with a not-yet-wired-in consumer touches only the `SKILL.md` + memory file — no
+  `skills-map.yml` entry (that registry is for skills registered as _suggestions to consumer
+  repos_, e.g. `atomic-design`; internal agent-consumed skills like `writing-adrs`/`writing-specs`/
+  `writing-docs` were never added there) and no `README.md` update in the same commit (README's
+  `knowledge-engineer` section only picked up ADR-pipeline prose in a LATER, separate docs commit
+  once the full `/sdlc:adr` command existed). Followed the same precedent here: no `skills-map.yml`
+  or `README.md` touch for `writing-docs` — that's the right scope for the future `/sdlc:docs`
+  command story (NA-51+), not this one.
+- Confirmed (via `git log -- plugins/sdlc/.claude-plugin/plugin.json`) that every prior commit
+  shipping new content under `plugins/sdlc/` bumps `plugin.json`'s version in the same commit
+  (0.31.0 → 0.32.0 for writing-adrs's own follow-up fix, 0.32.0 → 0.33.0 for the knowledge-engineer
+  agent + `/sdlc:adr` command) — bumped 0.33.0 → 0.34.0 here for the same reason (pinned consumers
+  won't see the new skill or the agent's updated Skill-load instructions otherwise). No version pin
+  for individual plugins exists in `.claude-plugin/marketplace.json` (it only lists `name`/
+  `source`/`description` per plugin) — nothing to update there.
+- A "Reference template" worked example illustrating two entries needed a triple-backtick example
+  snippet nested INSIDE the outer fenced code block showing the whole template — writing the outer
+  fence as also-triple-backtick is genuinely CommonMark-ambiguous (the inner ```closes the outer
+fence early, the same fence-length-matching rule the NA-27 memory entries already documented for
+a different file). This repo's real`prettier --write` didn't reject it or error — it silently
+"repaired" the ambiguity by widening the outer fence to 4 backticks but left the closing fence
+exactly where the (now-prematurely-terminated) 3-backtick pair had been, which meant the second
+illustrative entry (`## [Next symbol/command/field name]`) and its `...`leaked OUT of the code
+block as real rendered headings, and a orphan 4-backtick closer was left dangling with nothing
+left inside it — a **new**, first-time-seen variant of the "pre-commit write silently corrupts
+content it didn't flag as wrong" family from NA-27/NA-25/NA-43: this time the corruption showed
+up on the very FIRST`prettier --write`pass (not a later one), and the second (verification)
+pass reported "unchanged" — meaning a same-file two-pass check alone does NOT prove no corruption
+happened, only that whatever the first pass produced is now stable. Fix: read the post-prettier
+file back with the Read tool and manually verify fence balance (or run a small script that pairs
+every fence-opening line's backtick length against its closer) any time a SKILL.md/doc draft
+contains a fence nested inside another fence — never trust "prettier ran with no errors" as proof
+the nesting survived intact; widen the OUTER fence one backtick beyond the longest fence run used
+anywhere inside it before the first`--write`, don't wait for prettier to "fix" it for you.
+
 ## NA-7 QA fix round 2 on PR #103 (`plugins/gtm`)
 
 - gtm is a published plugin installed into arbitrary consumer repos, most of which have no
