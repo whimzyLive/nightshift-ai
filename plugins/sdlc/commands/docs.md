@@ -20,10 +20,11 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    `usage: /sdlc:docs sync <STORY-KEY> | release <version>  (seed|audit|distill land in later stories)`.
 2. **Unrecognised first token** (not one of `sync`/`release`/`seed`/`audit`/`distill`) → STOP with
    the same usage message.
-3. **Recognised future-mode token** (`seed`/`audit`/`distill`) → print
+3. **Recognised future-mode token** (`audit`/`distill`) → print
    `mode "<mode>" is not yet implemented (see Epic NA-50)` and exit cleanly. Not an error, not a
    STOP — a deliberate stub so the surface is stable before the modes land. **`release` is not in
-   this set** — it routes to the release contract below.
+   this set** — it routes to the release contract below. **`seed` is not in this set** — it routes
+   to the seed contract below.
 4. **`sync` with a missing or malformed story key** — the story key must match
    `^[A-Z][A-Z0-9]*-[0-9]+$` (e.g. `NA-52`). If the key is absent or fails the regex → STOP with the
    usage message. This is a **usage STOP** (a caller error), distinct from the manifest-absent
@@ -129,7 +130,7 @@ argument validation above, and the gates below that decide whether `knowledge-en
 dispatched at all.
 
 1. **Manifest gate (AC5).** Shared with `release` — defined **once** in
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-and-release` (the
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed` (the
    base-ref resolution pre-check that runs **before** the manifest read — an unresolvable
    `origin/<BASE-BRANCH>` is a STOP, never mistaken for "manifest absent" — then the
    checkout-independent `git show`, then the silent no-op on genuine absence). This command does not
@@ -193,7 +194,7 @@ argument validation above, and the founder-confirm gate between the two dispatch
 
 1. **Manifest gate (AC6).** Shared with `sync` — same pointer, same mechanics: see step 1 of the
    `sync` procedure above,
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-and-release`. The
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed`. The
    base-ref resolution pre-check runs first (an unresolvable `origin/<BASE-BRANCH>` STOPs — it is
    never mistaken for "manifest absent"), then the checkout-independent `git show`, then the silent
    no-op on genuine absence. Do not dispatch `knowledge-engineer` on either exit path.
@@ -314,7 +315,7 @@ pre-PR exit paths this covers.
 | `.claude/project/docs-manifest.md` absent                                                                       | **Silent** no-op — no branch, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                            |
 | Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                |
 | `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                |
-| Recognised future-mode token (`seed`/`audit`/`distill`)                                                         | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error.                                                                                                                                                                    |
+| Recognised future-mode token (`audit`/`distill`)                                                                | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error.                                                                                                                                                                    |
 | `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-55); exit **without** a silent success.                                                                                                                                  |
 | `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                              |
 | Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                 |

@@ -1,8 +1,8 @@
 # Docs pipeline
 
 Shared resolve → diff → regen → draft → founder-confirm → write → commit/PR protocol for
-`/sdlc:docs sync` (§§2–8) and `/sdlc:docs release` (§§10–14), referenced by both
-`agents/knowledge-engineer.md` and `commands/docs.md` so the
+`/sdlc:docs sync` (§§2–8), `/sdlc:docs release` (§§10–14), and `/sdlc:docs seed` (§§15–19),
+referenced by both `agents/knowledge-engineer.md` and `commands/docs.md` so the
 contract lives in exactly one place. Neither file re-inlines this logic — both summarize and link
 back here. Mirrors `refs/adr-pipeline.md`'s shape (copy the skeleton; do not abstract a shared ref
 between the two — same "copy the shape, do not generalize" rule `doc-types.md` and Epic NA-50 both
@@ -16,7 +16,7 @@ silent, `.claude/project/project-context.md`. In this SDLC repo itself, a plugin
 (touching `plugins/**`) stays within the `ai-enablement-engineer` write-scope — see the Active-guard
 scope note in the agent's First steps.
 
-### Manifest gate (shared by sync and release)
+### Manifest gate (shared by sync, release, and seed)
 
 Both modes apply this identical gate at the **command layer**, before any dispatch — defined once
 here; `commands/docs.md` points at it rather than re-deriving it. Resolve
@@ -173,7 +173,7 @@ inconsistently between this ref and the how-to template it governs:
 
 ## 6. No-op / change-gate semantics
 
-- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-and-release)
+- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed)
   — the command layer never dispatches `knowledge-engineer` when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks — phase 1 is never invoked in this case.
@@ -534,7 +534,7 @@ edits (re-derived by design), but it must not be mistaken for _preserving_ them.
 
 ## 14. Release mode — no-op / change-gate semantics
 
-- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-and-release)
+- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed)
   (shared with `sync`) — the command layer never dispatches when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks. The zero-setup-cost guarantee for repos that
