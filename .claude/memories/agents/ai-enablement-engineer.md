@@ -1,5 +1,54 @@
 # ai-enablement-engineer — memory
 
+## NA-57 — PR #125 review round (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/adr-pipeline.md`)
+
+- **An unqualified "manifest absent → silent no-op" error-table row that sits ABOVE mode-specific
+  rows in the same table can silently re-swallow a route this same story just made manifest-exempt
+  — even though every other closing check (grep-A, grep-B, guard-presence, Prettier idempotency)
+  passed clean.** `commands/docs.md`'s error table's first row read
+  `.claude/project/docs-manifest.md absent → Silent no-op` with **no mode qualifier** — a leftover
+  from when all four generic modes shared one manifest gate. Once `seed adr`/`distill` became live,
+  **manifest-exempt** routes, that same unqualified row is the first "manifest absent" match a
+  reader (or a future implementer deriving behavior from this table) would apply to them too —
+  reintroducing exactly the "collapse a distinct path into a benign no-op" defect class the whole
+  NA-50 epic was about closing, in the very last PR. `audit` had already been given its own scoped
+  row (a precedent this row should have matched from the start). None of NA-57's own verification
+  greps (grep-A `/sdlc:adr`, grep-B stub phrases, guard-presence strings) could catch this — it's a
+  **semantic scope gap in unchanged pre-existing prose**, not a residual string. Lesson: when a
+  story adds a new manifest-EXEMPT route next to existing manifest-GATED ones, always re-read every
+  unqualified/table-wide error row for accidental scope creep onto the new exemption — a clean grep
+  sweep proves no _string_ went stale, not that no _prose scope_ did.
+- **A command removal's migration path is only "clean" (AC4) if the successor surface is
+  discoverable from the STOP/usage messages a confused caller actually hits** — not just from full
+  documentation a founder may not read. `seed adr` was structurally correct (special route, live,
+  all guards relocated) but invisible at the two places someone migrating off deleted `/sdlc:adr`
+  would actually look: the usage string (`seed <type> [topic]` doesn't surface `adr` — it's
+  deliberately excluded from `SEED_TYPES`) and the unknown-seed-type STOP message (enumerates only
+  `SEED_TYPES`, silent about the special route that isn't a member). Fixed by adding `seed adr
+"<pattern>"` as its own clause in the usage string (echoed on every STOP that prints it) and a
+  one-line "for ADRs, use seed adr ..." pointer inside the unknown-type STOP's own fenced message.
+  Generalizable check for any future "type X is deliberately excluded from the generic enum"
+  design: grep every STOP/usage message that enumerates the _generic_ set and confirm the excluded
+  special case is named as a sibling invocation form, not just documented in prose elsewhere.
+- **A section can accurately be named "command-layer" for one reason (where the founder-confirm
+  gate lives) while its own body prose overclaims a SECOND, unrelated thing (who executes the
+  branch/PR naming stated in the same section) is also command-layer-only — and the two claims are
+  easy to conflate because they share a heading.** `refs/adr-pipeline.md` §3a is genuinely
+  command-layer for the gate (correct, established in §2/§3). But its own intro sentence ("this
+  section adds only what is genuinely command-layer-only: branch/PR naming and the post-PR
+  control-flow tail") extended that framing to branch/PR naming too — false: `knowledge-engineer.md`
+  actually **creates** the branch and **raises** the PR per that convention (its own branch/commit/
+  return steps say so explicitly). Fix: state the naming convention as single-sourced in the ref
+  (true) with the **agent** as its executor (also true), and keep only the post-PR control-flow tail
+  (loop-driving after the agent's dispatch returns) as the thing that's actually command-layer.
+  When a section heading names ONE property (e.g. "where the gate lives"), audit every sentence in
+  the section body for a second, unstated property riding along on the same label — a reviewer
+  reading only the heading (not the cross-referenced agent file) has no way to catch the overclaim.
+- Re-verified the NA-62 in-tree copy → `--write` → `diff` idempotency protocol on the two files this
+  round touched (`docs.md`, `adr-pipeline.md`) — both stable on the first pass; no new
+  list-nested-fence hazard introduced by these three fixes (finding 2's fenced-block edit reused the
+  fence's pre-existing, already-stable indentation rather than reintroducing a dedent).
+
 ## NA-57 — Absorb /sdlc:adr into /sdlc:docs, full command removal (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/commands/adr.md` [deleted], `plugins/sdlc/refs/adr-pipeline.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `plugins/sdlc/agents/qa-engineer.md`, `plugins/sdlc/refs/analyze-protocol.md`, `plugins/sdlc/commands/analyze.md`, `plugins/sdlc/refs/qa-engineer-playbook.md`, `plugins/sdlc/skills/writing-adrs/SKILL.md`, `plugins/sdlc/README.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
 
 - **A spec's own two-grep-family derivation methodology (grep-A command-name string, grep-B
