@@ -141,6 +141,14 @@ genuinely doesn't apply, but don't add sections that belong to a different quadr
 ### Tutorial template
 
 ```markdown
+---
+title: TODO — learning-oriented title, matching the H1 below
+description: TODO — one line, used verbatim as the llms.txt description
+# related-adrs: repo-root-relative docs/adr/NNNN-*.md paths this page depends on; audit's
+# ADR-drift flag reads it. Leave [] unless the page genuinely references an accepted ADR.
+related-adrs: []
+---
+
 # [Learning-oriented title, e.g. "Getting started with X"]
 
 [One or two sentences: what the reader will build/achieve, stated plainly — not "in this
@@ -171,10 +179,14 @@ along the way.]
 
 ```markdown
 ---
-title: [specific, real-world goal, matching the H1 below]
+title: TODO — specific, real-world goal, matching the H1 below
+description: TODO — one line, used verbatim as the llms.txt description
 # source: repo-root-relative globs; changes to these files make /sdlc:docs sync draft a refresh of this page. Omit to opt out.
 source:
   - [repo-root-relative glob, e.g. plugins/sdlc/commands/loop.md]
+# related-adrs: repo-root-relative docs/adr/NNNN-*.md paths this page depends on; audit's
+# ADR-drift flag reads it. Leave [] unless the page genuinely references an accepted ADR.
+related-adrs: []
 ---
 
 # How to [specific, real-world goal]
@@ -201,6 +213,14 @@ reach this specific goal.
 ### Reference template
 
 ````markdown
+---
+title: TODO — exact name of the API/CLI/config surface, matching the H1 below
+description: TODO — one line, used verbatim as the llms.txt description
+# related-adrs: repo-root-relative docs/adr/NNNN-*.md paths this page depends on; audit's
+# ADR-drift flag reads it. Leave [] unless the page genuinely references an accepted ADR.
+related-adrs: []
+---
+
 # [Exact name of the API/CLI/config surface being described]
 
 [One neutral sentence: what this is, no more.]
@@ -230,6 +250,14 @@ entry.
 ### Explanation template
 
 ```markdown
+---
+title: TODO — topic, matching the H1 below, e.g. About X or X design
+description: TODO — one line, used verbatim as the llms.txt description
+# related-adrs: the docs/adr/NNNN-*.md paths this page discusses; audit's ADR-drift flag reads it.
+# List the same ADRs the "Related decisions" section links, so the machine key and the prose agree.
+related-adrs: []
+---
+
 # About [topic] <!-- or: "[Topic] design", "Understanding [topic]" -->
 
 [Open with the "why" question this page answers — explanation exists to answer a real or implied
@@ -294,6 +322,8 @@ they follow from the quadrant model itself rather than from any one repo's taste
 ## Self-Review Checklist (run before publishing/committing)
 
 - [ ] The page is identifiable as exactly one quadrant from its title and opening paragraph
+- [ ] The page carries `title` + `description` frontmatter (both filled — no `TODO —` placeholder
+      left), and `related-adrs:` (empty `[]` unless the page genuinely references an accepted ADR)
 - [ ] No anti-pattern from the table above is present anywhere in the page
 - [ ] The page follows its quadrant's structure template (sections present, none borrowed from
       another quadrant)
