@@ -22,10 +22,12 @@ Save to: `docs/superpowers/specs/<STORY-KEY>.md` — the Jira story key is the e
 Commit on branch `spec/<STORY-KEY>`. Raise PR titled `docs(spec): <STORY-KEY> <story summary>`.
 
 After the PR is merged, comment on the story as a human-readable breadcrumb:
+
 ```bash
 acli jira workitem comment add <STORY-KEY> \
   --body "Spec: docs/superpowers/specs/<STORY-KEY>.md | PR: <PR_URL>"
 ```
+
 This comment is for human reference only — other agents derive the path from the story key directly, not from this comment.
 
 **Guard:** If you did not successfully fetch the Jira ticket before calling this skill, STOP and return to fetch it first. Never generate spec content from repository files alone.

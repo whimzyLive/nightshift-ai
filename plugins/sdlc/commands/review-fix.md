@@ -24,11 +24,12 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
 
 2. **Fetch the feedback** into the session temp dir (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh`
    — session-scoped `./.tmp/<key>`, never `/tmp`; write file, never inline JSON). The ONLY
-   thing excluded is an inline thread explicitly marked *Resolved* (a reviewer ticked *Resolve*, or
+   thing excluded is an inline thread explicitly marked _Resolved_ (a reviewer ticked _Resolve_, or
    a prior `/review-fix` run resolved it — already addressed, needs no fixing). EVERYTHING else is
    pulled in as context: the **PR body**, every **issue/general comment**, every **review-summary
    body**, and every **unresolved** inline thread. Generic comments and the PR body have no
    resolved state, so include them all — they often carry intent the inline notes assume:
+
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
    # PR description (body) + review-summary bodies + general/issue comments.
@@ -41,6 +42,7 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    # Commit target (instead of the two PR calls above) — commit comments have no resolved state:
    # gh api repos/<owner>/<repo>/commits/<SHA>/comments --paginate > "$dir/review-fix-inline.json"
    ```
+
    `pr-unresolved-comments.sh` emits NDJSON, one object per unresolved inline comment, each with
    its numeric `id` (databaseId), `path`, `line`, `author`, and `body` — the `id` is required later
    to reply on and resolve that exact thread. Read BOTH files: the summary file (body + general
@@ -49,12 +51,14 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    review feedback on <target> — nothing to triage".
 
 3. **Check out the branch and pin the pre-fix HEAD** (so the re-review range is exactly the fixes):
+
    ```bash
    git fetch origin <headRefName> <baseRefName>
    git checkout <headRefName>
    PRE_FIX_HEAD=$(git rev-parse HEAD)
    BASE_SHA=$(git merge-base origin/<baseRefName> HEAD)
    ```
+
    (Commit target: `git checkout` its branch; `PRE_FIX_HEAD=$(git rev-parse HEAD)`.)
 
 4. **Execute `${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md` inline via its "Alternative entry — external
@@ -71,22 +75,23 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
      (`PRE_FIX_HEAD..HEAD`) to confirm each accepted comment is resolved and nothing regressed;
      loop until clean.
    - **Quality gate (Step 6)** — the quality-gate commands from `.claude/project/project-context.md`, pasted evidence.
-   **Gate the AC/plan verification (Step 7) purely on plan-doc existence** at
-   `docs/superpowers/plans/<STORY-KEY>.md` — **not** on the head-branch name. Run Step 7 when that
-   plan doc exists; otherwise skip it — the comments are the requirements. This single signal is
-   correct for every path: feature-full (plan exists) → verify; feature-lightweight (no plan) → skip;
-   defect (no plan) → skip — each for the right reason (no plan doc), not by an accidental
-   `feat/`-branch-name match (which would wrongly skip a `fix/<KEY>` defect head and mis-handle any
-   non-`feat/` feature head). Do **not** add an `OR WORK_KIND=feature` disjunct — it is redundant (a
-   lightweight feature with no plan correctly skips on plan-absence alone) and would wrongly force
-   plan verification when no plan exists. (On the defect path the QA playbook's regression-evidence
-   contract runs in place of the plan checklist.)
+     **Gate the AC/plan verification (Step 7) purely on plan-doc existence** at
+     `docs/superpowers/plans/<STORY-KEY>.md` — **not** on the head-branch name. Run Step 7 when that
+     plan doc exists; otherwise skip it — the comments are the requirements. This single signal is
+     correct for every path: feature-full (plan exists) → verify; feature-lightweight (no plan) → skip;
+     defect (no plan) → skip — each for the right reason (no plan doc), not by an accidental
+     `feat/`-branch-name match (which would wrongly skip a `fix/<KEY>` defect head and mis-handle any
+     non-`feat/` feature head). Do **not** add an `OR WORK_KIND=feature` disjunct — it is redundant (a
+     lightweight feature with no plan correctly skips on plan-absence alone) and would wrongly force
+     plan verification when no plan exists. (On the defect path the QA playbook's regression-evidence
+     contract runs in place of the plan checklist.)
 
 5. **Close out the PR threads (only after fixes are pushed AND the gate is green).** For every
    triaged inline comment, post its justification back on the exact thread and resolve the
    accepted ones — so when the reviewer returns, only NON-accepted comments remain open, each
    carrying the reason it wasn't applied. Write the reply text to a file (never inline JSON), then
    call the helper per comment:
+
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
    # accepted — reply names the fix + commit, then the thread is RESOLVED:
@@ -96,6 +101,7 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    printf '❎ **Not applied** — %s' "<why wrong/stale/out-of-scope in this app>" > "$dir/reply-<id>.md"
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <id> rejected "$dir/reply-<id>.md"
    ```
+
    - The helper replies in-thread (REST) and, for `accepted`, resolves the thread via the GraphQL
      `resolveReviewThread` mutation; `rejected` replies but leaves the thread open. It prints one
      `replied:` / `resolved:` / `left-open:` line per comment.

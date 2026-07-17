@@ -35,7 +35,7 @@ in this order, first match wins:
      when present); the founder's answer is the resolved URL.
 
 **Precedence after this gate:** the value written to `marketing-context.md` (Step 5) is henceforth
-authoritative. An env var seeds the *first* resolution only — once a Backend URL token exists in
+authoritative. An env var seeds the _first_ resolution only — once a Backend URL token exists in
 `marketing-context.md`, it wins over whatever `POSTIZ_API_URL` happens to be set to in a later
 shell session.
 
@@ -55,8 +55,8 @@ skipped in error), **STOP**:
 
 The `postiz` CLI also requires the API-key environment variable, set and non-empty:
 
-| Env var | Purpose | Default name |
-| ------- | ------- | ------------- |
+| Env var          | Purpose                    | Default name     |
+| ---------------- | -------------------------- | ---------------- |
 | `POSTIZ_API_KEY` | API key for authentication | `POSTIZ_API_KEY` |
 
 ```bash
@@ -98,10 +98,11 @@ Interpret the result:
 ## Secret hygiene
 
 The **Backend URL** is not a secret — it is persisted to `marketing-context.md` by design (Condition
-1) and exported as `POSTIZ_API_URL` before every CLI invocation. Only the **API key** stays
-env-only: its **name** (`POSTIZ_API_KEY`) is written to `marketing-context.md`, never its value.
-The actual key value is read from the environment at run time and never persisted to any file this
-plugin writes.
+
+1. and exported as `POSTIZ_API_URL` before every CLI invocation. Only the **API key** stays
+   env-only: its **name** (`POSTIZ_API_KEY`) is written to `marketing-context.md`, never its value.
+   The actual key value is read from the environment at run time and never persisted to any file this
+   plugin writes.
 
 ## Re-run behaviour
 

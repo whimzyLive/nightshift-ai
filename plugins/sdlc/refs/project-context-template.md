@@ -12,45 +12,49 @@ generated file — every slot must be replaced with an actual value.
 ```markdown
 # Project Context
 
-| Token                | Value                  |
-| -------------------- | ---------------------- |
-| Project name         | <project name>         |
-| Jira project key     | <KEY>                  |
-| Jira site            | <site>                 |
-| Base branch          | <base branch>          |
-| Package manager      | <pm>                   |
-| Typecheck / Test     | <typecheck> / <test>   |
+| Token            | Value                |
+| ---------------- | -------------------- |
+| Project name     | <project name>       |
+| Jira project key | <KEY>                |
+| Jira site        | <site>               |
+| Base branch      | <base branch>        |
+| Package manager  | <pm>                 |
+| Typecheck / Test | <typecheck> / <test> |
 
 ## Detected stack
-| Signal           | Detected value         |
-| ---------------- | ---------------------- |
-| Primary language | <DETECTED_LANG>        |
-| Framework(s)     | <DETECTED_FRAMEWORK>   |
-| Package manager  | <DETECTED_PM>          |
-| Test runner      | <DETECTED_TEST>        |
+
+| Signal           | Detected value       |
+| ---------------- | -------------------- |
+| Primary language | <DETECTED_LANG>      |
+| Framework(s)     | <DETECTED_FRAMEWORK> |
+| Package manager  | <DETECTED_PM>        |
+| Test runner      | <DETECTED_TEST>      |
 
 ## Workspace → agent
-| Path            | Owner             |
-| --------------- | ----------------- |
+
+| Path | Owner |
+| ---- | ----- |
+
 <one row per active agent: its owned path → the agent>
 
 ## Tooling
+
 | Typecheck | `<typecheck cmd>` |
-| Test      | `<test cmd>`      |
+| Test | `<test cmd>` |
 
 ## Triage
 
-| Token | Value |
-| ----- | ----- |
+| Token                                           | Value         |
+| ----------------------------------------------- | ------------- |
 | Lightweight threshold (story points, inclusive) | `<threshold>` |
 
 ## Code Review
 
-| Token | Value |
-| ----- | ----- |
+| Token        | Value            |
+| ------------ | ---------------- |
 | Review agent | `<review-agent>` |
-| Review mode | `<review-mode>` |
-| Review gate | `<review-gate>` |
+| Review mode  | `<review-mode>`  |
+| Review gate  | `<review-gate>`  |
 ```
 
 ---
@@ -68,7 +72,7 @@ generated file — every slot must be replaced with an actual value.
 - **Workspace → agent rows** — write one row per active domain agent, mapping
   its confirmed owned path(s) to the agent name.
 - **Code Review** — `<review-agent>` and `<review-mode>` come from the `/init`
-  Step 3 *Review agent* and *Review trigger* pickers. Substitute the chosen values;
+  Step 3 _Review agent_ and _Review trigger_ pickers. Substitute the chosen values;
   when the values were not collected (e.g. the re-init merge path that skips Step 3),
   fall back to the picker defaults `Review agent = claude-inline` and
   `Review mode = on-update`. `claude-inline` is the default because it works on ANY

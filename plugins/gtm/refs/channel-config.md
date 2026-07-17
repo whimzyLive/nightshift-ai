@@ -61,11 +61,11 @@ of `/gtm:init` renders the model.
 
 ## Locked enums + defaults
 
-| Setting | Enum | Default |
-| ------- | ---- | ------- |
-| Ownership | `auto` \| `draft` \| `manual` | `draft` |
-| Voice | `brand` \| `founder` | `brand` |
-| Cadence | `default` \| `daily` \| `weekly` \| `paused` | `default` |
+| Setting       | Enum                                                                                | Default                   |
+| ------------- | ----------------------------------------------------------------------------------- | ------------------------- |
+| Ownership     | `auto` \| `draft` \| `manual`                                                       | `draft`                   |
+| Voice         | `brand` \| `founder`                                                                | `brand`                   |
+| Cadence       | `default` \| `daily` \| `weekly` \| `paused`                                        | `default`                 |
 | Content types | subset of `release-note`, `tip`, `thread`, `article-link`, `demo-clip`, `milestone` | `release-note, milestone` |
 
 ## Empty-list handling
@@ -112,23 +112,23 @@ No setting is ever silently overwritten or dropped (AC-5).
 
 ## Error handling
 
-| Scenario | Behaviour |
-| -------- | --------- |
-| `postiz integrations:list` errors (transport/connection failure, non-zero exit) after Step 2 auth passed | **STOP**: "could not enumerate Postiz channels via `postiz integrations:list`; confirm the backend is reachable and re-run `/gtm:init`." This run writes no `marketing-context.md` changes (Step 5 never runs); note that Step 4 may already have refreshed `.agents/product-marketing.md` — re-run `/gtm:init` to bring `marketing-context.md` back in sync. |
+| Scenario                                                                                                       | Behaviour                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `postiz integrations:list` errors (transport/connection failure, non-zero exit) after Step 2 auth passed       | **STOP**: "could not enumerate Postiz channels via `postiz integrations:list`; confirm the backend is reachable and re-run `/gtm:init`." This run writes no `marketing-context.md` changes (Step 5 never runs); note that Step 4 may already have refreshed `.agents/product-marketing.md` — re-run `/gtm:init` to bring `marketing-context.md` back in sync.          |
 | `postiz integrations:list` exits **zero** but no JSON array can be extracted from its output (see Enumeration) | **STOP** with a distinct parse-error message — never misreport this as backend-unreachable: "`postiz integrations:list` exited successfully but no JSON array could be extracted from its output; confirm the installed `postiz` CLI version matches what this plugin expects (`postiz --version`) and re-run `/gtm:init`." Same write-nothing scope as the row above. |
-| An enumerated channel is missing `id`, `name`, or `identifier` | Skip that malformed entry, warn which channel was skipped, continue with the rest. |
-| Founder skips / declines to set a channel's ownership | Apply the AC-4 default `draft` — never left blank. |
-| Re-run: an existing configured channel no longer returned by `integrations:list` | Per-channel drop-or-retain choice with the founder (see Re-run matching — never silent, never all-or-nothing); the run continues and writes normally either way. Full-run STOP only on an explicit founder abort. |
-| Re-run: two accounts share a platform `identifier` | Disambiguate rows by `Name`; match/preserve per (`identifier`, `Name`). |
+| An enumerated channel is missing `id`, `name`, or `identifier`                                                 | Skip that malformed entry, warn which channel was skipped, continue with the rest.                                                                                                                                                                                                                                                                                     |
+| Founder skips / declines to set a channel's ownership                                                          | Apply the AC-4 default `draft` — never left blank.                                                                                                                                                                                                                                                                                                                     |
+| Re-run: an existing configured channel no longer returned by `integrations:list`                               | Per-channel drop-or-retain choice with the founder (see Re-run matching — never silent, never all-or-nothing); the run continues and writes normally either way. Full-run STOP only on an explicit founder abort.                                                                                                                                                      |
+| Re-run: two accounts share a platform `identifier`                                                             | Disambiguate rows by `Name`; match/preserve per (`identifier`, `Name`).                                                                                                                                                                                                                                                                                                |
 
 ## Example Channels table row shape
 
 ```markdown
-| Channel  | Name              | Integration ID | Ownership | Voice   | Cadence | Content types              |
-| -------- | ----------------- | -------------- | --------- | ------- | ------- | -------------------------- |
-| x        | Nightshift        | <id>           | draft     | brand   | default | release-note, milestone    |
-| linkedin | Rishi Patel       | <id>           | draft     | founder | weekly  | release-note, article-link |
-| reddit   | u/nightshift-bot  | <id>           | manual    | founder | paused  | article-link               |
+| Channel  | Name             | Integration ID | Ownership | Voice   | Cadence | Content types              |
+| -------- | ---------------- | -------------- | --------- | ------- | ------- | -------------------------- |
+| x        | Nightshift       | <id>           | draft     | brand   | default | release-note, milestone    |
+| linkedin | Rishi Patel      | <id>           | draft     | founder | weekly  | release-note, article-link |
+| reddit   | u/nightshift-bot | <id>           | manual    | founder | paused  | article-link               |
 ```
 
 `<id>` above is the illustrative Postiz `id` value for that row — the written file materializes the

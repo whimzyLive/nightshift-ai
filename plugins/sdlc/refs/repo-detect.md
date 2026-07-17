@@ -8,15 +8,15 @@ and `grep` are used. Never execute build scripts or install dependencies.
 
 Detection produces exactly these seven fields:
 
-| Field | Description | Example values |
-| ----- | ----------- | -------------- |
-| `language` | Primary language(s) — comma-separated if mixed | `TypeScript`, `Python`, `Go`, `Rust`, `TypeScript, Python` |
-| `framework` | Web/API framework(s) detected, or `none` | `Next.js`, `Hono`, `FastAPI`, `none` |
-| `package_manager` | The package manager in use | `pnpm`, `npm`, `yarn`, `bun`, `cargo`, `poetry`, `uv`, `go`, `bundler` |
-| `test_runner` | Test command to run the suite | `pnpm test`, `pytest`, `cargo test`, `go test ./...` |
-| `typecheck` | Typecheck command, or empty string if not applicable | `pnpm typecheck`, `mypy .`, `pyright`, `` |
-| `runtime` | Language runtime + version where explicitly declared | `Node 20`, `Python 3.12`, `Go 1.22`, `Rust 2021` |
-| `commit_scopes` | Comma-separated valid conventional-commit scopes derived from workspace directories | `functions, config, web` |
+| Field             | Description                                                                         | Example values                                                         |
+| ----------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `language`        | Primary language(s) — comma-separated if mixed                                      | `TypeScript`, `Python`, `Go`, `Rust`, `TypeScript, Python`             |
+| `framework`       | Web/API framework(s) detected, or `none`                                            | `Next.js`, `Hono`, `FastAPI`, `none`                                   |
+| `package_manager` | The package manager in use                                                          | `pnpm`, `npm`, `yarn`, `bun`, `cargo`, `poetry`, `uv`, `go`, `bundler` |
+| `test_runner`     | Test command to run the suite                                                       | `pnpm test`, `pytest`, `cargo test`, `go test ./...`                   |
+| `typecheck`       | Typecheck command, or empty string if not applicable                                | `pnpm typecheck`, `mypy .`, `pyright`, ``                              |
+| `runtime`         | Language runtime + version where explicitly declared                                | `Node 20`, `Python 3.12`, `Go 1.22`, `Rust 2021`                       |
+| `commit_scopes`   | Comma-separated valid conventional-commit scopes derived from workspace directories | `functions, config, web`                                               |
 
 These field names are the canonical identifiers; `init.md` reads them by these exact names.
 
@@ -34,17 +34,17 @@ done
 
 Map the winning lockfile to `package_manager`:
 
-| Lockfile | `package_manager` |
-| -------- | ----------------- |
-| `pnpm-lock.yaml` | `pnpm` |
-| `yarn.lock` | `yarn` |
-| `bun.lockb` | `bun` |
-| `package-lock.json` | `npm` |
-| `Cargo.lock` | `cargo` |
-| `poetry.lock` | `poetry` |
-| `uv.lock` | `uv` |
-| `go.sum` | `go` |
-| `Gemfile.lock` | `bundler` |
+| Lockfile            | `package_manager` |
+| ------------------- | ----------------- |
+| `pnpm-lock.yaml`    | `pnpm`            |
+| `yarn.lock`         | `yarn`            |
+| `bun.lockb`         | `bun`             |
+| `package-lock.json` | `npm`             |
+| `Cargo.lock`        | `cargo`           |
+| `poetry.lock`       | `poetry`          |
+| `uv.lock`           | `uv`              |
+| `go.sum`            | `go`              |
+| `Gemfile.lock`      | `bundler`         |
 
 **Ambiguity rule:** if more than one lockfile exists at the same precedence tier (e.g. both
 `yarn.lock` and `pnpm-lock.yaml`), surface the top-2 candidates to the user:
@@ -117,29 +117,29 @@ grep -iE 'gin|echo|fiber|chi|gorilla' go.mod 2>/dev/null | head -5
 
 Map the first hit to a canonical `framework` label:
 
-| Matched string | `framework` label |
-| -------------- | ----------------- |
-| `next` | `Next.js` |
-| `react` (without next) | `React` |
-| `vue` | `Vue` |
-| `svelte` | `Svelte` |
-| `nuxt` | `Nuxt` |
-| `astro` | `Astro` |
-| `remix` | `Remix` |
-| `express` | `Express` |
-| `hono` | `Hono` |
-| `fastify` | `Fastify` |
-| `nestjs` / `@nestjs/core` | `NestJS` |
-| `elysia` | `Elysia` |
-| `django` | `Django` |
-| `flask` | `Flask` |
-| `fastapi` | `FastAPI` |
-| `starlette` | `Starlette` |
-| `axum` | `Axum` |
-| `actix` | `Actix` |
-| `gin` | `Gin` |
-| `echo` | `Echo` |
-| `fiber` | `Fiber` |
+| Matched string            | `framework` label |
+| ------------------------- | ----------------- |
+| `next`                    | `Next.js`         |
+| `react` (without next)    | `React`           |
+| `vue`                     | `Vue`             |
+| `svelte`                  | `Svelte`          |
+| `nuxt`                    | `Nuxt`            |
+| `astro`                   | `Astro`           |
+| `remix`                   | `Remix`           |
+| `express`                 | `Express`         |
+| `hono`                    | `Hono`            |
+| `fastify`                 | `Fastify`         |
+| `nestjs` / `@nestjs/core` | `NestJS`          |
+| `elysia`                  | `Elysia`          |
+| `django`                  | `Django`          |
+| `flask`                   | `Flask`           |
+| `fastapi`                 | `FastAPI`         |
+| `starlette`               | `Starlette`       |
+| `axum`                    | `Axum`            |
+| `actix`                   | `Actix`           |
+| `gin`                     | `Gin`             |
+| `echo`                    | `Echo`            |
+| `fiber`                   | `Fiber`           |
 
 If no framework is matched, set `framework` to `none`.
 
@@ -173,16 +173,16 @@ For Rust, Go: the test runner is the toolchain — no detection needed.
 
 Map findings to `test_runner`:
 
-| Signal | `test_runner` value |
-| ------ | ------------------- |
-| `vitest` in deps | `<pm> test` (e.g. `pnpm test`) |
-| `jest` in deps | `<pm> test` |
+| Signal                   | `test_runner` value                                 |
+| ------------------------ | --------------------------------------------------- |
+| `vitest` in deps         | `<pm> test` (e.g. `pnpm test`)                      |
+| `jest` in deps           | `<pm> test`                                         |
 | `node --test` in scripts | `node --import tsx --test` (if TS) or `node --test` |
-| `mocha` in deps | `<pm> test` |
-| `pytest` in deps/config | `pytest` |
-| `Cargo.lock` present | `cargo test` |
-| `go.sum` present | `go test ./...` |
-| Script entry exists | use the literal script value prefixed by `<pm> run` |
+| `mocha` in deps          | `<pm> test`                                         |
+| `pytest` in deps/config  | `pytest`                                            |
+| `Cargo.lock` present     | `cargo test`                                        |
+| `go.sum` present         | `go test ./...`                                     |
+| Script entry exists      | use the literal script value prefixed by `<pm> run` |
 
 If none of the above is conclusive, set `test_runner` to an empty string and leave the
 free-text prompt unprefilled so the user enters it manually.
@@ -203,14 +203,14 @@ command -v pyright >/dev/null 2>&1 && echo "TYPECHECK=pyright"
 
 Map to `typecheck`:
 
-| Signal | `typecheck` value |
-| ------ | ----------------- |
-| `"typecheck"` script in package.json | `<pm> typecheck` (e.g. `pnpm typecheck`) |
-| `"type-check"` script in package.json | `<pm> run type-check` |
-| `tsconfig.json` present, no named script | `npx tsc --noEmit` |
-| `mypy` available, Python repo | `mypy .` |
-| `pyright` available, Python repo | `pyright` |
-| None of the above | `` (empty — leave blank in prompts) |
+| Signal                                   | `typecheck` value                        |
+| ---------------------------------------- | ---------------------------------------- |
+| `"typecheck"` script in package.json     | `<pm> typecheck` (e.g. `pnpm typecheck`) |
+| `"type-check"` script in package.json    | `<pm> run type-check`                    |
+| `tsconfig.json` present, no named script | `npx tsc --noEmit`                       |
+| `mypy` available, Python repo            | `mypy .`                                 |
+| `pyright` available, Python repo         | `pyright`                                |
+| None of the above                        | `` (empty — leave blank in prompts)      |
 
 ---
 
@@ -241,13 +241,13 @@ grep -o 'edition[[:space:]]*=[[:space:]]*"[^"]*"' Cargo.toml 2>/dev/null | head 
 
 Map the first matching signal to the `runtime` field:
 
-| Signal | `runtime` value |
-| ------ | --------------- |
-| `.nvmrc` or `engines.node` present | `Node <version>` (e.g. `Node 20`) — strip patch if only major/minor matters |
-| `.python-version` or `requires-python` present | `Python <version>` (e.g. `Python 3.12`) |
-| `go.mod` `go` directive | `Go <version>` (e.g. `Go 1.22`) |
-| `Cargo.toml` `edition` field | `Rust <edition>` (e.g. `Rust 2021`) |
-| None of the above | `` (empty — do not guess) |
+| Signal                                         | `runtime` value                                                             |
+| ---------------------------------------------- | --------------------------------------------------------------------------- |
+| `.nvmrc` or `engines.node` present             | `Node <version>` (e.g. `Node 20`) — strip patch if only major/minor matters |
+| `.python-version` or `requires-python` present | `Python <version>` (e.g. `Python 3.12`)                                     |
+| `go.mod` `go` directive                        | `Go <version>` (e.g. `Go 1.22`)                                             |
+| `Cargo.toml` `edition` field                   | `Rust <edition>` (e.g. `Rust 2021`)                                         |
+| None of the above                              | `` (empty — do not guess)                                                   |
 
 If no version declaration is found, leave `runtime` empty. Do **not** run `node --version`,
 `python --version`, or any other live-environment probe.

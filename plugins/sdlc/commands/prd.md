@@ -5,6 +5,7 @@ description: Convert a Jira Epic into a full PRD. Creates branch, writes docs/fe
 Dispatch the `product-manager` agent to produce a PRD from the Jira Epic.
 
 The agent should:
+
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<EPIC-KEY>` from $ARGUMENTS
 2. Extract summary, description, all comments, linked tickets, and attachments — use everything as the source of truth for the feature
 3. Derive a kebab-case slug from the Epic summary (max 5 words)

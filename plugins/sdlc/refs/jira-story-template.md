@@ -44,15 +44,15 @@ Do not include role or surface in summary if it makes it longer than 8 words —
 
 ## Sizing guidance
 
-| Story type | Story Points |
-|---|---|
-| Read-only view (single surface) | 2 |
-| Read-only view (multiple surfaces) | 3 |
-| CRUD with simple form (single surface) | 3 |
-| CRUD with validation + permissions (single surface) | 5 |
-| CRUD (multiple surfaces, with integration) | 8 |
-| Complex workflow with multiple states | 8 |
-| New domain entity + full CRUD (all applicable surfaces) | 13 |
+| Story type                                              | Story Points |
+| ------------------------------------------------------- | ------------ |
+| Read-only view (single surface)                         | 2            |
+| Read-only view (multiple surfaces)                      | 3            |
+| CRUD with simple form (single surface)                  | 3            |
+| CRUD with validation + permissions (single surface)     | 5            |
+| CRUD (multiple surfaces, with integration)              | 8            |
+| Complex workflow with multiple states                   | 8            |
+| New domain entity + full CRUD (all applicable surfaces) | 13           |
 
 **Flag anything estimated >8 points for splitting before creating in Jira.**
 
@@ -62,18 +62,20 @@ Do not include role or surface in summary if it makes it longer than 8 words —
 
 Split only at these boundaries:
 
-| Boundary | Rule |
-|---|---|
-| Role | Different user roles are separate stories |
-| Workflow state | Different workflow states that are independently demoable are separate stories |
-| CRUD layer | Read/list stories separate from create/edit only when each is a complete, independently demoable outcome |
+| Boundary       | Rule                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------- |
+| Role           | Different user roles are separate stories                                                                |
+| Workflow state | Different workflow states that are independently demoable are separate stories                           |
+| CRUD layer     | Read/list stories separate from create/edit only when each is a complete, independently demoable outcome |
 
 **Do NOT split by layer or domain:**
+
 - API + UI for the same user flow = one story
 - "Backend story" + "frontend story" for the same outcome = wrong
 - Infrastructure + feature for the same outcome = one story
 
 **Never create stories for:**
+
 - Internal refactors with no user-visible change
 - Sub-steps that belong inside another story as subtasks
 - "Setup" or "infrastructure" work without a specific, demoable deliverable
@@ -91,18 +93,22 @@ Split only at these boundaries:
 Format is necessary but not sufficient — a story that fills the template can still be low quality. Apply these checks to every story.
 
 **"As a" — specific persona, not generic.**
+
 - ❌ "As a user" (no persona clarity; different users have different needs)
 - ✅ "As a trial user", "As a paid subscriber", "As an admin" — use a real role from `.claude/project/project-context.md`
 
 **"I want to" — a user action, not a feature you build.**
+
 - ❌ "As a user, I want a login button" (names the UI element, not the goal)
 - ✅ "As a trial user, I want to log in with Google" (the action the user takes)
 
 **"So that" — real motivation, not a restatement of the action.**
+
 - ❌ "I want to click save, so that I can save my work" (just repeats the action)
 - ✅ "…so that I don't lose progress if the page crashes" (the actual outcome they care about)
 
 **Acceptance Criteria — measurable, not vibes.**
+
 - ❌ "Then the experience is better" / "Then it's faster" (unverifiable)
 - ✅ "Then the page loads in under 2 seconds" / "Then a success confirmation is shown"
 
