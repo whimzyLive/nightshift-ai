@@ -58,25 +58,37 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         This is the mechanism that auto-onboards **any newly introduced parameter**: when a future
         template adds a token, an existing repo that runs Merge picks it up here — prompted if it is a
         user choice, defaulted otherwise — instead of silently missing it.
+
      3. **Never touch values already present** — only missing tokens are added; existing values are
         kept verbatim (the detected-value diff from step 3 of this guard may still be offered for
         changed detections, as today).
-     4. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
-        (ensure .tmp/ is gitignored), and Step 5.
+     4. **Docs opt-in check.** The docs opt-in is **not** a `refs/project-context-template.md`
+        token, so step 2's template-diff loop cannot surface it — check for it explicitly: if
+        `.claude/project/docs-manifest.md` is **absent**, present the docs opt-in
+        `AskUserQuestion` now (the identical prompt defined in Step 3's "Docs opt-in" section
+        below). Accepting it here satisfies Step 4g's gate for this run, exactly as accepting it
+        during a fresh Step 3 pass would. If the manifest already **exists**, skip this prompt
+        entirely — Step 4g's existing-manifest merge guard runs regardless of any opt-in answer
+        once a manifest exists (see Step 4g and the Docs opt-in section's Re-init semantics).
+     5. Jump to Step 4b (write the merged project-context), Step 4d (merge skills.json), Step 4e
+        (ensure .tmp/ is gitignored), Step 4g (merge `.claude/project/docs-manifest.md` against
+        `refs/doc-types.md` — reached when step 4 above accepted the docs opt-in, or when the
+        manifest already existed; runs the same existing-manifest merge guard described there), and
+        Step 5.
+
    - **Refresh skills** → re-fetch the **managed** skills to their latest upstream, then **STOP** —
      no prompts, no other config rewritten. A managed skill is one whose `refs/skills-map.yml` entry
      declares a `source` or `plugin`; scaffolded stubs and custom skills (no source) are user-owned and
-     left untouched. Steps:
-     1. Read `.claude/project/skills.json` for the installed skill list.
-     2. Group the installed managed skills by their `refs/skills-map.yml` entry and **run Step 4f in
-        refresh mode** (see Step 4f): a `source` skill is cleanly replaced via stage-then-swap (download
-        the latest upstream into a temp dir, then swap it into `.claude/skills/<name>/` only on success
-        — never delete before a fetch that may fail), cloning each shared source repo once; a `plugin`
-        skill is updated via `claude plugin marketplace add` then `claude plugin update
-        <plugin>@<marketplace> --scope project`; a sourceless skill is skipped.
-     3. Leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
-        untouched. Print a summary of which skills were refreshed (and which were skipped as
-        user-owned), then run the Final action release. Do **not** continue to Steps 1–5.
+     left untouched. First, read `.claude/project/skills.json` for the installed skill list. Then
+     group the installed managed skills by their `refs/skills-map.yml` entry and **run Step 4f in
+     refresh mode** (see Step 4f): a `source` skill is cleanly replaced via stage-then-swap (download
+     the latest upstream into a temp dir, then swap it into `.claude/skills/<name>/` only on success
+     — never delete before a fetch that may fail), cloning each shared source repo once; a `plugin`
+     skill is updated via `claude plugin marketplace add` then
+     `claude plugin update <plugin>@<marketplace> --scope project`; a sourceless skill is skipped.
+     Finally, leave `project-context.md`, the agent overrides, `skills.json`, and `.tmp/` gitignore
+     untouched, print a summary of which skills were refreshed (and which were skipped as
+     user-owned), then run the Final action release — do **not** continue to Steps 1–5.
    - **Re-run full setup** → continue to Step 1 with all existing values offered as pre-filled
      defaults in each prompt.
 
@@ -147,14 +159,14 @@ for use as pre-filled defaults in Step 3:
 
 After the scan, you will have (or empty strings for inconclusive signals):
 
-| Variable | Detected value |
-| -------- | -------------- |
-| `DETECTED_LANG` | e.g. `TypeScript` |
-| `DETECTED_FRAMEWORK` | e.g. `Hono` |
-| `DETECTED_PM` | e.g. `pnpm` |
-| `DETECTED_TEST` | e.g. `pnpm test` |
-| `DETECTED_TYPECHECK` | e.g. `pnpm typecheck` |
-| `DETECTED_RUNTIME` | e.g. `Node 20` (empty if no version declaration found) |
+| Variable                 | Detected value                                                      |
+| ------------------------ | ------------------------------------------------------------------- |
+| `DETECTED_LANG`          | e.g. `TypeScript`                                                   |
+| `DETECTED_FRAMEWORK`     | e.g. `Hono`                                                         |
+| `DETECTED_PM`            | e.g. `pnpm`                                                         |
+| `DETECTED_TEST`          | e.g. `pnpm test`                                                    |
+| `DETECTED_TYPECHECK`     | e.g. `pnpm typecheck`                                               |
+| `DETECTED_RUNTIME`       | e.g. `Node 20` (empty if no version declaration found)              |
 | `DETECTED_COMMIT_SCOPES` | e.g. `functions, config, web` (empty if no `packages/`/`apps/` dir) |
 
 These values **pre-fill the matching Step-3 prompts** (the package-manager picker pre-selects the
@@ -173,22 +185,22 @@ it in Step 3.5:
 
 Prompt the user for each value **individually** — one question at a time, never batched into a wall
 of prompts. Each field is **either** a picker **or** free text; the mechanics are mandatory, not a
-suggestion (see *Prompt mechanics* below). Collect:
+suggestion (see _Prompt mechanics_ below). Collect:
 
-| Value | Notes |
-| ----- | ----- |
-| Project name | repo/display name, e.g. `acme-api` |
-| Jira project key | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`) |
-| Jira site | the authenticated host from Step 2 (offer it as the default) |
-| Base branch | the integration branch PRs target, e.g. `main` or `develop` |
-| Package manager | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`** |
-| Typecheck command | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none) |
-| Test command | the project's test runner — **default: `DETECTED_TEST`** (blank if none) |
-| Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
-| Active agents | the **domain** agents whose code lives in this repo (see below) |
-| Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
-| Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
-| Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
+| Value                 | Notes                                                                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project name          | repo/display name, e.g. `acme-api`                                                                                                                                                                                                          |
+| Jira project key      | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`)                                                                                                                                                                       |
+| Jira site             | the authenticated host from Step 2 (offer it as the default)                                                                                                                                                                                |
+| Base branch           | the integration branch PRs target, e.g. `main` or `develop`                                                                                                                                                                                 |
+| Package manager       | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`**                                                                                                                                                                      |
+| Typecheck command     | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none)                                                                                                                                                                 |
+| Test command          | the project's test runner — **default: `DETECTED_TEST`** (blank if none)                                                                                                                                                                    |
+| Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3`                                                                                                                                                                            |
+| Active agents         | the **domain** agents whose code lives in this repo (see below)                                                                                                                                                                             |
+| Review agent          | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers`                                                                                                                              |
+| Review trigger        | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none`                                                                                                                                                      |
+| Review gate           | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
 
@@ -201,7 +213,7 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
 >
 > - **Rule:** never place a question with fewer than 2 `options` into an `AskUserQuestion` call.
 > - **Why it bites the whole call:** `AskUserQuestion` rejects the **entire call** — every question in
->   it, including the static ones — if *any single* question has <2 options
+>   it, including the static ones — if _any single_ question has <2 options
 >   (`too_small: expected array to have >=2 items`). One runtime field that computes to a single option
 >   fails the whole prompt, even the static fields batched alongside it.
 > - **What to do:** before issuing any call, compute each question's `options` and **exclude** any that
@@ -268,13 +280,13 @@ Three categories exist; only the domain tier is a multi-select pick:
 **Selection guide — which domain agents does this repo need?** Present the options with this decision
 aid (multi-select), so the user picks by what the repo actually contains, not by guessing:
 
-| Agent | Select it when the repo has… | Typical owned paths |
-| ----- | ---------------------------- | ------------------- |
-| `platform-engineer` | a backend, API, serverless handlers, or infra/IaC | `services/`, `src/api/`, `functions/`, `infra/` |
-| `web-engineer` | a web frontend (React/Vue/Svelte/etc.) | `apps/web/`, `src/web/`, `web/` |
-| `mobile-engineer` | a mobile app (React Native / native iOS-Android) | `apps/mobile/`, `mobile/` |
-| `database-administrator` | a relational schema you migrate (SQL, Prisma, Drizzle, TypeORM) | `db/`, `migrations/`, `prisma/` |
-| `sync-engineer` | an **offline-sync** layer (sync rules, transaction builders, DLQ) | `sync/`, `src/sync/` |
+| Agent                    | Select it when the repo has…                                      | Typical owned paths                             |
+| ------------------------ | ----------------------------------------------------------------- | ----------------------------------------------- |
+| `platform-engineer`      | a backend, API, serverless handlers, or infra/IaC                 | `services/`, `src/api/`, `functions/`, `infra/` |
+| `web-engineer`           | a web frontend (React/Vue/Svelte/etc.)                            | `apps/web/`, `src/web/`, `web/`                 |
+| `mobile-engineer`        | a mobile app (React Native / native iOS-Android)                  | `apps/mobile/`, `mobile/`                       |
+| `database-administrator` | a relational schema you migrate (SQL, Prisma, Drizzle, TypeORM)   | `db/`, `migrations/`, `prisma/`                 |
+| `sync-engineer`          | an **offline-sync** layer (sync rules, transaction builders, DLQ) | `sync/`, `src/sync/`                            |
 
 Guidance to apply while prompting:
 
@@ -321,27 +333,27 @@ AskUserQuestion(
 - **Opt in** → carry two effects into Step 4:
 
   (a) **Workspace→agent rows** — for each of `plugins/`, `skills/`: write a `<dir>/` →
-      `ai-enablement-engineer` row to the Step 4b table **only if that directory exists in this
-      repo**. Writing a row for a directory that doesn't exist yet is guaranteed false drift on the
-      very first `/sdlc:analyze` scan (the "Workspace→agent table vs disk" check in
-      `analyze-protocol.md#drift--gap-table` flags exactly this: "Table lists a path that no longer
-      exists"). At least one row must land to mark the agent **Active** — row presence is the sole
-      Active signal, no separate flag exists (`analyze-protocol.md#ownership-resolution-rules`):
-      `plugins/` exists in essentially every consumer repo (this plugin's own install lives there),
-      so in practice it is almost always the row that survives. If genuinely **neither** `plugins/`
-      nor `skills/` exists yet, still scaffold the override (below) and write one row for the
-      AI-config surface root (`.claude/` — a judgment call, note the rationale in the row) so the
-      Active signal holds regardless. When a skipped directory appears later, add its row on the
-      next `/init` "Merge new findings" pass or by hand — the agent's write-scope already covers it
-      via the config-driven AI-config surface baseline even before a table row names it explicitly.
+  `ai-enablement-engineer` row to the Step 4b table **only if that directory exists in this
+  repo**. Writing a row for a directory that doesn't exist yet is guaranteed false drift on the
+  very first `/sdlc:analyze` scan (the "Workspace→agent table vs disk" check in
+  `analyze-protocol.md#drift--gap-table` flags exactly this: "Table lists a path that no longer
+  exists"). At least one row must land to mark the agent **Active** — row presence is the sole
+  Active signal, no separate flag exists (`analyze-protocol.md#ownership-resolution-rules`):
+  `plugins/` exists in essentially every consumer repo (this plugin's own install lives there),
+  so in practice it is almost always the row that survives. If genuinely **neither** `plugins/`
+  nor `skills/` exists yet, still scaffold the override (below) and write one row for the
+  AI-config surface root (`.claude/` — a judgment call, note the rationale in the row) so the
+  Active signal holds regardless. When a skipped directory appears later, add its row on the
+  next `/init` "Merge new findings" pass or by hand — the agent's write-scope already covers it
+  via the config-driven AI-config surface baseline even before a table row names it explicitly.
 
-      **Migration (the sole documented exception to Step 0's "never touch values already
-      present"):** if `plugins/` or `skills/` already has a workspace→agent row under a
-      **different** owner (e.g. a legacy `platform-engineer` row predating this agent), the opt-in
-      confirmation **reassigns** that row to `ai-enablement-engineer` rather than leaving both a
-      stale row and a new one — one path, one owner is the ownership model's core invariant. This
-      reassignment fires only when the user explicitly confirms this AI-context opt-in prompt; it
-      never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
+  **Migration (the sole documented exception to Step 0's "never touch values already
+  present"):** if `plugins/` or `skills/` already has a workspace→agent row under a
+  **different** owner (e.g. a legacy `platform-engineer` row predating this agent), the opt-in
+  confirmation **reassigns** that row to `ai-enablement-engineer` rather than leaving both a
+  stale row and a new one — one path, one owner is the ownership model's core invariant. This
+  reassignment fires only when the user explicitly confirms this AI-context opt-in prompt; it
+  never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
 
   (b) scaffold `.claude/project/agents/ai-enablement-engineer.md` in Step 4c using
   the **fixed** override shape below (its skill list and owned paths are fixed by the agent
@@ -351,28 +363,34 @@ AskUserQuestion(
   # AI Workflow Manager — <project name> bindings
 
   ## Skills (plugin-bundled — invoke via the Skill tool)
+
   1. skill-creator
   2. find-skills
   3. conventional-commit
 
   ## Directory guides (read before coding)
+
   # No directory guides yet — add CLAUDE.md files to owned paths.
 
   ## Ownership
+
   - owns: plugins/, skills/, .claude/, CLAUDE.md, AGENT.md/AGENTS.md and the AI-config surface (baseline globs ship in the agent definition; this override may add more)
-  - never: .claude/project/project-context.md, .claude/.*-plugin-root pointers, other agents' memory files
+  - never: .claude/project/project-context.md, `.claude/.*-plugin-root` pointers, other agents' memory files
   - runs after: — · before: —
 
   ## Tech rules
+
   - Markdown/Shell; kebab-case file naming; any shell script touched must pass `bash tools/portability-lint.sh` if the repo has that gate.
 
   ## Local dev (tokens from project-context Tooling)
+
   - Typecheck: `<confirmed typecheck cmd, or "none configured">` · Test: `<confirmed test cmd, or "none configured">`
   - Never run cloud deploys — those are manual ops actions outside agent scope.
   ```
 
   Substitute `<project name>` and the typecheck/test tokens from the values already collected
   above (Step 3) — no `<...>` placeholder may remain.
+
 - **Skip** → add no workspace→agent row for `ai-enablement-engineer` and scaffold no override.
   The agent stays inactive with no effect on the repo — its definition is repo-agnostic, so
   there is nothing to undo later; opting in is always available on a future `/init` run.
@@ -381,6 +399,40 @@ AskUserQuestion(
   (no `ai-enablement-engineer` rows present) is prompted once when merging; a repo that already
   opted in (its rows already present) is never re-prompted — the existing rows and override are
   kept verbatim, matching Step 0's "never touch values already present" rule.
+
+### Docs opt-in (`/sdlc:docs` generation)
+
+Presented **after stack detection completes** (Step 2.5), alongside the AI-context opt-in above.
+This is an **independent** confirm — accepting or declining it has no bearing on the AI-context
+opt-in, and either may be accepted without the other. Ask:
+
+```
+AskUserQuestion(
+  header: "Docs generation",
+  question: "Scaffold a docs-manifest so /sdlc:docs can generate public documentation for this repo?",
+  multiSelect: false,
+  options: [
+    { label: "Opt in", description: "Write .claude/project/docs-manifest.md pre-filled with doc-type rows relevant to the detected stack. Activates docs generation." },
+    { label: "Skip",   description: "Write no manifest. All docs features stay a silent no-op. Re-run /init later to opt in." }
+  ]
+)
+```
+
+- **Opt in** → Step 4g (below) writes or merges `.claude/project/docs-manifest.md`.
+- **Skip** → Step 4g writes nothing — but **only when no manifest exists yet**. Once
+  `.claude/project/docs-manifest.md` exists (from any prior run), an existing manifest **always**
+  triggers Step 4g's merge behaviour regardless of this run's opt-in answer: Skip means "don't
+  create one," never "stop merging an existing one" — the merge behaviour only _offers_ new rows
+  (each confirmed individually via the per-row merge/confirm flow), so it never writes anything
+  this run's answer didn't separately authorize.
+- **Re-init semantics** — this opt-in is **not** a `refs/project-context-template.md` token, so
+  the Step 0 "Merge new findings" template-diff loop never surfaces it; a dedicated check does
+  instead (see Step 0's merge flow, step 4). Decline is **per-run and deliberately unpersisted** —
+  there is no record of an opt-in decline (unlike the per-row `<!-- declined: … -->` record inside
+  an _existing_ manifest, which Step 4g does honor). A manifest-less repo is therefore re-prompted
+  on **every** (re-)init or merge run for as long as the manifest stays absent. Once a manifest
+  exists, this prompt is no longer asked, and Step 4g's existing-manifest merge guard governs from
+  then on regardless of this run's answer (see Step 4g below).
 
 ## Step 3.5 — Suggest skills and refs based on detected stack
 
@@ -453,23 +505,23 @@ the value detected and confirmed in the steps above — when you finish, **no pl
 from the collected and detected values. Replace every token slot with an actual value; the fill rules
 are documented in that template file. Token slots to substitute:
 
-| Token | Source |
-| ----- | ------ |
-| `<project name>` | user input (Step 3) |
-| `<KEY>` | Jira project key (Step 3) |
-| `<site>` | Jira site (Step 3) |
-| `<base branch>` | base branch (Step 3) |
-| `<pm>` | confirmed package manager (Step 3) |
-| `<typecheck>` / `<test>` | confirmed commands (Step 3) |
-| `<DETECTED_LANG>` | `DETECTED_LANG` (Step 2.5) |
-| `<DETECTED_FRAMEWORK>` | `DETECTED_FRAMEWORK` (Step 2.5) |
-| `<DETECTED_PM>` | `DETECTED_PM` (Step 2.5) |
-| `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
-| `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
-| `<threshold>` | lightweight threshold (Step 3) |
-| `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
-| `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
-| workspace→agent rows | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
+| Token                            | Source                                                                                                                                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<project name>`                 | user input (Step 3)                                                                                                                                                                                   |
+| `<KEY>`                          | Jira project key (Step 3)                                                                                                                                                                             |
+| `<site>`                         | Jira site (Step 3)                                                                                                                                                                                    |
+| `<base branch>`                  | base branch (Step 3)                                                                                                                                                                                  |
+| `<pm>`                           | confirmed package manager (Step 3)                                                                                                                                                                    |
+| `<typecheck>` / `<test>`         | confirmed commands (Step 3)                                                                                                                                                                           |
+| `<DETECTED_LANG>`                | `DETECTED_LANG` (Step 2.5)                                                                                                                                                                            |
+| `<DETECTED_FRAMEWORK>`           | `DETECTED_FRAMEWORK` (Step 2.5)                                                                                                                                                                       |
+| `<DETECTED_PM>`                  | `DETECTED_PM` (Step 2.5)                                                                                                                                                                              |
+| `<DETECTED_TEST>`                | `DETECTED_TEST` (Step 2.5)                                                                                                                                                                            |
+| `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3)                                                                                                                                                                           |
+| `<threshold>`                    | lightweight threshold (Step 3)                                                                                                                                                                        |
+| `<review-agent>`                 | Review agent picker (Step 3) — `claude-inline` default                                                                                                                                                |
+| `<review-mode>`                  | Review trigger picker (Step 3) — `on-update` default                                                                                                                                                  |
+| workspace→agent rows             | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
 
 > **On the Merge-new-findings path** (Step 0): do **not** regenerate the file from scratch — preserve
 > the existing `.claude/project/project-context.md` verbatim and only **inject the tokens/sections
@@ -532,7 +584,7 @@ fi
 
 This is idempotent — running it on a repo that already has `.tmp/` in `.gitignore` is a no-op.
 
-**4f. Install each confirmed skill into project scope.** Steps 4c and 4d only *record* the confirmed
+**4f. Install each confirmed skill into project scope.** Steps 4c and 4d only _record_ the confirmed
 skills (in the agent overrides and `skills.json`); neither makes a skill discoverable. A skill is only
 invocable when its content is actually installed on disk. Without this step, `/init` leaves the
 selected skills tracked but absent and unavailable to the domain agents (the reported defect). Resolve
@@ -618,12 +670,12 @@ Rules:
 - **Idempotent — skip-if-exists / already-installed.** If `.claude/skills/<name>/SKILL.md` already
   exists, or the providing plugin is already installed, leave it **untouched** — never re-download,
   re-install, or clobber a hand-authored skill. `git clone` into a fresh temp dir, `claude plugin
-  marketplace add` / `install`, and the stub write are all otherwise safe to re-run.
+marketplace add` / `install`, and the stub write are all otherwise safe to re-run.
 - **Refresh mode** (entered from Step 0's "Refresh skills"): the skip-if-exists guard is lifted **only
   for managed skills** — a skill whose `refs/skills-map.yml` entry declares a `source` or `plugin`. For
   those, re-fetch to pick up upstream changes:
   - A `source` skill is **cleanly replaced**, not merged — but **stage-then-swap**, never delete first.
-    `cp -R` alone leaves behind files upstream renamed/deleted, yet `rm -rf` *before* a re-fetch that
+    `cp -R` alone leaves behind files upstream renamed/deleted, yet `rm -rf` _before_ a re-fetch that
     might fail (transient network, renamed `ref`/`path`, auth) would destroy a working skill. Stage the
     new content **on the same filesystem** as the destination (so the swap is a real rename, not a
     cross-device copy that can fail mid-write), and swap **only after the staged dir is confirmed
@@ -642,7 +694,7 @@ Rules:
     rm -rf "$stage"
     ```
     **De-duplicate by repo + ref** (as on the install path): when several refreshed skills share one
-    `source` repo *and* the same `ref`, clone it once and stage each skill's `path` from that single
+    `source` repo _and_ the same `ref`, clone it once and stage each skill's `path` from that single
     clone. Skills from the same repo pinned to **different** `ref`s need separate clones (one per ref)
     — a single clone can only be checked out at one ref.
   - A `plugin` skill is refreshed with `claude plugin update`. As on the install path, **register the
@@ -664,6 +716,56 @@ Rules:
 - If the confirmed install list is empty (no suggestions accepted, no custom skills), this step is a
   no-op — install nothing, write no files.
 
+**4g. `.claude/project/docs-manifest.md`** — executed whenever **either** the docs opt-in was
+accepted this run (Step 3, or Step 0's merge-flow docs-opt-in check) **or**
+`.claude/project/docs-manifest.md` already exists from a prior run — an existing manifest always
+reaches this step regardless of this run's opt-in answer (see the Docs opt-in section's Re-init
+semantics). Declining the opt-in **with no pre-existing manifest** writes nothing (no file, no
+partial content).
+
+Step 4g MUST **first detect whether the manifest already exists** — this existing-manifest merge
+guard applies on **every** path that reaches Step 4g, including a full "re-run setup" pass, not
+only the Step 0 "Merge new findings" path:
+
+```bash
+[ -f ".claude/project/docs-manifest.md" ] && echo "MANIFEST_EXISTS=yes" || echo "MANIFEST_EXISTS=no"
+```
+
+- **If absent** — fill `refs/docs-manifest-template.md` with the subset of `refs/doc-types.md`
+  rows whose `applies-when` matches the detected stack (v1: every row — all 15 mandatory rows use
+  `applies-when = always`). Write each row's `type`, `enabled = true`, and the registry row's
+  default `target-path` token, using the header comment and row-table shape defined in
+  `refs/docs-manifest-template.md`. Never leave a `<...>` placeholder in the written file.
+
+- **If present** — never regenerate from defaults. This is the merge behaviour (reuses the Step 0
+  "Merge new findings" mechanic and the Step 4d `skills.json` merge pattern; the merge source for
+  docs rows is `refs/doc-types.md`, **not** any `refs/project-context-template.md` token set):
+  1. Read the existing manifest's rows and its `<!-- declined: <type>[, <type>...] -->` comment
+     line(s), if any.
+  2. For every `refs/doc-types.md` row whose `applies-when` matches the detected stack **and**
+     is **absent** from the manifest **and** is **not** already recorded as declined: **offer to
+     append it**, one row at a time, via the same merge/confirm mechanic Step 0's "Merge new
+     findings" and Step 4d's `skills.json` merge use. The founder confirms or declines per row.
+  3. **Accepted** → append the row (`type`, `enabled = true`, the registry default
+     `target-path`) to the table, preserving the position of every existing row.
+  4. **Declined** → record it in a `<!-- declined: <type>[, <type>...] -->` comment line (append
+     the type to an existing line, or add a new one) so subsequent re-runs read it and **skip
+     re-offering** that type.
+  5. **Rows already present are kept verbatim** — their edited `target-path`, their `enabled`
+     value, and their table position are all preserved. Never remove or rewrite an existing
+     manifest row.
+
+Error / no-op branches:
+
+| Scenario                                                                   | Behaviour                                                                                                                                             |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docs opt-in declined (or never asked) and no manifest exists yet           | Write no manifest file. No error — re-prompted on the next (re-)init or merge run per the Docs opt-in section's Re-init semantics.                    |
+| Docs opt-in declined (or not asked) this run but a manifest already exists | Step 4g still runs its existing-manifest merge behaviour (see the rows below) — an existing manifest is never gated on this run's opt-in answer.      |
+| Manifest absent, opt-in accepted                                           | Fill from `refs/docs-manifest-template.md` per the "If absent" branch above.                                                                          |
+| Manifest present, new non-declined matching rows exist                     | Offer to append them per-row (merge/confirm); keep existing rows verbatim; record any decline in the `<!-- declined: … -->` comment. Never overwrite. |
+| Manifest present, no new (non-declined) rows                               | No-op on the manifest; print it as unchanged.                                                                                                         |
+| `refs/doc-types.md` unreadable or malformed at scaffold time               | Surface the failure and **skip** the manifest write — never write a half-filled manifest.                                                             |
+
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 
 Creating or modifying Jira custom fields is **out of scope** — but the pipeline needs them, so tell
@@ -671,9 +773,10 @@ the user exactly what to set up and how to verify. Print this checklist:
 
 > Files written: `.claude/project/project-context.md`, agent overrides for `<active agents>`
 > (plus `ai-enablement-engineer`'s override if the AI-context opt-in was accepted),
-> `.claude/.sdlc-plugin-root`, and `.claude/project/skills.json`. Confirmed skills are installed
-> (Step 4f): from their declared `source` into `.claude/skills/<name>/`, or via `claude plugin install
-> … --scope project` for plugin-backed ones, the rest as
+> `.claude/.sdlc-plugin-root`, and `.claude/project/skills.json`
+> (plus `.claude/project/docs-manifest.md` if the docs opt-in was accepted). Confirmed skills are
+> installed (Step 4f): from their declared `source` into `.claude/skills/<name>/`, or via
+> `claude plugin install … --scope project` for plugin-backed ones, the rest as
 > `.claude/skills/<name>/SKILL.md` scaffolds.
 >
 > **Configure these Jira custom fields on project `<KEY>` (the plugin reads but never creates them):**
@@ -683,7 +786,7 @@ the user exactly what to set up and how to verify. Print this checklist:
 > 2. **AI Workflow** (single-select) with options `Full Auto`, `Auto`, `Assisted` — controls
 >    auto-merge vs human-merge. Verify a value reads back:
 >    `acli jira workitem search --jql 'project = <KEY> AND "AI Workflow" is not EMPTY' --fields key`
->    *No admin access to create custom fields?* Issues can opt in with an
+>    _No admin access to create custom fields?_ Issues can opt in with an
 >    `AI-Workflow:<full-auto|auto|assisted>` label instead — the field, when set, always wins; with
 >    multiple such labels the most conservative mode applies (`assisted` > `auto` > `full-auto`).
 >

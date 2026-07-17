@@ -1,5 +1,148 @@
 # ai-enablement-engineer — memory
 
+## NA-51 — PR #113 review round 2, 10 accepted findings (`plugins/sdlc/commands/init.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`)
+
+- **A "gate a new write step on opt-in acceptance" design is incomplete without an explicit
+  precedence rule for the case where the gated artifact already exists but this run's answer was
+  Skip (or never asked).** Round 1's fix stated the 4g gate as "accepted this run OR artifact
+  already exists" but never said which wins when a manifest exists AND this run's answer is Skip —
+  QA correctly read that as a live contradiction (Skip's own description said "writes nothing").
+  The fix is a one-sentence precedence rule stated in at least three places that must all agree:
+  the opt-in's own `Skip` bullet, the write-step's own header, and the error/no-op table's first
+  row — "an existing artifact always reaches the merge step regardless of this run's answer; Skip
+  only means don't create one." Any time a review finds a same-file contradiction between two
+  "correct in isolation" bullets, look for the missing precedence rule between them rather than
+  patching either bullet alone.
+- **A prompt that "participates in Step 0's Merge-new-findings schema-backfill loop" is a false
+  claim unless the field is actually a token that loop's own diff step iterates over.** The loop
+  (Step 0 → Merge new findings → step 2) explicitly diffs against
+  `refs/project-context-template.md`'s token/section set — a prompt whose write target is a
+  **different file** (here, `.claude/project/docs-manifest.md`, never `project-context.md`) is
+  structurally invisible to that loop no matter how the prose describes it. The only fix that
+  actually closes the reachability gap is a **new, explicit numbered step** in the Merge flow that
+  checks the artifact's existence directly and re-asks the exact same `AskUserQuestion` — a
+  cross-reference/description change alone ("this participates like any other field") cannot make
+  an unreachable branch reachable. When a spec/plan or a fix instruction says a Step-3 confirm
+  "participates in the merge loop," verify mechanically: does the loop's own diff step actually
+  enumerate this field, or does it only enumerate `project-context-template.md` tokens? If the
+  latter, the field needs its own explicit step, not descriptive prose.
+- **Claiming persistence for a decision with no actual storage location is an "undecidable claim"
+  bug, not a wording nit** — round 1's "Re-init semantics" bullet said a repo is "prompted once when
+  merging" and called it "non-declined," implying some decline state is tracked, when nothing in
+  the design persists a decline of the _opt-in itself_ (only per-row declines inside an _already-
+  existing_ manifest are persisted, via the `<!-- declined: <type> -->` comment convention — a
+  genuinely different, correctly-designed mechanism that must NOT be touched when fixing this).
+  Before writing "prompted once" / "already declined" / any other claim implying persisted memory
+  of a past answer, verify a concrete field, file, or comment convention actually stores that
+  answer between runs — if none exists, the true behavior is "re-asked every time the precondition
+  still holds," not "asked once."
+- Restoring a bare glob (`.claude/.*-plugin-root`) that a nested ` ```markdown ``` ` fenced code
+  block's own prettier "embedded language formatting" had escaped to `.claude/.\*-plugin-root`:
+  wrapping the glob in a backtick code span (`` `.claude/.*-plugin-root` `` ) inside that nested
+  fence is what actually survives — prettier's embedded-markdown formatter escapes bare `*` in
+  prose text (emphasis-ambiguity) but never touches the contents of an inline code span, even one
+  written inside an outer fenced block. Verified stable across two `prettier --write` passes.
+- **A paragraph indented 6 spaces where its sibling paragraphs (same nesting level, same parent
+  bullet) sit at 2 spaces renders as an indented code block**, not as continued list-item prose —
+  CommonMark treats 4+ spaces of indentation beyond the container's own content column as a code
+  block trigger. This is a silent, unflagged-by-prettier defect (proseWrap: preserve doesn't touch
+  indentation, and prettier does not reformat indentation levels within nested list content) — the
+  only way to catch it is to eyeball-compare a paragraph's leading whitespace against its true
+  siblings' whitespace, not just against the immediately preceding line.
+- **When adding an optional free-form prose section to a file whose header comment is itself an
+  HTML `<!-- ... -->` block, never embed another literal `<!-- ... -->` inside that same outer
+  comment's text** — the string `-->` appearing anywhere before the outer comment's real closing
+  `-->` terminates the HTML comment early when any HTML-aware tool parses it, corrupting everything
+  after. Caught this in my own first draft (writing "...unless declined and recorded in a
+  `<!-- declined: <type> -->` comment line..." as prose _inside_ the outer header comment) before
+  committing — the fix is to describe the mechanism in plain words ("recorded — see the Decline
+  record convention below") and never reproduce another HTML comment's literal delimiters inside
+  the text of a comment that's still open.
+- Re-confirmed the NA-25/NA-27/NA-43/NA-51-round-1 lesson about avoiding "This story ships..."
+  phrasing in a permanent plugin artifact — caught myself reintroducing the identical anti-pattern
+  in a _new_ paragraph (the just-added docs-manifest-template.md Voice & format section, "this
+  story ships zero generation logic") immediately after having fixed the same phrasing elsewhere in
+  the same PR round. The instinct to explain "why this doesn't do X yet" by naming the current
+  story is strong and recurring — actively grep any newly-authored paragraph in a permanent
+  artifact for "this story" / "this PR" / "current story" before considering it done, don't rely on
+  having fixed it once already in the same file.
+
+## NA-51 — doc-type registry + docs-manifest scaffold (`plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`)
+
+- **A `##`/`###` Markdown heading is only the text on its own physical source line — wrapping a
+  long heading across two physical lines (no leading `##` on the second line) does NOT continue
+  the heading; it silently truncates the heading to line 1's text and turns line 2 into a
+  freestanding paragraph directly underneath.** `prettier --write` (`proseWrap: preserve` in this
+  repo) does **not** rejoin it for you, so this is a self-inflicted, `prettier`-invisible defect —
+  it happened to THIS memory file's own previous NA-51 entry in the prior round, corrupting its own
+  section heading. Never manually wrap a heading line; if it is long, let it stay long as one
+  physical line.
+- **`prettier --write` silently treats any path outside the repo, or under a `.gitignore`d
+  directory (e.g. this repo's own `.tmp/`), as "ignored" and leaves it byte-for-byte unchanged —
+  `prettier --file-info <path>` reports `{"ignored": true, "inferredParser": null}` for both
+  cases with zero error output from `--write`.** This makes the established "verify in a scratch
+  copy, run `--write` twice, confirm idempotent" protocol from prior NA-25/NA-27/NA-43 memory
+  entries **silently useless** if the scratch copy lives outside the repo (e.g. a session tmp
+  scratchpad) or under `.tmp/` — every "STABLE" result from such a copy is a false negative, not
+  evidence of anything. The protocol only produces a real signal when the copy sits at a real,
+  non-ignored path inside the repo, or is the real target path itself (reset with `git checkout --`
+  instead of a tmp copy). Always confirm with `prettier --file-info <path>` that `ignored: false`
+  before trusting any stability result from that path.
+- **Correction to this file's own prior-round entry, which reached the wrong conclusion and shipped
+  a QA-caught defect.** `plugins/sdlc/commands/init.md`'s Step 0 "Refresh skills" numbered sub-list
+  (nested inside an outer numbered list → bulleted option → nested numbered "Steps:" list) is
+  genuinely `prettier --write`-non-idempotent even on an untouched `git checkout --` copy — that
+  part of the prior diagnosis was correct, and it IS pre-existing repo drift, not something this
+  story's edits introduced. But the prior round's response — decide it's "out of scope", leave the
+  section untouched, and let the pre-commit hook's mandatory reformat produce and commit whatever
+  mangled form it emits (a collapsed run-on list with a code span `` `claude plugin update
+<plugin>@<marketplace> --scope project` `` split across two physical lines, dedenting the second
+  line to column 0) — was wrong: QA correctly flagged the committed, rendered defect regardless of
+  whose commit introduced the _cause_. "Pre-existing instability I didn't cause" is not a reason to
+  ship a broken rendering; the fix obligation travels with whoever's commit is the one that actually
+  contains the mangled text on disk. **The real fix was cheap and root-caused correctly on the
+  second attempt:** the failure was never really about nesting depth alone — it was a **code span
+  split across a hand-wrapped physical line** (`` `claude plugin update\n<plugin>@<marketplace>
+--scope project` `` — the exact CommonMark hazard already documented in the NA-7 gtm memory entry:
+  a code span's embedded line break renders as a literal space, and remark's paragraph reflow
+  around it inside deep list nesting is what actually broke). Flattening the nested "Steps:" ordered
+  list into plain prose sentences ("First, ... Then ... Finally, ...") — dropping the nesting from
+  3 list levels to 2 — **and** moving the multi-backtick code span onto a single unwrapped physical
+  line together fixed it completely: the file went from ~22 non-idempotent hunks (many pre-existing
+  and unrelated to this defect, e.g. GFM table column-padding, `*em*`→`_em_` conversion) to fully
+  `prettier --write`-stable on the very first pass (pre-format bytes == post-format bytes,
+  confirmed via `diff`). Lesson: when a "pre-existing, not my fault" defect is flagged in review on
+  a file your commit touches, don't defer to "out of scope" — try the actual root cause (search for
+  a split code span or other CommonMark hazard near the corruption site) before concluding it's
+  unfixably fragile; the nesting-depth framing was a red herring that led to giving up too early the
+  first time.
+- The `plugins/sdlc/skills/skill-creator/scripts/quick_validate.py` script hard-requires a
+  `SKILL.md` file (prints `"SKILL.md not found"` and exits 0 for any other filename) — it cannot
+  validate a command file's frontmatter. For a story that only touches `commands/*.md` frontmatter,
+  the correct fallback (per this story's own plan) is `head -12 <file>` plus a manual check that the
+  `---`-delimited block still parses as a single-key `description` scalar — there is no other
+  bundled validator for command frontmatter in this plugin.
+- A markdown table's header row (`| type | quadrant | ... |`) is not stable to grep for by its raw
+  literal spacing once `prettier --write` has column-padded it — the padding pass inserts
+  variable-width spaces between the pipe and each header word. Match structurally instead
+  (`line.startswith("| type") and "quadrant" in line`), not by the exact original spacing, in any
+  script that locates a registry/manifest table programmatically (self-check scripts, CI lint, a
+  future `/sdlc:docs` generator reading `refs/doc-types.md`).
+- **Gating a new opt-in prompt/write-step ("only when X was accepted") is not enough when the same
+  command has an existing bypass path that skips the step where X is normally asked.** `init.md`'s
+  Step 0 "Merge new findings" guard jumps straight to Steps 4b/4d/4e (and now 4g) without re-running
+  all of Step 3 — it only re-asks fields discovered via a template-token diff against
+  `refs/project-context-template.md`. A brand-new Step 3 `AskUserQuestion` that is **not** a
+  project-context token (this story's docs opt-in) is therefore unreachable on a Merge run under a
+  naive "gate 4g on Step 3 acceptance" rule — QA caught this as an AC5 reachability gap, not merely
+  a wording nit. Fix pattern for any future Step-3-adjacent opt-in: gate the downstream write step
+  on "(accepted this run) OR (its artifact already exists from a prior run)", and explicitly state,
+  next to the opt-in's own re-init-semantics prose, that a Merge run re-prompts it keyed on **the
+  artifact's absence**, not on appearing in the template-token diff loop. Whenever a spec/plan adds
+  a Step-3 confirm that writes a file outside `project-context.md` itself, check by hand whether
+  Step 0's merge-bypass path can actually reach that confirm — don't assume "it's a normal Step 3
+  field" without tracing the bypass.
+
 ## NA-58 — QA fix round on commit 9786198 (`plugins/sdlc/skills/writing-docs`)
 
 - Wrote a skill description for `writing-docs` at 1162 chars without ever checking it against the

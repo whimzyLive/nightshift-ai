@@ -74,3 +74,10 @@
 **Root causes:** description authored for completeness without running the plugin's own vendored validator (`skill-creator/scripts/quick_validate.py`); a sentence duplicated the body's "When to Use" section.
 **Preventions:** run `quick_validate.py` on any new/edited plugin skill before committing; keep frontmatter descriptions ~800 chars like sibling skills; never duplicate body sections into the description.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-17 — Story NA-51
+
+**Issues found:** Important: prettier pre-commit mangled init.md Step 0 nested list (4-level nesting non-idempotent); Important: Step 0→4g merge-path gate relied on inference (AC5 reachability); Minor: story-context leakage in permanent plugin ref, formatting noise, inconsistent backticking.
+**Root causes:** committing whichever form the prettier hook emits instead of restructuring to prettier-stable ≤3-level nesting; wiring a new init step into Step 0's jump list without re-checking the merge-run path that bypasses the prompt step.
+**Preventions:** run prettier twice + diff before committing any init.md edit; when adding an init step, verify every Step 0 path (merge run, full re-run) can reach it; write plugin refs in timeless language (no story refs).
+**Domains affected:** ai-enablement-engineer
