@@ -1,5 +1,113 @@
 # ai-enablement-engineer — memory
 
+## NA-61 — PR #129 review round: unfilled `TODO —` placeholder defeated the skip-and-surface net (`plugins/sdlc/skills/writing-docs/SKILL.md`, `plugins/sdlc/refs/docs-pipeline.md`)
+
+- **A "presence-only" guard and a "the field is now guaranteed present" story combine into a
+  silent regression the moment the guaranteed-present value can itself be an unfilled
+  placeholder — and this is the SAME failure shape as the NA-60 "gate on the real-signal subset,
+  not the union" lesson, just one abstraction level up.** NA-61's own placeholder design (a
+  `TODO —` scalar so an unfilled field is at least valid YAML) was never reconciled against the
+  two guards that read it: the founder-confirm gate checks **presence**, and §19's
+  skip-and-surface fires on **absence**. A `TODO —` value is present, so neither guard catches an
+  unedited scaffold — worse than pre-NA-61, where the same page (missing frontmatter entirely)
+  was loudly skipped. The fix pattern generalizes: whenever a story introduces a **placeholder
+  value that is valid-but-meaningless**, every downstream guard that used to test
+  presence/absence must be re-audited to also test **"is this the placeholder,"** not just
+  "is this populated" — a placeholder is a third state the binary guard was never designed for,
+  and it's very easy to design the placeholder and forget to chase its shadow through every
+  consumer. I designed the placeholder (Task 1) and separately re-scoped the guards' rationale
+  prose (Task 2) in the same PR without ever asking "what if seed confirms the scaffold
+  unedited" — the two tasks were sequenced correctly per the plan but never cross-examined
+  against each other from the guard's point of view.
+- **A reviewer's own suggested replacement text can itself reintroduce a documented YAML hazard
+  from this same file's history — verify a suggested fix against known landmines before adopting
+  it verbatim.** Finding 2 suggested `TODO: one line …` as the em-dash-free placeholder
+  replacement; a colon immediately followed by a space **inside** an unquoted plain scalar is the
+  exact "mapping values are not allowed here" YAML break this file's own NA-58 memory entry
+  already documents (a URL followed by `: ` broke a skill description the same way). Used
+  `TODO(fill)` instead — no colon, no em-dash, YAML-safe, and validated with
+  `python3 -c "import yaml; yaml.safe_load(...)"` before committing, not just eyeballed.
+- **Prettier canonicalizes a code span with a leading/trailing space (`` ` — ` ``) down to the
+  CommonMark-equivalent trimmed form (`` `—` ``) on `--write`**, breaking a prose sentence whose
+  meaning specifically depended on the surrounding spaces being visually present inside the span
+  (I was trying to say "the exact `—` sequence," not just "an em-dash"). This is a **new**
+  variant of the "prettier silently normalizes markdown you didn't expect" family (NA-27/NA-51
+  entries document bare-`*`-escaping and code-span-line-break variants) — caught by the
+  idempotency diff, not by `--check`, since my own hand-written first draft already "looked"
+  formatted. Fix: don't rely on a code span's internal whitespace to carry meaning; say "a space,
+  an em-dash, and a space" in prose instead of `` ` — ` ``.
+- Extending a guard's trigger condition (missing → missing-OR-unfilled) that has **already been
+  adopted verbatim by a second consumer** (audit's §21 says "§19's, verbatim") means the second
+  consumer's own restating sentence must be re-touched too, even though its own logic didn't
+  change — only its **description** of what it adopted did. Missed this on the first pass of the
+  fix, caught it by grep. General check: after widening a rule at its single source-of-truth
+  section, grep the whole file for every other section that describes itself as adopting that
+  rule "verbatim" and confirm each one's own restating prose still matches the widened condition
+  word-for-word, not just in spirit.
+- The review's suggestion "file a follow-up story, or note it as an OQ — your call" for the
+  genuinely-out-of-scope half of finding 2 (robustly fixing §8's positional `" — "`-delimited
+  format) was resolved as an in-repo Open Question blockquote at the point of use (§8 itself),
+  matching this file's own pre-existing `> **Underspecified — decision recorded (Open
+Question #1, adopted).**` convention — cheaper and more discoverable than a new Jira ticket for
+  a plugin-internal design note with no assigned owner or timeline yet.
+
+## NA-61 — writing-docs templates emit title/description/related-adrs frontmatter (`plugins/sdlc/skills/writing-docs/SKILL.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **A hand-wrapped checklist bullet that matches the FILE's own established wrapping
+  convention still breaks the PLAN's own single-physical-line verification grep — and the
+  right fix is to verify with the flattened `tr` idiom, not to un-wrap the line.** The plan's
+  Step 5 gave the new Self-Review line as one long logical sentence; I typed it wrapped across
+  two physical lines at the same point every neighboring long checklist bullet in this exact
+  file already wraps (`Voice and output format were resolved from…`, `If this is an explanation
+page…`) — genuinely the more consistent choice, and Prettier's `proseWrap: preserve` will
+  never rejoin it. But the plan's literal verification command
+  (`grep -c 'no .TODO —. placeholder left'`) assumed one physical line and returned 0 on a
+  clean pass. This is the established "grep trap" class (NA-53/54/55 memory entries) applied to
+  a bullet I wrapped myself, not one Prettier wrapped — confirmed correct with
+  `tr '\n' ' ' | tr -s ' ' | grep -o '...'` instead of relaxing my formatting to chase the
+  literal grep. Lesson: when a plan's own verbatim-text grep is single-line but the insertion
+  point sits inside prose this repo already wraps by convention, match the file's convention
+  and re-verify with the flatten idiom — don't treat "the plan's grep failed" as license to
+  make the source uglier just to pass a check.
+- **A trailing prose paragraph directly followed (zero blank lines) by a new list bullet is
+  Prettier-non-idempotent even when neither is itself indented/nested — this is a NEW distinct
+  landmine flavor from the already-documented "2-space-indented fence under a list item" one.**
+  Adding the `related-adrs:` reliability-caveat paragraph immediately above the pre-existing
+  `- **Dangling code reference.**` bullet (no blank line between, matching how the OLD one-line
+  caveat sentence had sat right above it) produced a real `prettier --write` diff on the FIRST
+  pass: Prettier inserted a blank line between the paragraph and the bullet to make the list
+  boundary unambiguous. Caught only by the copy → `--write` → `diff` idempotency protocol
+  (a bare `--check` also would have caught it here, but the copy protocol is what's mandated and
+  what I ran). Fix: always put a blank line between a freestanding paragraph and a list that
+  follows it, even if the paragraph it's replacing didn't have one — a longer multi-line
+  replacement paragraph changes Prettier's parse of the paragraph/list boundary even when a
+  shorter one-liner in the same spot didn't trigger a rewrite.
+- **The plan's own frontmatter-untouched verification grep
+  (`git diff SKILL.md | grep -E '^[-+](name|description):' | wc -l`, expected 0) is imprecise
+  and produces a false-positive the moment the story's OWN body edits add new
+  `description:`-prefixed lines** — it can't distinguish SKILL.md's real YAML frontmatter
+  (lines 1–4) from the four new body-template `description: TODO — …` lines this story
+  legitimately adds, so it returned 4, not the plan's expected 0. Verified the actual invariant
+  (frontmatter untouched) correctly instead via `diff <(git show HEAD:<file> | sed -n '1,4p')
+<(sed -n '1,4p' <file>)` → `UNCHANGED`. Lesson: when a plan's "prove X untouched" grep pattern
+  is a substring that the SAME diff's legitimate new content can also match, don't trust the
+  grep's raw count — isolate the specific line range the invariant actually claims and diff
+  that range directly.
+- Re-confirmed the NA-51 scratch-copy lesson on two separate files this round (SKILL.md and
+  docs-pipeline.md): a scratch copy must be a `.md`-suffixed file **inside the repo tree**
+  (sibling to the real file, not `/tmp` or the session scratchpad) for `prettier --file-info`
+  to report `ignored: false` + a non-null `inferredParser` — otherwise `--write` silently
+  no-ops and the "IDEMPOTENT" result is a false negative with zero signal value. Always run
+  `--file-info` on the scratch path first and confirm both fields before trusting the diff.
+- Confirmed (again, now 6th time across NA-54/55/57/58/60/61) that
+  `pnpm nx affected -t test --base=remotes/origin/develop` and `pnpm nx format:check` both
+  report clean/no-tasks for a `plugins/sdlc/**`-only change in this repo — expected, not a
+  skipped gate.
+- This story's dispatch prompt again explicitly overrode the standing "domain agent never
+  pushes" rule (same shape as NA-60's) with an instruction to push `feat/NA-61` directly and
+  verify `git rev-parse HEAD == git rev-parse origin/feat/NA-61` myself — no Principal Engineer
+  orchestrator, no PR, no `session-complete`, per the dispatch prompt's explicit instruction.
+
 ## NA-60 — PR #127 review fix: trigger the warning on `LIKELY_KEYS`, not `OUT_OF_SCOPE`
 
 - **A "fires iff `SUPERSET ≠ ∅`" gate is wrong the moment the superset legitimately contains a
