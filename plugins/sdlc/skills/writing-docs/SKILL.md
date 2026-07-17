@@ -142,8 +142,8 @@ genuinely doesn't apply, but don't add sections that belong to a different quadr
 
 ```markdown
 ---
-title: TODO — learning-oriented title, matching the H1 below
-description: TODO — one line, used verbatim as the llms.txt description
+title: TODO(fill) learning-oriented title, matching the H1 below
+description: TODO(fill) one line, used verbatim as the llms.txt description
 # related-adrs: repo-root-relative docs/adr/NNNN-*.md paths this page depends on; audit's
 # ADR-drift flag reads it. Leave [] unless the page genuinely references an accepted ADR.
 related-adrs: []
@@ -179,11 +179,11 @@ along the way.]
 
 ```markdown
 ---
-title: TODO — specific, real-world goal, matching the H1 below
-description: TODO — one line, used verbatim as the llms.txt description
+title: TODO(fill) specific, real-world goal, matching the H1 below
+description: TODO(fill) one line, used verbatim as the llms.txt description
 # source: repo-root-relative globs; changes to these files make /sdlc:docs sync draft a refresh of this page. Omit to opt out.
 source:
-  - [repo-root-relative glob, e.g. plugins/sdlc/commands/loop.md]
+  - TODO(fill) repo-root-relative glob, e.g. plugins/sdlc/commands/loop.md
 # related-adrs: repo-root-relative docs/adr/NNNN-*.md paths this page depends on; audit's
 # ADR-drift flag reads it. Leave [] unless the page genuinely references an accepted ADR.
 related-adrs: []
@@ -214,8 +214,8 @@ reach this specific goal.
 
 ````markdown
 ---
-title: TODO — exact name of the API/CLI/config surface, matching the H1 below
-description: TODO — one line, used verbatim as the llms.txt description
+title: TODO(fill) exact name of the API/CLI/config surface, matching the H1 below
+description: TODO(fill) one line, used verbatim as the llms.txt description
 # related-adrs: repo-root-relative docs/adr/NNNN-*.md paths this page depends on; audit's
 # ADR-drift flag reads it. Leave [] unless the page genuinely references an accepted ADR.
 related-adrs: []
@@ -251,8 +251,8 @@ entry.
 
 ```markdown
 ---
-title: TODO — topic, matching the H1 below, e.g. About X or X design
-description: TODO — one line, used verbatim as the llms.txt description
+title: TODO(fill) topic, matching the H1 below, e.g. About X or X design
+description: TODO(fill) one line, used verbatim as the llms.txt description
 # related-adrs: the docs/adr/NNNN-*.md paths this page discusses; audit's ADR-drift flag reads it.
 # List the same ADRs the "Related decisions" section links, so the machine key and the prose agree.
 related-adrs: []
@@ -318,12 +318,21 @@ they follow from the quadrant model itself rather than from any one repo's taste
   _content itself_ (not just a link) crosses the boundary.
 - **No TBDs in published docs** — an unfinished doc is worse than no doc; if a fact is genuinely
   unknown, say what's known and flag the gap explicitly rather than leaving a placeholder.
+- **No em-dash inside `title:` or `description:` frontmatter** — `/sdlc:docs`'s `llms.txt` regen
+  (`docs-pipeline.md` §8) parses each generated entry positionally as
+  `title — one-line description — relative link`, splitting on a space, an em-dash, and a space. An
+  em-dash inside either field's own value collides with that delimiter and breaks the split. Use a
+  comma, colon, or plain hyphen instead when the title/description itself needs a pause.
 
 ## Self-Review Checklist (run before publishing/committing)
 
 - [ ] The page is identifiable as exactly one quadrant from its title and opening paragraph
-- [ ] The page carries `title` + `description` frontmatter (both filled — no `TODO —` placeholder
-      left), and `related-adrs:` (empty `[]` unless the page genuinely references an accepted ADR)
+- [ ] The page carries `title` + `description` frontmatter (both filled — no unfilled
+      `TODO(fill)` sentinel left), and `related-adrs:` (empty `[]` unless the page genuinely
+      references an accepted ADR); if this is a how-to/integration-guide page with `source:`
+      present, its glob(s) are real paths, not the scaffold's `TODO(fill)` example
+- [ ] Neither `title:` nor `description:` contains an em-dash — it collides with the `llms.txt`
+      regen's field delimiter
 - [ ] No anti-pattern from the table above is present anywhere in the page
 - [ ] The page follows its quadrant's structure template (sections present, none borrowed from
       another quadrant)

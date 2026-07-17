@@ -234,6 +234,15 @@ generated page's frontmatter. Idempotent, no narrative synthesis. This matches t
 than restating it here; `refs/doc-types.md`'s own Registry self-check section is what keeps that
 cell's wording singular within that file.
 
+> **Delimiter fragility — Open Question, NOT resolved this story (NA-61).** This positional format
+> splits each entry on a space, an em-dash, and a space, so a `title`/`description` whose own value
+> legitimately contains an em-dash breaks the split. NA-61 mitigates the authoring side —
+> `writing-docs`'s templates no longer model an em-dash in their placeholder text, and both the
+> skill's craft rules and its Self-Review checklist now warn against one in real filled copy — but
+> the format itself stays positional and is not robust against an em-dash a founder writes anyway.
+> Robustly closing this would mean changing this v1 format (e.g. a structured/escaped delimiter, or
+> per-field length-prefixing) — out of scope here; deferred as a follow-up.
+
 ## 9. Cross-reference
 
 The registry (`refs/doc-types.md`) and the manifest template (`refs/docs-manifest-template.md`)
@@ -1000,6 +1009,17 @@ the authored content rather than discard it (§18).
      it as an opaque payload. A content check deferred to phase 2 can only STOP — it cannot ask the
      founder to fix the missing line — converting a one-line correction into the loss of a whole
      authored page.
+   - **"Present" is not "filled."** A `title`/`description` that is **missing** and a
+     `title`/`description` that **still carries the `writing-docs` scaffold's unfilled
+     `TODO(fill)` sentinel** are the **same rejection** at this gate — reject/re-prompt in either
+     case; a confirmed-but-unedited placeholder is never treated as valid content. (A
+     `TODO(fill)`-still-present `related-adrs:` value cannot occur — the key's own default is `[]`,
+     not a sentinel — so this check is scoped to `title`/`description`, plus, when the row is
+     `how-to`/`integration-guide` and `source:` is **present**, its list item(s): reject a `source:`
+     whose only entry is still the scaffold's own `TODO(fill)` glob example, since a `source:` list
+     holding no real glob can never intersect `CHANGED_FILES` and would silently defeat §5's
+     auto-refresh the founder believed they'd opted into. A `source:` key that is **absent** is
+     unaffected — omission is the documented opt-out, not a defect.)
    - **Founder rejects / does not confirm** → write nothing, no branch, no PR, no phase-2 dispatch;
      report and exit cleanly. Unlike `release`, a seed run has **no** deterministic half that could
      still be worth committing — the index/`llms.txt` regen is a _consequence_ of the page write, so
@@ -1044,24 +1064,34 @@ description: <one line, used verbatim as the llms.txt description>
 ```
 
 **As of NA-61 the `writing-docs` templates emit this frontmatter** — all four Diátaxis templates
-(Tutorial, How-to, Reference, Explanation) now carry `title:` + `description:` (bracket-free `TODO —`
-scalars the author fills) + `related-adrs: []`. A page authored from a current template therefore
-satisfies this requirement by construction. The seed layer still **validates** it at the
-founder-confirm gate (below) rather than assuming it, because a **legacy or hand-authored** page — or
-one written before NA-61 — may still lack it; the requirement is enforced on the page `seed` writes,
-not waived.
+(Tutorial, How-to, Reference, Explanation) now carry `title:` + `description:` (bracket-free
+`TODO(fill)` scalars the author fills) + `related-adrs: []`. A page authored from a current template
+therefore carries the **keys** by construction — but "carries the key" and "is actually filled in"
+are different claims, and only the second one satisfies this requirement. The seed layer still
+**validates** it at the founder-confirm gate (below) rather than assuming it, because (1) a
+**legacy or hand-authored** page — or one written before NA-61 — may still lack the key entirely, and
+(2) a current-template page the founder confirmed **without editing** still carries the unfilled
+`TODO(fill)` sentinel — present, but not a real title/description. The gate rejects **both**
+shapes; the requirement is enforced on the page `seed` writes, not waived by the template's own
+scaffolding.
 
 The consequence: §8's `llms.txt` regen derives every entry from the page's frontmatter
 (`title — one-line description — relative link`). A seeded page with no frontmatter either **drops
 out of `llms.txt` silently** — published but invisible to the index that exists to expose it, the
-exact failure `seed` prevents — or makes the regen fail on a page it expects to carry frontmatter.
+exact failure `seed` prevents — or makes the regen fail on a page it expects to carry frontmatter. A
+seeded page whose frontmatter is **present but still `TODO(fill)`** is **worse**, not merely
+equivalent: an absent-frontmatter page is loudly skipped-and-surfaced by §19 below, but a
+present-and-unfilled one would satisfy a naive presence check and ship the literal sentinel text into
+the public index — silently, and strictly worse than the pre-NA-61 state the skip already handled
+loudly. The gate below closes exactly this gap.
 
 **Where the check lives is itself load-bearing:** phase 1 emits the frontmatter; **the command layer
 validates it at the founder-confirm gate**, where the content still exists and the founder can fix a
-missing line in situ. It is **NOT** deferred to phase 2 — a fresh dispatch holding an opaque payload,
-which can only STOP, losing a four-hundred-line authored page to a one-line defect and reintroducing
-the "STOP after the founder has authored" failure this rule exists to prevent. Phase 2 MAY keep a
-defensive assertion, but it **must preserve the content** (session temp dir + surfaced path) rather
+missing line — or an unedited placeholder — in situ. It is **NOT** deferred to phase 2 — a fresh
+dispatch holding an opaque payload, which can only STOP, losing a four-hundred-line authored page to
+a one-line defect and reintroducing the "STOP after the founder has authored" failure this rule
+exists to prevent. Phase 2 MAY keep a defensive assertion, but it **must preserve the content**
+(session temp dir + surfaced path) rather
 than discard it.
 
 ### `source:` frontmatter — `how-to` and `integration-guide` only
@@ -1189,22 +1219,32 @@ apply):
   quadrant, each entry a `title — one-line description — relative link` derived from page
   frontmatter. The newly seeded page appears in it. Idempotent; committed only if changed.
 
-- **Frontmatter-less pages the regen encounters are SKIPPED, never fatal, and never fabricated.**
-  This story mandates frontmatter on the **page it writes**, and §8's algorithm reads frontmatter
-  from **every** enabled `public: yes` page in the tree. As of NA-61 the `writing-docs` templates
-  emit `title`/`description`, so a page authored from a current template carries it — **but the
-  regen cannot tell a template-produced page from a legacy one at regen time** (there is no origin
-  marker, and an age heuristic would be forbidden ambient input). So this skip stays **universal**;
-  it simply fires **rarely** now — only for a legacy or hand-authored page (or one predating NA-61)
-  that lacks frontmatter. Do not remove it: legacy pages still depend on it. That exposure is
-  pre-existing and shared with `sync`/`release`; `seed` merely walks into it.
-  - A page missing `title`/`description` is **omitted from `llms.txt`** and its path **surfaced in
-    the phase-2 output and the PR body**. Loud, not silent.
+- **Frontmatter-MISSING-OR-UNFILLED pages the regen encounters are SKIPPED, never fatal, and never
+  fabricated.** This story mandates frontmatter on the **page it writes**, and §8's algorithm reads
+  frontmatter from **every** enabled `public: yes` page in the tree. As of NA-61 the `writing-docs`
+  templates emit `title`/`description`, so a page authored from a current template carries the
+  **keys** — **but the regen cannot tell a template-produced page from a legacy one at regen time**
+  (there is no origin marker, and an age heuristic would be forbidden ambient input), and it also
+  cannot assume the founder-confirm gate (§16 step 7) ran on every page it walks — a page committed
+  by some other path, or predating that gate's `TODO(fill)` check, may still carry the scaffold's
+  unfilled sentinel untouched. So the trigger for this skip is **"missing `title`/`description` OR
+  either still carries the `TODO(fill)` sentinel"** — not presence alone. It stays **universal**; it
+  simply fires **rarely** now — only for a legacy/hand-authored page (or one predating NA-61) that
+  lacks frontmatter, or an unedited scaffold that slipped past the gate. Do not remove it: legacy
+  pages still depend on it. That exposure is pre-existing and shared with `sync`/`release`; `seed`
+  merely walks into it.
+  - A page missing, or still carrying the `TODO(fill)` sentinel in, `title`/`description` is
+    **omitted from `llms.txt`** and its path **surfaced in the phase-2 output and the PR body**.
+    Loud, not silent — this is the invariant the seed founder-confirm gate's own `TODO(fill)` check
+    (§17) exists to make rare, not the invariant that makes that gate check optional: the gate is the
+    fast, in-context catch; this skip is the regen-time backstop for anything that reaches it anyway.
   - It is **never a STOP.** A STOP mid-phase-2 would **tear the write** — the founder's page
     committed, the index not — and would let an unrelated page's defect block a valid seed the
     founder just authored.
-  - Its `title`/`description` are **never** inferred from the body or filename. That would fabricate
-    published index copy, the fabrication boundary this pipeline holds everywhere else.
+  - Its `title`/`description` are **never** inferred from the body or filename, and an unfilled
+    sentinel is **never** silently treated as "present enough" to ship. Both would fabricate or leak
+    unintended text into published index copy, the fabrication boundary this pipeline holds
+    everywhere else.
 
 - **The doc index** — if the consumer's docs tree already carries a section index page at
   `SEED_ROW`'s `target-path`, regenerate it deterministically (**upsert** the page's entry — add if
@@ -1301,10 +1341,11 @@ then compare the regenerated bytes against the **published** page at the same ba
   _regeneration procedure_, not its _affectedness keying_.
 - **`llms.txt` is an `auto` row and is regenerated like the others** (§8's format) — and its regen
   reflects any pages this run corrected (see §24).
-- **Frontmatter-less-page handling is §19's, verbatim.** A pre-existing `public: yes` page lacking
-  `title`/`description` that surfaces during the `llms.txt` regen is **skipped and surfaced, never a
-  STOP, never inferred** — `audit` adopts §19's skip-and-surface rule and does not invent a new one,
-  nor STOP the whole audit over one frontmatter-less page.
+- **Frontmatter-missing-or-unfilled-page handling is §19's, verbatim.** A pre-existing `public: yes`
+  page lacking `title`/`description`, **or still carrying the `TODO(fill)` sentinel in either**, that
+  surfaces during the `llms.txt` regen is **skipped and surfaced, never a STOP, never inferred** —
+  `audit` adopts §19's skip-and-surface rule (missing OR unfilled) and does not invent a new one, nor
+  STOP the whole audit over one such page.
 
 Every deterministic correction is a pure function of source-of-truth (byte-reproducible), which is
 what lets it be committed **un-gated** — the same "auto rows are un-gated" discipline `sync`,
