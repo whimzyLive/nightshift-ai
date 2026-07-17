@@ -1,5 +1,49 @@
 # ai-enablement-engineer — memory
 
+## NA-55 — `/sdlc:docs audit [--dry-run]` mode implementation (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **A plan's own gate-anchor pointer-count expectation can go stale the moment the story's own new
+  content legitimately adds MORE pointers to the thing it's renaming.** NA-55's Task 1 Step 7 and
+  Task 6 Step 4 both hard-coded "7 pointers total" / "8 total (1 heading + 4 pipeline + 3 docs.md)"
+  for the renamed manifest-gate anchor — correct for the pre-existing sync/release/seed pointers,
+  but the plan's own Task 2 (§20/§24) and Task 3 (the audit behavioural contract) each **correctly**
+  add their own new pointer to the same shared gate, since `audit` genuinely needs to cite it from
+  inside its own contract sections too (exactly the "point at it, don't re-derive it" rule the plan
+  itself states). Actual final count: **10** pointer occurrences (6 in `docs-pipeline.md`, 4 in
+  `docs.md`) + 1 heading — not the plan's 7/8. Verified each of the 3 "extra" sites individually: all
+  are legitimate citations, none re-derive the gate. When a rename-and-repoint task's own plan gives
+  an exact expected grep count, and a _later task in the same plan_ adds new prose that necessarily
+  cites the renamed anchor again, recompute the count by hand rather than trusting the earlier task's
+  frozen number — the discrepancy is a sign of correct-and-expected growth, not a bug, but it will
+  fail the plan's own literal "Expected: N" assertion if followed blindly.
+- **A verification grep built from disjunctive stub-language alternatives can true-positive on the
+  wrong reason.** Task 6 Step 2's `grep -rn 'audit.*not yet implemented\|audit|distill land\|audit`/`distill`'` intends to catch a surviving "audit is not yet implemented" stub claim, but its third alternative
+(`` `audit`/`distill` ``, a fixed backtick-slash-backtick substring) also matches the **legitimate**
+first-token enumeration line ("not one of `sync`/`release`/`seed`/`audit`/`distill`") — that line is
+correct and unrelated to the stub-claim the check exists to catch (`audit` genuinely IS a
+recognised first token; only the future-mode *stub set* dropped it). Confirmed with a narrower,
+intent-scoped grep (`audit.*not yet implemented`, `` `audit`/`distill` `` — the literal old
+  step-3 stub phrase) that zero genuine stale claims survive. When a plan's own multi-alternative
+  verification grep fires, check which alternative matched and whether that alternative's *intent\*
+  (not just its literal string) actually applies to the hit before treating it as a failure.
+- **This repo's agent-file frontmatter `description` fields are not actually bounded at 1024 chars
+  in practice, despite the plan/spec importing that limit from the command-frontmatter rule.**
+  `agents/knowledge-engineer.md`'s description was already 1063 chars (over the stated 1024 cap)
+  **before** this story touched it — confirmed via `git show HEAD:<file>` on the pre-NA-55 commit —
+  and no script in `plugins/sdlc/scripts/` validates agent-description length (only
+  `skill-creator/scripts/quick_validate.py`, which is `SKILL.md`-only and explicitly refuses any
+  other filename). The 1024 cap is real for **command** frontmatter (`docs.md`'s own description had
+  to be trimmed twice this story to fit) but the plan's "Keep the block ... ≤ 1024 chars" instruction
+  for the **agent** file's description clause is an unenforced carryover, not a live constraint.
+  Trimmed the new audit clause for cleanliness anyway (1259 → 1216 chars) but did not chase the
+  baseline's own pre-existing overage — flag this in the story return rather than silently absorbing
+  it as a new bug to fix, since fixing a pre-existing, unrelated overage is out of this story's scope.
+- Confirmed (again, third time after NA-53/NA-54) that `pnpm nx affected -t test --base=remotes/origin/develop`
+  reports `No tasks were run` for a `plugins/sdlc/**`-only change — expected, not a skipped gate.
+- `pnpm nx format:check` (full-repo) is a cheap, silent-on-success final sweep distinct from the
+  per-file `prettier --check` used mid-task — run it once at the very end of a multi-file plugin
+  story to catch any incidental reformat prettier's pre-commit hook didn't already normalize.
+
 ## NA-54 — `/sdlc:docs seed` mode implementation (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`)
 
 - **A plan's own literal verification grep can fail to match the plan's own verbatim template
