@@ -107,8 +107,14 @@ branch, no PR, no phase-2 dispatch).
 
 Single-sourced here — `commands/docs.md`'s `seed adr` and `distill` routes **point at** this
 section and do not restate it. The founder-confirmation gate flow itself is already stated in §2
-and §3 above; this section adds only what is genuinely command-layer-only: branch/PR naming and
-the post-PR control-flow tail.
+and §3 above; this section states the two things not covered there: the **branch/PR naming
+convention** and the **post-PR control-flow tail**. Naming this section "command-layer" describes
+where the founder-confirmation gate lives (§3), not who executes the branch/PR naming below — the
+naming convention is single-sourced **here**, but `knowledge-engineer.md`'s own ADR-dispatch
+branch/memory/commit/return steps are what actually **create** the branch and **raise** the PR
+using it (this ref is the convention's source of truth; the agent is its executor). The control-flow
+tail below genuinely is command-layer: `commands/docs.md` drives it once the agent's phase-2
+dispatch returns with a raised PR.
 
 **Branch/PR naming:**
 
