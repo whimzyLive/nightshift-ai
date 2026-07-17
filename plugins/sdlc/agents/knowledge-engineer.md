@@ -152,10 +152,14 @@ the command owns presenting the drafts/deletions and waiting for the founder's c
 
 ## Branch, memory, commit, return
 
-`/sdlc:adr` is a **standalone** command (not dispatched by `principal-engineer`), so — unlike the
-domain engineers that follow `domain-agent-handoff.md`'s "commit only, orchestrator pushes"
-contract — your phase-2 write dispatch **self-raises its own PR**, the same way
-`ai-enablement-engineer` does in standalone `/sdlc:analyze` mode:
+Both `/sdlc:adr` and `/sdlc:docs` are **standalone** commands (neither is dispatched by
+`principal-engineer`), so — unlike the domain engineers that follow `domain-agent-handoff.md`'s
+"commit only, orchestrator pushes" contract — your phase-2 write dispatch **self-raises its own
+PR**, the same way `ai-enablement-engineer` does in standalone `/sdlc:analyze` mode. The exact
+branch/commit/PR mechanics differ per dispatch type — branched below, matching the required-skills
+and `Skills loaded:` split elsewhere in this file:
+
+### ADR dispatch — branch, memory, commit, return
 
 1. Create and check out the branch per the naming convention in `commands/adr.md` (seed →
    `docs/adr-<slug>`, distill → `docs/adr-distill-<YYYY-MM-DD>`), off `<BASE-BRANCH>` from
@@ -167,14 +171,50 @@ contract — your phase-2 write dispatch **self-raises its own PR**, the same wa
    the PR via `gh` / `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh` with the title convention from
    `commands/adr.md`.
 
+### docs-sync dispatch — branch, memory, commit, return
+
+Branch/commit/PR mechanics are defined once in
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` (single source) —
+do not re-derive them; this is a pointer, not a restatement:
+
+1. Check out the `docs/sync-<STORY-KEY>` branch **cut from the story branch head**
+   (`$STORY_BRANCH`, resolved by the command layer before dispatch) — **not** `<BASE-BRANCH>` (the
+   deterministic regen must read the story branch's changed source). If `docs/sync-<STORY-KEY>`
+   already exists on `origin` (re-run), check it out and `git reset --hard` onto the freshly
+   regenerated state instead of branching fresh.
+2. Write the deterministic regen content, the regenerated `llms.txt`, and the founder-confirmed
+   narrative drafts under their manifest-resolved `target-path`s.
+3. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`.
+4. If `git status --porcelain` on the written target paths is non-empty (AC6), stage your changed
+   paths + the memory file, commit via the `conventional-commit` skill (`docs(docs): sync
+<STORY-KEY> reference docs`), then push: a first run pushes and self-raises the PR via `gh` /
+   `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh` (title `docs(docs): sync <STORY-KEY>`, base
+   `<BASE-BRANCH>`); a re-run instead `git push --force-with-lease` to update the existing open PR
+   — never open a duplicate. If `git status --porcelain` is empty, skip commit/push/PR entirely
+   (clean no-op) but still append any memory learning from this dispatch.
+
 ## Completion checklist
 
-1. If your write touched a gated path (e.g. plugin-authoring under `plugins/**`), run the
-   consumer repo's quality-gate commands from `.claude/project/project-context.md`. Otherwise the
-   "gate" is the deterministic index/frontmatter consistency check — confirm regenerating
-   `docs/adr/index.md` again from the same frontmatter yields a byte-identical file (idempotence).
-2. Confirm every written ADR's frontmatter `status` matches its body `## Status` section, and that
-   its filename follows `NNNN-decision-slug.md` with `NNNN` the next unused number.
+Branched by dispatch type — the idempotence gate each checks is different:
+
+- **ADR dispatch:**
+  1. If your write touched a gated path (e.g. plugin-authoring under `plugins/**`), run the
+     consumer repo's quality-gate commands from `.claude/project/project-context.md`. Otherwise the
+     "gate" is the deterministic index/frontmatter consistency check — confirm regenerating
+     `docs/adr/index.md` again from the same frontmatter yields a byte-identical file
+     (idempotence).
+  2. Confirm every written ADR's frontmatter `status` matches its body `## Status` section, and
+     that its filename follows `NNNN-decision-slug.md` with `NNNN` the next unused number.
+- **docs-sync dispatch:**
+  1. Run the consumer repo's quality-gate commands from `.claude/project/project-context.md` if
+     your write touched a gated path (plugin-authoring under `plugins/**`). The idempotence gate
+     itself is the deterministic-regen consistency check (per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §3/§6) — confirm re-running the deterministic
+     regen algorithm with no source change yields byte-identical reference docs **and**
+     byte-identical `llms.txt` content to what you just wrote.
+  2. Confirm every affected `how-to` page you wrote was a founder-confirmed draft (never an
+     un-confirmed narrative write), and that every written page landed at its manifest-resolved
+     `target-path`.
 
 ## `Skills loaded:` return line
 

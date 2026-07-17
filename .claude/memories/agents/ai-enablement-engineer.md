@@ -1255,3 +1255,32 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   running it against an edited skill is `python3 plugins/sdlc/skills/skill-creator/scripts/quick_validate.py plugins/sdlc/skills/<name>`
   from the repo root. Useful to know for any future skill edit needing the "run quick_validate"
   verification step without re-deriving where the script lives.
+
+## 2026-07-17 — Story NA-52 — QA round 1 fix
+
+- The first-pass "branch every shared section" work on `knowledge-engineer.md` (see the entry
+  above) still missed two sections that needed the same ADR-vs-docs-sync split: "Branch, memory,
+  commit, return" and the "Completion checklist" — both still read as ADR-only prose (the branch
+  section's step 1 literally said "off `<BASE-BRANCH>`", directly contradicting
+  `docs-pipeline.md` §7's story-branch-head cut point for docs-sync). A "branch every shared
+  section" sweep needs to be a literal grep for every `##`/`###` heading in the file, not a
+  from-memory list of "the sections I already knew needed it" — the two I'd already branched
+  (required-skills, `Skills loaded:` return line, Pipeline) were the ones explicitly named in the
+  dispatch prompt's task steps; the two QA caught were downstream sections whose ADR-only content
+  only became wrong _because_ of the upstream branching, not sections the original task list named.
+- `git diff --name-only "<BASE-BRANCH>...$STORY_BRANCH"` (bare local branch name on the left side
+  of a three-dot range) is checkout-dependent in a way that's easy to miss when writing the
+  contract from the spec's own bash snippet — the spec's own example used the bare form. QA's fix
+  was `origin/<BASE-BRANCH>...$STORY_BRANCH` (remote-tracking on both sides) since `sync` already
+  fetches (`git fetch origin --quiet`) before resolving `STORY_BRANCH` as an `origin/*` ref — using
+  a bare local base ref right after that fetch is inconsistent (one side of the diff is guaranteed
+  fresh, the other isn't) and silently wrong if the invoking checkout's local `<BASE-BRANCH>` is
+  stale. When a spec's own worked bash example mixes a fetched remote ref with a bare local one in
+  the same diff command, don't copy it verbatim — normalize both sides to the same freshness
+  guarantee.
+- Prettier's per-file reflow can shift a fix's target line numbers between "what I read" and "what
+  actually gets committed" (table column realignment shifted `doc-types.md`'s Registry rows table
+  by one line after the `source-of-truth` schema-cell edit). Re-read line numbers from a Read call
+  after any earlier edit in the same file before doing a second targeted edit later in the same
+  session, rather than trusting line numbers cited in a review finding against the pre-prettier
+  draft.

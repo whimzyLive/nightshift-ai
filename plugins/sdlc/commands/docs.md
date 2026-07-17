@@ -37,11 +37,14 @@ around the founder-confirmation gate (a dispatched subagent cannot itself pause 
 argument validation above, and the gates below that decide whether `knowledge-engineer` is
 dispatched at all.
 
-1. **Manifest gate (AC5).** Resolve `.claude/project/docs-manifest.md`. If **absent** →
-   **silent no-op**: no branch, no dispatch, no PR, no error, **no stdout** — exit cleanly (exit
-   0). This is the zero-setup-cost guarantee for repos that declined the `/init` docs opt-in, and
-   is deliberately distinct from a usage STOP (which does print a message). Do not dispatch
-   `knowledge-engineer` in this case.
+1. **Manifest gate (AC5).** Resolve `.claude/project/docs-manifest.md`. Unlike `STORY_BRANCH`
+   resolution (step 2, which always reads `origin` after a fetch), the manifest is read from the
+   **current checkout** — run `/sdlc:docs sync` from an up-to-date `<BASE-BRANCH>` checkout so the
+   manifest reflects the latest merged activation state. If **absent** → **silent no-op**: no
+   branch, no dispatch, no PR, no error, **no stdout** — exit cleanly (exit 0). This is the
+   zero-setup-cost guarantee for repos that declined the `/init` docs opt-in, and is deliberately
+   distinct from a usage STOP (which does print a message). Do not dispatch `knowledge-engineer`
+   in this case.
 
 2. **Resolve the story branch (v1 diff source).** `sync` never depends on the currently-checked-out
    branch:
@@ -61,11 +64,12 @@ dispatched at all.
      — then exit. Do not dispatch `knowledge-engineer` in this case.
 
 3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it
-   `STORY_BRANCH`, `<BASE-BRANCH>` (from project-context), and the story key. Per
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2/§3, phase 1 computes `CHANGED_FILES` +
-   `CHANGED_DIFF`, resolves affected rows, produces the deterministic regen content for the `auto`
-   rows + `llms.txt`, drafts narrative how-to refreshes via `writing-docs`, and returns all of it
-   to this command layer.
+   `STORY_BRANCH`, `origin/<BASE-BRANCH>` (the **remote-tracking** base ref from project-context,
+   not the bare local branch name — a stale local checkout must never skew the diff), and the story
+   key. Per `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2/§3, phase 1 computes `CHANGED_FILES` +
+   `CHANGED_DIFF` from `origin/<BASE-BRANCH>...$STORY_BRANCH`, resolves affected rows, produces the
+   deterministic regen content for the `auto` rows + `llms.txt`, drafts narrative how-to refreshes
+   via `writing-docs`, and returns all of it to this command layer.
 
 4. **Founder-confirmation gate (command layer, in-session, between the two dispatches):**
    - Present the deterministic regen summary (informational — auto rows are not gated; they were
