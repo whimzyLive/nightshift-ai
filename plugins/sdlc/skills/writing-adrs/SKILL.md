@@ -1,6 +1,6 @@
 ---
 name: writing-adrs
-description: Use when authoring an Architecture Decision Record (ADR) — a short document that captures one significant, hard-to-reverse technical or architectural decision, its context, and its consequences. Triggered by the sdlc ADR pipeline (the knowledge-engineer agent behind /sdlc:adr) when generating an ADR from a story, and by anyone hand-authoring an ADR under docs/adr/ today. Covers why ADRs are kept short and inverted-pyramid, the required sections (Title, Status, Decision, Context, Alternatives Considered, Consequences), the proposed→accepted→superseded (or →rejected) status lifecycle and the never-edit-only-supersede immutability rule, the NNNN-decision-slug.md filename convention, and the ADR frontmatter fields (status, agents, source-stories) the pipeline reads to route a generated ADR into docs/adr/index.md.
+description: Use when authoring an Architecture Decision Record (ADR) — a short document that captures one significant, hard-to-reverse technical or architectural decision, its context, and its consequences. Triggered by the sdlc ADR pipeline (the knowledge-engineer agent behind /sdlc:docs seed adr and /sdlc:docs distill) when generating an ADR from a story, and by anyone hand-authoring an ADR under docs/adr/ today. Covers why ADRs are kept short and inverted-pyramid, the required sections (Title, Status, Decision, Context, Alternatives Considered, Consequences), the proposed→accepted→superseded (or →rejected) status lifecycle and the never-edit-only-supersede immutability rule, the NNNN-decision-slug.md filename convention, and the ADR frontmatter fields (status, agents, source-stories) the pipeline reads to route a generated ADR into docs/adr/index.md.
 ---
 
 # writing-adrs — Architecture Decision Records
@@ -16,8 +16,9 @@ signal to split it into several ADRs.
 - Whenever a decision is architecturally significant: it affects structure, non-functional
   characteristics (performance, security, cost), external dependencies, interfaces between
   systems, or is expensive to reverse later.
-- When the sdlc ADR pipeline (`/sdlc:adr` command + `knowledge-engineer` agent) generates an ADR
-  from a Jira story or a completed piece of work — in a repo where that pipeline is adopted.
+- When the sdlc ADR pipeline (`/sdlc:docs seed adr` / `/sdlc:docs distill` + `knowledge-engineer`
+  agent) generates an ADR from a Jira story or a completed piece of work — in a repo where that
+  pipeline is adopted.
 - Not for routine implementation choices that any competent engineer would make the same way
   and that cost nothing to change later — those don't need a permanent record.
 
@@ -145,7 +146,8 @@ fact, not a mistake to delete.
 
 This is distinct from this SKILL.md's own frontmatter above — it's the YAML frontmatter that
 belongs at the top of every **generated ADR file** itself, so the sdlc ADR pipeline (the
-`knowledge-engineer` agent behind `/sdlc:adr`) can route and index it without re-parsing prose.
+`knowledge-engineer` agent behind `/sdlc:docs seed adr` / `/sdlc:docs distill`) can route and index
+it without re-parsing prose.
 Authoring with this frontmatter costs nothing even in a repo that hasn't adopted the pipeline yet,
 and needs no retrofitting once it does:
 
@@ -176,9 +178,9 @@ routed anywhere. Each listing carries the ADR's number, title, and status. Becau
 fully derived from frontmatter in a repo that has adopted the pipeline, never hand-edit
 `docs/adr/index.md` directly there; fix the frontmatter of the source ADR(s) and regenerate
 instead — otherwise the index will just be silently overwritten out of sync on the next
-regeneration. In a repo that hasn't adopted the pipeline (or hasn't yet run `/sdlc:adr`), a
-hand-maintained index (or no index at all) is perfectly fine — the never-hand-edit rule only
-starts to apply once there's something to regenerate from.
+regeneration. In a repo that hasn't adopted the pipeline (or hasn't yet run `/sdlc:docs seed adr` /
+`/sdlc:docs distill`), a hand-maintained index (or no index at all) is perfectly fine — the
+never-hand-edit rule only starts to apply once there's something to regenerate from.
 
 Hand-authored ADRs that aren't part of the pipeline may omit `agents`/`source-stories` if there's
 no sdlc routing use for them yet, but should still carry `status` — it costs nothing and keeps

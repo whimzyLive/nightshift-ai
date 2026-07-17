@@ -1,5 +1,112 @@
 # ai-enablement-engineer — memory
 
+## NA-57 — PR #125 review round (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/adr-pipeline.md`)
+
+- **An unqualified "manifest absent → silent no-op" error-table row that sits ABOVE mode-specific
+  rows in the same table can silently re-swallow a route this same story just made manifest-exempt
+  — even though every other closing check (grep-A, grep-B, guard-presence, Prettier idempotency)
+  passed clean.** `commands/docs.md`'s error table's first row read
+  `.claude/project/docs-manifest.md absent → Silent no-op` with **no mode qualifier** — a leftover
+  from when all four generic modes shared one manifest gate. Once `seed adr`/`distill` became live,
+  **manifest-exempt** routes, that same unqualified row is the first "manifest absent" match a
+  reader (or a future implementer deriving behavior from this table) would apply to them too —
+  reintroducing exactly the "collapse a distinct path into a benign no-op" defect class the whole
+  NA-50 epic was about closing, in the very last PR. `audit` had already been given its own scoped
+  row (a precedent this row should have matched from the start). None of NA-57's own verification
+  greps (grep-A `/sdlc:adr`, grep-B stub phrases, guard-presence strings) could catch this — it's a
+  **semantic scope gap in unchanged pre-existing prose**, not a residual string. Lesson: when a
+  story adds a new manifest-EXEMPT route next to existing manifest-GATED ones, always re-read every
+  unqualified/table-wide error row for accidental scope creep onto the new exemption — a clean grep
+  sweep proves no _string_ went stale, not that no _prose scope_ did.
+- **A command removal's migration path is only "clean" (AC4) if the successor surface is
+  discoverable from the STOP/usage messages a confused caller actually hits** — not just from full
+  documentation a founder may not read. `seed adr` was structurally correct (special route, live,
+  all guards relocated) but invisible at the two places someone migrating off deleted `/sdlc:adr`
+  would actually look: the usage string (`seed <type> [topic]` doesn't surface `adr` — it's
+  deliberately excluded from `SEED_TYPES`) and the unknown-seed-type STOP message (enumerates only
+  `SEED_TYPES`, silent about the special route that isn't a member). Fixed by adding `seed adr
+"<pattern>"` as its own clause in the usage string (echoed on every STOP that prints it) and a
+  one-line "for ADRs, use seed adr ..." pointer inside the unknown-type STOP's own fenced message.
+  Generalizable check for any future "type X is deliberately excluded from the generic enum"
+  design: grep every STOP/usage message that enumerates the _generic_ set and confirm the excluded
+  special case is named as a sibling invocation form, not just documented in prose elsewhere.
+- **A section can accurately be named "command-layer" for one reason (where the founder-confirm
+  gate lives) while its own body prose overclaims a SECOND, unrelated thing (who executes the
+  branch/PR naming stated in the same section) is also command-layer-only — and the two claims are
+  easy to conflate because they share a heading.** `refs/adr-pipeline.md` §3a is genuinely
+  command-layer for the gate (correct, established in §2/§3). But its own intro sentence ("this
+  section adds only what is genuinely command-layer-only: branch/PR naming and the post-PR
+  control-flow tail") extended that framing to branch/PR naming too — false: `knowledge-engineer.md`
+  actually **creates** the branch and **raises** the PR per that convention (its own branch/commit/
+  return steps say so explicitly). Fix: state the naming convention as single-sourced in the ref
+  (true) with the **agent** as its executor (also true), and keep only the post-PR control-flow tail
+  (loop-driving after the agent's dispatch returns) as the thing that's actually command-layer.
+  When a section heading names ONE property (e.g. "where the gate lives"), audit every sentence in
+  the section body for a second, unstated property riding along on the same label — a reviewer
+  reading only the heading (not the cross-referenced agent file) has no way to catch the overclaim.
+- Re-verified the NA-62 in-tree copy → `--write` → `diff` idempotency protocol on the two files this
+  round touched (`docs.md`, `adr-pipeline.md`) — both stable on the first pass; no new
+  list-nested-fence hazard introduced by these three fixes (finding 2's fenced-block edit reused the
+  fence's pre-existing, already-stable indentation rather than reintroducing a dedent).
+
+## NA-57 — Absorb /sdlc:adr into /sdlc:docs, full command removal (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/commands/adr.md` [deleted], `plugins/sdlc/refs/adr-pipeline.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `plugins/sdlc/agents/qa-engineer.md`, `plugins/sdlc/refs/analyze-protocol.md`, `plugins/sdlc/commands/analyze.md`, `plugins/sdlc/refs/qa-engineer-playbook.md`, `plugins/sdlc/skills/writing-adrs/SKILL.md`, `plugins/sdlc/README.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **A spec's own two-grep-family derivation methodology (grep-A command-name string, grep-B
+  stub/deferral phrases) can still be structurally blind to a third residue category: bare
+  file-path mentions of the deleted file that carry neither shape.** After all 6 named Task 6
+  files passed grep-A clean, a repo-wide `grep -rn 'commands/adr\.md' plugins/sdlc/` (not in the
+  plan/spec's own closing-check command list) found **6 more** dangling "Mirror `commands/adr.md`"
+  / "mirrors `commands/adr.md`'s ... shape" references inside `refs/docs-pipeline.md`'s
+  sync/release/seed/audit branch-naming and control-flow tables — precedent-mirroring prose written
+  when `/sdlc:adr` was still live, describing how the _other_ modes' branch/control-flow
+  conventions echo the ADR command's. None contain the string `/sdlc:adr` (so grep-A misses them)
+  and none match any grep-B phrase (`deferred to NA-57`, `not yet implemented`, `use seed mode`,
+  `NA-57`) — they're a genuinely distinct shape neither derivation family targets: a bare relative
+  path to a file this same story deletes. **Whenever a story deletes a file that other prose in the
+  same plugin used as a "mirrors X" / "see X" precedent-citation anchor, grep the whole plugin tree
+  for the literal file path itself** (not just the command-invocation string), separately from
+  whatever the spec's own named grep families are — a "the spec's greps are the authoritative
+  closing check" instruction does not mean the spec's greps are complete; verify their coverage by
+  construction (what shape of reference _could_ survive a deletion?) rather than trusting the named
+  list exhausts it. Fixed with a 7th commit (`fix(sdlc): ...`) after the planned 8-task sequence,
+  citing the gap explicitly rather than silently folding it into Task 5's or Task 8's commit.
+- **Dedenting a fenced code block under a list item to column 0 (the NA-62 landmine fix) can leave
+  the _next_ paragraph in the same list-item continuation still indented — and that mismatch, not
+  the fence itself, is what breaks Prettier idempotency.** `adr-pipeline.md` §5's halt-message fence
+  sat under `- **Tools absent → halt.**`, with a trailing sentence ("It does not silently proceed
+  without them.") indented 2 spaces _after_ the fence, as continued list-item prose. Dedenting only
+  the fence to column 0 (per the established NA-62 fix pattern) produced a **first**-`--write`-pass
+  diff a naive `--check`-only verification would have missed: Prettier reflowed the _trailing_
+  paragraph's indentation to match the fence's new (list-broken) context, since the column-0 fence
+  terminates the list continuation and the paragraph after it is no longer "inside" the list item
+  from Prettier's parser's point of view. Caught only by the in-tree copy → `--write` → `diff`
+  idempotency protocol (never a bare `--check` PASS) — confirmed via `prettier --file-info` that the
+  copy was `ignored: false` first, per the NA-51 lesson about scratch copies outside the repo tree
+  silently no-op'ing `--write`. Fix: dedent the _following_ prose to column 0 too, not just the
+  fence — verify the **whole** list-item's remaining continuation lines after any fence dedent, not
+  just the fence's own indentation.
+- **A `find-skills`/`skill-creator` step was not applicable this story** — pure command-absorption
+  editing an existing surface, no new capability gap and no candidate skill to scaffold. Both loaded
+  per the required-first-turn-skills gate; neither was invoked toward a scan/gap-fill action, which
+  is a legitimate no-op for a plugin-authoring story with no drift-scan component.
+- Confirmed (again) `pnpm nx affected -t test --base=remotes/origin/develop` reports "No tasks were
+  run" for a `plugins/sdlc/**`-only change — expected, not a skipped gate, matching every prior
+  plugin-authoring story this session.
+- **A plain `pnpm exec prettier --check <file>` in this environment (RTK/rtk hook wrapper active)
+  printed a misleadingly generic "All files formatted correctly" message while still exiting 1** —
+  the wrapper's filtered/summarized output did not match its own exit code. `rtk proxy pnpm exec
+prettier --check <file>` (bypassing the hook's rewrite) gave the real, actionable
+  `[warn] Code style issues found` output. When a wrapped command's stdout and exit code visibly
+  disagree, reach for the raw/proxy form immediately rather than debugging the mismatch — it's a
+  wrapper artifact, not a signal about the file.
+- This repo's agent-file frontmatter `description` field for `knowledge-engineer.md` was already
+  1216 chars pre-story (confirmed via `git show HEAD:<file>` before editing) — well over the
+  1024-char cap that's real and enforced for **command** frontmatter but an unenforced carryover for
+  **agent** files (per the NA-55 memory entry below). Grew it slightly to 1254 mid-edit, then
+  trimmed the final "Triggered manually via..." clause back down to 1199 — net **improvement** over
+  the pre-existing baseline, not a new violation, but flagged in the PR return per the established
+  "don't chase a pre-existing unenforced overage silently" convention.
+
 ## NA-55 — `/sdlc:docs audit [--dry-run]` mode implementation (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
 
 - **A plan's own gate-anchor pointer-count expectation can go stale the moment the story's own new

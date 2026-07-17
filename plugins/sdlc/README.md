@@ -36,10 +36,10 @@ The file is a regenerated per-session cache — **gitignore it**.
   executing-plans, subagent-driven-development, test-driven-development,
   verification-before-completion, requesting-code-review, receiving-code-review, writing-plans.
 - **claude-mem plugin** — **auto-installed.** Declared as a cross-marketplace dependency
-  (`claude-mem@thedotmack`). The `knowledge-engineer` agent's `/sdlc:adr --distill` mode uses its
+  (`claude-mem@thedotmack`). The `knowledge-engineer` agent's `/sdlc:docs distill` mode uses its
   `observation_search` / `get_observations` MCP tools to mine claude-mem's persistent cross-session
-  observations as distill evidence; seed mode does not need it. If the tools are unavailable at
-  runtime, distill halts with a clear message (see `refs/adr-pipeline.md`) — seed mode is
+  observations as distill evidence; `seed adr` mode does not need it. If the tools are unavailable
+  at runtime, distill halts with a clear message (see `refs/adr-pipeline.md`) — `seed adr` mode is
   unaffected.
 - **CLIs (install manually — not plugins):** `acli` (Jira), `gh` (GitHub).
 
@@ -70,7 +70,7 @@ that scope.
 ## `knowledge-engineer` — ADR curation agent
 
 A real-role domain agent, `plugins/sdlc/agents/knowledge-engineer.md`, that owns Architecture
-Decision Record curation under `docs/adr/**`. Runs behind `/sdlc:adr` in two modes — **seed**
+Decision Record curation under `docs/adr/**`. Runs behind `/sdlc:docs` in two modes — **seed adr**
 (formalize a founder-known pattern inline from `"<pattern>"`) and **distill** (mine the
 accumulated learnings corpus for promotable candidates) — through one shared draft →
 propose-tags → founder-confirm → write → regenerate-index → commit/PR pipeline defined once in
@@ -80,21 +80,24 @@ from `.claude/memories/**` during a distill PR, sanctioned as Exception 2 in
 section of the deterministically-regenerated `docs/adr/index.md` instead of re-deriving
 conventions or re-appending a learning an accepted ADR already covers.
 
-## `/sdlc:adr` — seed or distill Architecture Decision Records
+## `/sdlc:docs seed adr` / `/sdlc:docs distill` — Architecture Decision Records
 
-`plugins/sdlc/commands/adr.md` dispatches `knowledge-engineer` across two phases split by a
-founder-confirmation gate that lives at the command layer (a dispatched subagent cannot pause for
-interactive input): phase 1 drafts candidate ADR(s) and returns without writing; the command
+`plugins/sdlc/commands/docs.md` routes ADR curation to `knowledge-engineer` across two phases split
+by a founder-confirmation gate that lives at the command layer (a dispatched subagent cannot pause
+for interactive input): phase 1 drafts candidate ADR(s) and returns without writing; the command
 presents each draft, its proposed `agents:` tags, and (distill only) the exact memory entries
 slated for deletion, then waits for explicit founder confirmation; phase 2 writes only the
 confirmed items — assigns the next `NNNN`, writes `docs/adr/NNNN-slug.md`, regenerates
 `docs/adr/index.md` deterministically from ADR frontmatter, (distill only) deletes the confirmed
-learnings in the same PR, and self-raises the PR. `/sdlc:adr "<pattern>"` seeds inline with no
-corpus read; `/sdlc:adr --distill` mines `.claude/memories/agents/*.md`,
+learnings in the same PR, and self-raises the PR. `/sdlc:docs seed adr "<pattern>"` seeds inline
+with no corpus read; `/sdlc:docs distill ["<focus>"]` mines `.claude/memories/agents/*.md`,
 `.claude/memories/reviews/patterns.md`, PR review threads, commit history, and claude-mem
 observations, promoting a candidate only on recurrence, cross-agent relevance, or durable
-convention. See `refs/adr-pipeline.md` for the full pipeline and `skills/writing-adrs/SKILL.md`
-for the ADR body/lifecycle/frontmatter contract it renders against.
+convention. Both are special routes on `/sdlc:docs` — `seed adr` branches before the generic seed
+machinery and `distill` is not a member of the four generic doc-generation modes (`sync`/
+`release`/`seed`/`audit`), which this README does not otherwise document here. See
+`refs/adr-pipeline.md` for the full pipeline and `skills/writing-adrs/SKILL.md` for the ADR
+body/lifecycle/frontmatter contract it renders against.
 
 ## Project-skill loading enforcement
 

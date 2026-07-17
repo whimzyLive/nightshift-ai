@@ -31,7 +31,7 @@ The agent should:
    the contradictory sources + their exact assertions + file paths), proposed fixes, and any
    `find-skills` suggestions for skill gaps. If a **memory bloat** finding is present (oversized
    agent memory files, or repeated/duplicated learnings), surface it as a **recommendation to run
-   `/sdlc:adr --distill`** to curate them into ADRs — recommendation only, this scan never runs
+   `/sdlc:docs distill`** to curate them into ADRs — recommendation only, this scan never runs
    distill itself and gains no new apply path. If nothing was found, report "no drift detected" and
    exit cleanly.
 
