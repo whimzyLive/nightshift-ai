@@ -265,22 +265,23 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 - **`MODE`=`Full Auto`** → post an intent note, then run the tail loop **with** the auto-merge hook
   (it auto-merges the spec PR on clean exit; that merge webhook then resumes Phase 2 automatically):
-  ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
-  ```
+
+```bash
+acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
 
 Driving Copilot review-fix now; will auto-merge once review + checks pass, then advance to plan + implementation automatically."
+```
 
-````
 - **Any other mode** → post the human-merge note, then run the tail loop **without** a hook (drives
-the PR to Copilot-clean, leaves it open for a human merge):
+  the PR to Copilot-clean, leaves it open for a human merge):
+
 ```bash
 acli jira workitem comment create --key STORY_KEY --body "Spec PR ready for review.
 
 Spec PR: SPEC_PR_URL
 
 Driven to Copilot-clean. Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
-````
+```
 
 Tell the user:
 
@@ -325,23 +326,24 @@ Post the mode-aware comment now — before the loop, since the loop is the sessi
 tense; any merge happens inside the loop's clean exit):
 
 - **`Full Auto`:**
-  ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete (Full Auto).
-  ```
+
+```bash
+acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete (Full Auto).
 
 PR: IMPL_PR_URL
 
 Single PR contains the implementation plan and code. Driving Copilot review-fix; will auto-merge once review + checks pass. Spec was merged separately."
+```
 
-````
 - **Any other mode:**
+
 ```bash
 acli jira workitem comment create --key STORY_KEY --body "Plan and implementation complete.
 
 PR: IMPL_PR_URL
 
 Single PR contains the implementation plan and code, driven to Copilot-clean. Review and merge to develop. Spec was reviewed and merged separately."
-````
+```
 
 **If ASYNC_REVIEW=true** — fire completion event:
 
@@ -391,23 +393,24 @@ Post the mode-aware comment now — before entering the loop, since the loop is 
 (intent tense; any merge happens inside the loop's clean exit):
 
 - **`Full Auto`:**
-  ```bash
-  acli jira workitem comment create --key STORY_KEY --body "Implementation complete (Full Auto).
-  ```
+
+```bash
+acli jira workitem comment create --key STORY_KEY --body "Implementation complete (Full Auto).
 
 PR: IMPL_PR_URL
 
 Small story (≤3pts) — direct implementation path. Driving Copilot review-fix; will auto-merge once review + checks pass."
+```
 
-````
 - **Any other mode:**
+
 ```bash
 acli jira workitem comment create --key STORY_KEY --body "Implementation complete.
 
 PR: IMPL_PR_URL
 
 Small story (≤3pts) — direct implementation path. Driven to Copilot-clean; review and merge to develop."
-````
+```
 
 **If ASYNC_REVIEW=true** — fire completion event:
 

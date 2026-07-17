@@ -216,16 +216,20 @@ You run in one of two dispatch phases per invocation:
 
 You run in one of two dispatch phases per invocation:
 
-- **Phase 1 (compute & draft, writes nothing)** — resolve the manifest, resolve the story branch,
-  compute `CHANGED_FILES` + `CHANGED_DIFF`, resolve affected rows, produce deterministic regen
-  content for the `auto` rows + `llms.txt`, draft narrative how-to refreshes via `writing-docs`,
-  and return the regen summary, the deterministic content, and the narrative drafts to the command
-  layer.
+- **Phase 1 (compute & draft, writes nothing)** — the command layer hands you either the story
+  branch (the common case — you compute `CHANGED_FILES`/`CHANGED_DIFF` yourself) **or**, on the
+  merged-commit path (story branch absent), a precomputed `CHANGED_FILES`/`CHANGED_DIFF` pair plus
+  `REGEN_TREE_REF` — use whichever you're handed **verbatim** (`refs/docs-pipeline.md` §2 steps 2–3;
+  never re-derive one from the other). Resolve the manifest, resolve affected rows, produce
+  deterministic regen content for the `auto` rows + `llms.txt` (reading source content from
+  `REGEN_TREE_REF`), draft narrative how-to refreshes via `writing-docs`, and return the regen
+  summary, the deterministic content, and the narrative drafts to the command layer.
 - **Phase 2 (write confirmed, fresh dispatch)** — a fresh dispatch with no memory of phase 1 or the
   gate: the command hands you the deterministic content and the founder-confirmed narrative drafts
   **verbatim** (inline or via `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` temp files by path). Check
-  out the branch cut from the story branch head, write everything, then commit/push/open-or-update
-  the PR — but only if content changed (AC6).
+  out the branch cut from `REGEN_TREE_REF` (the story branch head when present, or
+  `origin/<BASE-BRANCH>` on the merged-commit path — `refs/docs-pipeline.md` §2 step 8), write
+  everything, then commit/push/open-or-update the PR — but only if content changed (AC6).
 - **Post-QA inline variant (dispatched by the Principal Engineer playbook Step 6.5, via `/impl` /
   `/auto`)** — a **single** dispatch, no phase-1/phase-2 split and **no** founder-confirm gate
   (`refs/docs-pipeline.md` §25). The orchestrator hands you the live `$WORKTREE` (already checked out

@@ -211,17 +211,29 @@ dispatched at all.
      §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
      (`<sha>^..<sha>`, or the union across matches). **Zero commits carry the key** → STOP with
      `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`
-     (never a silent no-op). `git fetch` failure / unresolvable `origin/<BASE-BRANCH>` → STOP. Then
-     dispatch `knowledge-engineer` Phase 1 with the merged-commit-derived diff instead of
-     `$STORY_BRANCH`.
+     (never a silent no-op). `git fetch` failure / unresolvable `origin/<BASE-BRANCH>` → STOP.
+     `STORY_BRANCH` stays empty; set `REGEN_TREE_REF=origin/<BASE-BRANCH>`
+     (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#2-two-phase-dispatch-split-across-the-confirmation-boundary`
+     step 2 — base HEAD already contains the landed commit(s), so it is the tree the regen reads
+     from and the tree Phase 2 checks out from).
 
-3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it
-   `STORY_BRANCH`, `origin/<BASE-BRANCH>` (the **remote-tracking** base ref from project-context,
-   not the bare local branch name — a stale local checkout must never skew the diff), and the story
-   key. Per `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2/§3, phase 1 computes `CHANGED_FILES` +
-   `CHANGED_DIFF` from `origin/<BASE-BRANCH>...$STORY_BRANCH`, resolves affected rows, produces the
-   deterministic regen content for the `auto` rows + `llms.txt`, drafts narrative how-to refreshes
-   via `writing-docs`, and returns all of it to this command layer.
+3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).**
+   - **`STORY_BRANCH` resolved** (the common case) → pass `STORY_BRANCH`, `origin/<BASE-BRANCH>`
+     (the **remote-tracking** base ref from project-context, not the bare local branch name — a
+     stale local checkout must never skew the diff), and the story key. Per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2 step 3, phase 1 **computes**
+     `CHANGED_FILES`/`CHANGED_DIFF` from `origin/<BASE-BRANCH>...$STORY_BRANCH` itself;
+     `REGEN_TREE_REF=$STORY_BRANCH` (§2 step 2).
+   - **`STORY_BRANCH` empty — merged-commit path selected** (previous step) → pass the
+     **precomputed** `CHANGED_FILES`/`CHANGED_DIFF` (already derived from the merged range above)
+     and `REGEN_TREE_REF=origin/<BASE-BRANCH>` instead. Per
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2 step 3, phase 1 uses these **verbatim** — it
+     does **not** recompute from `$STORY_BRANCH` (there is none to diff against). This is the fix
+     that makes the merged-commit path actually regenerate — a bare `STORY_BRANCH`-only dispatch
+     here would diff against nothing and silently no-op.
+   - In both shapes, phase 1 resolves affected rows, produces the deterministic regen content for
+     the `auto` rows + `llms.txt` (reading source content from `REGEN_TREE_REF`, §2 step 5), drafts
+     narrative how-to refreshes via `writing-docs`, and returns all of it to this command layer.
 
 4. **Founder-confirmation gate (command layer, in-session, between the two dispatches):**
    - Present the deterministic regen summary (informational — auto rows are not gated; they were
@@ -235,11 +247,12 @@ dispatched at all.
 5. **Dispatch `knowledge-engineer` Phase 2 (write confirmed, fresh dispatch).** Hand it the
    deterministic content **and** the founder-confirmed narrative drafts **verbatim** (inline or via
    session temp-dir files referenced by path, per `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh`) —
-   never re-derived. Phase 2 checks out the branch (see Branch/PR naming below, cut from the story
-   branch head, not `<BASE-BRANCH>`), writes the deterministic regen + `llms.txt` + confirmed
-   narrative drafts under their manifest-resolved `target-path`s, then — **only if content
-   changed** (`git status --porcelain` on the written target paths is non-empty, AC6) — commits via
-   `conventional-commit`, pushes, and opens or updates the sync PR.
+   never re-derived. Phase 2 checks out the branch (see Branch/PR naming below, cut from
+   `REGEN_TREE_REF` — the story branch head when present, or `origin/<BASE-BRANCH>` on the
+   merged-commit path; never a bare local `<BASE-BRANCH>`), writes the deterministic regen +
+   `llms.txt` + confirmed narrative drafts under their manifest-resolved `target-path`s, then —
+   **only if content changed** (`git status --porcelain` on the written target paths is non-empty,
+   AC6) — commits via `conventional-commit`, pushes, and opens or updates the sync PR.
 
 6. **Write + PR only on change (AC6).** If, after writing, `git status --porcelain` on the target
    paths is **empty** (deterministic output was byte-identical and no narrative draft was
