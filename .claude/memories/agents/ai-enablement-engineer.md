@@ -1,5 +1,47 @@
 # ai-enablement-engineer — memory
 
+## NA-60 — PR #127 review fix: trigger the warning on `LIKELY_KEYS`, not `OUT_OF_SCOPE`
+
+- **A "fires iff `SUPERSET ≠ ∅`" gate is wrong the moment the superset legitimately contains a
+  demoted-but-still-counted subset** — the original design computed `OUT_OF_SCOPE = LIKELY_KEYS ∪
+STANDARDS_MATCHES` and then gated the warning-no-op split and the confirm-gate print on
+  `OUT_OF_SCOPE ≠ ∅`, which is true whenever _either_ subset is non-empty. That silently let a range
+  whose only out-of-scope tokens were standards-prefixed (`RFC-2119`, `SHA-256`, zero real missing
+  stories) fire a warning with an **empty** `LIKELY_KEYS` individual list under an active header and
+  an action-demanding footer — driven entirely by tokens the same design explicitly meant to
+  _demote_. The general lesson: whenever a "fires iff X ≠ ∅" condition is defined over a union set
+  that itself splits into a "real signal" part and a "demoted noise" part, the gate belongs on the
+  **real-signal subset alone**, never the union — a union-gated trigger silently promotes the
+  demoted part back into a trigger the moment it's the only thing present, defeating the demotion.
+  This was caught by review, not by any of my own verification greps in the original round, because
+  every grep I wrote checked that the _pieces_ were present and worded correctly — none checked
+  whether the pieces _combined_ correctly for the all-standards, zero-likely-keys case, since I
+  never constructed that specific state by hand while verifying. Lesson: for a multi-set overlay
+  spec, explicitly hand-walk each of the state model's named states (not just each spec clause) and
+  confirm the file's own gate conditions actually route that state where the state model says it
+  should — grepping for presence of the right words is not the same check.
+- **A "narrow the old rows to the same trigger variable" fix for an overlapping-rows finding
+  (reviewer's finding 3) came for free once the root-cause variable was corrected** — once the
+  no-op split's trigger changed from `OUT_OF_SCOPE ≠ ∅` to `LIKELY_KEYS ≠ ∅`, the pre-existing
+  "no stories merged" clean-no-op rows and the new warning-no-op row became keyed off the same
+  single boolean (`LIKELY_KEYS` empty vs. non-empty) and were therefore automatically mutually
+  exclusive — no separate precedence rule was needed. When two rows' overlap traces back to a
+  shared root-cause variable being wrong in one of them, fixing the root variable can resolve the
+  overlap finding as a side effect; always re-check whether a downstream "add precedence" finding is
+  still needed after the root fix, rather than fixing both independently and risking a
+  now-redundant precedence clause that contradicts the corrected trigger.
+- **A "no example-parsing hazard because init never writes a stub" claim can go stale the instant a
+  _different_ file (not the one init writes) carries a copyable example** — my original resolver
+  robustness note reasoned correctly about the manifest init writes, but `docs-manifest-template.md`
+  itself (a separate ref file, always present in the plugin, sometimes copy-pasted by a founder
+  looking at the shape) carries its own illustrative `<... e.g.: ET>` text. Fixed by extending the
+  resolver's tolerant-parsing rule to also strip `<...>`-bracketed spans (generalizes past the
+  comment-only case), rather than editing the template's example to be non-key-shaped — the
+  resolver fix is strictly more robust since it protects against _any_ future template wording, not
+  just today's `ET` example.
+- Re-confirmed the in-repo (not `/tmp`, `.md`-suffixed) scratch-copy idempotency protocol from
+  earlier this same session on all three re-touched files — held stable on every file, first pass.
+
 ## NA-60 — Make release-mode PROJECT_KEYS discoverable (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
 
 - **`prettier --file-info` reporting `ignored: false` is necessary but not sufficient to trust an
