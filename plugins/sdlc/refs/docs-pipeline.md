@@ -1,8 +1,9 @@
 # Docs pipeline
 
 Shared resolve → diff → regen → draft → founder-confirm → write → commit/PR protocol for
-`/sdlc:docs sync` (§§2–8), `/sdlc:docs release` (§§10–14), and `/sdlc:docs seed` (§§15–19),
-referenced by both `agents/knowledge-engineer.md` and `commands/docs.md` so the
+`/sdlc:docs sync` (§§2–8), `/sdlc:docs release` (§§10–14), `/sdlc:docs seed` (§§15–19), and
+`/sdlc:docs audit` (§§20–24), referenced by both `agents/knowledge-engineer.md` and `commands/docs.md`
+so the
 contract lives in exactly one place. Neither file re-inlines this logic — both summarize and link
 back here. Mirrors `refs/adr-pipeline.md`'s shape (copy the skeleton; do not abstract a shared ref
 between the two — same "copy the shape, do not generalize" rule `doc-types.md` and Epic NA-50 both
@@ -16,7 +17,7 @@ silent, `.claude/project/project-context.md`. In this SDLC repo itself, a plugin
 (touching `plugins/**`) stays within the `ai-enablement-engineer` write-scope — see the Active-guard
 scope note in the agent's First steps.
 
-### Manifest gate (shared by sync, release, and seed)
+### Manifest gate (shared by sync, release, seed, and audit)
 
 All three modes apply this identical gate at the **command layer**, before any dispatch — defined
 once here; `commands/docs.md` points at it rather than re-deriving it. Resolve
@@ -173,14 +174,14 @@ inconsistently between this ref and the how-to template it governs:
 
 ## 6. No-op / change-gate semantics
 
-- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed)
+- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit)
   — the command layer never dispatches `knowledge-engineer` when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks — phase 1 is never invoked in this case.
 - **Story-branch-missing WARNING, never a silent success.** If neither `origin/feat/<STORY-KEY>`
   nor `origin/fix/<STORY-KEY>` exists, the command layer emits the explicit WARNING (see
   `commands/docs.md`) and exits — never a silent clean exit that could read as "docs already
-  current." v1 sync is branch-diff-only; post-merge sync is deferred to NA-55.
+  current." v1 sync is branch-diff-only; post-merge sync is deferred to NA-56.
 - **Commit/PR only on actual content change (AC6).** Phase 2 step 10 (§2) is the single point that
   decides this: an empty `git status --porcelain` on the written target paths means no commit, no
   PR — a clean, deterministic re-run is a no-op by construction.
@@ -197,7 +198,7 @@ inconsistently between this ref and the how-to template it governs:
 | Commit            | `docs(docs): sync <STORY-KEY> reference docs` (via `conventional-commit`)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | PR title          | `docs(docs): sync <STORY-KEY>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | PR base           | `<BASE-BRANCH>` from project-context (never assume `main`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Diff source (v1)  | `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")`, both from the same `origin/<BASE-BRANCH>...$STORY_BRANCH` three-dot range, against the **remote-tracking** base ref (checkout-independent — a stale local base never skews the diff), after `git fetch origin --quiet`. Dual diff-source selection (story-branch-vs-develop **vs** merged-commit) is out of scope — deferred to NA-55.                                   |
+| Diff source (v1)  | `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")`, both from the same `origin/<BASE-BRANCH>...$STORY_BRANCH` three-dot range, against the **remote-tracking** base ref (checkout-independent — a stale local base never skews the diff), after `git fetch origin --quiet`. Dual diff-source selection (story-branch-vs-develop **vs** merged-commit) is out of scope — deferred to NA-56.                                   |
 | First-run PR      | Create the branch, commit, push, open the PR (`gh pr create`) against `<BASE-BRANCH>`.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Re-run behaviour  | **Open or update** (AC6): before creating, check whether `docs/sync-<STORY-KEY>` already exists on `origin` (`git rev-parse --verify origin/docs/sync-<STORY-KEY>` / `gh pr list --head docs/sync-<STORY-KEY>`). If it does → check it out, **`git reset --hard` onto the freshly regenerated state** (the branch content is fully derived, so a hard reset is safe and keeps history clean), then **`git push --force-with-lease`** to update the existing open PR — never open a duplicate PR.                               |
 | Control-flow tail | Mirror `commands/adr.md`: after the PR is raised, drive the review loop to convergence via `/loop /sdlc:loop <PR_URL>` (falling back to `ScheduleWakeup` if the harness cannot nest `/loop`). If the run ended **before** any PR, release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — this covers the manifest-absent silent no-op, the story-branch-missing WARNING, a usage STOP, and a clean "nothing changed" no-op alike (all four release without a PR; only the manifest-absent path is silent). |
@@ -534,7 +535,7 @@ edits (re-derived by design), but it must not be mistaken for _preserving_ them.
 
 ## 14. Release mode — no-op / change-gate semantics
 
-- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed)
+- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit)
   (shared with `sync`) — the command layer never dispatches when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks. The zero-setup-cost guarantee for repos that
@@ -766,7 +767,7 @@ the authored content rather than discard it (§18).
    validated **before** gates 2–3 because it forms a branch name and a path.
 
 2. **Manifest gate (AC5)** — shared with `sync` and `release`; defined **once** in
-   [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed). `seed` is its third
+   [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit). `seed` is its third
    consumer and does **not** re-derive it. The base-ref pre-check ordering is load-bearing for
    exactly the reason §14 documents: a bare `git show origin/<BASE-BRANCH>:<path>` failure is
    ambiguous between "the manifest genuinely does not exist" (the intended silent no-op) and "the
@@ -1103,7 +1104,7 @@ apply):
 ### No-op / change-gate semantics
 
 - **Manifest-absent silent no-op (AC5).** See
-  [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed) — the base-ref pre-check is
+  [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit) — the base-ref pre-check is
   ordered **before** the absence conclusion. No prompt, no branch, no dispatch, no PR, no error, **no
   stdout**, exit 0.
 - **Deactivated type → informational report, no write (AC2)** (§16 step 3). Distinct from the silent

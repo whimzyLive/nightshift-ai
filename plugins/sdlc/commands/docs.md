@@ -20,11 +20,12 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    `usage: /sdlc:docs sync <STORY-KEY> | release <version> | seed <type> [topic]  (audit|distill land in later stories)`.
 2. **Unrecognised first token** (not one of `sync`/`release`/`seed`/`audit`/`distill`) → STOP with
    the same usage message.
-3. **Recognised future-mode token** (`audit`/`distill`) → print
+3. **Recognised future-mode token** (`distill`) → print
    `mode "<mode>" is not yet implemented (see Epic NA-50)` and exit cleanly. Not an error, not a
    STOP — a deliberate stub so the surface is stable before the modes land. **`release` is not in
    this set** — it routes to the release contract below. **`seed` is not in this set** — it routes
-   to the seed contract below.
+   to the seed contract below. **`audit` is not in this set** — it routes to the audit contract
+   below.
 4. **`sync` with a missing or malformed story key** — the story key must match
    `^[A-Z][A-Z0-9]*-[0-9]+$` (e.g. `NA-52`). If the key is absent or fails the regex → STOP with the
    usage message. This is a **usage STOP** (a caller error), distinct from the manifest-absent
@@ -171,7 +172,7 @@ argument validation above, and the gates below that decide whether `knowledge-en
 dispatched at all.
 
 1. **Manifest gate (AC5).** Shared with `release` — defined **once** in
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed` (the
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit` (the
    base-ref resolution pre-check that runs **before** the manifest read — an unresolvable
    `origin/<BASE-BRANCH>` is a STOP, never mistaken for "manifest absent" — then the
    checkout-independent `git show`, then the silent no-op on genuine absence). This command does not
@@ -191,7 +192,7 @@ dispatched at all.
 
    - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → emit the explicit
      WARNING (never a silent clean exit that reads as success):
-     `WARNING: no story branch (feat|fix)/<STORY-KEY> found on origin. v1 sync is branch-diff-only; post-merge sync (diffing the merged commit range) is deferred to NA-55. Nothing regenerated.`
+     `WARNING: no story branch (feat|fix)/<STORY-KEY> found on origin. v1 sync is branch-diff-only; post-merge sync (diffing the merged commit range) is deferred to NA-56. Nothing regenerated.`
      — then exit. Do not dispatch `knowledge-engineer` in this case.
 
 3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it
@@ -235,7 +236,7 @@ argument validation above, and the founder-confirm gate between the two dispatch
 
 1. **Manifest gate (AC6).** Shared with `sync` — same pointer, same mechanics: see step 1 of the
    `sync` procedure above,
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed`. The
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`. The
    base-ref resolution pre-check runs first (an unresolvable `origin/<BASE-BRANCH>` STOPs — it is
    never mistaken for "manifest absent"), then the checkout-independent `git show`, then the silent
    no-op on genuine absence. Do not dispatch `knowledge-engineer` on either exit path.
@@ -313,7 +314,7 @@ already available is hoisted ahead of the gate.
 1. **Argument validation** — the ladder above, including a supplied `<topic>`.
 
 2. **Manifest gate (AC5).** Shared with `sync` and `release` — defined once at
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed`
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`
    (base-ref resolution pre-check → checkout-independent `git show` → silent no-op on genuine
    absence). **Not re-derived here**; `seed` is its third consumer. If **absent** → **silent no-op**:
    no prompt, no branch, no dispatch, no PR, no error, **no stdout**, exit 0. Do not dispatch
@@ -446,8 +447,8 @@ or `seed`'s no-op/STOP set).
 | `.claude/project/docs-manifest.md` absent                                                                       | **Silent** no-op — no branch, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                                                                                                    |
 | Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
-| Recognised future-mode token (`audit`/`distill`)                                                                | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error.                                                                                                                                                                                                                                            |
-| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-55); exit **without** a silent success.                                                                                                                                                                                                          |
+| Recognised future-mode token (`distill` only, after the strike)                                                 | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error. **`audit` is no longer in this set.**                                                                                                                                                                                                      |
+| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-56); exit **without** a silent success.                                                                                                                                                                                                          |
 | `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                                                                                                      |
 | Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                                                                                         |
 | Deterministic regen produced byte-identical output and no narrative draft confirmed                             | No commit, no PR (AC6) — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                              |
