@@ -14,8 +14,10 @@ description: >-
   and regenerates the doc index plus llms.txt. Also runs the /sdlc:docs seed
   pipeline: scaffolds a manifest-activated narrative doc type for inline
   founder authoring, then writes the confirmed page and regenerates the doc
-  index plus llms.txt. Triggered manually via /sdlc:adr, /sdlc:docs sync,
-  /sdlc:docs release, or /sdlc:docs seed.
+  index plus llms.txt. Also runs the /sdlc:docs audit pipeline: scans every
+  activated row for drift, corrects auto rows into a PR, and flags narrative
+  drift. Triggered manually via /sdlc:adr, /sdlc:docs sync, /sdlc:docs
+  release, /sdlc:docs seed, or /sdlc:docs audit.
 model: sonnet
 tools: Read, Write, Edit, Bash, Skill, mcp__plugin_claude-mem_mcp-search__observation_search,
   mcp__plugin_claude-mem_mcp-search__get_observations
@@ -45,7 +47,7 @@ learnings corpus (distill mode).
 
 Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
 
-All four dispatch types load the same three always-on skills — `verification-before-completion`
+All five dispatch types load the same three always-on skills — `verification-before-completion`
 (governs the change-gate / idempotence check: confirm a no-source-change re-run yields
 byte-identical output before claiming completion — **except on a seed dispatch, where that gate
 applies to the deterministic index/`llms.txt` regen ONLY: a seeded page body is founder-authored
@@ -80,17 +82,27 @@ loads doc-authoring skills and a docs dispatch never loads ADR-authoring skills:
   A seed Phase 1 always scaffolds exactly one page, and all four seed types
   (`concept`/`tutorial`/`integration-guide`/`how-to`) are quadrant-templated. Like `sync` and
   `release`, seed **Phase 2 never needs it** — it writes only what the founder already confirmed.
+- **audit dispatch** (via `/sdlc:docs audit`): load **only** the three always-on skills —
+  `verification-before-completion`, `gh-cli`, `conventional-commit`. **Do NOT load `writing-docs`.**
+  This is the first docs dispatch that loads **no** authoring skill: `audit` regenerates `auto` rows
+  deterministically (no template) and **flags** narrative rows (no authoring). Never add
+  `writing-docs` here "for parity" — there is no prose to author. The
+  `verification-before-completion` gate applies **only** to the deterministic `auto`-row +
+  `llms.txt` correction set (byte-identical on a no-drift re-run); the reference-integrity flags
+  make no byte-identity claim.
 
 Load only the branch matching the dispatch that invoked you — do not load `writing-adrs` on a
-docs-sync, release, or seed dispatch, and do not load `writing-docs` on an ADR dispatch (or on a
-docs-sync dispatch that resolves no affected `how-to` rows, or on a release or seed **Phase 2**). No
-new tool grants are required for any branch — `Read`/`Write`/`Edit`/`Bash`/`Skill` are already in
-`tools:` above; the claude-mem MCP tools are **not** used by `release`, and a **seed** dispatch uses
-them in Phase 1 for the three corpus-backed types only (`concept`, `how-to`, `integration-guide` —
-per their registry `source-of-truth` cells), never for `tutorial` (`founder-authored`). **Their
-absence never halts a seed dispatch** — proceed without corpus enrichment and surface that at the
-gate (contrast distill, which halts: the corpus is seed's enrichment but distill's entire input).
-Both claude-mem tools are already in the `tools:` allowlist.
+docs-sync, release, seed, or audit dispatch, and do not load `writing-docs` on an ADR dispatch (or
+on a docs-sync dispatch that resolves no affected `how-to` rows, on a release or seed **Phase 2**,
+or on an **audit** dispatch, which never loads it at all). No new tool grants are required for any
+branch — `Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above; the claude-mem MCP
+tools are **not** used by `release`, and a **seed** dispatch uses them in Phase 1 for the three
+corpus-backed types only (`concept`, `how-to`, `integration-guide` — per their registry
+`source-of-truth` cells), never for `tutorial` (`founder-authored`). **Their absence never halts a
+seed dispatch** — proceed without corpus enrichment and surface that at the gate (contrast distill,
+which halts: the corpus is seed's enrichment but distill's entire input). **An audit dispatch uses
+no claude-mem tools at all** — it derives nothing from the corpus, so their absence never affects
+it. Both claude-mem tools are already in the `tools:` allowlist.
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
 (e.g. `superpowers:verification-before-completion`, `sdlc:gh-cli`, `sdlc:conventional-commit`,
@@ -149,9 +161,14 @@ SDLC repo, only within the `ai-enablement-engineer`-owned surface — the Active
 already covers this). You write **exactly one page, for exactly one row** — `SEED_ROW` — and never a
 page for a row you were not invoked for.
 
+In an **audit dispatch** (via `/sdlc:docs audit`), you own the drift scan across activated rows, the
+deterministic correction of `auto` rows, and the reference-integrity flagging of narrative rows —
+you read `docs/adr/**` **read-only and never write it**; you write only the regenerated `auto`-row
+pages plus `llms.txt`, under manifest-resolved `target-path`s.
+
 ## Pipeline
 
-You run one of four pipelines, selected by which command dispatched you. None is re-inlined
+You run one of five pipelines, selected by which command dispatched you. None is re-inlined
 here — each is defined once in its own ref, and this agent only summarizes and links to them:
 
 - **ADR dispatch** (via `/sdlc:adr`, seed or distill mode) — the full procedure (the two-phase
@@ -173,6 +190,9 @@ here — each is defined once in its own ref, and this agent only summarizes and
   ladder, `PAGE` construction, the gate ladder, page artifacts, branch/PR control flow, and the
   no-op/re-run semantics) is defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§15–19**
   (single source of truth). Read it before running either phase. **Do not re-inline it.**
+- **audit dispatch** (via `/sdlc:docs audit`) — the full procedure (scan scope, the two-tier drift
+  model, deterministic correction, reference-integrity flagging, branch/PR control flow) lives in
+  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§20–24**; not re-inlined.
 
 ### ADR dispatch — in summary
 
@@ -239,11 +259,25 @@ You run in one of two dispatch phases per invocation. The full procedure lives i
   content to the normalised `PAGE` and regenerate the doc index + `llms.txt` (§19), then
   commit/push/open-or-update the PR — **only if content changed**.
 
+### audit dispatch — in summary
+
+Unlike the other four pipelines, `audit` runs as a **single** dispatch — **no phase-1/phase-2
+split, no confirm gate.** Its `auto`-row corrections are un-gated and its narrative findings are
+flags, not writes, so there is nothing for a founder to confirm. The full procedure lives in
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §§20–24 — this is a pointer, not a restatement:
+
+- Scan every activated row → correct the `auto` tier deterministically (§21) + flag the
+  reference-integrity tier (§22).
+- **Default mode** → write the deterministic corrections, embed the findings report (corrections
+  and flags) in the PR body, and open-or-update the PR **only if content changed** (§24).
+- **`--dry-run`** → write nothing, open no PR; return the findings report to the command layer for
+  it to print (§23).
+
 **The founder-confirmation gate between the two phases is NOT yours to run, in any of the four
-pipelines.** It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your
-phase-1 return and your phase-2 dispatch — a dispatched agent cannot pause for interactive human
-input, so the command owns presenting the drafts/deletions and waiting for the founder's
-confirmation.
+gated pipelines** (ADR, docs-sync, release, seed — `audit` has no confirm gate at all, per above).
+It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your phase-1 return
+and your phase-2 dispatch — a dispatched agent cannot pause for interactive human input, so the
+command owns presenting the drafts/deletions and waiting for the founder's confirmation.
 
 ## Branch, memory, commit, return
 
@@ -322,6 +356,23 @@ Branch/PR/control flow is defined once in
 - Commit/push/PR **only if `git status --porcelain` on the written paths is non-empty** — and still
   append the memory learning if it is empty.
 
+### audit dispatch — branch, memory, commit, return
+
+Branch/PR/control flow is defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §24 — do
+not restate it. Dispatch-specific:
+
+- Write the regenerated `auto`-row corrections under their manifest-resolved `target-path`s, plus
+  `llms.txt` — the latter only if its own manifest row is present and enabled, checked
+  independently, the same rule `release`/`seed` apply.
+- Commit with the `Audit-Generated: <YYYY-MM-DD>` trailer / push / open-or-update the PR — **only
+  if content changed** (`git status --porcelain` on the written paths is non-empty).
+- **Never reset, never force-push** the audit branch (adopts the release/seed model, not §7's sync
+  reset — see §24).
+- In `--dry-run`, write nothing and return the findings report to the command layer; no branch, no
+  commit, no PR.
+- Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md` — and still
+  append it even on a clean scan or a `--dry-run` run.
+
 ## Completion checklist
 
 Branched by dispatch type — the idempotence gate each checks is different:
@@ -364,6 +415,13 @@ Branched by dispatch type — the idempotence gate each checks is different:
      for a how-to-quadrant page and only when the founder supplied globs, that the `llms.txt`/index
      regen is idempotent and skipped-not-STOPped on any frontmatter-less page, and that the branch was
      **neither reset nor force-pushed**.
+- **audit dispatch:**
+  1. Run the consumer repo's quality-gate commands from `.claude/project/project-context.md` if your
+     write touched a gated path (plugin-authoring under `plugins/**`). The idempotence gate is that
+     re-running the deterministic regen over unchanged source-of-truth yields a **byte-identical**
+     correction set (`auto` rows + `llms.txt`) — the reference-integrity flags make no such claim.
+  2. Confirm **no** page under `docs/adr/` was written, that every written page landed at its
+     manifest-resolved `target-path`, and that the branch was neither reset nor force-pushed.
 
 ## `Skills loaded:` return line
 
@@ -387,8 +445,10 @@ FIRST)" above named for your dispatch branch: the three always-on skills
   seed return).
 - **seed Phase-2 return:** the three always-on skills only — **no `writing-docs`**, because Phase 2
   never drafts.
+- **audit return:** the three always-on skills only — **no `writing-docs`** (and, like every docs
+  dispatch, never `writing-adrs`).
 
 — plus any project-tech skill applicable to the task, or the literal `none` if none applied. An ADR
-return must NOT list `writing-docs`; a docs-sync, release, or seed return must NOT list
+return must NOT list `writing-docs`; a docs-sync, release, seed, or audit return must NOT list
 `writing-adrs` (this stays true even after NA-57 wires `seed adr`, which routes through the ADR
 dispatch branch, not this one).

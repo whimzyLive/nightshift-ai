@@ -1,5 +1,5 @@
 ---
-description: Generate and maintain this repo's public docs surface via the doc-type registry and the per-repo docs manifest. Ships three live modes — `sync` diff-drives deterministic regeneration of frontmatter-driven reference docs + `llms.txt` and drafts gated how-to refreshes; `release <version>` aggregates every story merged since the last tag into the manifest-enabled subset of changelog, ADR-linked release notes, and a migration-guide stub; `seed <type> [topic]` scaffolds one new page of a manifest-activated narrative type (concept/tutorial/integration-guide/how-to) for the founder to author inline at the confirm gate, then writes the confirmed page. All three deterministically regenerate the doc index + `llms.txt` and run behind the knowledge-engineer agent (refs/docs-pipeline.md), with the founder-confirmation gate at this command layer. `audit`/`distill` are not-yet-implemented stubs (see Epic NA-50).
+description: Generate and maintain this repo's public docs surface via the doc-type registry and the per-repo docs manifest. Ships four live modes — `sync` diff-drives deterministic regeneration of frontmatter-driven reference docs + `llms.txt` and drafts gated how-to refreshes; `release <version>` aggregates every story merged since the last tag into the manifest-enabled subset of changelog, ADR-linked release notes, and a migration-guide stub; `seed <type> [topic]` scaffolds one new page of a manifest-activated narrative type (concept/tutorial/integration-guide/how-to) for the founder to author at the confirm gate; `audit [--dry-run]` scans every activated row for drift, corrects `auto` rows into a PR, and flags narrative drift (read-only under `--dry-run`). All four deterministically regenerate the doc index + `llms.txt` and run behind the knowledge-engineer agent (refs/docs-pipeline.md), with the founder-confirmation gate at this command layer. `distill` is a not-yet-implemented stub (see Epic NA-50).
 ---
 
 ## Modes (dispatched from `$ARGUMENTS`)
@@ -9,7 +9,7 @@ description: Generate and maintain this repo's public docs surface via the doc-t
 | `/sdlc:docs sync <STORY-KEY>`    | **sync**    | Shipped (NA-52)                                                 |
 | `/sdlc:docs release <version>`   | **release** | Shipped (NA-53)                                                 |
 | `/sdlc:docs seed <type> [topic]` | **seed**    | **Shipped (NA-54)** — except `seed adr`, which routes to NA-57  |
-| `/sdlc:docs audit [--dry-run]`   | audit       | Not yet implemented (see Epic NA-50) — clean stub, not an error |
+| `/sdlc:docs audit [--dry-run]`   | **audit**   | **Shipped (NA-55)**                                             |
 | `/sdlc:docs distill`             | distill     | Not yet implemented (see Epic NA-50) — clean stub, not an error |
 
 ## Argument validation
@@ -17,14 +17,15 @@ description: Generate and maintain this repo's public docs surface via the doc-t
 Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args. Apply, in order:
 
 1. **Empty `$ARGUMENTS`** → STOP with the usage message:
-   `usage: /sdlc:docs sync <STORY-KEY> | release <version> | seed <type> [topic]  (audit|distill land in later stories)`.
+   `usage: /sdlc:docs sync <STORY-KEY> | release <version> | seed <type> [topic] | audit [--dry-run]  (distill lands in a later story)`.
 2. **Unrecognised first token** (not one of `sync`/`release`/`seed`/`audit`/`distill`) → STOP with
    the same usage message.
-3. **Recognised future-mode token** (`audit`/`distill`) → print
+3. **Recognised future-mode token** (`distill`) → print
    `mode "<mode>" is not yet implemented (see Epic NA-50)` and exit cleanly. Not an error, not a
    STOP — a deliberate stub so the surface is stable before the modes land. **`release` is not in
    this set** — it routes to the release contract below. **`seed` is not in this set** — it routes
-   to the seed contract below.
+   to the seed contract below. **`audit` is not in this set** — it routes to the audit contract
+   below.
 4. **`sync` with a missing or malformed story key** — the story key must match
    `^[A-Z][A-Z0-9]*-[0-9]+$` (e.g. `NA-52`). If the key is absent or fails the regex → STOP with the
    usage message. This is a **usage STOP** (a caller error), distinct from the manifest-absent
@@ -160,6 +161,20 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
     prompts for it, but **after** the manifest and type-activation gates, so a repo with nothing to
     do is never prompted first. **A prompted topic runs the identical ladder** (§15): validation the
     primary input path never reaches is not validation.
+11. **`audit` flag recognition — the entire `audit` validation surface.** `audit` takes no free-text
+    argument (nothing forming a branch, path, or ref), so NA-53's `<version>` ladder and NA-54's
+    `<topic>` slug ladder have **no analogue here** — do not import one.
+    1. **`audit` with no further tokens** → default (PR) mode. Not an error.
+    2. **`audit --dry-run`** (the flag is the sole remaining token) → dry-run (report-only) mode.
+    3. **`audit <anything-else>`** — any remaining token not exactly `--dry-run` (e.g. `--dryrun`,
+       `foo`, `--dry-run extra`) → **usage STOP**:
+
+       ```text
+       unknown argument for audit — usage: /sdlc:docs audit [--dry-run]
+       ```
+
+       A usage STOP (caller error), **distinct from the manifest-absent silent no-op** — a founder
+       who fat-fingers `--dryrun` must not get a live PR-opening run they thought was a dry run.
 
 ## `sync <STORY-KEY>` — shared pipeline split across the dispatch boundary
 
@@ -171,7 +186,7 @@ argument validation above, and the gates below that decide whether `knowledge-en
 dispatched at all.
 
 1. **Manifest gate (AC5).** Shared with `release` — defined **once** in
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed` (the
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit` (the
    base-ref resolution pre-check that runs **before** the manifest read — an unresolvable
    `origin/<BASE-BRANCH>` is a STOP, never mistaken for "manifest absent" — then the
    checkout-independent `git show`, then the silent no-op on genuine absence). This command does not
@@ -191,7 +206,7 @@ dispatched at all.
 
    - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → emit the explicit
      WARNING (never a silent clean exit that reads as success):
-     `WARNING: no story branch (feat|fix)/<STORY-KEY> found on origin. v1 sync is branch-diff-only; post-merge sync (diffing the merged commit range) is deferred to NA-55. Nothing regenerated.`
+     `WARNING: no story branch (feat|fix)/<STORY-KEY> found on origin. v1 sync is branch-diff-only; post-merge sync (diffing the merged commit range) is deferred to NA-56. Nothing regenerated.`
      — then exit. Do not dispatch `knowledge-engineer` in this case.
 
 3. **Dispatch `knowledge-engineer` Phase 1 (compute & draft, writes nothing).** Pass it
@@ -235,7 +250,7 @@ argument validation above, and the founder-confirm gate between the two dispatch
 
 1. **Manifest gate (AC6).** Shared with `sync` — same pointer, same mechanics: see step 1 of the
    `sync` procedure above,
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed`. The
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`. The
    base-ref resolution pre-check runs first (an unresolvable `origin/<BASE-BRANCH>` STOPs — it is
    never mistaken for "manifest absent"), then the checkout-independent `git show`, then the silent
    no-op on genuine absence. Do not dispatch `knowledge-engineer` on either exit path.
@@ -313,7 +328,7 @@ already available is hoisted ahead of the gate.
 1. **Argument validation** — the ladder above, including a supplied `<topic>`.
 
 2. **Manifest gate (AC5).** Shared with `sync` and `release` — defined once at
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-and-seed`
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`
    (base-ref resolution pre-check → checkout-independent `git show` → silent no-op on genuine
    absence). **Not re-derived here**; `seed` is its third consumer. If **absent** → **silent no-op**:
    no prompt, no branch, no dispatch, no PR, no error, **no stdout**, exit 0. Do not dispatch
@@ -371,6 +386,45 @@ already available is hoisted ahead of the gate.
    `llms.txt` per §19 (**`llms.txt` only if its own manifest row is present and enabled — checked
    independently of `SEED_ROW`**), and commits/pushes/opens-or-updates the PR **only if
    `git status --porcelain` on the written paths is non-empty** (AC4).
+
+## `audit [--dry-run]` — single-dispatch drift scan + deterministic correction
+
+Unlike `sync`/`release`/`seed`, `audit` has **no founder-confirm gate** and therefore **no two-phase
+dispatch split** — its `auto`-row corrections are un-gated and its narrative findings are flags, not
+writes. It collapses to a **single** `knowledge-engineer` dispatch. The full procedure is defined
+once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§20–24**; this command owns only the
+manifest gate, the flag ladder above, the single dispatch, and the report/PR surfacing.
+
+```text
+1. argument validation  →  2. manifest gate (§1)  →  3. dispatch knowledge-engineer (audit)
+→  4. scan + compute (§§20–22)  →  5a. --dry-run: report, no PR (§23)
+                                    5b. default: write corrections + PR-on-change (§24)
+```
+
+1. **Argument validation** — the flag ladder above.
+
+2. **Manifest gate (AC5).** Shared — defined once at
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`
+   (base-ref pre-check → checkout-independent resolution → silent no-op on genuine absence). `audit`
+   is its **fourth** consumer; not re-derived here. If **absent** → **silent no-op**: no scan, no
+   dispatch, no PR, no error, **no stdout**, exit 0 — for **both** `audit` and `audit --dry-run`.
+
+3. **Dispatch `knowledge-engineer` (audit) — single dispatch, no confirm gate.** Pass the run mode
+   (`--dry-run` or default), the resolved activated-row set, and `origin/<BASE-BRANCH>`. The dispatch
+   performs the scan (§§20–22) and produces the findings report (§23).
+
+4. **Scan + compute** (§§20–22): every activated row, partitioned by `generation-mode` into the
+   deterministic-correction tier and the reference-integrity flag tier.
+
+5. **Report / PR** (§23/§24):
+   - **`--dry-run`** → print the report to stdout, open **no** PR, write nothing (AC3). Clean scan →
+     `docs are in sync — no drift found`.
+   - **default** → §24: ≥1 deterministic correction ⇒ write + embed report + open-or-update PR
+     (only if `git status --porcelain` is non-empty); reference-integrity-flags-only ⇒ stdout report,
+     no PR; clean ⇒ report clean, no PR.
+
+Branch/PR mechanics (`docs/audit-<YYYY-MM-DD>`, the `Audit-Generated:` trailer, both re-run guards,
+reset/force-push prohibition, the control-flow tail) live in §24 — not restated here.
 
 ## Release branch/PR naming
 
@@ -446,8 +500,8 @@ or `seed`'s no-op/STOP set).
 | `.claude/project/docs-manifest.md` absent                                                                       | **Silent** no-op — no branch, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                                                                                                    |
 | Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
-| Recognised future-mode token (`audit`/`distill`)                                                                | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error.                                                                                                                                                                                                                                            |
-| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-55); exit **without** a silent success.                                                                                                                                                                                                          |
+| Recognised future-mode token (`distill` only, after the strike)                                                 | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error. **`audit` is no longer in this set.**                                                                                                                                                                                                      |
+| `sync` but no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>` (post-merge / never-branched)               | Emit the explicit WARNING (v1 is branch-diff-only; post-merge deferred to NA-56); exit **without** a silent success.                                                                                                                                                                                                          |
 | `refs/doc-types.md` unreadable/malformed                                                                        | Surface the failure and STOP — never regenerate from a partial registry.                                                                                                                                                                                                                                                      |
 | Manifest present but no enabled `sync`-triggered row affected, and `llms.txt` unchanged                         | Clean no-op — no commit, no PR (AC6).                                                                                                                                                                                                                                                                                         |
 | Deterministic regen produced byte-identical output and no narrative draft confirmed                             | No commit, no PR (AC6) — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                              |
@@ -500,6 +554,16 @@ or `seed`'s no-op/STOP set).
 | Re-run: branch carries **out-of-pipeline** edits to generated pages (no trailer)                                | **STOP at step 5**, before the founder authors — surface the paths and the PR number. Never overwritten. The scanned path set is `PAGE` **plus** `llms.txt` (when enabled) **plus** any regenerated section index page.                                                                                                       |
 | A guard condition first becomes true **while the founder is authoring** (TOCTOU)                                | Phase 2 **MUST** re-check and STOP — but **MUST preserve the confirmed content** (session temp dir, path surfaced in the STOP), never discard it. The re-check is **mandatory, not optional**.                                                                                                                                |
 | A **local** `docs/seed-<type>-<SLUG>` holds commits not reachable from its remote                               | **STOP** (local-branch precondition, evaluated at step 5) — never discard unpushed work.                                                                                                                                                                                                                                      |
+| `audit` with an unrecognised argument (`--dryrun`, `foo`, `--dry-run extra`)                                    | Usage STOP — `unknown argument for audit — usage: /sdlc:docs audit [--dry-run]`. Never silently treated as a plain `audit`.                                                                                                                                                                                                   |
+| `audit` / `audit --dry-run`, `.claude/project/docs-manifest.md` absent                                          | **Silent** no-op — no scan, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                                                                                                      |
+| `audit`, manifest present but no row activated                                                                  | Clean scan — report `no activated doc types to audit`; no PR. Informational, not silent.                                                                                                                                                                                                                                      |
+| `refs/doc-types.md` unreadable/malformed (audit)                                                                | Surface and STOP — never audit against a partial registry, never fall back to a hardcoded row list.                                                                                                                                                                                                                           |
+| `--dry-run`, drift found                                                                                        | Print the findings report; **no** write, **no** PR (AC3).                                                                                                                                                                                                                                                                     |
+| default, ≥1 deterministic correction (audit)                                                                    | Write regenerated `auto` pages, embed the full findings report in the PR body, open-or-update the PR (AC2).                                                                                                                                                                                                                   |
+| default, drift is **only** reference-integrity flags                                                            | Report the flags to stdout; **no PR** — nothing mechanical to commit, a narrative fix is never fabricated.                                                                                                                                                                                                                    |
+| default, no drift of either tier (audit)                                                                        | Report clean; open nothing (AC2).                                                                                                                                                                                                                                                                                             |
+| A narrative page diverges from an ADR it references                                                             | **Flagged** as "the doc diverges from the ADR" (AC4) — ADR is source of truth, direction fixed, **never** written into `docs/adr/`.                                                                                                                                                                                           |
+| Re-run: audit branch carries out-of-pipeline edits (no `Audit-Generated:` trailer)                              | **STOP** (re-run content guard) — surface the paths + PR number; never overwritten.                                                                                                                                                                                                                                           |
 
 Mode + args:
 $ARGUMENTS

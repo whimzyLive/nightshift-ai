@@ -1,8 +1,9 @@
 # Docs pipeline
 
 Shared resolve → diff → regen → draft → founder-confirm → write → commit/PR protocol for
-`/sdlc:docs sync` (§§2–8), `/sdlc:docs release` (§§10–14), and `/sdlc:docs seed` (§§15–19),
-referenced by both `agents/knowledge-engineer.md` and `commands/docs.md` so the
+`/sdlc:docs sync` (§§2–8), `/sdlc:docs release` (§§10–14), `/sdlc:docs seed` (§§15–19), and
+`/sdlc:docs audit` (§§20–24), referenced by both `agents/knowledge-engineer.md` and `commands/docs.md`
+so the
 contract lives in exactly one place. Neither file re-inlines this logic — both summarize and link
 back here. Mirrors `refs/adr-pipeline.md`'s shape (copy the skeleton; do not abstract a shared ref
 between the two — same "copy the shape, do not generalize" rule `doc-types.md` and Epic NA-50 both
@@ -16,10 +17,11 @@ silent, `.claude/project/project-context.md`. In this SDLC repo itself, a plugin
 (touching `plugins/**`) stays within the `ai-enablement-engineer` write-scope — see the Active-guard
 scope note in the agent's First steps.
 
-### Manifest gate (shared by sync, release, and seed)
+### Manifest gate (shared by sync, release, seed, and audit)
 
-All three modes apply this identical gate at the **command layer**, before any dispatch — defined
-once here; `commands/docs.md` points at it rather than re-deriving it. Resolve
+**Every mode that reads the manifest** applies this identical gate at the **command layer**, before
+any dispatch — defined once here; `commands/docs.md` points at it rather than re-deriving it.
+Resolve
 `.claude/project/docs-manifest.md` **checkout-independently** — never the working tree, so a stale
 local checkout never skews which rows are active — but only **after** the base ref itself is
 confirmed to resolve. A bare `git show origin/<BASE-BRANCH>:<path>` failure is otherwise ambiguous
@@ -173,14 +175,14 @@ inconsistently between this ref and the how-to template it governs:
 
 ## 6. No-op / change-gate semantics
 
-- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed)
+- **Manifest-absent silent no-op (AC5).** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit)
   — the command layer never dispatches `knowledge-engineer` when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks — phase 1 is never invoked in this case.
 - **Story-branch-missing WARNING, never a silent success.** If neither `origin/feat/<STORY-KEY>`
   nor `origin/fix/<STORY-KEY>` exists, the command layer emits the explicit WARNING (see
   `commands/docs.md`) and exits — never a silent clean exit that could read as "docs already
-  current." v1 sync is branch-diff-only; post-merge sync is deferred to NA-55.
+  current." v1 sync is branch-diff-only; post-merge sync is deferred to NA-56.
 - **Commit/PR only on actual content change (AC6).** Phase 2 step 10 (§2) is the single point that
   decides this: an empty `git status --porcelain` on the written target paths means no commit, no
   PR — a clean, deterministic re-run is a no-op by construction.
@@ -197,7 +199,7 @@ inconsistently between this ref and the how-to template it governs:
 | Commit            | `docs(docs): sync <STORY-KEY> reference docs` (via `conventional-commit`)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | PR title          | `docs(docs): sync <STORY-KEY>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | PR base           | `<BASE-BRANCH>` from project-context (never assume `main`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Diff source (v1)  | `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")`, both from the same `origin/<BASE-BRANCH>...$STORY_BRANCH` three-dot range, against the **remote-tracking** base ref (checkout-independent — a stale local base never skews the diff), after `git fetch origin --quiet`. Dual diff-source selection (story-branch-vs-develop **vs** merged-commit) is out of scope — deferred to NA-55.                                   |
+| Diff source (v1)  | `CHANGED_FILES=$(git diff --name-only "origin/<BASE-BRANCH>...$STORY_BRANCH")` and `CHANGED_DIFF=$(git diff "origin/<BASE-BRANCH>...$STORY_BRANCH")`, both from the same `origin/<BASE-BRANCH>...$STORY_BRANCH` three-dot range, against the **remote-tracking** base ref (checkout-independent — a stale local base never skews the diff), after `git fetch origin --quiet`. Dual diff-source selection (story-branch-vs-develop **vs** merged-commit) is out of scope — deferred to NA-56.                                   |
 | First-run PR      | Create the branch, commit, push, open the PR (`gh pr create`) against `<BASE-BRANCH>`.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Re-run behaviour  | **Open or update** (AC6): before creating, check whether `docs/sync-<STORY-KEY>` already exists on `origin` (`git rev-parse --verify origin/docs/sync-<STORY-KEY>` / `gh pr list --head docs/sync-<STORY-KEY>`). If it does → check it out, **`git reset --hard` onto the freshly regenerated state** (the branch content is fully derived, so a hard reset is safe and keeps history clean), then **`git push --force-with-lease`** to update the existing open PR — never open a duplicate PR.                               |
 | Control-flow tail | Mirror `commands/adr.md`: after the PR is raised, drive the review loop to convergence via `/loop /sdlc:loop <PR_URL>` (falling back to `ScheduleWakeup` if the harness cannot nest `/loop`). If the run ended **before** any PR, release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — this covers the manifest-absent silent no-op, the story-branch-missing WARNING, a usage STOP, and a clean "nothing changed" no-op alike (all four release without a PR; only the manifest-absent path is silent). |
@@ -534,7 +536,7 @@ edits (re-derived by design), but it must not be mistaken for _preserving_ them.
 
 ## 14. Release mode — no-op / change-gate semantics
 
-- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed)
+- **Manifest-absent silent no-op.** See [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit)
   (shared with `sync`) — the command layer never dispatches when that gate finds the manifest
   genuinely absent, distinct from the STOP the same gate raises first if `origin/<BASE-BRANCH>`
   itself won't resolve. Not something phase 1 checks. The zero-setup-cost guarantee for repos that
@@ -766,7 +768,7 @@ the authored content rather than discard it (§18).
    validated **before** gates 2–3 because it forms a branch name and a path.
 
 2. **Manifest gate (AC5)** — shared with `sync` and `release`; defined **once** in
-   [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed). `seed` is its third
+   [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit). `seed` is its third
    consumer and does **not** re-derive it. The base-ref pre-check ordering is load-bearing for
    exactly the reason §14 documents: a bare `git show origin/<BASE-BRANCH>:<path>` failure is
    ambiguous between "the manifest genuinely does not exist" (the intended silent no-op) and "the
@@ -1103,7 +1105,7 @@ apply):
 ### No-op / change-gate semantics
 
 - **Manifest-absent silent no-op (AC5).** See
-  [§1's Manifest gate](#manifest-gate-shared-by-sync-release-and-seed) — the base-ref pre-check is
+  [§1's Manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit) — the base-ref pre-check is
   ordered **before** the absence conclusion. No prompt, no branch, no dispatch, no PR, no error, **no
   stdout**, exit 0.
 - **Deactivated type → informational report, no write (AC2)** (§16 step 3). Distinct from the silent
@@ -1132,3 +1134,161 @@ byte-identity would be false. **Do not copy §14's idempotence wording.**
 | **`llms.txt` / index regen** is deterministic   | **Yes** | Pure function of the enabled `public: yes` rows' page frontmatter (§8). Re-running over an unchanged page set yields byte-identical output                      |
 | **Commit/PR only on actual content change**     | **Yes** | Phase 2 commits only if `git status --porcelain` on the written paths is non-empty                                                                              |
 | Branch commits are **preserved** across re-runs | **Yes** | Never reset, never force-pushed — §18                                                                                                                           |
+
+## 20. Audit mode — scan scope + two-tier drift model
+
+`audit` is the **comprehensive** pass: unlike `sync` (branch-diff-scoped) and `release`/`seed`
+(verb-triggered), a default run scans **every row activated in the manifest** — present **and**
+`enabled = true` (the same "absent is never activated" rule §16 states; never infer a missing row
+as active), **regardless of which mode generates it**. `audit` is **not** keyed on the registry
+`trigger` column — **no row carries `audit` in its trigger, and none should.**
+
+**The activated set partitions into exactly two tiers, keyed solely on `generation-mode` — never a
+hand-list:**
+
+| Tier                          | Membership                                                                   | Drift means                                                  | Action                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| **Deterministic** (§21)       | every activated row with `generation-mode = auto`                            | published page ≠ byte-deterministic regen of source-of-truth | **correct** — the regenerated bytes, committed un-gated |
+| **Reference-integrity** (§22) | every activated row with `generation-mode ∈ {draft-for-review, manual-only}` | a **verifiable anchor** the page declares has moved          | **flag** in the report — **never rewrite the prose**    |
+
+There is **no third bucket and no "unclassified" row**. An `auto` row is deterministic; **every**
+non-`auto` row is reference-integrity — **`changelog` (draft-for-review) included**, so published
+changelog drift is never left unscanned (AC1). Resolved against `refs/doc-types.md` today the sets
+are `auto` = `command-reference`, `agent-reference`, `skill-reference`, `config-reference`,
+`hooks-contract`, `error-reference`, `llms-txt`; reference-integrity = `changelog`, `release-notes`,
+`migration-guide`, `tutorial`, `how-to`, `integration-guide`, `concept`. **That enumeration is an
+illustrative snapshot, not the source of truth — derive tier membership from `generation-mode` at
+read time.** Building the scan from a copied row list reintroduces the `changelog`-omission defect
+(the hardcoded-list drift class NA-54 hit).
+
+Row activation is resolved from the manifest **checkout-independently** at `origin/<BASE-BRANCH>`
+(the [manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit) already fetched and
+validated the base ref). `refs/doc-types.md` **unreadable or malformed → surface and STOP** — never
+audit against a partial registry, and never fall back to a hardcoded row list (the discipline
+`seed`'s `SEED_TYPES` resolution applies).
+
+## 21. Audit mode — deterministic-correction set
+
+For each activated row whose `generation-mode` is `auto`, reuse **§3's deterministic regen
+procedure** to regenerate the row's pages from **current** source-of-truth at `origin/<BASE-BRANCH>`,
+then compare the regenerated bytes against the **published** page at the same base ref
+(checkout-independently — never the working tree, for the reason every sibling reads that way):
+
+- **A non-empty diff IS drift**, provably — the published page is not what its source-of-truth would
+  currently generate. **The correction is the regenerated bytes.** No semantic judgment is involved.
+- **Affectedness keying does not apply.** §3's "affected when `CHANGED_FILES` contains …" columns are
+  a `sync`-only optimisation over a branch diff. `audit` has no branch diff: it treats **every**
+  activated `auto` row as in-scope and regenerates it unconditionally. `audit` reuses §3's per-row
+  _regeneration procedure_, not its _affectedness keying_.
+- **`llms.txt` is an `auto` row and is regenerated like the others** (§8's format) — and its regen
+  reflects any pages this run corrected (see §24).
+- **Frontmatter-less-page handling is §19's, verbatim.** A pre-existing `public: yes` page lacking
+  `title`/`description` that surfaces during the `llms.txt` regen is **skipped and surfaced, never a
+  STOP, never inferred** — `audit` adopts §19's skip-and-surface rule and does not invent a new one,
+  nor STOP the whole audit over one frontmatter-less page.
+
+Every deterministic correction is a pure function of source-of-truth (byte-reproducible), which is
+what lets it be committed **un-gated** — the same "auto rows are un-gated" discipline `sync`,
+`release`, and `seed` apply. **No ambient input** (`gh`, network) may feed a byte of it.
+
+## 22. Audit mode — reference-integrity flagging + AC4 ADR-direction rule
+
+For each activated **narrative** row (`generation-mode ∈ {draft-for-review, manual-only}` — which
+includes `changelog`, `release-notes`, `migration-guide`, `tutorial`, `how-to`, `integration-guide`,
+`concept`), `audit` **does not re-judge the prose and does not rewrite it.** It checks only
+**verifiable anchors the page itself declares**, each a deterministic git/filesystem signal, and
+**flags** (never corrects) a hit:
+
+- **`source:`-glob drift (`how-to`, `integration-guide`).** A page carrying `source:` frontmatter
+  (§5) whose globbed source files have commits **newer than the page's own last commit** is flagged
+  as potentially stale — the same signal `sync` uses to draft a refresh, but surfacing pages `sync`'s
+  branch-scoping never reached. A `source:`-less page is **not** flagged (§5's opt-in boundary).
+- **Referenced-ADR drift (AC4).** A page that **declares an ADR reference** — an inline link to
+  `docs/adr/NNNN-*` or an explicit ADR-reference frontmatter key — whose referenced ADR has commits
+  newer than the page is flagged **as "the doc diverges from the ADR"**. The ADR is source of truth;
+  **the direction is fixed and `audit` never proposes the reverse.** It reads `docs/adr/**`
+  **read-only** and **never writes `docs/adr/`** (the `adr` row is `public: no` — `audit` is a
+  _public-docs_ accuracy tool). A page with **no** declared ADR reference is **never attributed** to
+  an ADR — the association is never fabricated. **Reliability caveat:** the current `writing-docs`
+  templates emit no ADR-reference key, so this flag fires only for pages carrying an inline
+  `docs/adr/NNNN-*` link by convention — see the OQ carry-over in §24.
+- **Dangling code reference.** A page referencing a repo-relative code path that no longer exists at
+  the base ref is flagged. Deterministic (path-existence check), never a semantic guess.
+
+**Pure narrative divergence with no verifiable anchor is deliberately NOT audited in v1** — detecting
+that hand-authored prose has semantically drifted from an ADR requires an LLM judgment that is
+neither deterministic nor reproducible, and acting on it would be fabrication. `audit`'s narrative
+tier reports only anchor-backed signals, and says so.
+
+## 23. Audit mode — findings report + `--dry-run`
+
+The findings report is a structured, deterministic Markdown enumeration, grouped into the two tiers,
+one entry per finding:
+
+```text
+<row-type> · <page path> · <drift kind> · <evidence>
+```
+
+e.g. `command-reference · docs/reference/commands/docs.md · regen-diff · 12 lines differ from
+current frontmatter+body`; `concept · docs/concepts/offline-sync.md · adr-drift · docs/adr/0007-*.md
+changed 2 commits after page`. It is emitted to stdout in **both** modes; in default mode it is
+embedded verbatim in the PR body so a reviewer sees every flag — including narrative flags `audit`
+did **not** auto-correct — alongside the committed corrections.
+
+- **`--dry-run`:** the dispatch returns the report; the command **prints it to stdout** and opens
+  **no** PR, writes nothing (AC3). A clean scan prints the one-liner `docs are in sync — no drift
+found`. `--dry-run` **always ends before any PR** and releases via `session-complete.sh`.
+- **default:** see §24 for the write/PR-on-change path.
+
+**Determinism scope (load-bearing).** The **deterministic-correction set** (`auto`-row regenerated
+pages + `llms.txt`) is a pure function of source-of-truth at the base ref: re-running over an
+unchanged repo yields the **byte-identical** correction set, so a re-run with no new drift commits
+nothing and opens no PR. `audit` makes **no** determinism claim about the reference-integrity flags'
+phrasing or completeness (deterministic _inputs_, human-facing prose _findings_), and **no** claim of
+detecting semantic narrative drift at all. State only the determinism that holds (the NA-53/54
+lesson).
+
+## 24. Audit mode — branch / PR / control flow + no-op semantics
+
+> **Adopts the release/seed model, not §7's sync reset.** `audit`'s corrections are fully derived,
+> but — like `release`/`seed` — the control-flow tail drives `/loop /sdlc:loop` against the PR, so
+> the branch carries review-fix commits. `reset --hard` and force-push are **prohibited** on audit
+> paths.
+
+| Item                      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch                    | `docs/audit-<YYYY-MM-DD>`, cut from `origin/<BASE-BRANCH>` head — mirrors `commands/adr.md`'s `docs/adr-distill-<YYYY-MM-DD>` dated-branch convention for a periodic scan (a same-day re-run open-or-updates the same branch/PR). The date forms the **branch name only** — it never feeds a written byte, so it does not compromise the determinism claim (§23).                                                                                                          |
+| Commit / PR title         | `docs(docs): audit <YYYY-MM-DD>` (via `conventional-commit`), carrying the trailer `Audit-Generated: <YYYY-MM-DD>` — **load-bearing**, keyed on by both re-run guards.                                                                                                                                                                                                                                                                                                     |
+| PR base                   | `<BASE-BRANCH>` from project-context (never assume `main`).                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Local-branch precondition | Adopted from §13/§18: a **local** `docs/audit-<DATE>` holding unpushed commits → **STOP**; never `checkout -B` over it.                                                                                                                                                                                                                                                                                                                                                    |
+| Re-run behaviour          | Open-or-update; the branch's commits are never rewritten. If it exists on `origin` → `git fetch`, run both guards, check out at its remote head (`git checkout -B docs/audit-<DATE> origin/docs/audit-<DATE>`), write the fresh corrections on top, plain fast-forward `git push`.                                                                                                                                                                                         |
+| Re-run history guard      | No re-run may reset onto regenerated state, force-push, or discard any commit reachable from `origin/docs/audit-<DATE>`.                                                                                                                                                                                                                                                                                                                                                   |
+| Re-run content guard      | Find commits on the branch (relative to `origin/<BASE-BRANCH>`) that touch **any path this run writes** and **lack the `Audit-Generated:` trailer** → **STOP** and quote the paths + PR number. **The scanned path set is every path this run writes** — the corrected `auto`-row pages **plus** `llms.txt` — never a narrower set.                                                                                                                                        |
+| Write + PR only on change | Commit and open-or-update the PR **only if `git status --porcelain` on the written paths is non-empty**; otherwise no commit, no PR, report clean (AC2).                                                                                                                                                                                                                                                                                                                   |
+| Control-flow tail         | After a PR is raised, drive `/loop /sdlc:loop <PR_URL>` (fallback `ScheduleWakeup`), exactly as the three siblings. If the run ended **before** any PR — manifest-absent silent no-op, a clean scan, a reference-integrity-flags-only scan, a usage STOP, or a precondition/guard STOP — release directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh`. Only the manifest-absent path is silent. **`--dry-run` always ends before a PR** and releases this way. |
+
+### No-op / report-only semantics
+
+- **Manifest absent** → **silent** no-op: no scan, no dispatch, no PR, no error, **no stdout**, exit
+  0 (AC5) — for **both** `audit` and `audit --dry-run`. The base-ref pre-check
+  ([§1's gate](#manifest-gate-shared-by-sync-release-seed-and-audit)) runs **first**, so a
+  `git fetch` / unresolvable-`origin/<BASE-BRANCH>` failure is a **STOP**, never mistaken for absence.
+- **Manifest present, no row activated** → clean scan, report `no activated doc types to audit`, no
+  PR. **Informational, not silent** (the manifest exists).
+- **default, ≥1 deterministic correction** → write the regenerated `auto` pages, embed the full
+  findings report (corrections **and** reference-integrity flags) in the PR body, open-or-update the
+  PR (AC2).
+- **default, drift is ONLY reference-integrity flags** (no deterministic correction to commit) →
+  report the flags to stdout, open **no** PR — there is nothing mechanical to commit and fabricating
+  a narrative fix is forbidden. **(OQ, §Open-Questions in the spec: stdout report, no PR, for v1.)**
+- **default, no drift of either tier** → report clean, open nothing (AC2).
+
+### OQ carry-over — `audit` checks for frontmatter the templates do not emit
+
+The `writing-docs` templates emit no `description:` frontmatter (three of four emit no frontmatter
+block). This is in `audit`'s path twice: (1) the `llms.txt` regen (§21) — handled by §19's
+**skip-and-surface**, never a STOP; (2) a hypothetical narrative frontmatter-presence flag — **v1
+does NOT add one**, because it would flag nearly every existing narrative page (a template-source
+defect, not per-page drift). A follow-up story (NA-61) adds `description:` (and an ADR-reference key)
+to the templates at source; `audit` adopts skip-and-surface and does not teach itself to flag a gap
+the templates guarantee.
