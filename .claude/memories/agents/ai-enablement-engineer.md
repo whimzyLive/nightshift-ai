@@ -1,5 +1,50 @@
 # ai-enablement-engineer — memory
 
+## NA-54 — `/sdlc:docs seed` mode implementation (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/agents/knowledge-engineer.md`)
+
+- **A plan's own literal verification grep can fail to match the plan's own verbatim template
+  text, with no line-wrap involved at all** — a genuinely new variant of the "grep trap" family.
+  NA-54's Task 3 Step 8 asserted `grep -c "docs-pipeline.md\` \*\*§§15–19\*\*"`, expecting the
+behavioural-contract section's pointer sentence to have those two tokens adjacent. But the same
+plan's own Step 5 dictated the sentence verbatim as "...lives in
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md`§2, and the seed-specific procedure — ... — is
+defined once in that ref's **§§15–19**." — a full independent clause sits between the two tokens,
+so the assertion cannot pass no matter how faithfully the template text is transcribed. Confirmed
+by grepping the finished file for`§§15` alone: exactly one hit, at the correct location, just not
+  in the shape the assertion demanded. When a plan's own dictated prose and its own verification grep
+  disagree like this, trust the dictated prose (it's the spec-derived content) and flag the grep as
+  wrong, rather than rewriting mandated verbatim text to chase a miswritten check.
+- **When a plan adds an Nth branch to an agent file that already enumerates "N-1 of something" in
+  more than one place, the plan may name only the most prominent occurrence for you to fix, and miss
+  siblings.** NA-54's plan explicitly called out "All three dispatch types" → "All four" in the
+  Required-skills preamble, but the same file separately said "You run one of three pipelines" (the
+  `## Pipeline` intro bullet list) and "in any of the three [pipelines]" (the phase-boundary note
+  after the release Phase-1/2 summary) — neither named by the plan, both genuinely stale once a
+  fourth dispatch branch existed, and both the exact "NA-53 shipped 'seed'/'audit'/'distill' stale in
+  three places, plan named two" defect shape from this file's own NA-52 entry above. Fixed both for
+  consistency and noted the deviation from the plan's literal step list in the PR return — grep the
+  whole file for the literal word "three" (or whatever cardinal the pre-change state used) before
+  considering an Nth-branch addition complete, don't rely on the plan enumerating every site.
+- **`plugins/sdlc/.claude-plugin/plugin.json`'s "every commit shipping new content bumps the
+  version" convention (established in the NA-58 memory entry below) was silently NOT followed by
+  NA-53** (`git show <every NA-53 commit> --stat | grep plugin.json` → no hits across all of NA-53's
+  commits, despite NA-53 shipping a full new release-mode dispatch branch) — confirmed via
+  `git log -p --follow -- plugins/sdlc/.claude-plugin/plugin.json`, which shows the version frozen at
+  `0.36.0` since NA-52's last commit. Neither NA-54's plan nor spec calls for a version bump either.
+  Followed the more recent precedent (no bump) rather than resurrecting the older NA-58-era
+  convention unprompted, since bumping unilaterally when two sibling stories in the same epic didn't
+  would itself be an inconsistency — but this is worth a founder decision (resume the convention, or
+  formally drop it) rather than silently letting future agents guess which precedent wins.
+- The `tr '\n' ' ' | tr -s ' '` (flatten-and-squeeze) idiom the plan mandated for every prose-spanning
+  verification grep held up in practice across all of Tasks 2/4/5 — every squeezed assertion matched
+  on the first attempt; the plain `tr '\n' ' '` trap the plan warned about (indented continuation
+  lines flattening to a double space) was never hit because the squeeze was applied unconditionally
+  from the start, per the plan's own "do not add a multi-word grep over prose without both" rule.
+- Confirmed `pnpm nx affected -t test --base=remotes/origin/develop` reports "No tasks were run" for
+  a plugin-authoring-only change under `plugins/sdlc/**` (no Nx project owns that path) — this is the
+  expected, correct result for a docs/instructions-only story, not a sign the gate didn't run; don't
+  mistake a clean "no tasks" affected-scoped result for a skipped quality gate.
+
 ## NA-52 — PR #115 review round 3, 10 accepted findings (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/refs/doc-types.md`, `plugins/sdlc/commands/docs.md`, `plugins/sdlc/agents/knowledge-engineer.md`, `docs/superpowers/plans/NA-52.md`)
 
 - **A load/list asymmetry (skill loaded unconditionally but the `Skills loaded:` return contract
