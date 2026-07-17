@@ -54,23 +54,23 @@ API-reference row gated on `framework:Hono`) slots in without a schema change.
 
 ## Rows
 
-| type                | quadrant    | trigger        | source-of-truth                                   | generation-mode  | target-path                | public | applies-when |
-| ------------------- | ----------- | -------------- | ------------------------------------------------- | ---------------- | -------------------------- | ------ | ------------ |
-| `command-reference` | reference   | `sync`         | command frontmatter + body                        | auto             | `docs/reference/commands/` | yes    | always       |
-| `agent-reference`   | reference   | `sync`         | agent definition frontmatter + body               | auto             | `docs/reference/agents/`   | yes    | always       |
-| `skill-reference`   | reference   | `sync`         | skill `SKILL.md` frontmatter                      | auto             | `docs/reference/skills/`   | yes    | always       |
-| `config-reference`  | reference   | `sync`         | `project-context.md` + config templates           | auto             | `docs/reference/config/`   | yes    | always       |
-| `hooks-contract`    | reference   | `sync`         | `settings.json` hooks schema + hook scripts       | auto             | `docs/reference/hooks/`    | yes    | always       |
-| `error-reference`   | reference   | `sync`         | Error Handling tables across commands/agents/refs | auto             | `docs/reference/errors/`   | yes    | always       |
-| `llms-txt`          | meta        | `sync`         | aggregated command/agent/skill frontmatter        | auto             | `llms.txt`                 | yes    | always       |
-| `changelog`         | reference   | `release`      | merged stories since last tag                     | draft-for-review | `docs/changelog/`          | yes    | always       |
-| `release-notes`     | explanation | `release`      | merged stories since last tag                     | draft-for-review | `docs/release-notes/`      | yes    | always       |
-| `migration-guide`   | how-to      | `release`      | merged stories since last tag                     | draft-for-review | `docs/migration-guides/`   | yes    | always       |
-| `tutorial`          | tutorial    | `seed`         | founder-authored                                  | manual-only      | `docs/tutorials/`          | yes    | always       |
-| `how-to`            | how-to      | `seed,sync`    | founder-authored draft + learnings corpus         | draft-for-review | `docs/how-to/`             | yes    | always       |
-| `integration-guide` | how-to      | `seed`         | founder-authored draft + learnings corpus         | draft-for-review | `docs/integrations/`       | yes    | always       |
-| `concept`           | explanation | `seed`         | learnings corpus                                  | draft-for-review | `docs/concepts/`           | yes    | always       |
-| `adr`               | meta        | `seed,distill` | accepted ADRs                                     | draft-for-review | `docs/adr/`                | no     | always       |
+| type                | quadrant    | trigger        | source-of-truth                                         | generation-mode  | target-path                | public | applies-when |
+| ------------------- | ----------- | -------------- | ------------------------------------------------------- | ---------------- | -------------------------- | ------ | ------------ |
+| `command-reference` | reference   | `sync`         | command frontmatter + body                              | auto             | `docs/reference/commands/` | yes    | always       |
+| `agent-reference`   | reference   | `sync`         | agent definition frontmatter + body                     | auto             | `docs/reference/agents/`   | yes    | always       |
+| `skill-reference`   | reference   | `sync`         | skill `SKILL.md` frontmatter                            | auto             | `docs/reference/skills/`   | yes    | always       |
+| `config-reference`  | reference   | `sync`         | `project-context.md` + config templates                 | auto             | `docs/reference/config/`   | yes    | always       |
+| `hooks-contract`    | reference   | `sync`         | `settings.json` hooks schema + hook scripts             | auto             | `docs/reference/hooks/`    | yes    | always       |
+| `error-reference`   | reference   | `sync`         | Error Handling tables across commands/agents/refs       | auto             | `docs/reference/errors/`   | yes    | always       |
+| `llms-txt`          | meta        | `sync`         | generated pages of all enabled public:yes manifest rows | auto             | `llms.txt`                 | yes    | always       |
+| `changelog`         | reference   | `release`      | merged stories since last tag                           | draft-for-review | `docs/changelog/`          | yes    | always       |
+| `release-notes`     | explanation | `release`      | merged stories since last tag                           | draft-for-review | `docs/release-notes/`      | yes    | always       |
+| `migration-guide`   | how-to      | `release`      | merged stories since last tag                           | draft-for-review | `docs/migration-guides/`   | yes    | always       |
+| `tutorial`          | tutorial    | `seed`         | founder-authored                                        | manual-only      | `docs/tutorials/`          | yes    | always       |
+| `how-to`            | how-to      | `seed,sync`    | founder-authored draft + learnings corpus               | draft-for-review | `docs/how-to/`             | yes    | always       |
+| `integration-guide` | how-to      | `seed`         | founder-authored draft + learnings corpus               | draft-for-review | `docs/integrations/`       | yes    | always       |
+| `concept`           | explanation | `seed`         | learnings corpus                                        | draft-for-review | `docs/concepts/`           | yes    | always       |
+| `adr`               | meta        | `seed,distill` | accepted ADRs                                           | draft-for-review | `docs/adr/`                | no     | always       |
 
 ## Registry self-check
 
