@@ -1,41 +1,35 @@
 ---
-description: Generate and maintain this repo's public docs surface via the doc-type registry and the per-repo docs manifest. Ships four live modes — `sync` diff-drives deterministic regeneration of frontmatter-driven reference docs + `llms.txt` and drafts gated how-to refreshes; `release <version>` aggregates every story merged since the last tag into the manifest-enabled subset of changelog, ADR-linked release notes, and a migration-guide stub; `seed <type> [topic]` scaffolds one new page of a manifest-activated narrative type (concept/tutorial/integration-guide/how-to) for the founder to author at the confirm gate; `audit [--dry-run]` scans every activated row for drift, corrects `auto` rows into a PR, and flags narrative drift (read-only under `--dry-run`). All four deterministically regenerate the doc index + `llms.txt` and run behind the knowledge-engineer agent (refs/docs-pipeline.md), with the founder-confirmation gate at this command layer. `distill` is a not-yet-implemented stub (see Epic NA-50).
+description: Generate and maintain this repo's public docs surface via the doc-type registry and per-repo docs manifest. Ships five live modes — `sync` diff-drives deterministic reference-doc + `llms.txt` regen and drafts gated how-to refreshes; `release <version>` aggregates merged stories since the last tag into changelog/release-notes/migration-guide; `seed <type> [topic]` scaffolds one new narrative page for founder authoring at the confirm gate (`seed adr "<pattern>"` routes to the ADR pipeline instead); `audit [--dry-run]` scans activated rows for drift, auto-corrects via PR, flags narrative drift; `distill ["<focus>"]` mines the learnings corpus for promotable ADR candidates via refs/adr-pipeline.md. All modes regenerate the doc index + `llms.txt` where applicable, run behind the knowledge-engineer agent, with the founder-confirmation gate at this command layer.
 ---
 
 ## Modes (dispatched from `$ARGUMENTS`)
 
-| Invocation                       | Mode        | v1 status                                                       |
-| -------------------------------- | ----------- | --------------------------------------------------------------- |
-| `/sdlc:docs sync <STORY-KEY>`    | **sync**    | Shipped (NA-52)                                                 |
-| `/sdlc:docs release <version>`   | **release** | Shipped (NA-53)                                                 |
-| `/sdlc:docs seed <type> [topic]` | **seed**    | **Shipped (NA-54)** — except `seed adr`, which routes to NA-57  |
-| `/sdlc:docs audit [--dry-run]`   | **audit**   | **Shipped (NA-55)**                                             |
-| `/sdlc:docs distill`             | distill     | Not yet implemented (see Epic NA-50) — clean stub, not an error |
+| Invocation                       | Mode        | v1 status           |
+| -------------------------------- | ----------- | ------------------- |
+| `/sdlc:docs sync <STORY-KEY>`    | **sync**    | Shipped (NA-52)     |
+| `/sdlc:docs release <version>`   | **release** | Shipped (NA-53)     |
+| `/sdlc:docs seed <type> [topic]` | **seed**    | **Shipped (NA-54)** |
+| `/sdlc:docs audit [--dry-run]`   | **audit**   | **Shipped (NA-55)** |
+| `/sdlc:docs distill ["<focus>"]` | **distill** | **Shipped (NA-57)** |
 
 ## Argument validation
 
 Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args. Apply, in order:
 
 1. **Empty `$ARGUMENTS`** → STOP with the usage message:
-   `usage: /sdlc:docs sync <STORY-KEY> | release <version> | seed <type> [topic] | audit [--dry-run]  (distill lands in a later story)`.
+   `usage: /sdlc:docs sync <STORY-KEY> | release <version> | seed <type> [topic] | audit [--dry-run] | distill ["<focus>"]`.
 2. **Unrecognised first token** (not one of `sync`/`release`/`seed`/`audit`/`distill`) → STOP with
    the same usage message.
-3. **Recognised future-mode token** (`distill`) → print
-   `mode "<mode>" is not yet implemented (see Epic NA-50)` and exit cleanly. Not an error, not a
-   STOP — a deliberate stub so the surface is stable before the modes land. **`release` is not in
-   this set** — it routes to the release contract below. **`seed` is not in this set** — it routes
-   to the seed contract below. **`audit` is not in this set** — it routes to the audit contract
-   below.
-4. **`sync` with a missing or malformed story key** — the story key must match
+3. **`sync` with a missing or malformed story key** — the story key must match
    `^[A-Z][A-Z0-9]*-[0-9]+$` (e.g. `NA-52`). If the key is absent or fails the regex → STOP with the
    usage message. This is a **usage STOP** (a caller error), distinct from the manifest-absent
    silent no-op below.
-5. **`release` with a missing or empty `<version>`** → STOP with the usage message. A **usage STOP**,
+4. **`release` with a missing or empty `<version>`** → STOP with the usage message. A **usage STOP**,
    distinct from the manifest-absent silent no-op and the no-stories-merged clean no-op.
-6. **`release` `<version>` — hard-validate, then normalise.** `<version>` is **not** free text: it
+5. **`release` `<version>` — hard-validate, then normalise.** `<version>` is **not** free text: it
    becomes a git branch name (`docs/release-<VERSION>`), page ids (`docs/release-notes/<VERSION>.md`,
    `docs/migration-guides/<VERSION>.md`), and the `## <VERSION>` changelog heading the upsert keys
-   on. It is validated exactly as step 4 hard-validates `sync`'s story key **because** it forms a
+   on. It is validated exactly as step 3 hard-validates `sync`'s story key **because** it forms a
    branch/ref — same discipline, different regex:
 
    ```text
@@ -121,21 +115,20 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    - Beyond token safety, `<VERSION>` is **not** hard-validated against semver — a date-based label
      (e.g. `2026.07.1`) passes.
 
-7. **`seed` with a missing `<type>`** → STOP with the usage message **plus** the valid type list. A
+6. **`seed` with a missing `<type>`** → STOP with the usage message **plus** the valid type list. A
    **usage STOP** (caller error), distinct from the manifest-absent silent no-op below.
-8. **`seed` `<type>` = `adr`** → print the clean stub and exit 0. **Not an error, not a STOP** —
-   `adr` is a legitimate registry row carrying `seed` in its trigger, and NA-57 implements it against
-   the retained `refs/adr-pipeline.md`:
-
-   ```text
-   seed type "adr" is not yet implemented (see NA-57) — use /sdlc:adr until it lands
-   ```
-
-   The pointer to the still-live `/sdlc:adr` is load-bearing: **NA-57 removes that command and must
-   also delete this stub.** `adr` never enters `SEED_TYPES`, so it cannot reach a gate or a write
-   path.
-
-9. **`seed` `<type>` not in `SEED_TYPES` ∪ `{adr}`** → usage STOP naming what was passed and
+7. **`seed` `<type>` = `adr`** — the **special ADR route** (branches before the generic seed gates;
+   `adr` never enters `SEED_TYPES`). **Empty-pattern STOP (relocated command-layer guard):** if the
+   pattern text after `adr` is empty (`/sdlc:docs seed adr` or `/sdlc:docs seed adr ""`) → **STOP**
+   with a usage message (`usage: /sdlc:docs seed adr "<pattern>"`), **before** dispatching Phase 1 —
+   never draft an ADR from empty input. This guards `seed adr`'s pattern only. Otherwise dispatch
+   the **ADR pipeline (seed)** at `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` with an explicit
+   **ADR dispatch-type signal** (there is no longer a command name to infer it from): **no**
+   manifest gate, **no** type-activation gate — the `docs/adr/` target resolves from
+   `project-context.md` exactly as the retained pipeline does. The two-phase split, the
+   founder-confirm gate at this command layer, and the `docs(adr):` branch/PR naming are handed to
+   the agent per `refs/adr-pipeline.md`'s §3a command-layer-flow section, not restated here.
+8. **`seed` `<type>` not in `SEED_TYPES` ∪ `{adr}`** → usage STOP naming what was passed and
    enumerating the valid set:
 
    ```text
@@ -153,15 +146,15 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    placeholder resolves to `concept, tutorial, integration-guide, how-to` (shown for the reader's
    convenience only; never copy this list back into the template above).
 
-10. **`seed` `<topic>`, when supplied, is validated and normalised here — at the ladder, before any
-    gate.** The slugify rule and its **three** reachable STOPs (empty / >80 chars / reserved page id)
-    are defined once in `refs/docs-pipeline.md` §15 and are **not** restated here. This placement is
-    the direct lesson from NA-53, where a version token that forms a branch name reached the gate
-    unvalidated. **`<topic>` omitted is NOT an error** (the signature is `[topic]`) — the command
-    prompts for it, but **after** the manifest and type-activation gates, so a repo with nothing to
-    do is never prompted first. **A prompted topic runs the identical ladder** (§15): validation the
-    primary input path never reaches is not validation.
-11. **`audit` flag recognition — the entire `audit` validation surface.** `audit` takes no free-text
+9. **`seed` `<topic>`, when supplied, is validated and normalised here — at the ladder, before any
+   gate.** The slugify rule and its **three** reachable STOPs (empty / >80 chars / reserved page id)
+   are defined once in `refs/docs-pipeline.md` §15 and are **not** restated here. This placement is
+   the direct lesson from NA-53, where a version token that forms a branch name reached the gate
+   unvalidated. **`<topic>` omitted is NOT an error** (the signature is `[topic]`) — the command
+   prompts for it, but **after** the manifest and type-activation gates, so a repo with nothing to
+   do is never prompted first. **A prompted topic runs the identical ladder** (§15): validation the
+   primary input path never reaches is not validation.
+10. **`audit` flag recognition — the entire `audit` validation surface.** `audit` takes no free-text
     argument (nothing forming a branch, path, or ref), so NA-53's `<version>` ladder and NA-54's
     `<topic>` slug ladder have **no analogue here** — do not import one.
     1. **`audit` with no further tokens** → default (PR) mode. Not an error.
@@ -239,7 +232,8 @@ dispatched at all.
    - Present the deterministic regen summary (informational — auto rows are not gated; they were
      already computed, not yet written) and each narrative how-to draft (gated). Wait for explicit
      founder confirmation on the narrative drafts — identical discipline to `/sdlc:analyze`'s apply
-     gate and `commands/adr.md`'s founder-confirmation gate: no inline auto-apply path.
+     gate and the `seed adr`/`distill` routes' founder-confirmation gate below: no inline auto-apply
+     path.
    - The founder may accept, edit, or reject each narrative draft.
    - **The gate is skipped when there are zero narrative drafts** — proceed straight to phase 2
      with the deterministic content only.
@@ -445,6 +439,24 @@ manifest gate, the flag ladder above, the single dispatch, and the report/PR sur
 Branch/PR mechanics (`docs/audit-<YYYY-MM-DD>`, the `Audit-Generated:` trailer, both re-run guards,
 reset/force-push prohibition, the control-flow tail) live in §24 — not restated here.
 
+## `distill ["<focus>"]` — special ADR route
+
+`distill` is, like `seed adr`, a special route to `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` — not
+a generic docs mode. It takes an **optional positional focus** after the `distill` mode token
+(`/sdlc:docs distill ["<focus>"]`); everything after the mode token is the focus text, identical to
+the old `--distill "<focus>"` semantics. **Empty focus means "whole corpus" — not an error**; the
+`seed adr` empty-pattern STOP does **not** apply here. There is no `--distill` flag form.
+
+Dispatch the **ADR pipeline (distill)** with an explicit **ADR dispatch-type signal** — **no**
+manifest gate. Runs the two-phase dispatch defined in `refs/adr-pipeline.md`: Phase 1 mines the
+learnings corpus and returns candidate ADR(s), proposed `agents:` tags, and the per-candidate
+deletion list; the founder-confirmation gate at this command layer presents them (drafts and
+deletions together — nothing is deleted the founder did not see and approve); Phase 2 writes
+confirmed ADRs (`status: accepted`), deletes founder-approved learnings in the same PR, and
+regenerates `docs/adr/index.md`. The two-phase split, the gate flow, and the `docs(adr):` branch/PR
+naming are handed to the agent per `refs/adr-pipeline.md`'s §3a command-layer-flow section, not
+restated here.
+
 ## Release branch/PR naming
 
 - Branch `docs/release-<VERSION>`; PR title `docs(docs): release <VERSION>`. Cut from the **base
@@ -473,7 +485,7 @@ Auto (deterministic) rows are written **un-gated** — they are computed in phas
 phase 2 without a confirmation step, because they are fully derived and idempotent. Narrative
 (how-to) drafts are written **only after explicit founder confirmation** at this command layer. A
 dispatched subagent never runs the gate itself (it cannot pause for interactive input) — this
-command owns it, exactly as `commands/adr.md` does for the ADR pipeline.
+command owns it, exactly as it owns the gate for the `seed adr` and `distill` routes above.
 
 ## Branch/PR naming
 
@@ -495,7 +507,8 @@ cell in `refs/doc-types.md` — see that cell rather than this restating it. Reg
 
 ## Command control flow
 
-After the phase-2 PR is raised, drive the review loop to convergence exactly as `/sdlc:adr` does:
+After the phase-2 PR is raised, drive the review loop to convergence exactly as the ADR pipeline's
+command-layer flow does:
 
 ```bash
 /loop /sdlc:loop <PR_URL>
@@ -519,7 +532,6 @@ or `seed`'s no-op/STOP set).
 | `.claude/project/docs-manifest.md` absent                                                                       | **Silent** no-op — no branch, no dispatch, no PR, no error, **no stdout** (AC5). Distinct from a usage STOP, which prints.                                                                                                                                                                                                    |
 | Empty `$ARGUMENTS` / unrecognised first token                                                                   | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
 | `sync` with missing/malformed story key (fails `^[A-Z][A-Z0-9]*-[0-9]+$`)                                       | Usage STOP (prints the usage message).                                                                                                                                                                                                                                                                                        |
-| Recognised future-mode token (`distill` only, after the strike)                                                 | Print "mode not yet implemented (see Epic NA-50)" and exit cleanly — not an error. **`audit` is no longer in this set.**                                                                                                                                                                                                      |
 | `sync`, no `origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>`, merged commit **found** on base               | Select the **merged-commit** diff source (§26) — diff `<sha>^..<sha>` (union across matches) and regenerate.                                                                                                                                                                                                                  |
 | `sync`, no story branch, **zero** commits carry `<STORY-KEY>` on base                                           | **STOP** — `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`. Never a silent no-op.                                                                                                                                                                                                   |
 | `sync`, no story branch, `git fetch` fails / `origin/<BASE-BRANCH>` unresolvable                                | **STOP** (shared with §1's base-ref pre-check) — never a fallthrough to "no diff".                                                                                                                                                                                                                                            |
@@ -554,7 +566,9 @@ or `seed`'s no-op/STOP set).
 | Re-run: `## <VERSION>` already present in the cumulative changelog                                              | Not an error — the section is **replaced in place** (upsert), never prepended a second time.                                                                                                                                                                                                                                  |
 | Founder rejects every enabled draft and deterministic regen is byte-identical                                   | No commit, no PR — write phase detected an empty `git status --porcelain`.                                                                                                                                                                                                                                                    |
 | `seed` with a missing `<type>`                                                                                  | Usage STOP — usage message **plus** the valid type list.                                                                                                                                                                                                                                                                      |
-| `seed adr [pattern]`                                                                                            | Clean stub — print `seed type "adr" is not yet implemented (see NA-57) — use /sdlc:adr until it lands`, exit 0. **Not an error, not a STOP.** `adr` never enters `SEED_TYPES`, so it cannot reach a gate or a write path.                                                                                                     |
+| `/sdlc:docs seed adr` / `seed adr ""` — empty pattern                                                           | **STOP** at the `seed adr` route with a usage message, before dispatching Phase 1. Never draft an ADR from empty input. Distinct from a no-op.                                                                                                                                                                                |
+| `/sdlc:docs seed adr "<pattern>"`                                                                               | Dispatch the ADR pipeline (seed) — **no** manifest gate, **no** type-activation gate. Draft → founder-confirm → write `docs/adr/NNNN-slug.md` (`status: accepted`) + regen index.                                                                                                                                             |
+| First-ever ADR — `docs/adr/` does not exist                                                                     | `adr-pipeline.md`'s numbering step creates `docs/adr/` and bases `NNNN` at `0001`. Never a write into a missing dir or undefined numbering.                                                                                                                                                                                   |
 | `seed` with an unknown `<type>`                                                                                 | Usage STOP naming the passed type and enumerating the **resolved** `SEED_TYPES` (rendered, never a hardcoded literal).                                                                                                                                                                                                        |
 | `<topic>` slugs to empty (`...`, `@{`, `日本語`, `☕`)                                                          | Usage STOP — `must contain at least one ASCII letter or digit`. Says **ASCII** deliberately: a non-ASCII topic _is_ letters, and a message claiming otherwise would misdescribe the input.                                                                                                                                    |
 | `<topic>` slugs to more than 80 characters                                                                      | Usage STOP naming the derived length. **Never truncated** — truncation would collide two distinct topics onto one branch/page and silently overwrite one.                                                                                                                                                                     |
@@ -585,6 +599,9 @@ or `seed`'s no-op/STOP set).
 | default, no drift of either tier (audit)                                                                        | Report clean; open nothing (AC2).                                                                                                                                                                                                                                                                                             |
 | A narrative page diverges from an ADR it references                                                             | **Flagged** as "the doc diverges from the ADR" (AC4) — ADR is source of truth, direction fixed, **never** written into `docs/adr/`.                                                                                                                                                                                           |
 | Re-run: audit branch carries out-of-pipeline edits (no `Audit-Generated:` trailer)                              | **STOP** (re-run content guard) — surface the paths + PR number; never overwritten.                                                                                                                                                                                                                                           |
+| `distill`, claude-mem tools **absent**                                                                          | **HALT** — `claude-mem tools unavailable — /sdlc:docs distill requires the claude-mem plugin; install it or use seed adr`. **Not** softened to `seed`'s "continue without corpus" path.                                                                                                                                       |
+| `distill`, claude-mem tools present but **DB empty**                                                            | Non-fatal — continue on repo-native citations; note the empty DB. Distinct from the tools-absent halt.                                                                                                                                                                                                                        |
+| `distill`, **no promotable candidates**                                                                         | Clean no-op (AC6) — report "no candidates met the promotion criteria", open **no** PR, exit cleanly. Distinct from the tools-absent halt and from a git/`gh` STOP.                                                                                                                                                            |
 
 Mode + args:
 $ARGUMENTS
