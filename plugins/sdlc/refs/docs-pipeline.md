@@ -626,8 +626,8 @@ relative link` derived from page frontmatter (§12 specifies the frontmatter rel
 ### `SEED_TYPES` — registry-derived, never hardcoded
 
 `SEED_TYPES` resolves **at read time** from `refs/doc-types.md`: every row whose `trigger` cell
-contains the `seed` token, **minus `adr`** (deferred to NA-57). Today that resolves to `concept`,
-`tutorial`, `integration-guide`, and `how-to`.
+contains the `seed` token, **minus `adr`** (routed to `refs/adr-pipeline.md`, not the generic seed
+machinery). Today that resolves to `concept`, `tutorial`, `integration-guide`, and `how-to`.
 
 **Why derived and not a literal list in `docs.md`.** `refs/doc-types.md` is the stated single source
 of truth for `trigger` (`docs-manifest-template.md`: consumers "derive all four from
@@ -640,16 +640,9 @@ the list as a literal, or it becomes the copy this rule exists to avoid.
 `SEED_TYPES` from a partial registry, and never fall back to a hardcoded list.
 
 **`adr` is excluded from `SEED_TYPES` rather than admitted-then-rejected downstream**, so no `adr`
-run can reach the manifest gate, the branch, or the write path. `seed adr` is a **clean stub**, not
-a usage error — `adr` is a legitimate registry row carrying `seed`, and NA-57 implements it against
-the retained `refs/adr-pipeline.md`:
-
-```text
-seed type "adr" is not yet implemented (see NA-57) — use /sdlc:adr until it lands
-```
-
-Printed, exit 0. The pointer to the still-live `/sdlc:adr` is load-bearing: **NA-57 removes that
-command, and NA-57 is the story that must also delete this stub.**
+run can reach the manifest gate, the branch, or the write path. `seed adr` is a **special route**
+to `refs/adr-pipeline.md` (`commands/docs.md` step 7), not a generic `SEED_TYPES` member — an ADR
+is a numbered `docs/adr/NNNN-slug.md` file, not a single narrative page.
 
 ### Topic validation + slug normalisation
 
@@ -1118,8 +1111,8 @@ apply):
   from the other side. **Both rules are required; neither is redundant.**
 
 - **All four seed types are `public: yes`** in the registry, so a seeded page always belongs in
-  `llms.txt` when that row is enabled. (`adr` is the registry's only `public: no` row — out of scope
-  here, routed to NA-57.)
+  `llms.txt` when that row is enabled. (`adr` is the registry's only `public: no` row — handled by
+  the special `seed adr` route to `refs/adr-pipeline.md`, not the generic seed machinery.)
 
 ### No-op / change-gate semantics
 
@@ -1338,7 +1331,7 @@ reason it exists:
    runs the same push / primary-checkout guard as playbook Step 5. _Reason:_ matches the
    `domain-agent-handoff.md` "agent commits, orchestrator pushes" contract every in-playbook
    dispatch obeys — the agent's self-raise-PR behaviour applies only to **standalone**
-   `/sdlc:docs`/`/sdlc:adr`.
+   `/sdlc:docs`.
 4. **Raises no PR.** Step 7 folds the docs commit into the impl PR. _Reason:_ AC2.
 
 **Diff source handed in, not resolved here.** The playbook passes the **story-branch-vs-base** source

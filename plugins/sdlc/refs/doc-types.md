@@ -7,11 +7,11 @@ file directly — they activate rows via their own `.claude/project/docs-manifes
 by `/sdlc:init` from `refs/docs-manifest-template.md`.
 
 `/sdlc:docs` reads this registry for every row whose `trigger` names a live mode (see
-`refs/docs-pipeline.md`). `sync` (NA-52), `release` (NA-53), `seed` (NA-54), and `audit` (NA-55)
-are **live**; `seed` derives its valid type set from the `trigger` cells below at read time, and
+`refs/docs-pipeline.md`). All five `/sdlc:docs` modes (`sync`/`release`/`seed`/`audit`/`distill`)
+are now live; `seed` derives its valid type set from the `trigger` cells below at read time, and
 `audit` partitions **every** activated row into its two drift tiers by `generation-mode` — so this
-table, not the command, keys both. `audit` reads this registry read-only and touches no row. Only
-`distill` (NA-57) remains specified-but-not-yet-built (see Epic NA-50).
+table, not the command, keys both. `audit` reads this registry read-only and touches no row.
+`seed adr` and `distill` route to `refs/adr-pipeline.md` instead of the generic docs machinery.
 
 Mirrors the documentary style of `refs/skills-map.yml` (a flat table registry). Do **not**
 abstract a shared registry format between the two files — copy the shape, do not generalize.
