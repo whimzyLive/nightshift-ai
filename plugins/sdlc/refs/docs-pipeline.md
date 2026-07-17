@@ -334,11 +334,15 @@ union across records. Each key retains the `(subject, body)` of the record(s) th
    secondary project keys whose commits should also be recognised (e.g. a repo migrated from an old
    Jira project key to a new one still carries old-key references in its history that must not be
    silently dropped from the changelog). When parsing the "Additional Jira project keys" section
-   body, **ignore HTML-comment spans and whitespace** — a section whose only non-whitespace content
-   is a comment (e.g. a founder commented out their keys) resolves to the **empty** additional-keys
-   set (falling back to the primary key alone). Defensive, not load-bearing: since `/sdlc:init`
-   never writes a stub or example into a consumer manifest, there is no example-parsing hazard to
-   guard against — only a founder's own hand-edits.
+   body, **ignore HTML-comment spans, whitespace, and any `<...>`-bracketed placeholder token** —
+   a section whose only non-whitespace content is a comment (e.g. a founder commented out their
+   keys) or an unfilled `<...>` placeholder resolves to the **empty** additional-keys set (falling
+   back to the primary key alone). The `<...>` skip is load-bearing, not merely defensive:
+   `refs/docs-manifest-template.md`'s own section prose shows the shape as
+   `<comma-separated list of legacy or secondary Jira project keys, e.g.: ET>` — a founder who
+   copies that line verbatim to see the format and forgets to replace it would otherwise feed the
+   bare `ET` to this resolver as a real key, silently scoping `release` to `ET-*`. Stripping any
+   `<...>` span before parsing closes that hole regardless of what example text the template shows.
 
 `PROJECT_KEYS` is the union of both. Build the regex as an alternation over the set, still anchored
 so it cannot degrade into the unscoped form:
@@ -381,16 +385,28 @@ already defines.
 **When `PROJECT_KEYS ≠ ∅`**, compute the following over the `(subject, body)` records already
 enumerated for `RANGE` (no second enumeration, no `gh`, no network):
 
-| Set                 | Definition                                                                                                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SHAPE_MATCHES`     | every **distinct** token matching the loose shape `\b[A-Z][A-Z0-9]*-[0-9]+\b` — the superset of what any emission mode could match                                     |
-| `IN_SCOPE`          | tokens whose **prefix** (the `[A-Z][A-Z0-9]*` head — the char class admits no `-`, so it is unambiguous) is a member of `PROJECT_KEYS`. Exactly what NA-53 emits here. |
-| `OUT_OF_SCOPE`      | `SHAPE_MATCHES − IN_SCOPE` — every shape-matched token emission **drops**. The warning fires **iff `OUT_OF_SCOPE ≠ ∅`**.                                               |
-| `LIKELY_KEYS`       | `OUT_OF_SCOPE − (prefix ∈ STANDARDS_TOKEN_DENYLIST)` — out-of-scope tokens **not** matching a known-standards prefix → **listed individually** in the warning          |
-| `STANDARDS_MATCHES` | `OUT_OF_SCOPE ∩ (prefix ∈ STANDARDS_TOKEN_DENYLIST)` — out-of-scope tokens matching a known-standards prefix → **summarized in one aggregated line, never dropped**    |
+| Set                 | Definition                                                                                                                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SHAPE_MATCHES`     | every **distinct** token matching the loose shape `\b[A-Z][A-Z0-9]*-[0-9]+\b` — the superset of what any emission mode could match                                                                          |
+| `IN_SCOPE`          | tokens whose **prefix** (the `[A-Z][A-Z0-9]*` head — the char class admits no `-`, so it is unambiguous) is a member of `PROJECT_KEYS`. Exactly what NA-53 emits here.                                      |
+| `OUT_OF_SCOPE`      | `SHAPE_MATCHES − IN_SCOPE` — every shape-matched token emission **drops**.                                                                                                                                  |
+| `LIKELY_KEYS`       | `OUT_OF_SCOPE − (prefix ∈ STANDARDS_TOKEN_DENYLIST)` — out-of-scope tokens **not** matching a known-standards prefix → **listed individually** in the warning. **The warning fires iff `LIKELY_KEYS ≠ ∅`.** |
+| `STANDARDS_MATCHES` | `OUT_OF_SCOPE ∩ (prefix ∈ STANDARDS_TOKEN_DENYLIST)` — out-of-scope tokens matching a known-standards prefix → **summarized in one aggregated line, never dropped**                                         |
 
 `IN_SCOPE` is subtracted **first**, so a configured key sharing a denylisted prefix is never
 mis-handled — it is removed as in-scope before the denylist is ever consulted.
+
+**The trigger is `LIKELY_KEYS ≠ ∅`, never `OUT_OF_SCOPE ≠ ∅` (State C, refined).** `OUT_OF_SCOPE`
+is a superset that also contains `STANDARDS_MATCHES`, and `STANDARDS_MATCHES` is a **demoted
+addendum shown only inside an already-firing warning — it is never, by itself, what fires the
+warning.** A range whose only out-of-scope tokens are standards-prefixed (e.g. commit bodies citing
+`RFC-2119`/`SHA-256`, zero genuine unrecognised keys) has `LIKELY_KEYS = ∅` even though
+`OUT_OF_SCOPE ≠ ∅` — that range takes the **clean** no-op (or the normal gate, no warning line), not
+the warning path. Gating on `OUT_OF_SCOPE ≠ ∅` instead would fire a warning with an **empty**
+individual-key list under an active header and a "register this as a Jira project" footer, driven
+entirely by standards noise — exactly the inversion AC4's demotion exists to prevent. Every part of
+the warning below — the header, the count, the individual list, the standards-demotion line, and the
+remediation footer — is gated as **one unit** on `LIKELY_KEYS ≠ ∅`; none of them renders on its own.
 
 **`STANDARDS_TOKEN_DENYLIST` (fixed plugin constant, prefix-level):** `{ UTF, SHA, AES, RFC, ISO }`,
 seeded from this repo's verified false-positives. It is a **display demotion, never a suppression**
@@ -403,8 +419,14 @@ _prominence_, never the _presence_, of the notice:
   (interpolated from `STANDARDS_MATCHES`), never fixed illustrative text:
 
 ```text
-(N token(s) matched common-standards prefixes (<distinct folded prefixes, e.g. RFC, SHA>) and were not listed individually — if any names a real Jira project, add its prefix as above.)
+(M token(s) matched common-standards prefixes (<distinct folded prefixes, e.g. RFC, SHA>) and were not listed individually — if any names a real Jira project, add its prefix as above.)
 ```
+
+`M` is `|STANDARDS_MATCHES|` — a distinct variable from the warning's own total-dropped count
+(`N` in `commands/docs.md`'s warning text, `= |LIKELY_KEYS| + |STANDARDS_MATCHES|`), never the same
+letter as the total. This line renders only when `STANDARDS_MATCHES ≠ ∅` **and** the warning is
+already firing (`LIKELY_KEYS ≠ ∅`) — it is an addendum inside a firing warning, never a trigger on
+its own.
 
 **Invariant (must hold on every path): no shape-matched out-of-scope token is ever dropped with zero
 notice.** A token is emitted (`∈ PROJECT_KEYS`), listed individually (`LIKELY_KEYS`), or counted in
@@ -415,9 +437,10 @@ denylist **cannot** suppress. `RFC-14` is folded into the summary, whose interpo
 shows `RFC`, and the founder — reading "if any names a real Jira project, add its prefix" against a
 prefix they recognise — adds it. No silence, no anonymous count.
 
-**Who computes and prints it:** the **command layer** (`commands/docs.md`) computes `OUT_OF_SCOPE` at
-its release route (it already runs this §10 enumeration and owns the interactive gate) and prints the
-warning at the no-op branch (§14) or the founder-confirm gate. This ref owns only the definitions.
+**Who computes and prints it:** the **command layer** (`commands/docs.md`) computes `OUT_OF_SCOPE`
+and its `LIKELY_KEYS`/`STANDARDS_MATCHES` partition at its release route (it already runs this §10
+enumeration and owns the interactive gate), fires the warning **iff `LIKELY_KEYS ≠ ∅`**, and prints
+it at the no-op branch (§14) or the founder-confirm gate. This ref owns only the definitions.
 `agents/knowledge-engineer.md` is **not** involved — it never renders the gate.
 
 **"Most recent" is well-defined:** `git log` emits newest-first by default, so for a key appearing in
@@ -624,18 +647,29 @@ edits (re-derived by design), but it must not be mistaken for _preserving_ them.
 docs-manifest.md — nothing to generate` and exit without a PR. **Informational, not silent** — the
   manifest exists, so the founder opted in; a fully-disabled release surface is worth surfacing
   (mirroring `sync`'s "found nothing to do" vs "opted out" distinction).
-- **No stories merged → split by `OUT_OF_SCOPE` (§10).** The emitted set here is NA-53's `IN_SCOPE`.
-  When `PROJECT_KEYS ≠ ∅`, `OUT_OF_SCOPE` is computed over the full range **regardless of whether
-  `IN_SCOPE` is empty** (§10), so this no-op splits:
-  - emitted set `= ∅` **and** (`PROJECT_KEYS = ∅` **or** `OUT_OF_SCOPE = ∅`) → the existing clean
+- **No stories merged → split by `LIKELY_KEYS` (§10), never by `OUT_OF_SCOPE`.** The emitted set
+  here is NA-53's `IN_SCOPE`. When `PROJECT_KEYS ≠ ∅`, `OUT_OF_SCOPE` (and its `LIKELY_KEYS` /
+  `STANDARDS_MATCHES` partition) is computed over the full range **regardless of whether `IN_SCOPE`
+  is empty** (§10), so this no-op splits **on `LIKELY_KEYS`, one mutually-exclusive state — never
+  both branches for the same range:**
+  - emitted set `= ∅` **and** (`PROJECT_KEYS = ∅` **or** `LIKELY_KEYS = ∅`) → the existing clean
     no-op, interpolating `LAST_TAG` **only when set** (never an empty interpolation):
     - `LAST_TAG` set → `no stories merged since <LAST_TAG> — nothing to release`
     - `LAST_TAG` empty → `no stories merged since the start of history — nothing to release`
-  - emitted set `= ∅` **but** `PROJECT_KEYS ≠ ∅` **and** `OUT_OF_SCOPE ≠ ∅` → **the warning no-op**
-    (the pure silent-drop case). Print the §10 warning (out-of-scope keys + section-aware
-    remediation, per `commands/docs.md`); the message must **not** claim unqualified "nothing to
-    release". Exit 0, still **no PR** — the pipeline never fabricates a release from unconfigured
-    keys; it prompts the founder to configure and re-run.
+    - **`LIKELY_KEYS = ∅` covers the standards-only case too** — a range whose only out-of-scope
+      tokens are standards-prefixed (`STANDARDS_MATCHES ≠ ∅` but `LIKELY_KEYS = ∅`) takes this clean
+      branch, not the warning branch (see §10's refined State C — the demotion must never itself be
+      what suppresses "nothing to release").
+  - emitted set `= ∅` **but** `PROJECT_KEYS ≠ ∅` **and** `LIKELY_KEYS ≠ ∅` → **the warning no-op**
+    (the pure silent-drop case — at least one genuine unrecognised key exists). Print the §10 warning
+    (out-of-scope keys + section-aware remediation, per `commands/docs.md`); the message must **not**
+    claim unqualified "nothing to release". Exit 0, still **no PR** — the pipeline never fabricates a
+    release from unconfigured keys; it prompts the founder to configure and re-run.
+
+  Because the split is keyed on the single variable `LIKELY_KEYS` (empty vs. non-empty), the two
+  branches above are **structurally mutually exclusive** — no range can match both, so there is no
+  precedence question and no risk of a legacy-key range silently falling into the clean branch.
+
 - **Commit/PR only on actual content change.** Phase 2 commits only if `git status --porcelain` on
   the written paths is non-empty. If the founder rejected every draft and the deterministic regen
   produced byte-identical output → no commit, no PR, clean exit. If the founder rejected the

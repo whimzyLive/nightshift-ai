@@ -737,8 +737,11 @@ only the Step 0 "Merge new findings" path:
   default `target-path` token, using the header comment and row-table shape defined in
   `refs/docs-manifest-template.md`. Never leave a `<...>` placeholder in the written file.
 
-  After writing the row table + header comment, and **only if the founder accepted the docs opt-in
-  this run**, **offer** (do not autonomously write) an optional additional-keys prompt:
+  After writing the row table + header comment, **offer** (do not autonomously write) an optional
+  additional-keys prompt. (No separate opt-in guard is needed here: Step 4g's own preamble above
+  already restricts this "If absent" branch to runs where the docs opt-in was accepted this run — an
+  absent manifest with a declined-or-unasked opt-in writes nothing and never reaches this branch at
+  all.)
 
   > Does this repo carry commits under more than one Jira project key (e.g. after a Jira rename or a
   > repo merge)? List additional prefixes, or leave blank to skip.
