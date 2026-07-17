@@ -253,10 +253,14 @@ sync with this graph.
 The 5-story rollout above was decomposed into 7 Jira stories during `/stories`: the "Deterministic
 core" bullet split into a manifest/registry story (NA-51) and a sync-core story (NA-52) since the
 combined scope exceeded the 8-point split threshold; "Seed + audit modes" split into separate seed
-(NA-54) and audit (NA-55) stories since each is an independently demoable outcome.
+(NA-54) and audit (NA-55) stories since each is an independently demoable outcome. An eighth
+foundation story (NA-58) was added after decomposition: the `writing-docs` skill (Diátaxis craft
+guidance per <https://diataxis.fr/>) ships in the plugin and is loaded by knowledge-engineer before
+any prose doc is drafted — it blocks all other stories.
 
 **Completion order:**
 
+- **L0 (foundation):** NA-58 — `writing-docs` skill + knowledge-engineer wiring
 - **L0:** NA-51 — doc-type registry + `/sdlc:init` docs-manifest scaffold
 - **L1:** NA-52 — `/sdlc:docs` command + `docs-pipeline.md` + `sync` mode + `llms.txt` regen
 - **L2** (parallel-safe, each depends only on NA-52): NA-53 — release mode · NA-54 — seed mode ·
@@ -267,6 +271,7 @@ combined scope exceeded the 8-point split threshold; "Seed + audit modes" split 
 
 | Blocker | Blocks | Rationale |
 |---|---|---|
+| NA-58 | NA-51..NA-57 (all) | Foundation skill: every story that writes or specifies prose docs builds on the `writing-docs` Diátaxis skill and its knowledge-engineer wiring. |
 | NA-51 | NA-52 | `sync` mode and the `/sdlc:docs` command read the doc-type registry and `docs-manifest.md` scaffolded by NA-51. |
 | NA-52 | NA-53 | `release` mode is a second mode on the `/sdlc:docs` command shell and reuses `docs-pipeline.md` shipped by NA-52. |
 | NA-52 | NA-54 | `seed` mode is a third mode on the same command shell; needs the registry/manifest read path and founder-confirm gate wiring from NA-52. |
