@@ -737,6 +737,23 @@ only the Step 0 "Merge new findings" path:
   default `target-path` token, using the header comment and row-table shape defined in
   `refs/docs-manifest-template.md`. Never leave a `<...>` placeholder in the written file.
 
+  After writing the row table + header comment, and **only if the founder accepted the docs opt-in
+  this run**, **offer** (do not autonomously write) an optional additional-keys prompt:
+
+  > Does this repo carry commits under more than one Jira project key (e.g. after a Jira rename or a
+  > repo merge)? List additional prefixes, or leave blank to skip.
+  - **Founder supplies keys** → **validate** each is key-shaped: it must match `^[A-Z][A-Z0-9]*$` —
+    a bare project prefix, **no** `-<number>`, **no** angle-bracket placeholder such as `<PREFIX>`.
+    Re-prompt on any token that fails. Then write a real `## Additional Jira project keys` section
+    (below the table, and below "Voice & format" if present) containing **exactly those validated
+    founder-supplied keys** as a comma-separated list — **no stub, no example, no placeholder**
+    (honouring the template's no-`<...>` Fill rule). The header written this run already documents
+    the section (AC2), so header and body are consistent by construction.
+  - **Founder leaves blank** → **write nothing** for the section. It stays absent and founder-owned.
+
+  This offer is the **fresh-write path only**. It never runs on the merge path (below), and it never
+  writes the section without an explicit founder-supplied value.
+
 - **If present** — never regenerate from defaults. This is the merge behaviour (reuses the Step 0
   "Merge new findings" mechanic and the Step 4d `skills.json` merge pattern; the merge source for
   docs rows is `refs/doc-types.md`, **not** any `refs/project-context-template.md` token set):
