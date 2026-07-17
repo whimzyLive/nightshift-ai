@@ -1,5 +1,92 @@
 # ai-enablement-engineer — memory
 
+## NA-60 — PR #127 review fix: trigger the warning on `LIKELY_KEYS`, not `OUT_OF_SCOPE`
+
+- **A "fires iff `SUPERSET ≠ ∅`" gate is wrong the moment the superset legitimately contains a
+  demoted-but-still-counted subset** — the original design computed `OUT_OF_SCOPE = LIKELY_KEYS ∪
+STANDARDS_MATCHES` and then gated the warning-no-op split and the confirm-gate print on
+  `OUT_OF_SCOPE ≠ ∅`, which is true whenever _either_ subset is non-empty. That silently let a range
+  whose only out-of-scope tokens were standards-prefixed (`RFC-2119`, `SHA-256`, zero real missing
+  stories) fire a warning with an **empty** `LIKELY_KEYS` individual list under an active header and
+  an action-demanding footer — driven entirely by tokens the same design explicitly meant to
+  _demote_. The general lesson: whenever a "fires iff X ≠ ∅" condition is defined over a union set
+  that itself splits into a "real signal" part and a "demoted noise" part, the gate belongs on the
+  **real-signal subset alone**, never the union — a union-gated trigger silently promotes the
+  demoted part back into a trigger the moment it's the only thing present, defeating the demotion.
+  This was caught by review, not by any of my own verification greps in the original round, because
+  every grep I wrote checked that the _pieces_ were present and worded correctly — none checked
+  whether the pieces _combined_ correctly for the all-standards, zero-likely-keys case, since I
+  never constructed that specific state by hand while verifying. Lesson: for a multi-set overlay
+  spec, explicitly hand-walk each of the state model's named states (not just each spec clause) and
+  confirm the file's own gate conditions actually route that state where the state model says it
+  should — grepping for presence of the right words is not the same check.
+- **A "narrow the old rows to the same trigger variable" fix for an overlapping-rows finding
+  (reviewer's finding 3) came for free once the root-cause variable was corrected** — once the
+  no-op split's trigger changed from `OUT_OF_SCOPE ≠ ∅` to `LIKELY_KEYS ≠ ∅`, the pre-existing
+  "no stories merged" clean-no-op rows and the new warning-no-op row became keyed off the same
+  single boolean (`LIKELY_KEYS` empty vs. non-empty) and were therefore automatically mutually
+  exclusive — no separate precedence rule was needed. When two rows' overlap traces back to a
+  shared root-cause variable being wrong in one of them, fixing the root variable can resolve the
+  overlap finding as a side effect; always re-check whether a downstream "add precedence" finding is
+  still needed after the root fix, rather than fixing both independently and risking a
+  now-redundant precedence clause that contradicts the corrected trigger.
+- **A "no example-parsing hazard because init never writes a stub" claim can go stale the instant a
+  _different_ file (not the one init writes) carries a copyable example** — my original resolver
+  robustness note reasoned correctly about the manifest init writes, but `docs-manifest-template.md`
+  itself (a separate ref file, always present in the plugin, sometimes copy-pasted by a founder
+  looking at the shape) carries its own illustrative `<... e.g.: ET>` text. Fixed by extending the
+  resolver's tolerant-parsing rule to also strip `<...>`-bracketed spans (generalizes past the
+  comment-only case), rather than editing the template's example to be non-key-shaped — the
+  resolver fix is strictly more robust since it protects against _any_ future template wording, not
+  just today's `ET` example.
+- Re-confirmed the in-repo (not `/tmp`, `.md`-suffixed) scratch-copy idempotency protocol from
+  earlier this same session on all three re-touched files — held stable on every file, first pass.
+
+## NA-60 — Make release-mode PROJECT_KEYS discoverable (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/docs-manifest-template.md`, `plugins/sdlc/commands/init.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **`prettier --file-info` reporting `ignored: false` is necessary but not sufficient to trust an
+  idempotency-check scratch copy — the copy also needs a filename `prettier` actually infers a
+  parser for.** A first attempt copied `docs-pipeline.md` to a non-`.md`-suffixed scratch name
+  (`docs-pipeline.md.na60scratch`); `--file-info` reported `ignored: false` (looked safe per the
+  NA-51 lesson) but `inferredParser: null` — `--write` silently no-op'd on it, so a `diff` against
+  the original trivially showed "IDEMPOTENT" with zero signal value, identical in effect to the
+  known `ignored: true` false-negative this check exists to catch. Fix: always check **both** fields
+  of `--file-info` (`ignored: false` **and** `inferredParser` non-null) before trusting a diff
+  result, and keep the scratch copy's own extension (`.md`) rather than appending a suffix.
+- **A plan's own hand-typed markdown table content can be Prettier-non-idempotent on the very first
+  `--write` even though the plan author clearly intended it to be final text** — my initial edit
+  reproduced the plan's five-row `OUT_OF_SCOPE`/`IN_SCOPE`/etc. set-definition table verbatim
+  (including its exact column-padding spaces), and `prettier --write` still re-padded three of the
+  five rows on first pass (unrelated to content, purely because the em-dash/prefix cell widths I
+  typed didn't match Prettier's own column-width computation for the finished file). This is not a
+  defect in the plan — table cell padding is never meant to be typed by hand; the fix is simply to
+  run `prettier --write` on the real file immediately after any table edit and treat its output as
+  authoritative, then re-verify idempotency from that written state, rather than trying to
+  hand-match Prettier's padding or treating the first `--write` diff as evidence of a problem.
+- **A NA-62-landmine-avoidance fenced block that sits under a numbered list item can require its
+  _surrounding bullets_ to also drop to column 0, not just the fence itself, when the source plan
+  says so** — Task 2 Step 1's fenced text block (the warning-message template) was specified by the
+  plan sitting between two column-0 (undented) bullet groups, deliberately breaking out of list item
+  3's normal 3-space-indented continuation. My first draft kept the post-fence bullets indented 3
+  spaces (matching the pre-fence sub-bullets' style, which felt more consistent) — a deviation from
+  the plan's literal text that would have been my own choice, not a required fix, but I caught it by
+  diffing my draft against the plan's exact characters before running Prettier, and re-indented to
+  match column 0 exactly, since the plan's authors had presumably already reasoned through the
+  NA-62 dedent boundary for that specific insertion point. Lesson: when a plan hands you literal
+  markdown to insert (not just a description of what to add), match its whitespace exactly on the
+  first pass rather than reflowing it to look more consistent with neighboring prose — the literal
+  text may already encode a landmine-avoidance decision that isn't otherwise explained.
+- Re-confirmed the NA-55/NA-52 lesson that `pnpm nx affected -t test --base=remotes/origin/develop`
+  and `pnpm nx format:check` both report clean/no-tasks for a `plugins/sdlc/**`-only change — not a
+  skipped gate, the expected result for this plugin's Nx-project-less path.
+- This story's dispatch prompt explicitly overrode the standing "domain agent never pushes" handoff
+  rule (`domain-agent-handoff.md`'s "Do NOT push") with an explicit instruction to push
+  `feat/NA-60` and verify `git rev-parse HEAD == git rev-parse origin/feat/NA-60` myself, since no
+  Principal Engineer orchestrator was dispatching this run (a direct, already-planned single-agent
+  story with no PR to raise). Confirmed the override is legitimate per this agent's own contract
+  (a message from the dispatching agent directs the work); did not raise a PR or run
+  session-complete, per the same prompt's explicit "no PR, no session-complete" instruction.
+
 ## NA-57 — PR #125 review round (`plugins/sdlc/commands/docs.md`, `plugins/sdlc/refs/adr-pipeline.md`)
 
 - **An unqualified "manifest absent → silent no-op" error-table row that sits ABOVE mode-specific

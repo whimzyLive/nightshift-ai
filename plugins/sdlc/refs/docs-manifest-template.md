@@ -18,8 +18,9 @@ project name already stored in `.claude/project/project-context.md` instead):
   will generate. To deactivate a doc type, set enabled = false — that is the stable way to turn
   it off without losing the row. Deleting a row instead does NOT permanently deactivate it: a
   future re-init will offer to re-append it unless the offer was previously declined and recorded
-  (see the Decline record convention below). This file may also carry an optional "Voice & format"
-  free-form section below the table (see refs/docs-manifest-template.md) — the row table itself
+  (see the Decline record convention below). This file may also carry, below the table, an
+  optional "Voice & format" free-form section and an optional "Additional Jira project keys"
+  free-form section (both described in refs/docs-manifest-template.md) — the row table itself
   remains 3-column activation data only, never generation logic, a schedule, or a runtime
   directive.
 -->
@@ -84,9 +85,14 @@ prefixes beyond the single primary key in `.claude/project/project-context.md` �
 history carries commits under more than one Jira project key (most commonly after a Jira project
 rename or a repo merge), so those commits' stories are not silently dropped from the changelog. Not
 part of the 3-column row-table activation data, and not validated by the Registry self-check in
-`refs/doc-types.md`. `/sdlc:init` never writes or touches this section — it is populated by hand,
-same as "Voice & format", and its absence is not an error: `release` simply falls back to the single
-primary project key (or, if that is also absent, a documented-risk loose regex — see §10).
+`refs/doc-types.md`. `/sdlc:init` never writes this section **autonomously** and never invents its
+content; it **may** write the exact additional keys a founder supplies at the fresh-write offer
+(Step 4g's "If absent" path, validated key-shaped, no stub or placeholder). A blank offer, and
+**every** merge-path run, leave the section untouched — so a founder who deleted it never gets it
+silently re-appended. Its absence is not an error: `release` simply falls back to the single primary
+project key (or, if that is also absent, a documented-risk loose regex — see §10). Because init never
+writes a stub or example here, the only text ever parsed from a consumer manifest is the founder's
+own — §10's resolution additionally ignores HTML comments and whitespace.
 
 ## Fill rules
 
@@ -97,9 +103,12 @@ primary project key (or, if that is also absent, a documented-risk loose regex �
 - `enabled` defaults to `true` for every newly-written row.
 - `target-path` is pre-filled with the matching registry row's `target-path` default; the
   founder edits it later to point at their real docs tree.
-- `/init` only ever writes or merges the row table (and the header comment) — it never adds,
-  edits, or removes the optional "Voice & format" or "Additional Jira project keys" sections; both
-  are entirely founder-owned.
+- `/init` writes or merges the row table and the header comment on every path, and **never** adds,
+  edits, or removes the optional "Voice & format" section — that section is entirely founder-owned.
+  The optional "Additional Jira project keys" section is likewise never written **autonomously**;
+  the **only** exception is Step 4g's fresh-write offer, where `/init` may write the exact
+  founder-supplied validated keys (no stub, no example, no `<...>` placeholder). A blank offer and
+  every merge-path run leave it untouched.
 
 ## Decline record convention
 
