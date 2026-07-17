@@ -1,5 +1,62 @@
 # ai-enablement-engineer — memory
 
+## NA-61 — writing-docs templates emit title/description/related-adrs frontmatter (`plugins/sdlc/skills/writing-docs/SKILL.md`, `plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **A hand-wrapped checklist bullet that matches the FILE's own established wrapping
+  convention still breaks the PLAN's own single-physical-line verification grep — and the
+  right fix is to verify with the flattened `tr` idiom, not to un-wrap the line.** The plan's
+  Step 5 gave the new Self-Review line as one long logical sentence; I typed it wrapped across
+  two physical lines at the same point every neighboring long checklist bullet in this exact
+  file already wraps (`Voice and output format were resolved from…`, `If this is an explanation
+page…`) — genuinely the more consistent choice, and Prettier's `proseWrap: preserve` will
+  never rejoin it. But the plan's literal verification command
+  (`grep -c 'no .TODO —. placeholder left'`) assumed one physical line and returned 0 on a
+  clean pass. This is the established "grep trap" class (NA-53/54/55 memory entries) applied to
+  a bullet I wrapped myself, not one Prettier wrapped — confirmed correct with
+  `tr '\n' ' ' | tr -s ' ' | grep -o '...'` instead of relaxing my formatting to chase the
+  literal grep. Lesson: when a plan's own verbatim-text grep is single-line but the insertion
+  point sits inside prose this repo already wraps by convention, match the file's convention
+  and re-verify with the flatten idiom — don't treat "the plan's grep failed" as license to
+  make the source uglier just to pass a check.
+- **A trailing prose paragraph directly followed (zero blank lines) by a new list bullet is
+  Prettier-non-idempotent even when neither is itself indented/nested — this is a NEW distinct
+  landmine flavor from the already-documented "2-space-indented fence under a list item" one.**
+  Adding the `related-adrs:` reliability-caveat paragraph immediately above the pre-existing
+  `- **Dangling code reference.**` bullet (no blank line between, matching how the OLD one-line
+  caveat sentence had sat right above it) produced a real `prettier --write` diff on the FIRST
+  pass: Prettier inserted a blank line between the paragraph and the bullet to make the list
+  boundary unambiguous. Caught only by the copy → `--write` → `diff` idempotency protocol
+  (a bare `--check` also would have caught it here, but the copy protocol is what's mandated and
+  what I ran). Fix: always put a blank line between a freestanding paragraph and a list that
+  follows it, even if the paragraph it's replacing didn't have one — a longer multi-line
+  replacement paragraph changes Prettier's parse of the paragraph/list boundary even when a
+  shorter one-liner in the same spot didn't trigger a rewrite.
+- **The plan's own frontmatter-untouched verification grep
+  (`git diff SKILL.md | grep -E '^[-+](name|description):' | wc -l`, expected 0) is imprecise
+  and produces a false-positive the moment the story's OWN body edits add new
+  `description:`-prefixed lines** — it can't distinguish SKILL.md's real YAML frontmatter
+  (lines 1–4) from the four new body-template `description: TODO — …` lines this story
+  legitimately adds, so it returned 4, not the plan's expected 0. Verified the actual invariant
+  (frontmatter untouched) correctly instead via `diff <(git show HEAD:<file> | sed -n '1,4p')
+<(sed -n '1,4p' <file>)` → `UNCHANGED`. Lesson: when a plan's "prove X untouched" grep pattern
+  is a substring that the SAME diff's legitimate new content can also match, don't trust the
+  grep's raw count — isolate the specific line range the invariant actually claims and diff
+  that range directly.
+- Re-confirmed the NA-51 scratch-copy lesson on two separate files this round (SKILL.md and
+  docs-pipeline.md): a scratch copy must be a `.md`-suffixed file **inside the repo tree**
+  (sibling to the real file, not `/tmp` or the session scratchpad) for `prettier --file-info`
+  to report `ignored: false` + a non-null `inferredParser` — otherwise `--write` silently
+  no-ops and the "IDEMPOTENT" result is a false negative with zero signal value. Always run
+  `--file-info` on the scratch path first and confirm both fields before trusting the diff.
+- Confirmed (again, now 6th time across NA-54/55/57/58/60/61) that
+  `pnpm nx affected -t test --base=remotes/origin/develop` and `pnpm nx format:check` both
+  report clean/no-tasks for a `plugins/sdlc/**`-only change in this repo — expected, not a
+  skipped gate.
+- This story's dispatch prompt again explicitly overrode the standing "domain agent never
+  pushes" rule (same shape as NA-60's) with an instruction to push `feat/NA-61` directly and
+  verify `git rev-parse HEAD == git rev-parse origin/feat/NA-61` myself — no Principal Engineer
+  orchestrator, no PR, no `session-complete`, per the dispatch prompt's explicit instruction.
+
 ## NA-60 — PR #127 review fix: trigger the warning on `LIKELY_KEYS`, not `OUT_OF_SCOPE`
 
 - **A "fires iff `SUPERSET ≠ ∅`" gate is wrong the moment the superset legitimately contains a
