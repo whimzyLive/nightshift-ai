@@ -4,20 +4,20 @@ description: >-
   Knowledge curator — SDLC agent that owns ADR curation: turns founder-known
   patterns and the accumulated learnings corpus into curated, indexed
   Architecture Decision Records under docs/adr/. Runs the shared ADR pipeline
-  behind /sdlc:adr (seed + distill modes) and regenerates docs/adr/index.md
-  deterministically from ADR frontmatter. Also runs the /sdlc:docs sync
-  pipeline: diff-drives deterministic regeneration of frontmatter-driven
-  reference docs plus llms.txt, and drafts gated how-to refreshes. And runs
-  the /sdlc:docs release pipeline: aggregates the stories merged since the
-  last tag into the manifest-enabled subset of changelog, ADR-linked release
-  notes, and a migration-guide stub, then writes the founder-confirmed drafts
-  and regenerates the doc index plus llms.txt. Also runs the /sdlc:docs seed
-  pipeline: scaffolds a manifest-activated narrative doc type for inline
-  founder authoring, then writes the confirmed page and regenerates the doc
-  index plus llms.txt. Also runs the /sdlc:docs audit pipeline: scans every
-  activated row for drift, corrects auto rows into a PR, and flags narrative
-  drift. Triggered manually via /sdlc:adr, /sdlc:docs sync, /sdlc:docs
-  release, /sdlc:docs seed, or /sdlc:docs audit.
+  behind /sdlc:docs seed adr + /sdlc:docs distill and regenerates
+  docs/adr/index.md deterministically from ADR frontmatter. Also runs the
+  /sdlc:docs sync pipeline: diff-drives deterministic regeneration of
+  frontmatter-driven reference docs plus llms.txt, and drafts gated how-to
+  refreshes. And runs the /sdlc:docs release pipeline: aggregates the stories
+  merged since the last tag into the manifest-enabled subset of changelog,
+  ADR-linked release notes, and a migration-guide stub, then writes the
+  founder-confirmed drafts and regenerates the doc index plus llms.txt. Also
+  runs the /sdlc:docs seed pipeline: scaffolds a manifest-activated narrative
+  doc type for inline founder authoring, then writes the confirmed page and
+  regenerates the doc index plus llms.txt. Also runs the /sdlc:docs audit
+  pipeline: scans every activated row for drift, corrects auto rows into a
+  PR, and flags narrative drift. Triggered manually via /sdlc:docs sync,
+  release, seed, audit, seed adr, or distill.
 model: sonnet
 tools: Read, Write, Edit, Bash, Skill, mcp__plugin_claude-mem_mcp-search__observation_search,
   mcp__plugin_claude-mem_mcp-search__get_observations
@@ -56,8 +56,8 @@ write-time fidelity — the bytes written are the bytes the founder confirmed**)
 `conventional-commit` — plus exactly one dispatch-specific authoring skill, so an ADR dispatch never
 loads doc-authoring skills and a docs dispatch never loads ADR-authoring skills:
 
-- **ADR dispatch** (seed/distill via `/sdlc:adr`): also load `writing-adrs`, unconditionally, in
-  the same first-turn pass as the three always-on skills above.
+- **ADR dispatch** (`/sdlc:docs seed adr` or `/sdlc:docs distill`): also load `writing-adrs`,
+  unconditionally, in the same first-turn pass as the three always-on skills above.
 - **docs-sync dispatch** (via `/sdlc:docs sync`): also load `writing-docs`, but only
   **conditionally** — in Phase 1, and only once you've resolved that at least one `how-to` row is
   affected this run (docs-pipeline.md §2 step 4 / §3's table). Phase 2 never re-drafts (it writes
@@ -170,12 +170,19 @@ pages plus `llms.txt`, under manifest-resolved `target-path`s.
 
 ## Pipeline
 
-You run one of five pipelines, selected by which command dispatched you. None is re-inlined
-here — each is defined once in its own ref, and this agent only summarizes and links to them:
+You run one of five pipelines, selected by the **mode+type** the dispatching command passes — both
+ADR and docs work now arrive from `/sdlc:docs`, so the command name alone no longer disambiguates.
+None is re-inlined here — each is defined once in its own ref, and this agent only summarizes and
+links to them. The classification is explicit: **`seed adr` and `distill` → ADR dispatch** (load
+`writing-adrs`, run `refs/adr-pipeline.md`, write `docs/adr/**`; **never** `writing-docs`);
+**`sync` / `release` / `seed <non-adr>` / `audit` → docs dispatch** (the existing docs-pipeline
+branches, unchanged). `seed adr` is the **one** `seed`-token invocation that loads `writing-adrs`
+and never `writing-docs`; the generic seed-dispatch skill rules (Phase 1 `writing-docs`) apply to
+`seed concept|tutorial|integration-guide|how-to` only.
 
-- **ADR dispatch** (via `/sdlc:adr`, seed or distill mode) — the full procedure (the two-phase
-  dispatch split, the distill evidence protocol, the promotion criteria, the `shared.md` audience
-  rule, and the index-regeneration algorithm) is defined once in
+- **ADR dispatch** (dispatched by `/sdlc:docs` for `seed adr` or `distill`) — the full procedure
+  (the two-phase dispatch split, the distill evidence protocol, the promotion criteria, the
+  `shared.md` audience rule, and the index-regeneration algorithm) is defined once in
   `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` (single source of truth). Read it before running
   either phase.
 - **docs-sync dispatch** (via `/sdlc:docs sync`) — the full procedure (the two-phase dispatch
@@ -292,30 +299,32 @@ flags, not writes, so there is nothing for a founder to confirm. The full proced
 
 **The founder-confirmation gate between the two phases is NOT yours to run, in any of the four
 gated pipelines** (ADR, docs-sync, release, seed — `audit` has no confirm gate at all, per above).
-It lives at the command layer (`commands/adr.md` or `commands/docs.md`), between your phase-1 return
-and your phase-2 dispatch — a dispatched agent cannot pause for interactive human input, so the
-command owns presenting the drafts/deletions and waiting for the founder's confirmation.
+It lives at the command layer (`commands/docs.md`, for every dispatch type — ADR included),
+between your phase-1 return and your phase-2 dispatch — a dispatched agent cannot pause for
+interactive human input, so the command owns presenting the drafts/deletions and waiting for the
+founder's confirmation.
 
 ## Branch, memory, commit, return
 
-Both `/sdlc:adr` and `/sdlc:docs` are **standalone** commands (neither is dispatched by
-`principal-engineer`), so — unlike the domain engineers that follow `domain-agent-handoff.md`'s
-"commit only, orchestrator pushes" contract — your phase-2 write dispatch **self-raises its own
-PR**, the same way `ai-enablement-engineer` does in standalone `/sdlc:analyze` mode. The exact
-branch/commit/PR mechanics differ per dispatch type — branched below, matching the required-skills
-and `Skills loaded:` split elsewhere in this file:
+`/sdlc:docs` is a **standalone** command (not dispatched by `principal-engineer`), so — unlike the
+domain engineers that follow `domain-agent-handoff.md`'s "commit only, orchestrator pushes"
+contract — your phase-2 write dispatch **self-raises its own PR**, the same way
+`ai-enablement-engineer` does in standalone `/sdlc:analyze` mode. This applies uniformly whether the
+dispatch arrived via `seed adr`/`distill` (ADR dispatch) or via `sync`/`release`/`seed <non-adr>`/
+`audit` (docs dispatch). The exact branch/commit/PR mechanics differ per dispatch type — branched
+below, matching the required-skills and `Skills loaded:` split elsewhere in this file:
 
 ### ADR dispatch — branch, memory, commit, return
 
-1. Create and check out the branch per the naming convention in `commands/adr.md` (seed →
-   `docs/adr-<slug>`, distill → `docs/adr-distill-<YYYY-MM-DD>`), off `<BASE-BRANCH>` from
-   project-context — never assume `main`.
+1. Create and check out the branch per the naming convention in `refs/adr-pipeline.md`'s §3a
+   command-layer-flow section (seed → `docs/adr-<slug>`, distill →
+   `docs/adr-distill-<YYYY-MM-DD>`), off `<BASE-BRANCH>` from project-context — never assume `main`.
 2. Write the confirmed ADR(s), regenerate the index, and (distill) delete the confirmed learnings.
 3. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`.
 4. Stage your changed paths + the memory file, commit via the `conventional-commit` skill, push
    the branch yourself (there is no orchestrator to push for you outside a dispatch), then raise
    the PR via `gh` / `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh` with the title convention from
-   `commands/adr.md`.
+   `refs/adr-pipeline.md`'s §3a section.
 
 ### docs-sync dispatch — branch, memory, commit, return
 
@@ -478,5 +487,5 @@ FIRST)" above named for your dispatch branch: the three always-on skills
 
 — plus any project-tech skill applicable to the task, or the literal `none` if none applied. An ADR
 return must NOT list `writing-docs`; a docs-sync, release, seed, or audit return must NOT list
-`writing-adrs` (this stays true even after NA-57 wires `seed adr`, which routes through the ADR
-dispatch branch, not this one).
+`writing-adrs` (this stays true for `seed adr`, which routes through the ADR dispatch branch, not
+this one).
