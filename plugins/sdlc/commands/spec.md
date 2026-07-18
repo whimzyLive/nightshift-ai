@@ -57,15 +57,12 @@ The agent should:
      "spec/<STORY-KEY>" develop "docs(spec): <STORY-KEY> <story summary>" "$dir/pr-body.md" --phase spec)
    ```
 8. Comment the story with the spec reference. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
-
-```bash
-acli jira workitem comment create --key <STORY-KEY> \
-  --body "Spec ready.
-
-File: docs/superpowers/specs/<STORY-KEY>.md
-PR: <PR_URL>"
-```
-
+   ```bash
+   acli jira workitem comment create --key <STORY-KEY> \
+     --body "Spec ready.
+   File: docs/superpowers/specs/<STORY-KEY>.md
+   PR: <PR_URL>"
+   ```
 9. Return: story key, spec file path, PR URL
 
 ## Final action — loop the PR to Copilot-clean, then release (when run standalone)

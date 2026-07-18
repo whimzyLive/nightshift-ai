@@ -61,15 +61,12 @@ The agent should:
       "plan/<STORY-KEY>" develop "docs(plan): <STORY-KEY> <story summary>" "$dir/pr-body.md" --phase plan)
     ```
 11. Comment the story. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
-
-```bash
-acli jira workitem comment create --key <STORY-KEY> \
-  --body "Plan ready.
-
-File: docs/superpowers/plans/<STORY-KEY>.md
-PR: <PR_URL>"
-```
-
+    ```bash
+    acli jira workitem comment create --key <STORY-KEY> \
+      --body "Plan ready.
+    File: docs/superpowers/plans/<STORY-KEY>.md
+    PR: <PR_URL>"
+    ```
 12. Return: story key, plan file path, PR URL
 
 ## Final action — loop the PR to Copilot-clean, then release (when run standalone)
