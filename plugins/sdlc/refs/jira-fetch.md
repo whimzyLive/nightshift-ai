@@ -46,7 +46,7 @@ JQL search reads Jira's Lucene **index**, which can **lag** a just-written field
 or transient `acli` failure can also look like an empty result. (This is the same indexing lag seen
 elsewhere: a write returns `204` while a JQL read still shows the old state for a few seconds.) So a
 single empty probe must **never** be trusted as `missing`: retry a few times with a short back-off,
-and treat an `acli` **error** (non-zero exit) as *inconclusive*, not as `missing`.
+and treat an `acli` **error** (non-zero exit) as _inconclusive_, not as `missing`.
 
 ```bash
 FOUND_FIELD=""; LAST_ERR=0
@@ -68,7 +68,7 @@ Decide from the loop result — **only a clean, repeatable empty means `missing`
   all retries) → points are genuinely unset → `missing`.
 - `FOUND_FIELD` empty **but** `LAST_ERR=1` persisted (every attempt errored — auth/DNS, or an
   ambiguous-field error) → **inconclusive: STOP and surface the error; do NOT report `missing`.** A
-  transient/config error must never masquerade as "no points". A persistent *"field is ambiguous"*
+  transient/config error must never masquerade as "no points". A persistent _"field is ambiguous"_
   error means the instance has duplicate field names — for that one instance, disambiguate with the
   `cf[id]` form (the id from the project's field config) rather than the display name.
 

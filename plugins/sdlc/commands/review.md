@@ -22,6 +22,7 @@ fix agents it needs. You play the QA Engineer role directly, in the top-level se
    `/review` is a **standalone consumer**: it has no upstream `WORK_KIND`, and the impl branch already
    encodes how the work was built — so the branch that exists is authoritative. A Jira fetch here
    would re-introduce the fail-safe-to-`feature` false-STOP the branch-probe exists to avoid.
+
    ```bash
    # Fetch each candidate INDEPENDENTLY — a single combined `git fetch` of all three refs aborts
    # whole if ANY ref is absent (the normal case: only one prefix exists), which would leave the
@@ -33,6 +34,7 @@ fix agents it needs. You play the QA Engineer role directly, in the top-level se
    FIX_EXISTS=$(git rev-parse --verify -q origin/fix/<STORY-KEY>  >/dev/null 2>&1 && echo yes || echo no)
    FEAT_EXISTS=$(git rev-parse --verify -q origin/feat/<STORY-KEY> >/dev/null 2>&1 && echo yes || echo no)
    ```
+
    Decide the branch:
    - **exactly one exists** → review it.
    - **neither exists** → **STOP**: "no `fix/<STORY-KEY>` or `feat/<STORY-KEY>` branch for `<STORY-KEY>` — run `/impl` first".
@@ -43,12 +45,14 @@ fix agents it needs. You play the QA Engineer role directly, in the top-level se
      **and emit a WARNING** naming both branches — never silently review a stale branch.
 
    Set `RESOLVED_BRANCH` to the chosen `fix/<STORY-KEY>` or `feat/<STORY-KEY>`, then:
+
    ```bash
    BASE_SHA=$(git merge-base origin/develop "origin/$RESOLVED_BRANCH")
    ```
+
 2. **Derive `WORK_KIND` from the resolved branch prefix** — `fix/` ⇒ `defect`, `feat/` ⇒ `feature`.
    This is the single source for `WORK_KIND` on this already-produced-work path; it is **not** a second
-   predicate competing with `refs/triage.md`'s issuetype check (that gates *routing*, upstream). The
+   predicate competing with `refs/triage.md`'s issuetype check (that gates _routing_, upstream). The
    only way they could disagree is an upstream misroute (a Bug built on `feat/`), which is a separate
    defect `/review` does not re-litigate by re-fetching the issue type.
 3. Fetch the story with `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`<KEY>=<STORY-KEY>`) for the summary and

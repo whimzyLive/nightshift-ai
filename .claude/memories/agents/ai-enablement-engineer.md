@@ -1,5 +1,155 @@
 # ai-enablement-engineer — memory
 
+## NA-62 — PR #131 review round: the reformat sweep introduced 3 NEW corruption classes the quad-fence guard was blind to
+
+- **"No new quad-backtick fences" is only ONE corruption signature — a benign-looking `prettier
+--write` sweep can corrupt markdown in shapes that never touch a quad fence at all, and a review
+  found 3 more in files my own Task-1 triage had classified clean.** The whole point of NA-62 was
+  closing the NA-56 quad-fence landmine; I built exactly one regression guard (quad-fence census)
+  and trusted it as sufficient proof the sweep was safe. It wasn't. Three genuinely distinct
+  corruption shapes slipped through the SAME "42 benign, verified quad-fence-neutral" bulk write:
+  1. **Pipe-eating in a table cell.** `plugins/sdlc/commands/loop.md`'s CI-b row had an unescaped
+     literal `||` inside a code span (`` `... && echo 0 || echo 1` ``) sitting inside a markdown
+     table cell. Prettier's table formatter splits a cell on ANY literal `|` character it finds,
+     even one inside backticks, unless it's backslash-escaped (`\|`) — it rewrote `echo 0 || echo 1`
+     to `echo 0 |     | echo 1` (inserting phantom-column padding), a shell syntax error, breaking
+     the exact review-clean marker `/loop` uses to drive itself. The fix (and the tell that this was
+     an established, working pattern, not a novel guess) was already sitting two table rows above in
+     the SAME file: `` `... > 0 \|\| ... == 1` `` — escaped, and untouched by the sweep. **Lesson:
+     grep any file with a table BEFORE sweeping it for literal `|`/`||` inside a code span on a
+     `|`-prefixed line — that's the corruption signature, and an already-escaped sibling elsewhere in
+     the same plugin is the fastest way to find the known-working fix form.**
+  2. **A wrapped ordinal parsed as a list marker.** `plugins/gtm/refs/postiz-verify.md` had a
+     sentence hand-wrapped as "...by design (Condition\n1) and exported..." — no blank line before
+     the "1)". CommonMark specifically permits an ordinal of exactly **1** (not 2+) to interrupt a
+     paragraph without a preceding blank line, so remark (Prettier's parser) read the wrapped "1)"
+     as a new ordered-list item, splitting the sentence into a broken paragraph + a spurious
+     "1. and exported..." list. This is almost certainly a landmine that predated this story (the
+     hand-wrap itself was already parser-ambiguous before Prettier ever touched the file) — the
+     sweep just materialized it into committed corruption. Same general family as the NA-51
+     "never manually wrap a heading/token a parser would greedily interpret as a marker" lesson,
+     one level more specific: **any hand-wrapped "N)" or "N." at a physical line start, for N=1
+     specifically, is parser-ambiguous regardless of whether a blank line precedes it** — grep
+     pre-sweep files for `^[0-9]+[.)][[:space:]]` and manually eyeball whether each hit is a genuine
+     list item or a wrapped continuation (a lowercase word or mid-sentence conjunction immediately
+     after the marker, e.g. "1) and", is the tell).
+  3. **A column-0 dedent (my own Task-2 fix) silently broke list membership.** The manual
+     dedent-to-column-0 technique I used to stop `spec.md`/`plan.md`'s quad-fence shatter is
+     Prettier-STABLE but has a side effect I never checked: a column-0 fence terminates the
+     enclosing list item's content region, so the NEXT numbered step starts a structurally separate,
+     list-disconnected `<ol>` instead of continuing the same 1..N list. Stable ≠ correct — I verified
+     the narrow property (no quad fence, fixed point) and never verified the broader one (still one
+     continuous list). **The actual fix that resolves BOTH the shatter and the list-membership break
+     simultaneously: keep the fence at its ORIGINAL list-continuation indent and instead remove the
+     embedded blank line inside the quoted `--body "..."` string** (the blank line, not the
+     indentation, is the real NA-56 trigger). Verified empirically in a scratch file: with the blank
+     line gone, Prettier re-indents the quoted body's continuation lines to match the fence's own
+     baseline on write, but that indentation is stripped uniformly when the fence renders — so the
+     actual command bytes are unaffected, only one blank line is lost from the posted Jira comment
+     (an accepted, spec-sanctioned tradeoff already named as the fallback technique). **Lesson: when
+     a manual fix stops the FAILURE MODE you were staring at, explicitly re-derive what property you
+     were actually trying to preserve (here: "one continuous numbered list," never stated as an
+     explicit check) and verify THAT too — Prettier-stable is a necessary, not sufficient, bar for
+     "correctly fixed."**
+  - **Root-cause take for next time:** before trusting a bulk `prettier --write` sweep as "safe
+    because no quad fence appeared," re-audit the diff for the OTHER shapes Prettier can corrupt:
+    table row/column integrity (compare table row counts AND fence-indentation-sequences pre/post,
+    not just presence), wrapped ordinals at physical line starts, and — for any block your own
+    manual fix touches — whether the fix's stability proof actually covers every property that block
+    needs (not just the one you were fixing). A full re-audit of the remaining ~39 benign files
+    (quad-fence census, pipe-in-codespan grep, wrapped-ordinal grep, fence-indentation-sequence diff,
+    table-row-count diff, and a classification pass over every newly-inserted blank line) found
+    exactly these 2 additional corruptions (loop.md, postiz-verify.md) and zero more — the review's
+    own 2 named findings were the full extent of it, not a sample of a larger unseen set, but only
+    a systematic re-check proved that; spot-checking wouldn't have.
+- **A guard and the gate it protects can silently diverge if they enumerate the same target set
+  through two DIFFERENT mechanisms — even when neither mechanism is individually wrong.** My own
+  prior-round fix for the `shopt -s globstar` bash-3.2 bug (using `find plugins -name '*.md'` to
+  count files) traded one bug for a subtler one: `find` walks the filesystem directly, ignoring
+  `.prettierignore`, while the actual gate (`prettier --check`) resolves its glob ignore-aware. A
+  future `.prettierignore` entry could make `find` see files the gate itself would silently skip —
+  vacuously green on exactly the files the guard exists to protect. Fixed by reading the SAME
+  `prettier --check` invocation's own output (it reports "No files matching the pattern were found"
+  - non-zero exit for a genuinely empty glob) instead of a separate enumeration — one call is now
+    simultaneously the gate and the empty-set detector, so there is no second mechanism left to
+    diverge from the first. **Also discovered and explicitly did NOT try to solve: a bare
+    directory-level `.prettierignore` entry (e.g. a line just saying `plugins/`) makes prettier
+    silently ignore every matched file individually and still print "All matched files use Prettier
+    code style!" — there is no CLI-exposed way to distinguish that from genuine all-clean.** This is a
+    deeper prettier-CLI limitation, not a guard-design gap — it affects the bare gate identically with
+    or without any guard — so I documented it in the script's own comment rather than chasing an
+    unsolvable local pre-check for it.
+- **Testing an empty-glob scenario by relocating a copy of a script to a nested scratch directory is
+  invalid for anything that shells out via `pnpm exec`** — `pnpm exec <cmd>` always executes from the
+  pnpm **workspace root**, regardless of the invoking shell's cwd (confirmed directly: `cd
+<nested-dir> && pnpm exec pwd` prints the real repo root, not the nested dir). A "fake empty
+  plugins/ dir nested under `.tmp/`" test silently exercised the REAL repo's `plugins/` instead,
+  producing a false "all clean" result that had nothing to do with the guard logic under test. The
+  valid way to test an empty-match scenario for a `pnpm exec`-based script: either point the glob
+  itself at a guaranteed-nonexistent subpath while still invoking from the real repo root (confirms
+  the raw-zero-match branch), or temporarily edit `.prettierignore` and revert with `git checkout --`
+  immediately after (confirms the ignore-aware branch) — never relocate the script to fake a
+  different cwd for a `pnpm exec` call.
+
+## NA-62 — Prettier fixed-point gate for plugin docs, Phase A (`plugins/**/*.md` sweep + `check-plugin-docs-format.sh`)
+
+- **A single-write quad-fence delta triage (`before=grep -c…; write; after=grep -c…`) can classify a
+  file "benign" while it is actually a SECOND-write shatter — the exact same NA-56 landmine shape,
+  just one `--write` pass further downstream.** `plugins/sdlc/commands/plan.md` passed the plan's own
+  triage script clean (single write introduced no quad fence) and was bulk-written along with the
+  other 41 benign files. But the aggregate `prettier --check` run immediately afterward (Task 1 Step
+  4 — testing `format(current) == current`, i.e., genuinely a **second** write from the file's
+  post-sweep state) flagged it alone as still not a fixed point. A manual second `--write` on it
+  confirmed why: the first write had already re-fenced part of its `acli --body` block (indented
+  under a numbered list item 11, with an embedded blank line in the quoted body — same NA-56 shape as
+  `commands/spec.md`), producing an intermediate state that was itself unstable; the SECOND write is
+  what actually shattered it to quad backticks. **The plan's own explicit escape hatch fired
+  correctly** ("If SHATTER lists MORE than spec.md, STOP — hand each extra file to Task 2's manual
+  technique too") — the aggregate post-write `--check` step is what surfaced it, not the single-write
+  triage. Lesson: treat the plan's pre-triage as a snapshot, but trust the aggregate `--check` after
+  the bulk write as the real gate — if ANY file in the "benign" bulk-write set fails that aggregate
+  check, don't debug it as a fluke; assume it's a second-pass shatter of the same landmine shape and
+  revert + hand-fix it exactly like the plan's known shatter file, using the already-stable sibling
+  pattern elsewhere in the same plugin (`auto.md`/`impl.md`'s `acli --body` blocks: blank line before
+  a column-0 fence, fence + body at column 0, blank line after, list numbering continues normally)
+  as the reference fixed form rather than reinventing one.
+- **The plan's literal wrapper-script content (`shopt -s globstar nullglob; files=(plugins/**/_.md)`)
+fails outright on macOS's stock `/bin/bash`(3.2.57)** —`globstar`was introduced in bash 4.0, and
+Apple has shipped 3.2 (its last GPLv2 release) as the default`/bin/bash`for over a decade; both`bash script.sh`and`env bash`resolve to it here with no newer bash anywhere in`PATH`. Running
+the plan's script verbatim printed two `shopt: globstar: invalid shell option name`errors to
+stderr on every invocation — the gate still happened to exit correctly (prettier's own quoted glob
+did the real check regardless), but the fail-fast empty-glob guard itself was silently broken
+(falls through with`nullglob`never applied either, since bash aborts the whole`shopt -s a b`
+command on the first invalid name — verified by testing the guard against an empty-`.md`directory
+copy, which failed to fire before the fix and printed "FAILED — no ... files found" correctly
+after). Fixed by swapping to`find plugins -type f -name '_.md' | wc -l`for the empty-set count —
+no bash-version dependency, behavior otherwise identical. The sibling script`check-agent-skill-preloads.sh` never hit this because its own glob is single-level
+(`"$agents*dir"/*.md`, no `**`), so it only ever needed plain `nullglob`. **Any future
+  plugins/sdlc/scripts/\_.sh script that needs a recursive glob should default to `find`, not
+  `shopt -s globstar`, unless bash>=4 on every target shell (including contributor macOS laptops) is
+  independently confirmed\*\* — a CI-only script would mask this, since GitHub's Ubuntu runners ship a
+  new-enough bash; the failure only surfaces locally, which is exactly where this agent's own
+  verification steps run.
+- Re-confirmed (again) the in-tree triage protocol (write real file → diff/grep → `git checkout --`
+  restore) from the NA-56 lesson: 43 files flagged today (spec cited 44 at spec-time — one drifted
+  out on this branch), 1 shatter reconfirmed on the plan's own pre-classified single-write pass
+  (`commands/spec.md`) plus the 1 second-pass shatter this round discovered (`commands/plan.md`) —
+  neither the plan's count nor its triage method is a ceiling; both explicitly say so and both were
+  exercised for real this round, not just as a hypothetical caveat.
+- Confirmed the RTK-masking lesson does NOT extend to script-internal `pnpm exec prettier` calls
+  (only interactive shell commands typed directly appear to be rewritten by the RTK hook) — invoking
+  `check-plugin-docs-format.sh` directly via `bash` produced prettier's real native
+  `[warn] <file>` / `Checking formatting...` output on both the clean-pass and the corrupted-probe
+  runs, not RTK's generic "All files formatted correctly" mask. Still used the raw
+  `./node_modules/.bin/prettier` binary for all direct ad-hoc verification commands per the standing
+  rule; only the wrapper script's own internal `pnpm exec` call was left as specified (CI has no RTK
+  either way).
+- The pre-commit hook (lint-staged) itself runs `prettier --write --ignore-unknown` on every staged
+  file at commit time — this is the exact re-write-on-commit mechanism the whole NA-62 story defends
+  against, so it is not safe to assume a clean pre-commit-hook exit means nothing regressed; verified
+  after each of this story's 3 commits that the full-tree `--check` was still green and the
+  quad-backtick census was still exactly 4 post-commit, not just pre-commit.
+
 ## NA-61 — PR #129 review round: unfilled `TODO —` placeholder defeated the skip-and-surface net (`plugins/sdlc/skills/writing-docs/SKILL.md`, `plugins/sdlc/refs/docs-pipeline.md`)
 
 - **A "presence-only" guard and a "the field is now guaranteed present" story combine into a

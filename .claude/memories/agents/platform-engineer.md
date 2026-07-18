@@ -1,5 +1,29 @@
 # platform-engineer memory
 
+## 2026-07-18 — Story NA-62 (Phase B) — wire check-plugin-docs-format.sh into ci.yml
+
+**Learnings:**
+
+- Same shape as NA-25's guard wiring, confirmed again: `.github/workflows/ci.yml` still isn't a
+  row in project-context's workspace→agent table, but the dispatch (backed by the spec's explicit
+  Ownership-split table) named it platform-engineer's — one `- run: bash
+plugins/sdlc/scripts/<guard>.sh` line appended after the last existing guard step, content of
+  the guard script itself strictly off-limits (ai-enablement-engineer's artifact, authored in
+  Phase A on the same shared branch). Two-phase single-PR stories with this owner split (script +
+  sweep in one agent's phase, one-line `ci.yml` invocation in the other's) are a repeatable
+  pattern now, not a one-off.
+- This dispatch explicitly overrode the handoff protocol's default "commit only, PE pushes" —
+  instructed to push `feat/NA-62` directly and confirm origin==local, with no PR/session-complete
+  (a plan-writing-only continuation dispatch, not a full domain-agent phase handoff). Read the
+  dispatch prompt's explicit push/no-push instruction before defaulting to the shared protocol.
+
+**Patterns:**
+
+- Verifying a one-line `ci.yml` addition: `git diff` (uncommitted) or `git diff <base>..HEAD`
+  (once committed) to confirm exactly one added line and the adjacent lines untouched, plus
+  `python3 -c "import yaml,sys; yaml.safe_load(open(...))"` for well-formedness — cheap and
+  sufficient for a single-step YAML append.
+
 ## 2026-07-07 — Story NA-3 — Bootstrap gtm plugin config via /gtm:init
 
 **Learnings:**

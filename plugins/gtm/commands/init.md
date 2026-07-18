@@ -307,6 +307,7 @@ addition to the **Channels configured** line below before printing the summary.
 Print a summary:
 
 > **Files written:**
+>
 > - `.claude/project/marketing-context.md` — gtm's operational config (product basics, the Postiz
 >   Backend URL, the Postiz API key env-var name, empty Voice overrides, the per-channel Channels
 >   table, the KPI metric/source/`Verified value`).
@@ -328,6 +329,7 @@ Print a summary:
 > `postiz` CLI automatically; you don't need to keep it set yourself.
 >
 > **To commit the foundation** (AC-5):
+>
 > ```bash
 > git add .claude/project/marketing-context.md .agents/product-marketing.md docs/gtm .gitignore
 > git commit -m "chore(gtm): bootstrap marketing foundation via /gtm:init"

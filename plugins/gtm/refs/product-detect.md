@@ -7,12 +7,12 @@ fills.
 
 ## Output contract
 
-| Field | Detection sources (in order) | Interview fallback |
-| ----- | ---------------------------- | ------------------- |
-| `name` | `package.json` `name` → git remote repo name → top-level `README.md` H1 | prompt |
-| `one-liner` | `package.json` `description` → README tagline/subtitle → `brand/BRAND_KIT.md` tagline (when present) | prompt |
-| `repo` | `git remote get-url origin` (normalized to `owner/name` or URL) | prompt |
-| `landing URL` | `package.json` `homepage` → first external link/badge in `README.md` | prompt (blank allowed) |
+| Field         | Detection sources (in order)                                                                         | Interview fallback     |
+| ------------- | ---------------------------------------------------------------------------------------------------- | ---------------------- |
+| `name`        | `package.json` `name` → git remote repo name → top-level `README.md` H1                              | prompt                 |
+| `one-liner`   | `package.json` `description` → README tagline/subtitle → `brand/BRAND_KIT.md` tagline (when present) | prompt                 |
+| `repo`        | `git remote get-url origin` (normalized to `owner/name` or URL)                                      | prompt                 |
+| `landing URL` | `package.json` `homepage` → first external link/badge in `README.md`                                 | prompt (blank allowed) |
 
 `brand/` is **read-only** here — a detection source only; this command makes no changes under
 `brand/`.

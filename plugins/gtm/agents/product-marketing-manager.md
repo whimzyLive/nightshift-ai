@@ -32,7 +32,7 @@ guessing what the launch is trying to achieve.
    integrations, scheduling, media upload, analytics). **Never hand-roll raw HTTP or curl against
    Postiz** — always go through this skill's CLI wrapper. Before invoking the CLI, export the
    backend URL from `marketing-context.md` (`export POSTIZ_API_URL="<Backend URL from
-   marketing-context.md>"`) — the CLI reads it from the environment, but gtm persists it as a
+marketing-context.md>"`) — the CLI reads it from the environment, but gtm persists it as a
    config token, not an env-only secret. Authenticate first (`postiz auth:status` must pass before
    any other Postiz command); upload all media via `postiz upload`.
 

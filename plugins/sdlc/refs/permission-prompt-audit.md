@@ -13,6 +13,7 @@ It does NOT bypass per-command permission checks. `auto` mode = auto-approve onl
 what matches an allow rule; everything else prompts.
 
 True bypass requires one of:
+
 - `"defaultMode": "bypassPermissions"` in settings, OR
 - launching `claude --dangerously-skip-permissions`.
 
@@ -25,13 +26,13 @@ The Bash permission matcher statically parses the command. If it can't, it canno
 match an allow rule, so it falls through to ASK. Allowlisting does not help — the
 rule never matches. Triggers seen / known:
 
-| Trigger | Error / behavior | Source |
-|---|---|---|
-| Backtick `` `...` `` | `backtick_body_overrun` "cannot be statically analyzed" | user report |
-| Command subst `$(...)` | unanalyzable → prompt | 76 occurrences in agents/skills |
-| Quote inside brace exp `{"..."}` | "expansion obfuscation" HARD block (overrides allow) | CLAUDE.md |
-| Unbalanced/nested quotes, heredoc | parse failure → prompt | — |
-| Inline JSON literal | combines brace+quote → block | CLAUDE.md, acli skill |
+| Trigger                           | Error / behavior                                        | Source                          |
+| --------------------------------- | ------------------------------------------------------- | ------------------------------- |
+| Backtick `` `...` ``              | `backtick_body_overrun` "cannot be statically analyzed" | user report                     |
+| Command subst `$(...)`            | unanalyzable → prompt                                   | 76 occurrences in agents/skills |
+| Quote inside brace exp `{"..."}`  | "expansion obfuscation" HARD block (overrides allow)    | CLAUDE.md                       |
+| Unbalanced/nested quotes, heredoc | parse failure → prompt                                  | —                               |
+| Inline JSON literal               | combines brace+quote → block                            | CLAUDE.md, acli skill           |
 
 ## Root cause #2 — compound + dynamic commands
 
@@ -75,11 +76,13 @@ These instructions actively generate the patterns above:
 ## Remediations (ranked)
 
 ### R0 — flip to true bypass (eliminates ALL of the above)
+
 Set project `.claude/settings.json` → `"defaultMode": "bypassPermissions"` (or always
 launch with `--dangerously-skip-permissions`). Security tradeoff — only do this in
 the CI / spare-machine context. This is the single highest-leverage fix.
 
 ### R1 — move temp files into project + allowlist (if staying in auto)
+
 - Use `./.tmp/` not `/tmp`. Add to `.gitignore`.
 - Allow rules: `Read(./.tmp/**)`, `Write(./.tmp/**)`, `Bash(rm ./.tmp/*)`,
   `Bash(mkdir -p ./.tmp)`.
@@ -94,6 +97,7 @@ the CI / spare-machine context. This is the single highest-leverage fix.
   after a dot separator.
 
 ### R2 — scriptify repeated dynamic shell
+
 Move any command containing `$(...)`, backticks, or compound `&&`/`|` logic into a
 committed script under `${CLAUDE_PLUGIN_ROOT}/scripts/*.sh` with a fixed positional-param
 interface. The `$(...)` lives INSIDE the script — never on the command line — so the
@@ -102,6 +106,7 @@ Candidates: jira-fetch probes, git rev/diff comparisons, exit-marker echoes,
 DNS/auth checks (the `S293`/`S294` compound-shell blocks).
 
 ### R3 — kill commit-message churn
+
 Write the message into the session-scoped temp dir and commit from there —
 `dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh); ...; git commit -F "$dir/msg.txt"`.
 Allow rule: `Bash(git commit -F *)`. Removes the per-message paren-escaping prompt and lets the
@@ -110,5 +115,6 @@ Allow rule: `Bash(git commit -F *)`. Removes the per-message paren-escaping prom
 scoped-only and does not sweep loose `./.tmp/*` files.
 
 ### R4 — never inline JSON / never inline `$()` or backticks on command line
+
 Already in CLAUDE.md for JSON. Extend the rule to: no backticks, no `$(...)`, no
 heredoc on the Bash command line — wrap in a script (R2) or write payload to `./.tmp`.

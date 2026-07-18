@@ -125,31 +125,31 @@ gh pr merge <number-or-url> --squash --delete-branch
 
 ## Branch conventions
 
-| Artifact   | Branch pattern             |
-| ---------- | -------------------------- |
-| Idea doc   | `ideas/<slug>`             |
-| PRD        | `feature/prd-<slug>`       |
-| Spec       | `spec/<JIRA-KEY>`          |
-| Plan       | `plan/<slug>`              |
-| DB changes | `feat/db/<feature>`        |
-| Backend    | `feat/backend/<feature>`   |
-| Sync       | `feat/sync/<feature>`      |
-| Web        | `feat/web/<feature>`       |
-| Mobile     | `feat/mobile/<feature>`    |
+| Artifact   | Branch pattern           |
+| ---------- | ------------------------ |
+| Idea doc   | `ideas/<slug>`           |
+| PRD        | `feature/prd-<slug>`     |
+| Spec       | `spec/<JIRA-KEY>`        |
+| Plan       | `plan/<slug>`            |
+| DB changes | `feat/db/<feature>`      |
+| Backend    | `feat/backend/<feature>` |
+| Sync       | `feat/sync/<feature>`    |
+| Web        | `feat/web/<feature>`     |
+| Mobile     | `feat/mobile/<feature>`  |
 
 ## PR title conventions
 
-| Phase     | Title format                             |
-| --------- | ---------------------------------------- |
-| Idea doc  | `docs(idea): <concept title>`            |
-| PRD       | `docs(prd): <feature title>`             |
-| Spec      | `docs(spec): <JIRA-KEY> <story summary>` |
-| Plan      | `docs(plan): <JIRA-KEY> <feature title>` |
-| DB        | `feat(db): <description>`                |
-| Backend   | `feat(backend): <description>`           |
-| Sync      | `feat(sync): <description>`              |
-| Web       | `feat(web): <description>`               |
-| Mobile    | `feat(mobile): <description>`            |
+| Phase    | Title format                             |
+| -------- | ---------------------------------------- |
+| Idea doc | `docs(idea): <concept title>`            |
+| PRD      | `docs(prd): <feature title>`             |
+| Spec     | `docs(spec): <JIRA-KEY> <story summary>` |
+| Plan     | `docs(plan): <JIRA-KEY> <feature title>` |
+| DB       | `feat(db): <description>`                |
+| Backend  | `feat(backend): <description>`           |
+| Sync     | `feat(sync): <description>`              |
+| Web      | `feat(web): <description>`               |
+| Mobile   | `feat(mobile): <description>`            |
 
 ## PR body template per phase
 
