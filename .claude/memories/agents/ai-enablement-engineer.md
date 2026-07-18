@@ -253,10 +253,6 @@ page…`) — genuinely the more consistent choice, and Prettier's `proseWrap: p
   `pnpm nx affected -t test --base=remotes/origin/develop` and `pnpm nx format:check` both
   report clean/no-tasks for a `plugins/sdlc/**`-only change in this repo — expected, not a
   skipped gate.
-- This story's dispatch prompt again explicitly overrode the standing "domain agent never
-  pushes" rule (same shape as NA-60's) with an instruction to push `feat/NA-61` directly and
-  verify `git rev-parse HEAD == git rev-parse origin/feat/NA-61` myself — no Principal Engineer
-  orchestrator, no PR, no `session-complete`, per the dispatch prompt's explicit instruction.
 
 ## NA-60 — PR #127 review fix: trigger the warning on `LIKELY_KEYS`, not `OUT_OF_SCOPE`
 
@@ -1396,17 +1392,7 @@ review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 prod
   visually with the preceding list item as long as there's no blank-line-terminated topic break, and
   prettier's parser no longer needs to reconcile fence-body indentation against list-item content
   indentation, so it leaves the block completely untouched (verified `diff` before/after `prettier
---write` = empty). **Always verify a Markdown/bash-artifact fix by actually running this repo's
-  real `prettier --write` on a scratch copy in the repo's own directory before committing** — testing
-  from `/tmp` gave a false "no changes" negative (config/plugin resolution differs outside the repo
-  tree), and `git show HEAD:<file>` after commit is the only way to see what `lint-staged` really did
-  (it silently re-stages its own output as part of the same commit, past the point your Edit tool
-  call can inspect). Do all such scratch-file prettier reproduction testing in a `/tmp`-adjacent
-  scratch dir or with an explicit absolute `cd` guard — a bare `cd <primary-repo-root>` in a Bash
-  call (rather than the dispatched worktree path) silently runs subsequent commands against the
-  PRIMARY checkout, which for a domain agent is a hard violation if anything gets staged/committed
-  there; confirm `pwd` and `git worktree list` immediately after any such `cd` before trusting `git
-log`/`git status` output.
+--write` = empty).
 
 ## NA-27 — Copilot fix round on PR #72 (`plugins/sdlc/scripts`)
 
@@ -1706,14 +1692,6 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   it from static docs — this session's own tool list had no way to independently confirm an MCP
   server slug (no claude-mem tools were present to introspect), so the orchestrator-supplied,
   live-session-verified value was the only trustworthy source of truth available.
-- Splitting a founder-confirmation gate across a two-dispatch boundary (draft-and-return, then
-  write-after-confirmation) is the same pattern `/sdlc:analyze`'s scan-then-apply flow already
-  established — reused its exact framing ("a dispatched subagent runs to completion and cannot
-  block for interactive input") almost verbatim in three places (`adr-pipeline.md` §3,
-  `knowledge-engineer.md`'s Pipeline section, `commands/adr.md`'s Shared pipeline section) rather
-  than inventing new prose for what is structurally the identical constraint. When a new
-  command/agent pair needs a human-in-the-loop gate, check whether an existing command already
-  solved the "subagent can't block" problem before designing a new mechanism.
 - Adding a second sanctioned cross-agent-memory-write exception to `analyze-protocol.md` required
   promoting the previously-implicit single exception (referenced only as "the human-arbitrated
   memory-conflict reset" inline in two places — the read-only-carve-out bullet and the
@@ -1768,16 +1746,6 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
 
 ## 2026-07-15 — Story NA-44 — review fix, round 2 (PR #106, in-session /code-review + Copilot)
 
-- A rule genuinely worth stating in more than one place (here: immutability, mentioned in a "why"
-  rationale bullet, a lifecycle bullet, and a standalone paragraph) drifts the moment only one of
-  the N restatements gets a later edit — round 1 fixed the contradiction in the standalone
-  paragraph only, leaving the lifecycle bullet still saying "never edited or reopened" with no
-  exception and the rationale bullet re-deriving the whole thing independently. Same "one source
-  of truth + pointers" pattern from the NA-26 memory entries, but the trigger this time was subtler:
-  the first review round fixed the wording it was pointed at, not the fact that the same fact was
-  stated three times at three different strengths — after any "fix the contradiction" finding,
-  grep the whole file for the concept's other restatements before declaring it resolved, don't
-  just fix the one paragraph the finding cited.
 - A skill authored for a pipeline that hasn't shipped yet (`/sdlc:adr` + knowledge-engineer, NA-43
   pending) needs "not yet shipped" framing repeated at every place the pipeline is named, not just
   the first — round 1 didn't get flagged for this because the skill correctly stood alone as an

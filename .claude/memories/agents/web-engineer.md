@@ -901,17 +901,6 @@ version:1 }], direction:'ltr', format:'', indent:0, version:1 } }` shape is
 
 **Pitfalls:**
 
-- Adding a Payload `findGlobal`/`find` call directly in a Next.js App Router
-  page makes that route attempt static prerendering at `next build` time by
-  default — which then requires a **migrated** Postgres schema to exist
-  (not just a reachable DB.) A brand-new global with no migration yet fails
-  build with `relation "<slug>" does not exist`. Fix: add
-  `export const dynamic = 'force-dynamic';` to the page so Payload is only
-  queried at request time — this is also the _more correct_ choice for
-  CMS content that must reflect admin edits without a redeploy. Don't try
-  to fight the DB-at-build-time requirement (e.g. by faking data) if you
-  can instead just defer rendering — check first whether the page even
-  needs to be statically prerendered.
 - Testing an async Server Component with Jest + `@testing-library/react`
   does **not** work by nesting it as JSX (`<Page />`) inside another
   render — React's client renderer errors because the component returns a
@@ -936,18 +925,6 @@ version:1 }], direction:'ltr', format:'', indent:0, version:1 } }` shape is
 - GSAP's transform aliases are `rotationX`/`rotationY` (not `rotateX`/
   `rotateY`) — passing the CSS-style names to `gsap.quickTo`/`gsap.to`
   silently does nothing.
-
-**Patterns:**
-
-- `gsap.matchMedia({ reduceMotion: '(prefers-reduced-motion: reduce)' }, ...)`
-  is the single place to branch: skip the entrance timeline, skip the
-  pointermove listener, skip the ScrollTrigger creation, and `gsap.set(...)`
-  straight to the final visible state when `reduceMotion` is true. Testable
-  by mocking `gsap.matchMedia`'s `add(query, handler)` to capture the
-  handler and invoking it directly with both `{ reduceMotion: true }` and
-  `{ reduceMotion: false }`, then asserting which GSAP calls fired.
-  **CORRECTED 2026-07-10 (NA-16 code review, see below): this pattern is a
-  CRITICAL bug** — see the entry below for why and the fix.
 
 ## 2026-07-12 — Story NA-30 — site-wide night-sky chrome + Tailwind v4 token layer
 
@@ -1059,19 +1036,6 @@ animation-iteration-count:1!important; transition-duration:.01ms!important; }`)
 
 **Learnings:**
 
-- GSAP's real `MatchMedia.add(conditions, handler)` (gsap-core.js) only
-  invokes `handler` when **at least one** named condition's media query
-  actually matches (`active = 1` per matching query; `active && func(...)`).
-  Registering only `{ reduceMotion: '(prefers-reduced-motion: reduce)' }`
-  means a default user (no explicit motion preference either way) matches
-  _nothing_ → the handler never runs → no entrance animation, ever, for the
-  common case. Always pair `reduceMotion` with its complement
-  `allowMotion: '(prefers-reduced-motion: no-preference)'` so the handler
-  is guaranteed to fire. Read `node_modules/.pnpm/gsap@*/node_modules/gsap/gsap-core.js`
-  directly (`grep -n matchMedia`) to verify this contract instead of trusting
-  intuition about what "should" happen — this is exactly the bug the
-  previous memory entry (immediately above) shipped and mis-documented as a
-  correct pattern.
 - A jest mock that just captures `mm.add`'s handler and invokes it manually
   with a hand-picked `{ conditions }` object (as the original hero-client
   spec did) tests the mock's own fabricated behavior, not GSAP's real
