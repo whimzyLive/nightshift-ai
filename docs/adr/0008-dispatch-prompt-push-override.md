@@ -4,7 +4,7 @@ agents: [ai-enablement-engineer, platform-engineer]
 source-stories: [NA-60, NA-61, NA-62]
 ---
 
-# 0006. An explicit dispatch-prompt push instruction overrides the standing commit-only handoff default
+# 0008. Dispatch-prompt push override of the commit-only handoff default
 
 ## Status
 

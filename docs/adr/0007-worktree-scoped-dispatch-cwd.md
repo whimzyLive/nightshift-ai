@@ -4,7 +4,7 @@ agents: [platform-engineer, web-engineer, ai-enablement-engineer]
 source-stories: [NA-3, NA-16, NA-26, NA-27]
 ---
 
-# 0005. Never operate from the shared/primary checkout path inside a dispatched worktree; free branch locks via ff-only merge
+# 0007. Worktree-scoped working directory for domain-agent dispatches
 
 ## Status
 

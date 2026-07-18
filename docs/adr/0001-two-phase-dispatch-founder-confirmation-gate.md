@@ -4,7 +4,7 @@ agents: [ai-enablement-engineer, knowledge-engineer]
 source-stories: [NA-43, NA-52, NA-54, NA-55, NA-57]
 ---
 
-# 0001. Split every founder-confirmation gate across two stateless subagent dispatches
+# 0001. Two-phase dispatch for founder-confirmation gates
 
 ## Status
 

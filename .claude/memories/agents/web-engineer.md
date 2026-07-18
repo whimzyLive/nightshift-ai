@@ -438,9 +438,10 @@ slug: 'whySdlc', depth: 0 })`'s own generic inference (same as `find()`'s
   parameter needed on the call.
 - `pnpm nx build marketing` (Turbopack, Next 16, no live DB) succeeds with
   `/why-sdlc` correctly listed as `ƒ` (dynamic) in the route summary once
-  `export const dynamic = 'force-dynamic'` is set (same NA-16 convention as
-  the home page) — confirms the build-time static-prerender trap doesn't
-  apply here either, no live Postgres needed for this story's verification.
+  `export const dynamic = 'force-dynamic'` is set (same convention as the
+  home page, per `docs/adr/0010-cms-force-dynamic-and-migration.md`) —
+  confirms the build-time static-prerender trap doesn't apply here either,
+  no live Postgres needed for this story's verification.
 - `pnpm nx format:write --uncommitted` after a full build+lint+test pass
   only touched `apps/marketing/next-env.d.ts` (the `./.next/dev/types/...`
   vs `./.next/types/...` import-path churn documented in the NA-16
@@ -727,10 +728,13 @@ slug: 'whySdlc', depth: 0 })`'s own generic inference (same as `find()`'s
   Payload/DB calls in the new page tree statically prerenders successfully
   with **no `DATABASE_URL`/DB at all** — confirms static composition
   sections (no `findGlobal`/`find` calls) don't inherit the "needs a
-  migrated Postgres schema at build time" constraint documented in the
-  NA-16 entry below (that constraint is specific to pages that actually
-  call Payload's Local API). Good fast way to get real `tsc`-equivalent
-  type-checking signal for a story with no repo `typecheck` target — `next
+  migrated Postgres schema at build time" constraint documented in
+  `docs/adr/0010-cms-force-dynamic-and-migration.md` (see also
+  `docs/adr/0009-cms-read-try-catch-fallback.md` for the fallback that
+  constraint pairs with; that constraint is specific to pages that
+  actually call Payload's Local API). Good fast way to get real
+  `tsc`-equivalent type-checking signal for a story with no repo
+  `typecheck` target — `next
 build` runs the full TypeScript pass before prerendering.
 - No `gsap` or `motion`/`framer-motion` package is installed anywhere in
   this workspace (`grep` across every `package.json` came back empty),

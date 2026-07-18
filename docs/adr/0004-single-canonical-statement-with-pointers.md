@@ -4,7 +4,7 @@ agents: [ai-enablement-engineer]
 source-stories: [NA-26, NA-43, NA-44, NA-52, NA-57]
 ---
 
-# 0003. Shared cross-file contracts get exactly one canonical statement, with every other site reduced to a pointer
+# 0004. Single canonical statement with pointers for shared cross-file contracts
 
 ## Status
 

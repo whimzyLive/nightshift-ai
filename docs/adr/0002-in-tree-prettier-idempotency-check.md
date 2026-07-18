@@ -4,7 +4,7 @@ agents: [ai-enablement-engineer, qa-engineer]
 source-stories: [NA-25, NA-27, NA-43, NA-51, NA-52, NA-54, NA-57, NA-58, NA-60, NA-61, NA-62]
 ---
 
-# 0002. Verify markdown edits under plugins/sdlc/\*\* with an in-tree, two-pass Prettier diff — never trust a pre-commit dry run
+# 0002. In-tree two-pass Prettier idempotency check for plugin markdown
 
 ## Status
 
@@ -23,11 +23,7 @@ on it twice and require the second pass to be byte-identical to the first
 (idempotence); (4) after the real commit lands, re-read the file from the committed
 tree (`git show HEAD:<file>`) and confirm it still matches, since the repo's real
 `lint-staged` pre-commit hook runs its own `prettier --write` that can differ from any
-prior dry run. Any fenced code block or paragraph sitting adjacent to (nested under, or
-immediately following) a numbered/bulleted list item is dedented to column 0 — fence,
-body, and any trailing continuation prose — rather than matched to the list item's
-content-indentation, since indentation-matching is the recurring root cause of
-Prettier/remark markdown corruption in this repo.
+prior dry run.
 
 ## Context
 
@@ -62,24 +58,12 @@ zero signal value.
 - Cons: would let genuinely unformatted markdown land uncaught; the hook itself isn't
   the problem, the failure to verify its actual output is.
 
-### Re-indent to match the surrounding list item instead of dedenting to column 0
-
-- Pros: visually more "consistent" with neighboring nested content.
-- Cons: repeatedly the literal root cause of the corruption this ADR exists to prevent —
-  Prettier's parser requires every line inside a fence nested under a list item to
-  satisfy that item's content-indentation exactly, and any content that quotes/embeds
-  raw text verbatim (e.g. a Jira comment body) can't safely absorb re-indentation without
-  changing the literal bytes it's meant to preserve.
-
 ## Consequences
 
 - Adds real verification overhead (scratch-copy, two-pass write, post-commit re-read) to
   every markdown-touching plugin story — but this cost is already what the corpus shows
   actually catches real, ship-blocking corruption; skipping it has repeatedly shipped
   defects to review instead of catching them pre-commit.
-- Column-0 dedent is now the default fix for any list-adjacent fence, rather than a
-  case-by-case judgment call — trades a small amount of visual nesting consistency for
-  parser stability.
 - A single same-file two-pass check is not sufficient on its own if the SAME file has
   other corruption elsewhere in the same reflow unit (e.g. the same paragraph) — the
   whole paragraph/list-item span must be checked, not just the touched lines.
