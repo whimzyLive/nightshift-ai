@@ -31,17 +31,6 @@ cd "$repo_root" || {
   exit 1
 }
 
-# Fail-fast empty-set guard — a vacuously-green gate is worse than none (mirror the sibling guard).
-# Deliberately `find`, not `shopt -s globstar`: globstar requires bash >= 4, but macOS ships bash
-# 3.2 as its default /bin/bash (Apple's last GPLv2-licensed release) — `shopt -s globstar` fails
-# with "invalid shell option name" there, silently degrading this guard on any contributor's local
-# macOS run even though CI's bash is new enough. `find` has no such version dependency.
-file_count="$(find plugins -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
-if [ "$file_count" -eq 0 ]; then
-  echo "check-plugin-docs-format: FAILED — no plugins/**/*.md files found (wrong dir / misconfigured path)" >&2
-  exit 1
-fi
-
 # Prettier availability guard — actionable message on a local run before node_modules is installed.
 if ! pnpm exec prettier --version >/dev/null 2>&1; then
   echo "check-plugin-docs-format: FAILED — prettier unavailable; run 'pnpm install --frozen-lockfile'" >&2
@@ -50,7 +39,34 @@ fi
 
 # The gate: the native fixed-point predicate over ALL plugin markdown, in one call.
 # Let prettier expand its own glob (quoted) so it applies .prettierignore consistently.
-if pnpm exec prettier --check "plugins/**/*.md"; then
+#
+# Fail-fast empty-set guard — a vacuously-green gate is worse than none (mirror the sibling guard).
+# Deliberately NOT a separate `find`/`shopt -s globstar` pre-check: either would enumerate the glob
+# through a DIFFERENT mechanism than the gate itself uses below (a plain filesystem walk ignores
+# .prettierignore and dotfile rules prettier applies), so the guard's count could silently diverge
+# from what the gate actually checks — a later .prettierignore entry could make the pre-check see
+# files while prettier's own ignore-aware glob sees none, defeating the guard. `find` also would
+# have needed `shopt -s globstar` for the recursive `**`, which fails outright on macOS's stock
+# bash 3.2 (globstar needs bash >= 4; verified locally). Avoid both problems by reading the SAME
+# `prettier --check` invocation's own output: prettier reports an unmatched glob explicitly
+# ("No files matching the pattern were found", non-zero exit) when the raw glob resolves to zero
+# paths (wrong dir, plugins/ deleted/misconfigured), so that single call is simultaneously the
+# fixed-point gate and the empty-set detector for THAT case — same enumeration, zero chance of the
+# guard and the gate seeing a different file set. (A bare directory-level .prettierignore entry
+# that ignores every matched file individually is a different, deeper prettier-CLI limitation:
+# prettier reports blanket "All matched files use Prettier code style!" for that case with no way
+# to distinguish it from a genuine all-clean result. No local pre-check can fix that — it is
+# identical to what the CI gate itself would silently report, since both now run this exact call.)
+output="$(pnpm exec prettier --check "plugins/**/*.md" 2>&1)"
+exit_code=$?
+printf '%s\n' "$output"
+
+if printf '%s' "$output" | grep -q 'No files matching the pattern were found'; then
+  echo "check-plugin-docs-format: FAILED — no plugins/**/*.md files matched prettier's own glob (wrong dir / misconfigured path)" >&2
+  exit 1
+fi
+
+if [ "$exit_code" -eq 0 ]; then
   echo "check-plugin-docs-format: OK — every plugins/**/*.md is a Prettier fixed point"
   exit 0
 fi
