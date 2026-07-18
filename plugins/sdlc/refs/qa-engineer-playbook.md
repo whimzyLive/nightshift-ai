@@ -340,7 +340,7 @@ every round, regardless of any ADR-index match:**
 
 The `patterns.md` audit log is never soft-skipped, even when the finding repeats something an
 `accepted` ADR already documents — a repeat violation of an accepted convention is itself
-recurrence evidence that `/sdlc:adr --distill` needs to see (per `adr-pipeline.md` §6's
+recurrence evidence that `/sdlc:docs distill` needs to see (per `adr-pipeline.md` §6's
 Recurrence criterion), so suppressing this entry would starve distill of the exact signal that
 justifies revisiting or reinforcing the ADR. The ADR-index guard below applies only to the
 per-agent memory append (item 2), never to this audit log.

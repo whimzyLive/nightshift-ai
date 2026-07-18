@@ -8,6 +8,7 @@
 - **Summary:** Enable Google login for trial users to reduce signup friction
 
 #### Use Case:
+
 - **As a** trial user visiting the app for the first time
 - **I want to** log in using my Google account
 - **so that** I can access the app without creating and remembering a new password
@@ -23,6 +24,7 @@
 ```
 
 **Why this works:**
+
 - Persona is specific ("trial user visiting for the first time")
 - Action is clear ("log in using my Google account")
 - Outcome explains motivation ("without creating a new password")
@@ -39,6 +41,7 @@
 - **Summary:** Improve login experience
 
 #### Use Case:
+
 - **As a** user
 - **I want to** better login
 - **so that** I can use the app
@@ -53,12 +56,14 @@
 ```
 
 **Why this fails:**
+
 - "User" is too generic (trial user? returning user? admin?)
 - "Better login" is not an action (what specifically?)
 - "Use the app" is not a specific outcome (everyone wants to use the app)
 - Acceptance criteria are untestable ("works better" = unmeasurable)
 
 **How to fix it:**
+
 - Narrow the persona: "trial user," "returning user without password manager," etc.
 - Define the action: "log in using Google," "reset my password via email," etc.
 - Specify the outcome: "without remembering a new password," "in under 30 seconds," etc.
@@ -74,6 +79,7 @@
 - **Summary:** Manage shopping cart
 
 #### Use Case:
+
 - **As a** shopper
 - **I want to** add items, remove items, update quantities, apply coupons, and checkout
 - **so that** I can complete my purchase
@@ -95,12 +101,14 @@
 ```
 
 **Why this needs splitting:**
+
 - Multiple "When" statements = multiple stories
 - Scope is too large for a single sprint
 - Different outcomes aren't related (adding items ≠ applying coupons)
 
 **How to split it:**
 Use `skills/user-story-splitting/SKILL.md` to break this into:
+
 1. "Add items to cart"
 2. "Remove items from cart"
 3. "Update item quantities"

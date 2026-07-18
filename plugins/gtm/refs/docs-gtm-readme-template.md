@@ -17,10 +17,10 @@ engagement, pulse, and launch workflows on top of the foundation `/gtm:init` boo
 
 ## Directory map
 
-| Path | Holds |
-| ---- | ----- |
-| `docs/gtm/digests/` | Committed pulse digests (a downstream story populates this) |
-| `docs/gtm/briefs/` | GTM briefs emitted by the `product-marketing-manager` agent, named `<date>-<slug>.md` (a downstream story populates this) |
+| Path                | Holds                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `docs/gtm/digests/` | Committed pulse digests (a downstream story populates this)                                                               |
+| `docs/gtm/briefs/`  | GTM briefs emitted by the `product-marketing-manager` agent, named `<date>-<slug>.md` (a downstream story populates this) |
 
 Downstream stories (channel ownership/voice/cadence, KPI setup, engagement listening, pulse,
 launch) may add further placeholders here as they land — this file's directory map should be kept

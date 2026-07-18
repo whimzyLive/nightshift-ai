@@ -3,6 +3,7 @@
 **Rule:** All Jira descriptions and comments written via `acli --description-file` MUST be ADF JSON. Plain markdown renders as raw symbols in Jira Cloud.
 
 Save to a `.json` temp file under the session-scoped temp dir (never `/tmp` — outside permission scope):
+
 ```bash
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
 desc=$(mktemp "$dir/acli-adf.XXXXXX.json")
@@ -18,11 +19,14 @@ acli jira workitem create --description-file "$desc" ...
 ## Root structure
 
 Every ADF document:
+
 ```json
 {
   "version": 1,
   "type": "doc",
-  "content": [ /* array of block nodes */ ]
+  "content": [
+    /* array of block nodes */
+  ]
 }
 ```
 
@@ -31,16 +35,16 @@ Every ADF document:
 ## Block nodes
 
 ### paragraph
+
 ```json
 {
   "type": "paragraph",
-  "content": [
-    { "type": "text", "text": "Plain text here." }
-  ]
+  "content": [{ "type": "text", "text": "Plain text here." }]
 }
 ```
 
 ### heading
+
 ```json
 {
   "type": "heading",
@@ -48,33 +52,33 @@ Every ADF document:
   "content": [{ "type": "text", "text": "Section Title" }]
 }
 ```
+
 `level`: 1–6. Use 2 for major sections, 3 for sub-sections.
 
 ### bulletList
+
 ```json
 {
   "type": "bulletList",
   "content": [
     {
       "type": "listItem",
-      "content": [
-        { "type": "paragraph", "content": [{ "type": "text", "text": "Item one" }] }
-      ]
+      "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Item one" }] }]
     },
     {
       "type": "listItem",
-      "content": [
-        { "type": "paragraph", "content": [{ "type": "text", "text": "Item two" }] }
-      ]
+      "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Item two" }] }]
     }
   ]
 }
 ```
 
 ### orderedList
+
 Same as `bulletList` but `"type": "orderedList"`.
 
 ### taskList — for Acceptance Criteria checkboxes
+
 ```json
 {
   "type": "taskList",
@@ -93,10 +97,12 @@ Same as `bulletList` but `"type": "orderedList"`.
   ]
 }
 ```
+
 `state`: `"TODO"` (unchecked) or `"DONE"` (checked). Always use `"TODO"` for new stories.
 `localId` values must be unique within the document — use sequential strings (`tl-1`, `ti-1`, `ti-2`, …).
 
 ### codeBlock
+
 ```json
 {
   "type": "codeBlock",
@@ -106,6 +112,7 @@ Same as `bulletList` but `"type": "orderedList"`.
 ```
 
 ### rule (horizontal divider)
+
 ```json
 { "type": "rule" }
 ```
@@ -115,21 +122,25 @@ Same as `bulletList` but `"type": "orderedList"`.
 ## Inline marks (apply to text nodes)
 
 ### bold
+
 ```json
 { "type": "text", "text": "Bold label", "marks": [{ "type": "strong" }] }
 ```
 
 ### italic
+
 ```json
 { "type": "text", "text": "Italic text", "marks": [{ "type": "em" }] }
 ```
 
 ### inline code
+
 ```json
 { "type": "text", "text": "someFunction()", "marks": [{ "type": "code" }] }
 ```
 
 ### link
+
 ```json
 {
   "type": "text",
@@ -139,6 +150,7 @@ Same as `bulletList` but `"type": "orderedList"`.
 ```
 
 ### Combined marks
+
 ```json
 { "type": "text", "text": "Bold+italic", "marks": [{ "type": "strong" }, { "type": "em" }] }
 ```
@@ -148,6 +160,7 @@ Same as `bulletList` but `"type": "orderedList"`.
 ## Common patterns
 
 ### Bold label + plain value in same paragraph
+
 ```json
 {
   "type": "paragraph",
@@ -159,6 +172,7 @@ Same as `bulletList` but `"type": "orderedList"`.
 ```
 
 ### Mixed content paragraph (bold intro + body)
+
 ```json
 {
   "type": "paragraph",

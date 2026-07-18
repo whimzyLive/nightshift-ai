@@ -67,3 +67,24 @@
 **Root causes:** two-phase dispatch designed without an explicit data handoff contract; docs updated for the new rule but not the old rule's absolutist wording; uniqueness schemes (numbers, date branches) designed single-writer; guard scope stated ambiguously ("both appends").
 **Preventions:** every cross-dispatch boundary needs an explicit payload contract (what, verbatim, via which channel); when adding exception N, grep for "only" claims about exceptions 1..N-1; any generated identifier needs a collision rule; guards state their exact scope per append site.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-17 — Story NA-58
+
+**Issues found:** 1 Critical — writing-docs SKILL.md frontmatter description exceeded the 1024-char validator limit (1162 chars); runtime truncation would have dropped the parameterization clause, undermining AC-1 signal and skill triggering. 1 Minor — garbled ADR-index parenthetical in the explanation template.
+**Root causes:** description authored for completeness without running the plugin's own vendored validator (`skill-creator/scripts/quick_validate.py`); a sentence duplicated the body's "When to Use" section.
+**Preventions:** run `quick_validate.py` on any new/edited plugin skill before committing; keep frontmatter descriptions ~800 chars like sibling skills; never duplicate body sections into the description.
+**Domains affected:** ai-enablement-engineer
+
+## 2026-07-17 — Story NA-51
+
+**Issues found:** Important: prettier pre-commit mangled init.md Step 0 nested list (4-level nesting non-idempotent); Important: Step 0→4g merge-path gate relied on inference (AC5 reachability); Minor: story-context leakage in permanent plugin ref, formatting noise, inconsistent backticking.
+**Root causes:** committing whichever form the prettier hook emits instead of restructuring to prettier-stable ≤3-level nesting; wiring a new init step into Step 0's jump list without re-checking the merge-run path that bypasses the prompt step.
+**Preventions:** run prettier twice + diff before committing any init.md edit; when adding an init step, verify every Step 0 path (merge run, full re-run) can reach it; write plugin refs in timeless language (no story refs).
+**Domains affected:** ai-enablement-engineer
+
+## 2026-07-17 — Story NA-52
+
+**Issues found:** Important: knowledge-engineer.md shared sections (branch/commit/return, completion checklist) not branched per dispatch type — ADR-only instructions were a live wrong-branch-cut hazard for docs-sync phase 2; Minor: diff range used local base (stale-base risk), manifest resolution checkout-dependency undocumented, fossil examples in registry schema.
+**Root causes:** adding a second dispatch type to an agent without sweeping EVERY shared section for type-specific assumptions; spec text inherited verbatim without checkout-independence audit.
+**Preventions:** when an agent gains a dispatch type, grep every section heading for unbranched instructions; prefer origin/<base> remote-tracking refs in all diff ranges.
+**Domains affected:** ai-enablement-engineer

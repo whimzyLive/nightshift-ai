@@ -34,13 +34,13 @@ this path. Do not abbreviate, alias, or move it.
 
 ### Field definitions
 
-| Field | Type | Required | Description |
-| ----- | ---- | -------- | ----------- |
-| `version` | `number` | yes | Schema version. Always `1` for files written by this version of the plugin. |
-| `skills` | `array` | yes | Ordered list of tracked skill entries. Empty array `[]` is valid. |
-| `skills[].name` | `string` | yes | Skill identifier — must match the name listed in `.claude/project/agents/<agent>.md`. Case-sensitive. |
-| `skills[].source` | `"suggested" \| "custom"` | yes | `suggested` — the skill was recommended by `/init` based on the detected stack. `custom` — the user typed a skill name not in the suggestion list. |
-| `skills[].addedBy` | `string` | yes | The agent name (e.g. `platform-engineer`) or literal `"user"` that added this entry. `/init` always sets this to `"init"`. |
+| Field              | Type                      | Required | Description                                                                                                                                        |
+| ------------------ | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`          | `number`                  | yes      | Schema version. Always `1` for files written by this version of the plugin.                                                                        |
+| `skills`           | `array`                   | yes      | Ordered list of tracked skill entries. Empty array `[]` is valid.                                                                                  |
+| `skills[].name`    | `string`                  | yes      | Skill identifier — must match the name listed in `.claude/project/agents/<agent>.md`. Case-sensitive.                                              |
+| `skills[].source`  | `"suggested" \| "custom"` | yes      | `suggested` — the skill was recommended by `/init` based on the detected stack. `custom` — the user typed a skill name not in the suggestion list. |
+| `skills[].addedBy` | `string`                  | yes      | The agent name (e.g. `platform-engineer`) or literal `"user"` that added this entry. `/init` always sets this to `"init"`.                         |
 
 ---
 

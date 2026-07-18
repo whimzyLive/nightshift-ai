@@ -67,7 +67,7 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 
 Also read your `docs/adr/index.md` section (the `qa-engineer` section, plus `General`) if it
 exists — best-effort; a missing index (repo has no ADRs yet) is a no-op, not an error. Open the
-full `docs/adr/NNNN-*.md` only on demand. This matters because `/sdlc:adr --distill` can promote —
+full `docs/adr/NNNN-*.md` only on demand. This matters because `/sdlc:docs distill` can promote —
 and delete — entries from `.claude/memories/reviews/patterns.md`, which Step 5 of the playbook
 consults; without this read-path, a promoted-and-deleted review pattern would vanish from QA's
 view instead of surfacing via its canonical ADR. This is guaranteed to work: the pipeline's

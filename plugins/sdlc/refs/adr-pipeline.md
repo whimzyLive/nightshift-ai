@@ -1,13 +1,14 @@
 # ADR pipeline
 
 Shared draft → propose-tags → founder-confirm → write → regenerate-index → commit/PR protocol for
-`/sdlc:adr`, referenced by both `agents/knowledge-engineer.md` and `commands/adr.md` so the
-contract lives in exactly one place. Neither file re-inlines this logic — both summarize and link
-back here.
+`/sdlc:docs seed adr` and `/sdlc:docs distill`, referenced by both `agents/knowledge-engineer.md`
+and `commands/docs.md` so the contract lives in exactly one place. Neither file re-inlines this
+logic — both summarize and link back here.
 
 ## 1. Purpose + ownership note
 
-This is the single-source pipeline for `/sdlc:adr`. All `docs/adr/**` writes land under paths
+This is the single-source pipeline for `/sdlc:docs seed adr` and `/sdlc:docs distill`. All
+`docs/adr/**` writes land under paths
 resolved from the consumer repo's `.claude/project/project-context.md`. In this SDLC repo itself,
 any write that touches `plugins/**` (plugin-authoring, not a plain ADR run) stays within the
 `ai-enablement-engineer` write-scope — see the Active-guard scope note in the agent's First steps.
@@ -53,14 +54,20 @@ Phase 2 writes what the founder saw; it never re-drafts.
 
 5. For each confirmed ADR: compute `NNNN = max(existing) + 1` (four-digit, zero-padded, never
    reused — including numbers retired by superseded/rejected ADRs) from the **union** of two
-   sources, not `docs/adr/` alone — a concurrent `/sdlc:adr` run on another branch can claim a
-   number before this one merges: (a) `docs/adr/` on the latest fetched `origin/<BASE-BRANCH>`,
-   and (b) every open `docs/adr-*` PR branch (`gh pr list --search 'head:docs/adr-'` or
-   equivalent, listing each candidate branch's `docs/adr/*.md` files). Take the max across both
-   sets, then write `docs/adr/NNNN-<decision-slug>.md`. If a duplicate `NNNN` is still detected at
-   PR time (the base moved again after this dispatch computed its number) — renumber the new ADR
-   before merge: rename the file, update its frontmatter/body number, and regenerate the index;
-   never reuse or leave two ADRs sharing one number.
+   sources, not `docs/adr/` alone — a concurrent `/sdlc:docs seed adr` or `/sdlc:docs distill` run
+   on another branch can claim a number before this one merges: (a) `docs/adr/` on the latest
+   fetched `origin/<BASE-BRANCH>`, and (b) every open `docs/adr-*` PR branch
+   (`gh pr list --search 'head:docs/adr-'` or equivalent, listing each candidate branch's
+   `docs/adr/*.md` files). Take the max across both sets, then write
+   `docs/adr/NNNN-<decision-slug>.md`. If a duplicate `NNNN` is still detected at PR time (the base
+   moved again after this dispatch computed its number) — renumber the new ADR before merge: rename
+   the file, update its frontmatter/body number, and regenerate the index; never reuse or leave two
+   ADRs sharing one number.
+
+   **First-ADR base case.** If `docs/adr/` does not exist yet (the first-ever ADR in the repo),
+   **create it**; an empty or absent existing ADR set bases `NNNN` at **`0001`**. `max(existing)`
+   over an empty/absent directory is otherwise undefined and the write target directory would be
+   missing — so this base case is required, not optional.
 
    **The founder-confirmation gate IS the acceptance moment.** Drafts presented at the gate (phase
    1 output) carry `status: proposed` — under discussion, not yet binding, per `writing-adrs`'
@@ -87,7 +94,7 @@ Phase 2 writes what the founder saw; it never re-drafts.
 ## 3. Founder-confirmation gate is at the command layer, NOT in the agent
 
 State this explicitly because it is easy to get backwards: the gate is not something
-`knowledge-engineer` runs. It lives in `commands/adr.md`, between the phase-1 and phase-2
+`knowledge-engineer` runs. It lives in `commands/docs.md`, between the phase-1 and phase-2
 dispatches — identical in spirit to `/sdlc:analyze`'s "report, then apply only after explicit
 human confirmation" split. The command presents each drafted ADR, its proposed `agents` tags, and
 (distill) the exact memory entries slated for deletion, then waits for the founder. The founder
@@ -95,6 +102,46 @@ may edit tags, reject individual candidates, or adjust/veto specific deletions. 
 covers drafts AND deletions together — nothing is deleted that the founder did not see and
 approve. If the founder confirms nothing, the command writes nothing and exits cleanly (no
 branch, no PR, no phase-2 dispatch).
+
+## 3a. Command-layer flow + branch/PR naming
+
+Single-sourced here — `commands/docs.md`'s `seed adr` and `distill` routes **point at** this
+section and do not restate it. The founder-confirmation gate flow itself is already stated in §2
+and §3 above; this section states the two things not covered there: the **branch/PR naming
+convention** and the **post-PR control-flow tail**. Naming this section "command-layer" describes
+where the founder-confirmation gate lives (§3), not who executes the branch/PR naming below — the
+naming convention is single-sourced **here**, but `knowledge-engineer.md`'s own ADR-dispatch
+branch/memory/commit/return steps are what actually **create** the branch and **raise** the PR
+using it (this ref is the convention's source of truth; the agent is its executor). The control-flow
+tail below genuinely is command-layer: `commands/docs.md` drives it once the agent's phase-2
+dispatch returns with a raised PR.
+
+**Branch/PR naming:**
+
+- **Seed** → branch `docs/adr-<slug>`, PR title `docs(adr): <decision title>`.
+- **Distill** → branch `docs/adr-distill-<YYYY-MM-DD>`, PR title
+  `docs(adr): distill <n> ADR(s) from learnings corpus`. **Same-day collision rule:** before
+  creating the branch, check whether `docs/adr-distill-<YYYY-MM-DD>` already exists — locally,
+  on `origin`, or as an open PR (`gh pr list --search 'head:docs/adr-distill-<YYYY-MM-DD>'`). If
+  it does, suffix `-2`, `-3`, … (`docs/adr-distill-<YYYY-MM-DD>-2`, and so on) and use the first
+  unused suffix. Never reuse an existing distill branch/PR for a new confirmation set — each
+  distill run's confirmed candidates get their own branch and PR.
+
+Both branch off `<BASE-BRANCH>` from `.claude/project/project-context.md` — never assume `main`.
+
+**Command control flow:**
+
+After the phase-2 PR is raised, drive the review loop to convergence exactly as `/spec` does:
+
+```bash
+/loop /sdlc:loop <PR_URL>
+```
+
+If the harness cannot nest `/loop` from inside a command, fall back to `ScheduleWakeup` to drive
+`sdlc:loop`'s pass-cycle instead (same effect — the loop is the last thing the session does), then
+let its final pass release. If the command hit a terminal STOP before a PR was raised (nothing to
+loop on, e.g. an empty `seed adr` pattern or the founder confirmed nothing), release the session
+directly.
 
 ## 4. Distill evidence protocol
 
@@ -131,11 +178,11 @@ candidate:
   `get_observations`) are not available in the session (the plugin is not installed / not
   whitelisted), distill mode halts with a clear message, e.g.:
 
-  ```
-  claude-mem tools unavailable — /sdlc:adr --distill requires the claude-mem plugin; install it or use seed mode
-  ```
+```
+claude-mem tools unavailable — /sdlc:docs distill requires the claude-mem plugin; install it or use seed adr
+```
 
-  It does not silently proceed without them.
+It does not silently proceed without them.
 
 - **Tools present but DB empty → non-fatal.** A zero-result observation search is not an error —
   per §4, a candidate carried entirely by repo-native citations still fully satisfies the evidence

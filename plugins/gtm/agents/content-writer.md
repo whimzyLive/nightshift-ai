@@ -70,14 +70,14 @@ You accept a `task` parameter passed by the dispatching command (`/gtm:site`).
 Consultancy ordering — structure, then copy, then conversion, then discoverability. Run these
 skills **in this exact order**:
 
-| Step | Skill | Produces | Required? |
-|------|-------|----------|-----------|
-| 1 | `site-architecture` | Page map / IA: section order, URL, nav stubs, future-page slots | Required |
-| 2 | `copywriting` | Copy deck written to the IA from step 1 | Required |
-| 3 | `cro` | Conversion pass over the copy deck (CTA placement, friction, hierarchy) | Required |
-| 4 | `ai-seo` + `schema` | Meta/OG tags, JSON-LD blocks, llms.txt recommendation | Required |
-| — | `offers` | Sharpen CTA/offer framing | **Conditional** — only when CTA framing is weak after the `cro` pass |
-| — | `marketing-council` | Multi-perspective critique pass | **Conditional** — runs **iff the dispatch carries `--council`** (the flag is the sole trigger; "launch-critical pages" is guidance for when *callers* should pass the flag, not a second gate you apply — never skip an explicitly requested pass on your own judgment). Off by default; never run for a pulse-style dispatch. **If the skill is unavailable/fails to load: skip the pass, do NOT abort the run, and flag the skip explicitly in your return** |
+| Step | Skill               | Produces                                                                | Required?                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---- | ------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `site-architecture` | Page map / IA: section order, URL, nav stubs, future-page slots         | Required                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2    | `copywriting`       | Copy deck written to the IA from step 1                                 | Required                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 3    | `cro`               | Conversion pass over the copy deck (CTA placement, friction, hierarchy) | Required                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 4    | `ai-seo` + `schema` | Meta/OG tags, JSON-LD blocks, llms.txt recommendation                   | Required                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| —    | `offers`            | Sharpen CTA/offer framing                                               | **Conditional** — only when CTA framing is weak after the `cro` pass                                                                                                                                                                                                                                                                                                                                                                                           |
+| —    | `marketing-council` | Multi-perspective critique pass                                         | **Conditional** — runs **iff the dispatch carries `--council`** (the flag is the sole trigger; "launch-critical pages" is guidance for when _callers_ should pass the flag, not a second gate you apply — never skip an explicitly requested pass on your own judgment). Off by default; never run for a pulse-style dispatch. **If the skill is unavailable/fails to load: skip the pass, do NOT abort the run, and flag the skip explicitly in your return** |
 
 `copy-editing` is deliberately **not** in your skill list. It is the copy-review gate's skill, run
 by `/gtm:site` (command step 3) after you hand off — keeping the shared-gate boundary that NA-8's
@@ -102,14 +102,14 @@ orchestration steps (command steps 3, 4, 5).
 
 The artifact carries six required sections:
 
-| Section | Contents |
-|---------|----------|
-| Page map / IA | Ordered section list, page URL/slug, nav stubs, future-page slots |
-| Copy deck | Per-section headline + body + CTA copy (brand-token annotation happens later, at command step 4 — leave that placeholder empty or unannotated) |
-| JSON-LD | Schema.org structured-data block(s) — e.g. `SoftwareApplication`, `Organization` |
-| Meta / OG | `<title>`, meta description, Open Graph + Twitter card tags |
-| llms.txt recommendation | Recommended `llms.txt` content/placement for AI-crawler discoverability |
-| Brand tokens | Placeholder section noting `nightshift-design` tokens are applied later, at command step 4 — you do not populate this |
+| Section                 | Contents                                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page map / IA           | Ordered section list, page URL/slug, nav stubs, future-page slots                                                                              |
+| Copy deck               | Per-section headline + body + CTA copy (brand-token annotation happens later, at command step 4 — leave that placeholder empty or unannotated) |
+| JSON-LD                 | Schema.org structured-data block(s) — e.g. `SoftwareApplication`, `Organization`                                                               |
+| Meta / OG               | `<title>`, meta description, Open Graph + Twitter card tags                                                                                    |
+| llms.txt recommendation | Recommended `llms.txt` content/placement for AI-crawler discoverability                                                                        |
+| Brand tokens            | Placeholder section noting `nightshift-design` tokens are applied later, at command step 4 — you do not populate this                          |
 
 **Persistence boundary:** never write `docs/gtm/site-brief.md` yourself — persisting the brief is
 `/gtm:site` step 5b, and it happens only after the copy-review gate and re-run guard. Return the

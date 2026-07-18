@@ -40,11 +40,11 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
 4. **Probe (AC-4):** read one value via a single `gh api` call, mapped by `GitHub metric`:
 
    | GitHub metric | jq field on `repos/<owner>/<name>` |
-   | ------------- | ----------------------------------- |
-   | `stars`       | `.stargazers_count` |
-   | `forks`       | `.forks_count` |
-   | `watchers`    | `.subscribers_count` |
-   | `open-issues` | `.open_issues_count` |
+   | ------------- | ---------------------------------- |
+   | `stars`       | `.stargazers_count`                |
+   | `forks`       | `.forks_count`                     |
+   | `watchers`    | `.subscribers_count`               |
+   | `open-issues` | `.open_issues_count`               |
 
    ```bash
    gh api "repos/<owner>/<name>" --jq '.stargazers_count'
@@ -78,6 +78,7 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
    > re-run, or supply a raw-numeric endpoint with `Value path` `.`.
 
    A `Value path` of `.` needs no `jq` gate — the raw body is validated numeric directly.
+
 3. **Probe (AC-4), with auth injection applied inline:** the `Authorization` header (when needed)
    must be attached to the **same** `curl` call that reads the value — never added after the fact,
    or an authed endpoint 401s and STOPs before any later step is reached. When `Auth env var` is
@@ -92,7 +93,6 @@ Record the resolved `Source type` (`managed` | `custom`) and `Provider` (`github
 
    Which of the two forms below applies is exactly the same condition as the jq availability gate
    in step 2 — `jq` is only invoked when `Value path` is non-`.`:
-
    - **`Value path` = `.`** (raw-numeric body, the common case for a from-scratch metric endpoint):
      validate the response body numeric directly — no `jq` involved, so this form works even when
      `jq` isn't installed:
@@ -140,18 +140,18 @@ persisted verbatim and must reference an env var rather than embed a literal sec
 Every STOP below occurs in the gather phase (Step 4c), **before** the atomic Step 5, so no
 `marketing-context.md` change is written:
 
-| Scenario | Behaviour | AC |
-| -------- | --------- | -- |
-| GitHub, `gh` not installed | STOP: install `gh` (or choose a custom source), then re-run. Write nothing. | AC-3/4 |
-| GitHub, `gh auth status` not authenticated | STOP: run `gh auth login`, then re-run. Write nothing. | AC-3/4 |
-| GitHub, `Repo` token not resolvable to `owner/name` | STOP: repo is not a GitHub `owner/name`; fix the `Repo` token or use a custom source. Write nothing. | AC-4 |
-| GitHub probe non-zero exit / non-numeric | STOP: could not read `<metric>` from `<owner>/<name>`; verify the repo exists and `gh` can reach it. Write nothing. | AC-4 |
-| Custom, named required env var missing/empty | STOP: env var `<NAME>` is not set; set it and re-run. Write nothing. | AC-3/4 |
-| Custom command non-zero exit / empty / non-numeric | STOP: the KPI command did not return a numeric value. Write nothing. | AC-4 |
-| Endpoint unreachable / HTTP error | STOP: could not reach `<url>`. Write nothing. | AC-4 |
-| Endpoint `Value path` non-`.` but `jq` missing | STOP: `jq` required to extract `<Value path>`; install `jq` or use a raw-numeric endpoint. Write nothing. | AC-4 |
-| Endpoint response not numeric after `Value path` | STOP: the endpoint response did not yield a numeric value at `<Value path>`. Write nothing. | AC-4 |
-| `Metric name` left blank | Re-prompt — required (AC-1); never write a default. | AC-1 |
+| Scenario                                            | Behaviour                                                                                                           | AC     |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------ |
+| GitHub, `gh` not installed                          | STOP: install `gh` (or choose a custom source), then re-run. Write nothing.                                         | AC-3/4 |
+| GitHub, `gh auth status` not authenticated          | STOP: run `gh auth login`, then re-run. Write nothing.                                                              | AC-3/4 |
+| GitHub, `Repo` token not resolvable to `owner/name` | STOP: repo is not a GitHub `owner/name`; fix the `Repo` token or use a custom source. Write nothing.                | AC-4   |
+| GitHub probe non-zero exit / non-numeric            | STOP: could not read `<metric>` from `<owner>/<name>`; verify the repo exists and `gh` can reach it. Write nothing. | AC-4   |
+| Custom, named required env var missing/empty        | STOP: env var `<NAME>` is not set; set it and re-run. Write nothing.                                                | AC-3/4 |
+| Custom command non-zero exit / empty / non-numeric  | STOP: the KPI command did not return a numeric value. Write nothing.                                                | AC-4   |
+| Endpoint unreachable / HTTP error                   | STOP: could not reach `<url>`. Write nothing.                                                                       | AC-4   |
+| Endpoint `Value path` non-`.` but `jq` missing      | STOP: `jq` required to extract `<Value path>`; install `jq` or use a raw-numeric endpoint. Write nothing.           | AC-4   |
+| Endpoint response not numeric after `Value path`    | STOP: the endpoint response did not yield a numeric value at `<Value path>`. Write nothing.                         | AC-4   |
+| `Metric name` left blank                            | Re-prompt — required (AC-1); never write a default.                                                                 | AC-1   |
 
 This table mirrors the spec's Error Handling section, plus the jq-availability gate row (a
 hardening addition not present in the spec) — `/gtm:init` Step 4c cites this ref rather than
