@@ -97,12 +97,7 @@ Interpret the result:
 
 ## Secret hygiene
 
-The **Backend URL** is not a secret — it is persisted to `marketing-context.md` by design (Condition
-
-1. and exported as `POSTIZ_API_URL` before every CLI invocation. Only the **API key** stays
-   env-only: its **name** (`POSTIZ_API_KEY`) is written to `marketing-context.md`, never its value.
-   The actual key value is read from the environment at run time and never persisted to any file this
-   plugin writes.
+The **Backend URL** is not a secret — it is persisted to `marketing-context.md` by design (Condition 1) and exported as `POSTIZ_API_URL` before every CLI invocation. Only the **API key** stays env-only: its **name** (`POSTIZ_API_KEY`) is written to `marketing-context.md`, never its value. The actual key value is read from the environment at run time and never persisted to any file this plugin writes.
 
 ## Re-run behaviour
 
