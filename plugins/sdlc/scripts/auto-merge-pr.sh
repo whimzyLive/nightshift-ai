@@ -104,11 +104,28 @@ if [ -n "$STORY_KEY" ] && [ -n "$DONE_STATUS" ]; then
   elif acli jira workitem transition --key "$STORY_KEY" --status "$DONE_STATUS" --yes >/dev/null 2>&1; then
     echo "transition: $STORY_KEY -> $DONE_STATUS" >&2
   else
-    echo "WARNING: auto-transition of $STORY_KEY to $DONE_STATUS failed after merge (permission / workflow-scheme mismatch / status name unavailable) — a human must move it manually" >&2
-    acli jira workitem comment create --key "$STORY_KEY" \
-      --body "Auto-transition to $DONE_STATUS failed after the PR merged. Please move this story to $DONE_STATUS manually." \
-      >/dev/null 2>&1 || echo "WARNING: could not post the auto-transition-failed comment on $STORY_KEY either" >&2
+    # Transition call failed — before warning, re-read status: a flaky first read or a
+    # concurrent transition may mean the story is ALREADY done, in which case this is an
+    # idempotent no-op, not a failure (never post a contradictory "move it manually" comment
+    # on a story that's actually already Done).
+    RECHECK_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
+                        | jq -r '.fields.status.name // empty' 2>/dev/null || true)
+    if [ "$RECHECK_STATUS" = "$DONE_STATUS" ]; then
+      echo "transition: $STORY_KEY already $DONE_STATUS (confirmed on re-read) — no-op" >&2
+    else
+      echo "WARNING: auto-transition of $STORY_KEY to $DONE_STATUS failed after merge (permission / workflow-scheme mismatch / status name unavailable) — a human must move it manually" >&2
+      acli jira workitem comment create --key "$STORY_KEY" \
+        --body "Auto-transition to $DONE_STATUS failed after the PR merged. Please move this story to $DONE_STATUS manually." \
+        >/dev/null 2>&1 || echo "WARNING: could not post the auto-transition-failed comment on $STORY_KEY either" >&2
+    fi
   fi
+elif [ -n "$STORY_KEY" ]; then
+  # Story key supplied but done-status is empty — a resolvable misconfig (e.g. the caller failed
+  # to resolve the `Pipeline done status` token), not the deliberate 1-arg back-compat case. The
+  # merge already succeeded, but silently skipping the transition here would leave a completing
+  # story stuck in progress with no signal — exactly the bug this script fixes. Warn loudly
+  # instead of silently no-op'ing; do not attempt any acli call with an empty target status.
+  echo "WARNING: story key ($STORY_KEY) supplied but done-status is empty — skipping the Jira transition; the story may remain in progress. Check the 'Pipeline done status' row in .claude/project/project-context.md." >&2
 fi
 
 printf 'MERGED\n'
