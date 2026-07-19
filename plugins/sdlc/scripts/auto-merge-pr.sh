@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# auto-merge-pr.sh <pr>
+# auto-merge-pr.sh <pr> [<story-key> <done-status>]
 #
 # Merge a pull request using the repository's allowed merge method, resolved DYNAMICALLY at
 # merge time — never a hard-coded flag. Used by /auto's Full-Auto terminal action, after the
@@ -20,13 +20,37 @@ set -euo pipefail
 # halts and surfaces — it must NOT guess, and the PR stays open.
 #
 # Args:
-#   $1 pr   PR number or URL to merge
+#   $1 pr           PR number or URL to merge
+#   $2 story-key    OPTIONAL — the Jira story key to transition after a story-COMPLETING merge
+#                   (Workflow B impl PR, or Workflow A Phase-2 plan+impl PR). Omit for a
+#                   non-completing merge (e.g. Workflow A Phase-1 spec PR) — the story stays
+#                   in progress and no transition is attempted.
+#   $3 done-status  OPTIONAL — the consuming project's pipeline done status (e.g. `Done`), read
+#                   by the caller from `.claude/project/project-context.md`'s `Pipeline done
+#                   status` token. Both $2 and $3 must be supplied together to enable the
+#                   transition block below; supplying only one is treated as neither (1-arg
+#                   behaviour) since a story key with no target status (or vice versa) cannot
+#                   drive a transition.
+#
+# Transition semantics (only when both $2 and $3 are supplied, run AFTER a verified MERGED):
+#   - Idempotent: if the story's current status already equals <done-status>, this is a no-op
+#     (logged to stderr), not an error.
+#   - Best-effort: the transition (and its status read) can NEVER fail this script — the merge
+#     already succeeded. Any transition failure emits a `WARNING:` to stderr and posts a Jira
+#     comment on the story noting the auto-transition failed and a human should move it
+#     manually; the script still prints `MERGED` and exits 0.
+#
+# Back-compat: called with exactly 1 arg, this script is byte-for-byte behaviourally identical
+# to the original merge-only version — no transition block runs, nothing new is printed.
 #
 # Output:
 #   - On success: prints `MERGED` to stdout; progress/warnings go to stderr.
-#   - On failure: non-zero exit, reason on stderr, nothing on stdout.
+#   - On failure: non-zero exit, reason on stderr, nothing on stdout. (The transition block never
+#     causes a non-zero exit — see Best-effort above.)
 
 PR="${1:?PR number or URL required}"
+STORY_KEY="${2:-}"
+DONE_STATUS="${3:-}"
 
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
 [ -n "$SLUG" ] || { echo "ERROR: could not determine repo slug (gh repo context)" >&2; exit 1; }
@@ -62,5 +86,25 @@ for _ in 1 2 3 4 5 6; do
 done
 [ "$STATE" = "MERGED" ] || { echo "ERROR: PR $PR not MERGED after merge (state=${STATE:-unknown}); merge output: $MERGE_OUT" >&2; exit 1; }
 echo "merged: PR $PR" >&2
+
+# Best-effort, idempotent Jira transition to the pipeline done status (AC-1,2,4,5) — runs ONLY
+# when the caller supplied both $2 and $3 (a story-COMPLETING merge on a Full-Auto story; see the
+# header docstring). Everything in this block is guarded so a non-zero acli can NEVER abort the
+# script under `set -euo pipefail` — the merge above already succeeded, and that must stand
+# regardless of transition outcome.
+if [ -n "$STORY_KEY" ] && [ -n "$DONE_STATUS" ]; then
+  CURRENT_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
+                      | jq -r '.fields.status.name // empty' 2>/dev/null || true)
+  if [ "$CURRENT_STATUS" = "$DONE_STATUS" ]; then
+    echo "transition: $STORY_KEY already $DONE_STATUS — no-op" >&2
+  elif acli jira workitem transition --key "$STORY_KEY" --status "$DONE_STATUS" --yes >/dev/null 2>&1; then
+    echo "transition: $STORY_KEY -> $DONE_STATUS" >&2
+  else
+    echo "WARNING: auto-transition of $STORY_KEY to $DONE_STATUS failed after merge (permission / workflow-scheme mismatch / status name unavailable) — a human must move it manually" >&2
+    acli jira workitem comment create --key "$STORY_KEY" \
+      --body "Auto-transition to $DONE_STATUS failed after the PR merged. Please move this story to $DONE_STATUS manually." \
+      >/dev/null 2>&1 || echo "WARNING: could not post the auto-transition-failed comment on $STORY_KEY either" >&2
+  fi
+fi
 
 printf 'MERGED\n'
