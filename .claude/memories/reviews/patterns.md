@@ -81,3 +81,10 @@
 **Root causes:** adding a second dispatch type to an agent without sweeping EVERY shared section for type-specific assumptions; spec text inherited verbatim without checkout-independence audit.
 **Preventions:** when an agent gains a dispatch type, grep every section heading for unbranched instructions; prefer origin/<base> remote-tracking refs in all diff ranges.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-19 — Story NA-47
+
+**Issues found:** No Critical/Important. Minor: `auto.md` completing-phase auto-merge hook example mixed placeholder conventions (`"$DONE_STATUS"` shell-var vs `<STORY_KEY>` bare vs `<DONE_STATUS>` prose) — risked the LLM emitting the literal `$DONE_STATUS` into the transition call, producing a spurious best-effort failure warning + Jira comment on every Full-Auto completion. Noted (not fixed): read-then-transition edge could post a failure comment on an already-done story if the status read fails; workflow must allow a direct current→done edge.
+**Root causes:** command files are LLM-consumed instructions — a `$var` in an example is ambiguous between "substitute the resolved value" and "emit verbatim"; the impl carried the shell-var form over from the script into the prose example.
+**Preventions:** in command/agent markdown, use ONE placeholder convention (`<ANGLE_BRACKET>`) for every value the model must substitute; never use `$shellvar` syntax in an example command string the model is meant to fill in. For best-effort Jira transitions, remember `--status` requires a direct workflow edge; distinguish "read failed" from "transition rejected" before posting a failure comment.
+**Domains affected:** ai-enablement-engineer
