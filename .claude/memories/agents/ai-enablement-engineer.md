@@ -1,5 +1,42 @@
 # ai-enablement-engineer — memory
 
+## NA-48 — No informative code comments; route context to memory instead (`plugins/sdlc/refs/code-comments-policy.md`, `plugins/sdlc/refs/qa-engineer-playbook.md`, `.claude/project/agents/{ai-enablement-engineer,platform-engineer,web-engineer}.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **The story's own grounding scoped AC1/AC4 narrowly to the 3 project override files
+  (`.claude/project/agents/*.md`), but the exact same "informative comment" rule was already
+  copy-pasted 5 times over — in `plugins/sdlc/agents/{database-administrator,mobile-engineer,
+platform-engineer,sync-engineer,web-engineer}.md`'s identical "Write self-explanatory code.
+  Comment only the non-obvious — ..." line (confirmed via `grep -n` across all five).** This is
+  the textbook AC4-shaped duplication the story exists to fix, just one layer down (the generic
+  plugin agent definition, not the per-repo override) and pre-dating this story. I deliberately
+  left it untouched — the grounding named only the 3 override files as the AC1/AC4 target, and the
+  two rules aren't in hard conflict (one says "keep non-obvious", the new one says "no informative,
+  route to memory, excludes lint-required") — but flagging it here as a legitimate follow-up: a
+  future story could collapse all 5 plugin-agent lines down to a pointer at
+  `refs/code-comments-policy.md` too, closing the loop at the generic-plugin level, not just the
+  per-repo override level this story touched.
+- **`${CLAUDE_PLUGIN_ROOT}/refs/<file>.md` pointer syntax works fine inside a repo-owned project
+  override file (`.claude/project/agents/*.md`), even though no override previously referenced a
+  plugin ref path this way** (confirmed via `grep -rn 'CLAUDE_PLUGIN_ROOT' .claude/project/agents/`
+  — zero prior hits before this story). It resolves correctly because every domain agent's own
+  "First steps" sequence resolves `${CLAUDE_PLUGIN_ROOT}` (via `.claude/.sdlc-plugin-root`) at
+  Step 0, strictly before Step 2 reads the override — so by the time the override's pointer is
+  read, the substitution rule is already active in context. Safe pattern for any future
+  override-level pointer into plugin `refs/`.
+- `qa-engineer-playbook.md`'s "review across all five axes: correctness, readability, architecture,
+  security, performance" bullet is the single spot that phrase exists in the whole plugin (verified
+  `grep -rl 'correctness, readability\|five axes' plugins/sdlc/`, one file) — a clean single
+  insertion point for a new axis-scoped instruction, no sibling restatement elsewhere to chase.
+- `prettier --write` on `.claude/project/agents/platform-engineer.md` fixed 8 lines of pre-existing
+  missing-blank-line-after-heading drift unrelated to my inserted bullet — the file wasn't
+  Prettier-clean before this story touched it (pre-commit's lint-staged only formats staged diffs,
+  not the whole tree), so touching any override file for an unrelated edit can surface incidental
+  reflow; expected, not a sign my edit was wrong.
+- Reused the already-bumped `plugin.json` `0.42.0` → `0.43.0` (minor: new ref doc + new enforcement
+  wiring, backward compatible) in the same commit per the NA-54-established hard rule ("every commit
+  shipping new content under `plugins/sdlc/` bumps `plugin.json`'s version") — held without
+  incident this round.
+
 ## NA-62 — PR #131 review round: the reformat sweep introduced 3 NEW corruption classes the quad-fence guard was blind to
 
 - **"No new quad-backtick fences" is only ONE corruption signature — a benign-looking `prettier

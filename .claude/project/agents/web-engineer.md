@@ -22,6 +22,9 @@
 
 ## Tech rules
 
+- No informative/explanatory comments — see the shared rule at
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` (excludes comments required by language or
+  lint conventions).
 - Language: TypeScript (React 19, ESM — apps/marketing has "type": "module").
 - UI layer: always .tsx + Tailwind CSS v4 (utility classes in TSX, tokens in `@theme`) — no .jsx, no CSS Modules, no SCSS (sole exception: generated (payload)/custom.scss).
 - Framework: Next.js 16 (App Router) with embedded Payload CMS 3 in apps/marketing —
