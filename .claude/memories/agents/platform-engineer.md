@@ -55,6 +55,36 @@
   required gate per the plan, but not evidence the new file itself is clean of anything beyond
   what the plan explicitly checked for (typecheck + no dependency changes).
 
+## 2026-07-19 — Story NA-63 review fix — updateProjectVersion fails loud instead of failing open
+
+**Learnings:**
+
+- Original code did `if (!contents || !VERSION_FIELD_PATTERN.test(contents)) continue;` — under
+  `git-tag`/`conventional-commits` resolvers `nx release` still tags + writes CHANGELOG.md even
+  when the version-bump write to `plugin.json` was silently skipped, producing permanent,
+  undetected tag↔manifest drift. Fixed by throwing instead of `continue`-ing on every failure path
+  (unreadable manifest, zero matches, >1 match) — a manifest that can't record the bump must abort
+  the whole release, not be silently skipped.
+- Closed the "first-match-wins on a future nested `version` key" risk in the same pass: switched
+  from `.test()` (which only proves ≥1 match exists) to `new RegExp(VERSION_FIELD_PATTERN.source,
+'gm').match(contents)` to _count_ matches — exactly 1 is required; 0 throws "no top-level
+  version field", >1 throws "ambiguous version fields (<n>)" naming the manifest path in both.
+  Kept the original anchored line-based `VERSION_FIELD_PATTERN` (`^(\s*"version"\s*:\s*)"[^"]*"`,
+  `m` flag) and the regex-replace write unchanged — this is a fail-fast guard in front of the
+  existing formatting-preserving write, not a rewrite of the write strategy itself (JSON.parse/
+  stringify was explicitly out of scope, would lose key order/formatting).
+- Re-ran `./node_modules/.bin/nx release --dry-run --first-release` after the fix to prove the
+  happy path is unaffected: both real plugins (`sdlc`→v1.0.0, `gtm`→v0.6.0) still bump
+  `plugin.json`, changelogs/tags preview normally, `git status --porcelain` shows zero mutation —
+  confirms the new throws only fire on the pathological 0-match/>1-match cases, never on the
+  existing well-formed manifests.
+
+**Pitfalls:**
+
+- Same `rtk` proxy risk as the original NA-63 Phase-2 dispatch (see next entry below) — reused the
+  raw `./node_modules/.bin/tsc --noEmit <flags-from-tsconfig.base.json>` invocation rather than
+  `pnpm exec tsc` for a trustworthy exit code.
+
 ## 2026-07-18 — Story NA-62 (Phase B) — wire check-plugin-docs-format.sh into ci.yml
 
 **Learnings:**

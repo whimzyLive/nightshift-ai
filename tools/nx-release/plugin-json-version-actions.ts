@@ -60,8 +60,26 @@ export default class PluginJsonVersionActions extends VersionActions {
     const messages: string[] = [];
     for (const { manifestPath } of this.manifestsToUpdate) {
       const contents = tree.read(manifestPath, 'utf-8');
-      if (!contents || !VERSION_FIELD_PATTERN.test(contents)) {
-        continue;
+      if (!contents) {
+        throw new Error(
+          `[nx-release] could not read manifest ${manifestPath}; refusing to tag a release the manifest would not record`,
+        );
+      }
+      // Count matches (not just .test()) so a manifest with a nested "version"
+      // key before the top-level one can't silently steer the first-match-wins
+      // .replace() below at the wrong field.
+      const matches = contents.match(
+        new RegExp(VERSION_FIELD_PATTERN.source, 'gm'),
+      );
+      if (!matches || matches.length === 0) {
+        throw new Error(
+          `[nx-release] no top-level "version" field in ${manifestPath}; refusing to tag a release the manifest would not record`,
+        );
+      }
+      if (matches.length > 1) {
+        throw new Error(
+          `[nx-release] ambiguous "version" fields (${matches.length}) in ${manifestPath}`,
+        );
       }
       tree.write(
         manifestPath,
