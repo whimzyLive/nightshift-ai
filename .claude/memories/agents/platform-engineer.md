@@ -1,5 +1,60 @@
 # platform-engineer memory
 
+## 2026-07-19 — Story NA-63 (Phase 2) — custom PluginJsonVersionActions module
+
+**Learnings:**
+
+- The public barrel `nx/release` maps (via nx@23.0.1's package.json `exports`) to
+  `dist/release/index.d.ts`/`.js`, which re-exports `VersionActions` from the internal
+  `src/command-line/release/version/version-actions` module — confirmed this resolves both at
+  typecheck time and at runtime (loaded the compiled `.ts` file with `ts-node -e` and checked
+  `Object.getPrototypeOf(Cls).name === 'VersionActions'`). The deep path `nx/release/version-actions`
+  has a `./release/*` wildcard entry in `exports` but no `dist/release/version-actions.d.ts`/`.js`
+  actually exists on disk — the wildcard matches syntactically but the file 404s, hence
+  `MODULE_NOT_FOUND` at runtime (spec's warning verified, not just trusted).
+- The base `VersionActions.init(tree)` (called by Nx before any of the abstract methods run)
+  already resolves `manifestRootsToUpdate` + `validManifestFilenames` into `this.manifestsToUpdate`
+  (`{ manifestPath, preserveLocalDependencyProtocols }[]`), interpolating `{projectRoot}` for us.
+  Implementing methods should consume `this.manifestsToUpdate[0].manifestPath` rather than
+  re-deriving the join by hand from `projectGraphNode.data.root` — simpler and can't drift from
+  whatever `nx.json`'s `manifestRootsToUpdate` actually says.
+- `Tree`/`ProjectGraph` types aren't exported from any `nx` package.json `exports` entry by name,
+  but nx's `exports` map has a `./src/*` wildcard → `dist/src/*.d.ts` that genuinely has a compiled
+  `.d.ts` on disk (unlike the `version-actions` deep-path trap above) — `import type { Tree } from
+'nx/src/generators/tree'` resolves cleanly under `moduleResolution: "bundler"`. Since it's a
+  type-only import it's erased at runtime, so no `MODULE_NOT_FOUND` risk even though it's a "deep"
+  path.
+- Overriding/implementing an abstract base-class method under `noImplicitOverride` (this repo's
+  tsconfig.base.json setting) requires the `override` keyword even on members that only _implement_
+  an abstract member (not just concrete-method overrides) — omitting it is a tsc error.
+- A subclass method implementing an abstract member with more parameters (e.g.
+  `readCurrentVersionOfDependency(tree, projectGraph, name)`) can be declared with **zero**
+  parameters in the override — TS structural typing allows fewer declared params — which avoided
+  needing the `ProjectGraph` type import at all for the three members that ignore their inputs.
+- Preserving `plugin.json` key order/formatting on write: a JSON.parse→stringify round-trip risks
+  reordering/reformatting; instead did a line-anchored regex replace
+  (`/^(\s*"version"\s*:\s*)"[^"]*"/m`) that touches only the `"version"` value and leaves every
+  other byte (indentation, key order, trailing newline) untouched.
+
+**Pitfalls:**
+
+- `pnpm exec tsc ...` in this repo is silently rewritten by the user's global `rtk` proxy hook —
+  it printed `TypeScript: No errors found` but still exited `1`, which would have read as a false
+  failure. Calling `./node_modules/.bin/tsc` directly bypassed the hook and gave a trustworthy
+  `EXIT: 0`/no-output result. When a wrapped tool's exit code contradicts its own success message,
+  re-run via the raw binary path before trusting the exit code.
+- No Nx project (`project.json`) exists at the repo root and no `nx typecheck` target covers
+  `tools/` — there's nothing to `pnpm nx typecheck source`. Verified instead with a manual `tsc
+--noEmit` invocation replicating `tsconfig.base.json`'s compilerOptions by flag, plus a `ts-node -e`
+  smoke-load to prove the runtime import (not just the type) resolves.
+
+**Patterns:**
+
+- `bash tools/portability-lint.sh` only scans `plugins/**` (confirmed again, per the NA-3 memory
+  entry) — a green run is expected and uninformative for anything added under `tools/`; it's a
+  required gate per the plan, but not evidence the new file itself is clean of anything beyond
+  what the plan explicitly checked for (typecheck + no dependency changes).
+
 ## 2026-07-18 — Story NA-62 (Phase B) — wire check-plugin-docs-format.sh into ci.yml
 
 **Learnings:**
