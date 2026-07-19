@@ -59,8 +59,11 @@ your agent memory file (`.claude/memories/agents/<agent>.md`), appended per
 ## Enforcement
 
 1. **Authoring.** Every active domain agent's project override states this rule and points here
-   (see `.claude/project/agents/<agent>.md`) rather than restating it — this is the single
-   shared location every override references (do not copy this rule's text into an override).
+   (see `.claude/project/agents/<agent>.md`) rather than restating it — this is the single shared
+   location every override references (do not copy this rule's text into an override). The generic
+   plugin agent definitions (`plugins/sdlc/agents/*.md`) defer to this file the same way, for every
+   agent whose "Conventions" section used to carry its own inline comment guidance — so there is
+   exactly one place (this file) either layer can disagree with, not two.
 2. **Review gate.** The QA Engineer review loop (`refs/qa-engineer-playbook.md` Step 1 dispatch
    and Step 2 severity) flags any new informative/explanatory comment a PR diff introduces: the
    finding requests the comment be removed and, if it captured real context, that the context be

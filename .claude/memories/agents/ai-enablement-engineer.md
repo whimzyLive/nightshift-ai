@@ -9,12 +9,20 @@ platform-engineer,sync-engineer,web-engineer}.md`'s identical "Write self-explan
   Comment only the non-obvious — ..." line (confirmed via `grep -n` across all five).** This is
   the textbook AC4-shaped duplication the story exists to fix, just one layer down (the generic
   plugin agent definition, not the per-repo override) and pre-dating this story. I deliberately
-  left it untouched — the grounding named only the 3 override files as the AC1/AC4 target, and the
-  two rules aren't in hard conflict (one says "keep non-obvious", the new one says "no informative,
-  route to memory, excludes lint-required") — but flagging it here as a legitimate follow-up: a
-  future story could collapse all 5 plugin-agent lines down to a pointer at
-  `refs/code-comments-policy.md` too, closing the loop at the generic-plugin level, not just the
-  per-repo override level this story touched.
+  left it untouched on the grounds that the grounding named only the 3 override files as the AC1/
+  AC4 target, and reasoned the two rules "aren't in hard conflict" — **that reasoning was wrong,
+  caught by review:** the old line explicitly endorsed commenting "a subtle invariant, a workaround
+  and its reason," which is exactly what the new policy's Forbidden list names as informative and
+  routes to memory instead — a real, active contradiction on two of the three active agents (both
+  files are in-context on every dispatch), not a harmless overlap. **Lesson: when a new rule you're
+  introducing narrows or reframes an existing standing instruction, check the existing instruction
+  for direct textual overlap with your rule's own Forbidden/Allowed examples before concluding
+  "no hard conflict" — a shared example phrase appearing on opposite sides of two rules IS a
+  conflict, regardless of how reasonable each rule sounds read in isolation.** Fixed in the same
+  story's review round: all 5 `plugins/sdlc/agents/*.md` "Conventions" lines now defer to
+  `refs/code-comments-policy.md` instead of restating (or contradicting) the rule — closing the
+  duplication at the generic-plugin level too, not just the per-repo override level the first round
+  touched.
 - **`${CLAUDE_PLUGIN_ROOT}/refs/<file>.md` pointer syntax works fine inside a repo-owned project
   override file (`.claude/project/agents/*.md`), even though no override previously referenced a
   plugin ref path this way** (confirmed via `grep -rn 'CLAUDE_PLUGIN_ROOT' .claude/project/agents/`
