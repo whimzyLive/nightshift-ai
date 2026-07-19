@@ -102,16 +102,6 @@ origin/feat/<STORY-KEY>`) to pick up commits (the plan doc) that existed on the 
   correct top-level-only, JSON-aware extraction; the `// empty` guards against `jq` emitting the
   literal string `null` when the field is absent (verified against a JSON file lacking `name`).
 
-**Pitfalls:**
-
-- Same isolated-worktree-can't-check-out-the-named-branch situation as the initial pass (see the
-  entry above) recurred on this review-fix dispatch too — `git checkout feat/NA-3` failed because
-  the shared main checkout already had it. Reused the same fix: stay in the default (non-`cd`'d)
-  Bash cwd of the assigned worktree, and `git merge --ff-only origin/feat/NA-3` to fast-forward
-  the worktree's local branch onto the remote branch's tip before editing anything. This is
-  evidently a recurring characteristic of this project's worktree-per-dispatch setup, not a one-off
-  — expect it on every dispatch for a story whose branch is also open in the main checkout.
-
 **Patterns:**
 
 - When a review finding says "root hardcoded to X, should scan all Y" for a lint/CI script, check
@@ -241,14 +231,6 @@ C:\\Users\\y\n'`) and the two false-positive shapes found in `plugins/sdlc/refs/
   session right before every CLI invocation. Don't conflate "the CLI's contract requires an env var"
   with "the value must be secret / env-only" — those are separate, independently-decidable design
   choices.
-
-**Pitfalls:**
-
-- Same isolated-worktree-can't-check-out-the-named-branch situation recurred yet again on this
-  dispatch — `git checkout feat/NA-3` would have failed since the shared main checkout already had
-  it open. Used the `git merge --ff-only origin/feat/NA-3` fix from the first NA-3 dispatch (not the
-  detach-and-checkout variant from the second) since it was the simplest option available without
-  touching the shared checkout at all.
 
 **Patterns:**
 
