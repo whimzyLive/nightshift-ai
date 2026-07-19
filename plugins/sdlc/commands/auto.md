@@ -193,7 +193,7 @@ runs the hook. The loop owns the single `session-complete`; `/auto` does **not**
        PR) → pass `<STORY_KEY>` and `<DONE_STATUS>` so the hook transitions the story after the
        verified merge:
        ```bash
-       /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL> STORY_KEY \"$DONE_STATUS\""
+       /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL> <STORY_KEY> \"<DONE_STATUS>\""
        ```
      - **`<PHASE>` = `spec`** (A1's spec PR — does NOT complete the story; the pipeline just advances
        to Phase 2) → the 1-arg, merge-only invocation, no transition:

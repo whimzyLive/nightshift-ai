@@ -32,6 +32,10 @@ set -euo pipefail
 #                   behaviour) since a story key with no target status (or vice versa) cannot
 #                   drive a transition.
 #
+# Note: the transition requires the consumer repo's Jira workflow to permit a DIRECT transition
+# from the story's current status to <done-status>; a workflow that forces an intermediate hop
+# (no direct edge) will hit the best-effort warning path below by design (see AC-5).
+#
 # Transition semantics (only when both $2 and $3 are supplied, run AFTER a verified MERGED):
 #   - Idempotent: if the story's current status already equals <done-status>, this is a no-op
 #     (logged to stderr), not an error.
