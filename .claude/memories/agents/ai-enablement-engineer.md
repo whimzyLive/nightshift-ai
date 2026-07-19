@@ -31,6 +31,14 @@ platform-engineer,sync-engineer,web-engineer}.md`'s identical "Write self-explan
   Step 0, strictly before Step 2 reads the override — so by the time the override's pointer is
   read, the substitution rule is already active in context. Safe pattern for any future
   override-level pointer into plugin `refs/`.
+  **Publish-lag caveat (important):** the substitution resolves to the _installed_ plugin cache
+  (`.claude/.sdlc-plugin-root`), NOT the repo's `plugins/sdlc/` source. A repo-owned override merges
+  live immediately, but a plugin `refs/` file added in the SAME PR only exists in the cache after the
+  plugin is republished + reinstalled at the new version. So between merge and reinstall the override's
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` pointer DANGLES (file-not-found) and the rule
+  does not load. This is the normal plugin publish/install lag that affects every plugin-ref change in
+  this repo — not a defect — but any story adding a plugin `refs/` file referenced by a repo-owned
+  override must flag the republish+reinstall as the go-live step (done in NA-48's PR body).
 - `qa-engineer-playbook.md`'s "review across all five axes: correctness, readability, architecture,
   security, performance" bullet is the single spot that phrase exists in the whole plugin (verified
   `grep -rl 'correctness, readability\|five axes' plugins/sdlc/`, one file) — a clean single
@@ -40,10 +48,11 @@ platform-engineer,sync-engineer,web-engineer}.md`'s identical "Write self-explan
   Prettier-clean before this story touched it (pre-commit's lint-staged only formats staged diffs,
   not the whole tree), so touching any override file for an unrelated edit can surface incidental
   reflow; expected, not a sign my edit was wrong.
-- Reused the already-bumped `plugin.json` `0.42.0` → `0.43.0` (minor: new ref doc + new enforcement
-  wiring, backward compatible) in the same commit per the NA-54-established hard rule ("every commit
-  shipping new content under `plugins/sdlc/` bumps `plugin.json`'s version") — held without
-  incident this round.
+- Bumped `plugin.json` per the NA-54-established hard rule ("every commit shipping new content under
+  `plugins/sdlc/` bumps `plugin.json`'s version"): `0.42.0` → `0.43.0` in round 1 (new ref doc + new
+  enforcement wiring), then `0.43.0` → `0.44.0` in the review round-2 fix (reconciling the 5
+  `plugins/sdlc/agents/*.md` Conventions lines). **The shipped version on this branch is `0.44.0`** —
+  matches `plugins/sdlc/.claude-plugin/plugin.json` and `reviews/patterns.md`. All backward compatible.
 
 ## NA-62 — PR #131 review round: the reformat sweep introduced 3 NEW corruption classes the quad-fence guard was blind to
 
