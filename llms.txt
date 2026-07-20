@@ -6,4 +6,5 @@ Changelog — Release notes are generated from commit messages by nx release; th
 
 ## Explanation
 
+What is the sdlc plugin — A repo-agnostic SDLC automation layer for Claude Code that drives Jira stories through spec, plan, implementation, and review — docs/concepts/what-is-the-sdlc-plugin.md
 What is the gtm plugin — Why the gtm plugin exists, how its commands and agents relate, and how it mirrors the sdlc plugin — docs/concepts/what-is-the-gtm-plugin.md
