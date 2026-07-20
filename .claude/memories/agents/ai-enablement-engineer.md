@@ -1,5 +1,62 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-20 — Story NA-45 (fix round) — mocked-CLI regression tests can be false-green on the exact logic they claim to cover
+
+**Learnings:** A mock CLI that hardcodes its "resolved" output (e.g. `gh api ... --jq '...'` mocked
+to always `echo "--merge"`) never exercises the real script's jq expression at all — a verifier
+proved this by deliberately breaking the script's jq (line 67) and watching the test still PASS.
+Fixed by piping a realistic JSON payload through the REAL `jq` binary using the exact `--jq`
+expression the script passes, so a broken expression actually breaks the test. That alone was
+still insufficient: the downstream mock `gh pr merge` accepted ANY method flag unconditionally, so
+even a `--BROKEN-PROBE` string produced by the broken jq still "merged successfully." Had to add a
+second layer — the mock's `merge` case now validates the method arg is one of
+`--merge`/`--squash`/`--rebase` and rejects anything else with `unknown flag: <value>` (mirroring
+real gh's actual flag-parsing behaviour) — before the broken-jq-then-restore verification actually
+went red-then-green as claimed. **Lesson: when a mock stands in for a multi-step CLI contract
+(resolve -> act), every downstream mock step that consumes the resolved value must also validate
+it, or a broken resolver can silently degrade into "any string passes."** A reviewer's own
+prescribed verification step (temporarily break the real logic, confirm the test fails, restore)
+is the right adversarial check to run on your own mock before trusting it — I only caught the
+second gap because I actually ran that verification rather than assuming the first fix was enough.
+
+**Pitfalls:** also added a merge-rejection failure-contract case (env-var toggle
+`MOCK_GH_MERGE_REJECT=1` on the shared mock `gh`, since the mock script is a static heredoc written
+once — env vars set on the outer `PATH=... bash "$script"` invocation propagate to the mock
+subprocess it execs) asserting non-zero exit + the `ERROR: gh pr merge ... failed` line, per the
+bug's own Expected Result naming that failure contract explicitly. The 3-arg Jira-transition path
+stayed explicitly out of scope (noted in the test header) since the bug names only the merge-flag
+and failure-contract behaviour.
+
+**Patterns:** confirms/extends the "in-tree triage: write a real broken probe, diff, restore"
+protocol from prior stories — apply it to test infrastructure itself (deliberately break the
+production line the test claims to pin, confirm RED, restore, confirm GREEN) as a required step
+before trusting any newly-hardened mock-CLI regression test, not just as an initial-authoring step.
+
+## 2026-07-20 — Story NA-45 — `auto-merge-pr.sh` dropped `--yes` from `gh pr merge` (removed flag on gh ≥2.90)
+
+**Learnings:** `gh pr merge <pr> <method>` (no `--yes`) is already non-interactive in a TTY-less
+automated session once the merge method is given explicitly — `gh pr merge` only prompts
+interactively for the _method_ when the repo allows more than one and none is passed on the
+command line, never for a bare yes/no confirm once the method is resolved. So dropping `--yes`
+restored working behaviour with zero change to the hang-avoidance guarantee the original comment
+claimed it was for.
+
+**Pitfalls:** none — the fix was a single-line flag removal plus a comment rewrite; the failure
+mode reproduces perfectly under a mocked `gh` (`unknown flag: --yes`, exit 1) so there was no
+ambiguity about root cause. Confirmed the fix does NOT touch the separate `acli jira workitem
+transition ... --yes` call at the bottom of the script — that's a different CLI (`acli`) whose
+`--yes` is a real, still-supported flag; conflating the two would have caused a regression on the
+NA-47 transition path.
+
+**Patterns:** `plugins/sdlc/scripts/` had zero test coverage before this story — established
+`plugins/sdlc/scripts/__tests__/<name>.test.sh` as the pattern: self-runnable via `bash <path>`
+(no framework), mocks external CLIs (`gh`, `acli`) by writing tiny wrapper scripts into a
+`mktemp -d` dir prepended onto `PATH`, asserts on stdout contract + exit code, prints a `PASS:`/
+`FAIL:` line, exit 0/non-zero. This keeps the test fully portable (no absolute paths, passes
+`tools/portability-lint.sh` unmodified) and reusable for future `plugins/sdlc/scripts/*.sh`
+regression tests — mock only the specific subcommand/flag combinations the script under test
+actually invokes (verified by reading the script first), not a generic gh emulator.
+
 ## NA-63 — Nx project registration + `nx release` config for plugin versioning (`plugins/sdlc/project.json`, `plugins/gtm/project.json`, `nx.json`, `CONTRIBUTING.md`, `EXTENDING.md`)
 
 - **The spec's verbatim `nx.json` `release` block used `releaseTagPattern` as a flat top-level/group
