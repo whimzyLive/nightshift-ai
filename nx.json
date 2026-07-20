@@ -98,7 +98,7 @@
           "projectChangelogs": {
             "file": "{projectRoot}/CHANGELOG.md"
           },
-          "createRelease": false
+          "createRelease": "github"
         }
       }
     },
