@@ -1,5 +1,30 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-20 — Story NA-45 — `auto-merge-pr.sh` dropped `--yes` from `gh pr merge` (removed flag on gh ≥2.90)
+
+**Learnings:** `gh pr merge <pr> <method>` (no `--yes`) is already non-interactive in a TTY-less
+automated session once the merge method is given explicitly — `gh pr merge` only prompts
+interactively for the _method_ when the repo allows more than one and none is passed on the
+command line, never for a bare yes/no confirm once the method is resolved. So dropping `--yes`
+restored working behaviour with zero change to the hang-avoidance guarantee the original comment
+claimed it was for.
+
+**Pitfalls:** none — the fix was a single-line flag removal plus a comment rewrite; the failure
+mode reproduces perfectly under a mocked `gh` (`unknown flag: --yes`, exit 1) so there was no
+ambiguity about root cause. Confirmed the fix does NOT touch the separate `acli jira workitem
+transition ... --yes` call at the bottom of the script — that's a different CLI (`acli`) whose
+`--yes` is a real, still-supported flag; conflating the two would have caused a regression on the
+NA-47 transition path.
+
+**Patterns:** `plugins/sdlc/scripts/` had zero test coverage before this story — established
+`plugins/sdlc/scripts/__tests__/<name>.test.sh` as the pattern: self-runnable via `bash <path>`
+(no framework), mocks external CLIs (`gh`, `acli`) by writing tiny wrapper scripts into a
+`mktemp -d` dir prepended onto `PATH`, asserts on stdout contract + exit code, prints a `PASS:`/
+`FAIL:` line, exit 0/non-zero. This keeps the test fully portable (no absolute paths, passes
+`tools/portability-lint.sh` unmodified) and reusable for future `plugins/sdlc/scripts/*.sh`
+regression tests — mock only the specific subcommand/flag combinations the script under test
+actually invokes (verified by reading the script first), not a generic gh emulator.
+
 ## NA-63 — Nx project registration + `nx release` config for plugin versioning (`plugins/sdlc/project.json`, `plugins/gtm/project.json`, `nx.json`, `CONTRIBUTING.md`, `EXTENDING.md`)
 
 - **The spec's verbatim `nx.json` `release` block used `releaseTagPattern` as a flat top-level/group
