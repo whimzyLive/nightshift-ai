@@ -20,8 +20,8 @@
 | hooks-contract    | true    | docs/reference/hooks/    |
 | error-reference   | true    | docs/reference/errors/   |
 | llms-txt          | true    | llms.txt                 |
-| changelog         | true    | docs/changelog/          |
-| release-notes     | true    | docs/release-notes/      |
+| changelog         | false   | docs/changelog/          |
+| release-notes     | false   | docs/release-notes/      |
 | migration-guide   | true    | docs/migration-guides/   |
 | tutorial          | true    | docs/tutorials/          |
 | how-to            | true    | docs/how-to/             |
