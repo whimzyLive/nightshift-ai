@@ -10,6 +10,7 @@ Getting started with gtm — Bootstrap a marketing foundation for your repo and 
 How to run the full sdlc pipeline on a story — Take one Jira story from a raw ticket to a merged PR, using either the one-shot /sdlc:auto command or the manual step commands — docs/how-to/run-the-sdlc-pipeline-on-a-story.md
 How to generate landing-page copy with gtm — Run /gtm:site to produce reviewed, brand-correct landing-page copy with a full SEO layer and the durable site-brief.md handoff — docs/how-to/generate-landing-page-copy.md
 Jira and GitHub setup for sdlc — Wire a repo's sdlc plugin to Jira Cloud and GitHub so the pipeline can read stories and open PRs — docs/integrations/jira-and-github.md
+Postiz setup for gtm — Connect the gtm plugin to a running Postiz instance so channels can be configured and content published — docs/integrations/postiz.md
 
 ## Reference
 
