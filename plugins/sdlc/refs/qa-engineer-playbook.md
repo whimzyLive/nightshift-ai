@@ -134,6 +134,10 @@ skill pattern. The prompt MUST include:
 - Explicit instruction to review across all five axes: **correctness, readability,
   architecture, security, performance** — and (Story mode) to flag any AC that is not demonstrably
   met and any regression risk to existing behavior.
+- Explicit instruction (readability axis) to flag any new informative/explanatory code comment the
+  diff introduces, per the shared rule at `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` —
+  point the reviewer at that file for the exact definition and the language/lint-required
+  exclusions rather than restating the rule in the dispatch prompt.
 
 Dispatch with `isolation: "worktree"` is NOT needed — the reviewer reads, it does not write.
 
@@ -203,6 +207,11 @@ PR. Accepted comments flow into the Step 3 fix loop; discarded ones go in the re
 - **AC gap** — treat as Critical regardless of how the reviewer framed it; the ticket exists to
   satisfy its ACs.
 - **Security** — treat as Critical unless demonstrably non-exploitable; say why if downgraded.
+- **Informative/explanatory comment** (per `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`) —
+  treat as **Important**: the fix requests the comment be removed and, if it captured real
+  non-obvious context, that the context be moved to the introducing agent's memory file
+  (`.claude/memories/agents/<agent>.md`) instead. A comment required by language/lint convention
+  (per that same doc's exclusions) is not a finding.
 
 **Domain mapping (file path → owning agent — derive from project-context Workspace Structure):**
 

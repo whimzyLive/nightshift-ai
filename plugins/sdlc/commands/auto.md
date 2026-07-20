@@ -176,15 +176,30 @@ The loop is the phase's **tail**, exactly like the standalone commands: hand it 
 runs the hook. The loop owns the single `session-complete`; `/auto` does **not** release separately.
 
 1. **Resolve `MODE`** (see above) — this decides whether an `--on-clean` hook is attached.
-2. **Post the phase's Jira comment FIRST** (the loop is the session's last act, so the comment is
+2. **Resolve `DONE_STATUS`** — read the **`Pipeline done status`** row from this repo's
+   `.claude/project/project-context.md` (the same token E2a's idempotent-skip check reads; no new
+   terminal status is introduced here). Only needed when `MODE` = `Full Auto` **and** `<PHASE>` is
+   story-COMPLETING (see step 3) — resolve it unconditionally here for simplicity, it is simply
+   unused otherwise.
+3. **Post the phase's Jira comment FIRST** (the loop is the session's last act, so the comment is
    posted before it — see A1/A3/B2 for the per-phase, mode-aware text).
-3. **Run the loop as the tail:**
+4. **Run the loop as the tail:**
    - **`MODE` = `Full Auto`** → attach the auto-merge hook; on the loop's clean exit it auto-merges
      `<PR_URL>`, whose merge event advances the pipeline (`<PHASE>=spec` → resumes Phase 2;
-     `plan+impl`/`impl` → completes the story):
-     ```bash
-     /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
-     ```
+     `plan+impl`/`impl` → completes the story and also best-effort transitions it to
+     `<DONE_STATUS>`). Whether the hook also transitions the story depends on **whether `<PHASE>` is
+     story-COMPLETING**:
+     - **`<PHASE>` = `plan+impl` or `impl`** (story-COMPLETING — A2/A3's combined PR, or B1/B2's impl
+       PR) → pass `<STORY_KEY>` and `<DONE_STATUS>` so the hook transitions the story after the
+       verified merge:
+       ```bash
+       /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL> <STORY_KEY> \"<DONE_STATUS>\""
+       ```
+     - **`<PHASE>` = `spec`** (A1's spec PR — does NOT complete the story; the pipeline just advances
+       to Phase 2) → the 1-arg, merge-only invocation, no transition:
+       ```bash
+       /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
+       ```
    - **Any other mode** → no hook; the loop just drives the PR to Copilot-clean and stops for a human
      merge:
      ```bash
@@ -316,9 +331,9 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 5. **Comment, then loop (tail).** Resolve `MODE`, post the mode-aware A3 comment **before** the loop,
    then run the **Loop-after-raise** procedure (above) for the impl PR as the session **tail**
    (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`plan+impl`): `Full Auto` → tail loop **with** the auto-merge
-   hook (auto-merges on clean → the plan+impl PR landing on `develop` **completes** the story); any
-   other mode → tail loop **without** a hook (leave open for human merge). The tail loop owns the
-   release.
+   hook (auto-merges on clean → the plan+impl PR landing on `develop` **completes** the story, then
+   best-effort transitions it to the pipeline done status); any other mode → tail loop **without** a
+   hook (leave open for human merge). The tail loop owns the release.
 
 ### A3 — Complete (comment posted BEFORE the tail loop)
 
@@ -332,7 +347,7 @@ acli jira workitem comment create --key STORY_KEY --body "Plan and implementatio
 
 PR: IMPL_PR_URL
 
-Single PR contains the implementation plan and code. Driving Copilot review-fix; will auto-merge once review + checks pass. Spec was merged separately."
+Single PR contains the implementation plan and code. Driving Copilot review-fix; will auto-merge once review + checks pass, then transition this story to the pipeline done status. Spec was merged separately."
 ```
 
 - **Any other mode:**
@@ -384,8 +399,9 @@ PR, folding regenerated docs into the same PR; a docs-content failure WARNs, not
 Then resolve `MODE`, post the mode-aware Jira comment (B2 below) **before** the loop, and run the
 **Loop-after-raise** procedure (above) for the impl PR as the session **tail**
 (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`impl`): `Full Auto` → tail loop **with** the auto-merge hook
-(auto-merges on clean → completes the story); any other mode → tail loop **without** a hook (leave the
-PR open for human merge). The tail loop owns the release.
+(auto-merges on clean → completes the story, then best-effort transitions it to the pipeline done
+status); any other mode → tail loop **without** a hook (leave the PR open for human merge). The tail
+loop owns the release.
 
 ### B2 — Complete (comment posted BEFORE the tail loop)
 
@@ -399,7 +415,7 @@ acli jira workitem comment create --key STORY_KEY --body "Implementation complet
 
 PR: IMPL_PR_URL
 
-Small story (≤3pts) — direct implementation path. Driving Copilot review-fix; will auto-merge once review + checks pass."
+Small story (≤3pts) — direct implementation path. Driving Copilot review-fix; will auto-merge once review + checks pass, then transition this story to the pipeline done status."
 ```
 
 - **Any other mode:**
@@ -508,11 +524,12 @@ epic is resumable. Exactly **one** child session is live at any moment.
 
 **E2a — Idempotent skip (re-run safety).** Before spawning, probe `S`'s Jira status definitively
 (format-stable field read — `acli jira workitem view S --fields status --json` then read
-`.fields.status.name`; do not scrape rendered text). If it already equals the **pipeline done
-status** (the consuming repo's terminal status — read from `.claude/project/project-context.md`,
-the same done status the pipeline already uses; add no new terminal status here) → **skip `S`
-without spawning a session** and advance to the next story. This makes re-running `/auto EPIC_KEY`
-idempotent: already-finished stories are passed over.
+`.fields.status.name`; do not scrape rendered text). If it already equals the **`Pipeline done
+status`** token (the consuming repo's terminal status — read from
+`.claude/project/project-context.md`'s `## Pipeline` section, the same token the Full-Auto
+auto-merge-then-transition hook resolves `<DONE_STATUS>` from; add no new terminal status here) →
+**skip `S` without spawning a session** and advance to the next story. This makes re-running
+`/auto EPIC_KEY` idempotent: already-finished stories are passed over.
 
 **E2b — Decide whether `S` is gated.** Resolve `S`'s effective mode:
 

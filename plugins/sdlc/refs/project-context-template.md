@@ -55,6 +55,12 @@ generated file — every slot must be replaced with an actual value.
 | Review agent | `<review-agent>` |
 | Review mode  | `<review-mode>`  |
 | Review gate  | `<review-gate>`  |
+
+## Pipeline
+
+| Token                | Value                    |
+| -------------------- | ------------------------ |
+| Pipeline done status | `<pipeline-done-status>` |
 ```
 
 ---
@@ -96,3 +102,10 @@ generated file — every slot must be replaced with an actual value.
   phase not listed has its review skipped (effective review-mode `none` for that
   phase). **OMIT the row entirely when not gating** — an omitted/empty gate means
   all phases review, the default and back-compatible behaviour.
+- **Pipeline done status** — the consuming project's terminal/Done status, exactly
+  as it appears in that project's issue tracker workflow (e.g. `Done`, `Closed`,
+  `Resolved`) — substitute the real status name; never leave the `<pipeline-done-status>`
+  placeholder in the generated file. This is the single token every done-status
+  reader in the plugin resolves against (e.g. the epic loop's idempotent-skip check
+  and the Full-Auto auto-merge-then-transition hook) — do not invent a second
+  terminal-status token elsewhere.
