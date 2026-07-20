@@ -5,6 +5,10 @@
 Getting started with sdlc — Install the sdlc plugin, onboard a repo, and drive your first Jira story to an open PR — docs/tutorials/getting-started-with-sdlc.md
 Getting started with gtm — Bootstrap a marketing foundation for your repo and produce your first landing-page copy brief with the gtm plugin — docs/tutorials/getting-started-with-gtm.md
 
+## How-to guides
+
+How to run the full sdlc pipeline on a story — Take one Jira story from a raw ticket to a merged PR, using either the one-shot /sdlc:auto command or the manual step commands — docs/how-to/run-the-sdlc-pipeline-on-a-story.md
+
 ## Reference
 
 Changelog — Release notes are generated from commit messages by nx release; this page points to the canonical GitHub Releases and plugin changelogs. — docs/changelog/index.md
