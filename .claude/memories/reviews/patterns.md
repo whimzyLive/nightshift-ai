@@ -102,3 +102,18 @@
 **Root causes:** an AND-guard (`[ -n key ] && [ -n status ]`) collapses two distinct cases — "both empty = deliberate 1-arg back-compat" vs "key present, status empty = misconfig" — so the misconfig fell into the silent path. Idempotency was checked only on the pre-transition read, with no re-check after a failed attempt.
 **Preventions:** when a guard's false branch has materially different meanings for different sub-cases, split it (add an `elif`) and make at least the dangerous sub-case loud. For best-effort external-state mutations, re-read the target state after a failed write before declaring failure — a flaky read or concurrent actor may already have reached the goal state.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-20 — Story NA-46
+
+**Issues found:** hard-pinned sdlc plugin-version literal embedded in skill prose
+(`writing-adrs/SKILL.md` line 173: "regeneration tooling, shipped as of sdlc `0.33.0`") — rots on
+every version bump since authored prose is never touched by the release process.
+**Root causes:** a conditional ("pipeline adopted") framing borrowed the plugin's then-current
+version number as a stand-in for "this capability exists in the plugin", instead of describing
+the capability version-free.
+**Preventions:** never embed a literal plugin self-version number (a `\d+\.\d+\.\d+` pattern near
+"sdlc"/"gtm"/"plugin"/"shipped") in skill/ref/command/agent prose — describe capability existence
+version-free (e.g. "shipped with this plugin", "where X is adopted") instead; reserve literal
+version numbers for `plugin.json` fields and CHANGELOG entries, the only surfaces meant to track
+releases.
+**Domains affected:** ai-enablement-engineer

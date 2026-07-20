@@ -170,7 +170,7 @@ source-stories: [PROJ-142, PROJ-156] # Jira keys that motivated or are evidenced
   why it exists), as a list even when there's only one.
 
 Where the sdlc ADR pipeline is installed and in use — the `knowledge-engineer` agent and its
-regeneration tooling, shipped as of sdlc `0.33.0` — a generated `docs/adr/index.md` is rebuilt
+regeneration tooling, shipped with this plugin — a generated `docs/adr/index.md` is rebuilt
 deterministically from this frontmatter across every file in `docs/adr/`: grouped into a section
 per agent named in `agents`, plus one `General` (unrouted) section for any ADR whose `agents` list
 is empty or omitted, so no ADR is ever silently dropped from the index just because it wasn't
