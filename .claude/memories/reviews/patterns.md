@@ -88,3 +88,17 @@
 **Root causes:** a new global policy doc was added without sweeping the agents' OWN definitions for pre-existing guidance that states the opposite — single-source (AC4) was enforced at the override layer but the plugin agent-definition layer still carried the copy-pasted contradiction.
 **Preventions:** when introducing a policy/rule doc, grep every agent definition AND override for standing guidance on the same topic and reconcile (defer to the doc), not just the files named in the story scope; a single-source claim must hold across BOTH the override layer and the plugin agent-definition layer.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-19 — Story NA-47
+
+**Issues found:** No Critical/Important. Minor: `auto.md` completing-phase auto-merge hook example mixed placeholder conventions (`"$DONE_STATUS"` shell-var vs `<STORY_KEY>` bare vs `<DONE_STATUS>` prose) — risked the LLM emitting the literal `$DONE_STATUS` into the transition call, producing a spurious best-effort failure warning + Jira comment on every Full-Auto completion. Noted (not fixed): read-then-transition edge could post a failure comment on an already-done story if the status read fails; workflow must allow a direct current→done edge.
+**Root causes:** command files are LLM-consumed instructions — a `$var` in an example is ambiguous between "substitute the resolved value" and "emit verbatim"; the impl carried the shell-var form over from the script into the prose example.
+**Preventions:** in command/agent markdown, use ONE placeholder convention (`<ANGLE_BRACKET>`) for every value the model must substitute; never use `$shellvar` syntax in an example command string the model is meant to fill in. For best-effort Jira transitions, remember `--status` requires a direct workflow edge; distinguish "read failed" from "transition rejected" before posting a failure comment.
+**Domains affected:** ai-enablement-engineer
+
+## 2026-07-19 — Story NA-47 — loop review-fix
+
+**Issues found:** Two robustness gaps a high-effort review caught that the first-pass review missed. (1) `auto-merge-pr.sh` silently no-op'd the transition when a story-key was supplied but `DONE_STATUS` resolved empty (misconfig) — re-introducing the exact stuck-In-Progress bug the story fixes, with no signal. (2) A flaky status read on an already-Done story defeated the idempotency guard and posted a contradictory "move it manually" comment. Rejected (out of scope): a migration/backfill of the new `## Pipeline` token for pre-NA-47 consumer repos — story Out-of-Scope excludes broader project-context schema changes.
+**Root causes:** an AND-guard (`[ -n key ] && [ -n status ]`) collapses two distinct cases — "both empty = deliberate 1-arg back-compat" vs "key present, status empty = misconfig" — so the misconfig fell into the silent path. Idempotency was checked only on the pre-transition read, with no re-check after a failed attempt.
+**Preventions:** when a guard's false branch has materially different meanings for different sub-cases, split it (add an `elif`) and make at least the dangerous sub-case loud. For best-effort external-state mutations, re-read the target state after a failed write before declaring failure — a flaky read or concurrent actor may already have reached the goal state.
+**Domains affected:** ai-enablement-engineer
