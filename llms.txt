@@ -1,5 +1,9 @@
 # nightshift-ai
 
+## How-to guides
+
+How to run the full sdlc pipeline on a story — Take one Jira story from a raw ticket to a merged PR, using either the one-shot /sdlc:auto command or the manual step commands — docs/how-to/run-the-sdlc-pipeline-on-a-story.md
+
 ## Reference
 
 Changelog — Release notes are generated from commit messages by nx release; this page points to the canonical GitHub Releases and plugin changelogs. — docs/changelog/index.md
