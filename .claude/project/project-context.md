@@ -55,3 +55,9 @@ round.
 | ------------ | --------------- |
 | Review agent | `claude-inline` |
 | Review mode  | `on-create`     |
+
+## Pipeline
+
+| Token                | Value  |
+| -------------------- | ------ |
+| Pipeline done status | `Done` |

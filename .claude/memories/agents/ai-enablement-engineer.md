@@ -1,5 +1,40 @@
 # ai-enablement-engineer — memory
 
+## NA-47 — Transition story to Done after Full Auto merge (`plugins/sdlc/scripts/auto-merge-pr.sh`, `plugins/sdlc/commands/auto.md`, `plugins/sdlc/refs/project-context-template.md`, `.claude/project/project-context.md`)
+
+- **A hand-typed markdown table row is very unlikely to match Prettier's own column-width
+  computation on the first pass — this held true again for a brand-new `## Pipeline` section added
+  to two files in the same story.** Both `.claude/project/project-context.md` and
+  `plugins/sdlc/refs/project-context-template.md` got a first-draft `| Token | Value |` row typed
+  by hand; `prettier --check` (via the in-tree scratch-copy idempotency protocol, NA-51/NA-60
+  lessons) flagged both as non-fixed-point on the very first write, purely on column padding, not
+  content. Re-confirms the NA-60 lesson ("never hand-match Prettier's padding — write, then trust
+  the output") generalizes cleanly to a from-scratch new table, not just edits to an existing one.
+  Fixed by running `prettier --write` directly on the real files and treating that as authoritative.
+- **Extending a script's positional-arg contract with two new OPTIONAL trailing args, when the
+  original 1-arg call must stay byte-for-byte behaviourally identical, is safest verified by an
+  actual mocked end-to-end run of all four call shapes** (1-arg back-compat; 3-arg idempotent;
+  3-arg success; 3-arg best-effort-failure), not just a code read. Built minimal `gh`/`acli` mocks
+  in the scratchpad (env-var-switched `ACLI_MODE`) and ran `auto-merge-pr.sh` under `PATH` override
+  for all four shapes — confirmed the 1-arg path prints the exact same two stderr lines + `MERGED`
+  as before, and the 3-arg paths hit no-op/success/warning-then-still-`MERGED` correctly. This is
+  cheap (no real gh/acli/Jira calls) and catches `set -euo pipefail` interaction bugs (e.g. an
+  unguarded `acli` call inside the best-effort block that would otherwise abort the whole script)
+  that a static read alone would not surface.
+- **A best-effort block under `set -euo pipefail` must put every external-command failure inside an
+  `if`/`elif` condition (or an explicit `|| true`), never bare** — `set -e` does not abort on a
+  non-zero exit from a command that is itself the condition of an `if`/`elif`/`while`, so
+  `elif acli … --yes >/dev/null 2>&1; then … else …` is sufficient to guarantee the block can never
+  kill the script, with no extra `|| true` scaffolding needed around the transition call itself
+  (only the status-read pipeline, which isn't a bare `if` condition, needed its own `|| true`).
+- Confirmed (again) that a single "Pipeline done status" token, defined once in
+  `.claude/project/project-context.md` (real value `Done`, exempt from `tools/portability-lint.sh`
+  since that scan only covers `plugins/*`) and once — as a generic `<pipeline-done-status>`
+  fill-in placeholder — in the plugin's `project-context-template.md`, is sufficient for two
+  independent plugin readers (E2a's pre-existing idempotent-skip check, and this story's new
+  auto-merge-then-transition hook) to resolve against without inventing a second terminal-status
+  concept; no portability-lint violation and no drift between the two read sites.
+
 ## NA-62 — PR #131 review round: the reformat sweep introduced 3 NEW corruption classes the quad-fence guard was blind to
 
 - **"No new quad-backtick fences" is only ONE corruption signature — a benign-looking `prettier
