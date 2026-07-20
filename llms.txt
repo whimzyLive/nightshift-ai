@@ -1,5 +1,9 @@
 # nightshift-ai
 
+## How-to guides
+
+Jira and GitHub setup for sdlc — Wire a repo's sdlc plugin to Jira Cloud and GitHub so the pipeline can read stories and open PRs — docs/integrations/jira-and-github.md
+
 ## Reference
 
 Changelog — Release notes are generated from commit messages by nx release; this page points to the canonical GitHub Releases and plugin changelogs. — docs/changelog/index.md
