@@ -3,6 +3,7 @@
 ## Tutorials
 
 Getting started with sdlc — Install the sdlc plugin, onboard a repo, and drive your first Jira story to an open PR — docs/tutorials/getting-started-with-sdlc.md
+Getting started with gtm — Bootstrap a marketing foundation for your repo and produce your first landing-page copy brief with the gtm plugin — docs/tutorials/getting-started-with-gtm.md
 
 ## Reference
 
