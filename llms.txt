@@ -1,5 +1,9 @@
 # nightshift-ai
 
+## Tutorials
+
+Getting started with gtm — Bootstrap a marketing foundation for your repo and produce your first landing-page copy brief with the gtm plugin — docs/tutorials/getting-started-with-gtm.md
+
 ## Reference
 
 Changelog — Release notes are generated from commit messages by nx release; this page points to the canonical GitHub Releases and plugin changelogs. — docs/changelog/index.md
