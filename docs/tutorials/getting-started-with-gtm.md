@@ -9,7 +9,7 @@ related-adrs: []
 In this tutorial you'll stand up the gtm marketing foundation for a repository and produce your
 first landing-page copy brief. You'll install the plugin, connect it to a running Postiz instance,
 run `/gtm:init` to bootstrap the foundation, and finish by running `/gtm:site` to generate a
-handoff brief you can see on disk. By the end you'll have four marketing files committed to your
+handoff brief you can see on disk. By the end you'll have four marketing files written into your
 repo and a copy brief ready to build from.
 
 ## Prerequisites
