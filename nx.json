@@ -92,7 +92,7 @@
           "fallbackCurrentVersionResolver": "disk",
           "manifestRootsToUpdate": ["{projectRoot}/.claude-plugin"],
           "versionActions": "./tools/nx-release/plugin-json-version-actions.ts",
-          "adjustSemverBumpsForZeroMajorVersion": false
+          "adjustSemverBumpsForZeroMajorVersion": true
         },
         "changelog": {
           "projectChangelogs": {
