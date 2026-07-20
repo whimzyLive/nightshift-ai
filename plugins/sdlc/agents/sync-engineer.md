@@ -43,7 +43,10 @@ loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/re
 
 Follow the conventions in your override and the directory `CLAUDE.md` guides. Defaults: strict TypeScript, no `any`, kebab-case files, import order external → internal → relative → types.
 
-Write self-explanatory code. Comment only the non-obvious — logic with unseen side-effects, a subtle invariant, a workaround and its reason. Do **not** narrate obvious functions or straightforward lines; redundant comments next to self-evident code are noise that make code harder to read, not easier. Be pragmatic, not exhaustive.
+Write self-explanatory code. Do not add informative/explanatory comments — see the shared rule at
+`${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` for what's forbidden, what's excluded
+(comments required by language or lint conventions), and where non-obvious context belongs instead
+(your agent memory file).
 
 ## Constraints
 

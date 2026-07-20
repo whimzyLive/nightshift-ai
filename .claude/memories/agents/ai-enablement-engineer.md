@@ -1,5 +1,59 @@
 # ai-enablement-engineer — memory
 
+## NA-48 — No informative code comments; route context to memory instead (`plugins/sdlc/refs/code-comments-policy.md`, `plugins/sdlc/refs/qa-engineer-playbook.md`, `.claude/project/agents/{ai-enablement-engineer,platform-engineer,web-engineer}.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **The story's own grounding scoped AC1/AC4 narrowly to the 3 project override files
+  (`.claude/project/agents/*.md`), but the exact same "informative comment" rule was already
+  copy-pasted 5 times over — in `plugins/sdlc/agents/{database-administrator,mobile-engineer,
+platform-engineer,sync-engineer,web-engineer}.md`'s identical "Write self-explanatory code.
+  Comment only the non-obvious — ..." line (confirmed via `grep -n` across all five).** This is
+  the textbook AC4-shaped duplication the story exists to fix, just one layer down (the generic
+  plugin agent definition, not the per-repo override) and pre-dating this story. I deliberately
+  left it untouched on the grounds that the grounding named only the 3 override files as the AC1/
+  AC4 target, and reasoned the two rules "aren't in hard conflict" — **that reasoning was wrong,
+  caught by review:** the old line explicitly endorsed commenting "a subtle invariant, a workaround
+  and its reason," which is exactly what the new policy's Forbidden list names as informative and
+  routes to memory instead — a real, active contradiction on two of the three active agents (both
+  files are in-context on every dispatch), not a harmless overlap. **Lesson: when a new rule you're
+  introducing narrows or reframes an existing standing instruction, check the existing instruction
+  for direct textual overlap with your rule's own Forbidden/Allowed examples before concluding
+  "no hard conflict" — a shared example phrase appearing on opposite sides of two rules IS a
+  conflict, regardless of how reasonable each rule sounds read in isolation.** Fixed in the same
+  story's review round: all 5 `plugins/sdlc/agents/*.md` "Conventions" lines now defer to
+  `refs/code-comments-policy.md` instead of restating (or contradicting) the rule — closing the
+  duplication at the generic-plugin level too, not just the per-repo override level the first round
+  touched.
+- **`${CLAUDE_PLUGIN_ROOT}/refs/<file>.md` pointer syntax works fine inside a repo-owned project
+  override file (`.claude/project/agents/*.md`), even though no override previously referenced a
+  plugin ref path this way** (confirmed via `grep -rn 'CLAUDE_PLUGIN_ROOT' .claude/project/agents/`
+  — zero prior hits before this story). It resolves correctly because every domain agent's own
+  "First steps" sequence resolves `${CLAUDE_PLUGIN_ROOT}` (via `.claude/.sdlc-plugin-root`) at
+  Step 0, strictly before Step 2 reads the override — so by the time the override's pointer is
+  read, the substitution rule is already active in context. Safe pattern for any future
+  override-level pointer into plugin `refs/`.
+  **Publish-lag caveat (important):** the substitution resolves to the _installed_ plugin cache
+  (`.claude/.sdlc-plugin-root`), NOT the repo's `plugins/sdlc/` source. A repo-owned override merges
+  live immediately, but a plugin `refs/` file added in the SAME PR only exists in the cache after the
+  plugin is republished + reinstalled at the new version. So between merge and reinstall the override's
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` pointer DANGLES (file-not-found) and the rule
+  does not load. This is the normal plugin publish/install lag that affects every plugin-ref change in
+  this repo — not a defect — but any story adding a plugin `refs/` file referenced by a repo-owned
+  override must flag the republish+reinstall as the go-live step (done in NA-48's PR body).
+- `qa-engineer-playbook.md`'s "review across all five axes: correctness, readability, architecture,
+  security, performance" bullet is the single spot that phrase exists in the whole plugin (verified
+  `grep -rl 'correctness, readability\|five axes' plugins/sdlc/`, one file) — a clean single
+  insertion point for a new axis-scoped instruction, no sibling restatement elsewhere to chase.
+- `prettier --write` on `.claude/project/agents/platform-engineer.md` fixed 8 lines of pre-existing
+  missing-blank-line-after-heading drift unrelated to my inserted bullet — the file wasn't
+  Prettier-clean before this story touched it (pre-commit's lint-staged only formats staged diffs,
+  not the whole tree), so touching any override file for an unrelated edit can surface incidental
+  reflow; expected, not a sign my edit was wrong.
+- Bumped `plugin.json` per the NA-54-established hard rule ("every commit shipping new content under
+  `plugins/sdlc/` bumps `plugin.json`'s version"): `0.42.0` → `0.43.0` in round 1 (new ref doc + new
+  enforcement wiring), then `0.43.0` → `0.44.0` in the review round-2 fix (reconciling the 5
+  `plugins/sdlc/agents/*.md` Conventions lines). **The shipped version on this branch is `0.44.0`** —
+  matches `plugins/sdlc/.claude-plugin/plugin.json` and `reviews/patterns.md`. All backward compatible.
+
 ## NA-47 — Transition story to Done after Full Auto merge (`plugins/sdlc/scripts/auto-merge-pr.sh`, `plugins/sdlc/commands/auto.md`, `plugins/sdlc/refs/project-context-template.md`, `.claude/project/project-context.md`)
 
 - **A hand-typed markdown table row is very unlikely to match Prettier's own column-width

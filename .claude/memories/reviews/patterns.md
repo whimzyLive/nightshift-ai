@@ -82,6 +82,13 @@
 **Preventions:** when an agent gains a dispatch type, grep every section heading for unbranched instructions; prefer origin/<base> remote-tracking refs in all diff ranges.
 **Domains affected:** ai-enablement-engineer
 
+## 2026-07-19 — Story NA-48
+
+**Issues found:** 1 Important — the new `code-comments-policy.md` (forbids informative comments incl. "subtle invariant" and "workaround and its reason") directly contradicted the standing "Conventions" line in the plugin agent definitions (`plugins/sdlc/agents/{platform,web}-engineer.md`) which endorsed commenting exactly those cases; two active agents received contradictory in-context instructions → perpetual review-gate churn. Fixed round 2 by deferring all 5 code-writing agent definitions' Conventions line to the policy doc (also closed the AC4 residual duplication). Minors (not blocking): publish-lag dangling `${CLAUDE_PLUGIN_ROOT}` pointer until 0.44.0 reinstall; prettier blank-line reflow noise.
+**Root causes:** a new global policy doc was added without sweeping the agents' OWN definitions for pre-existing guidance that states the opposite — single-source (AC4) was enforced at the override layer but the plugin agent-definition layer still carried the copy-pasted contradiction.
+**Preventions:** when introducing a policy/rule doc, grep every agent definition AND override for standing guidance on the same topic and reconcile (defer to the doc), not just the files named in the story scope; a single-source claim must hold across BOTH the override layer and the plugin agent-definition layer.
+**Domains affected:** ai-enablement-engineer
+
 ## 2026-07-19 — Story NA-47
 
 **Issues found:** No Critical/Important. Minor: `auto.md` completing-phase auto-merge hook example mixed placeholder conventions (`"$DONE_STATUS"` shell-var vs `<STORY_KEY>` bare vs `<DONE_STATUS>` prose) — risked the LLM emitting the literal `$DONE_STATUS` into the transition call, producing a spurious best-effort failure warning + Jira comment on every Full-Auto completion. Noted (not fixed): read-then-transition edge could post a failure comment on an already-done story if the status read fails; workflow must allow a direct current→done edge.
