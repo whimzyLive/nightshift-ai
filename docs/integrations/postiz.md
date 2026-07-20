@@ -72,17 +72,16 @@ Run it:
 
 ## Configure each channel
 
-Once the gate passes, `/gtm:init` enumerates your Postiz channels and prompts you, one channel at a
-time, for four settings. Answer each per channel:
+Once the gate passes, `/gtm:init` reads each channel's integration `id`, `name`, and `identifier`
+from `postiz integrations:list` — you do not enter the integration ID; it is recorded for you. It
+then walks your channels one at a time and prompts you for four settings. Answer each per channel:
 
-1. **Integration** — `/gtm:init` reads the integration `id`, `name`, and `identifier` from
-   `postiz integrations:list`. You do not enter the integration ID; it is recorded for you.
-2. **Ownership** — `auto` (gtm may publish to this channel without a human gate) or `draft` (gtm
+1. **Ownership** — `auto` (gtm may publish to this channel without a human gate) or `draft` (gtm
    prepares content but never publishes unattended). A channel you skip falls back to `draft`; the
    `reddit` identifier defaults to `manual`.
-3. **Voice** — the tone override for this channel, or blank to inherit the product voice.
-4. **Cadence** — how often gtm should post to this channel.
-5. **Content types** — the kinds of content this channel accepts.
+2. **Voice** — the tone override for this channel, or blank to inherit the product voice.
+3. **Cadence** — how often gtm should post to this channel.
+4. **Content types** — the kinds of content this channel accepts.
 
 All answers land in the `## Channels` table of `.claude/project/marketing-context.md`. To graduate a
 channel from `draft` to `auto` later, re-run `/gtm:init` and change its ownership (Merge or Re-run
