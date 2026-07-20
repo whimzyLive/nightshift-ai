@@ -28,7 +28,7 @@ nightshift/
 
 nightshift's whole value is that the plugin works in **any** repo. So the shipped plugin
 (`plugins/sdlc/**`) must contain **zero project-specific tokens** — no company names, Jira keys,
-stack names, or hardcoded paths. Project specifics belong in the *consuming* repo's
+stack names, or hardcoded paths. Project specifics belong in the _consuming_ repo's
 `.claude/project/` (project-context + agent overrides), never in the plugin.
 
 A lint enforces this. **Run it before every PR:**
@@ -83,13 +83,78 @@ SessionStart hook or manifests, start a **fresh** Claude Code session (hooks fir
 - **A stack starter-config** → docs/example `project-context.md` + override files for a common stack.
 - **An adapter** (GitLab/Linear/etc.) → discuss in an issue first; these touch refs + commands broadly.
 
+## Releasing
+
+Plugin versions (`plugins/sdlc/.claude-plugin/plugin.json`, `plugins/gtm/.claude-plugin/plugin.json`)
+are bumped, tagged, and changelogged automatically by **`nx release`**, driven by your commits — you
+never hand-edit a plugin's `version` field. Each plugin is versioned **independently**; root
+`package.json` (`@nightshift-ai/source`, `0.0.0`, `private: true`) is never released and stays `0.0.0`.
+
+### Commit contract
+
+Scope your commit to the plugin name (`sdlc` or `gtm`) — that scope is what routes the commit to a
+project and drives its bump. The commit **type** sets the bump magnitude (Nx's default conventional-commits
+mapping — no custom `types` override needed):
+
+| Commit type / marker                                                | Bump  |
+| ------------------------------------------------------------------- | ----- |
+| `feat`                                                              | minor |
+| `fix`                                                               | patch |
+| `!` suffix or a `BREAKING CHANGE:` footer (any type)                | major |
+| `chore`, `docs`, `refactor`, `perf`, `build`, `test`, `ci`, `style` | none  |
+
+**One plugin per commit.** With `useCommitScope: true`, a commit that touches a project's files but
+carries a _different_ scope is still treated as a `patch` for that project — so a commit mixing
+`sdlc` and `gtm` changes under one `(gtm)` scope would silently patch-bump `sdlc` too. Keep every
+commit scoped to exactly the one plugin it changes.
+
+### Running a release
+
+```bash
+# Dry run first — always. Prints the computed bump, the sdlc@X.Y.Z / gtm@X.Y.Z tag, and the
+# CHANGELOG.md diff for each plugin. Writes, tags, and commits NOTHING.
+pnpm nx release --dry-run
+
+# Release both plugins:
+pnpm nx release
+
+# Release a single plugin:
+pnpm nx release --projects=sdlc
+pnpm nx release --projects=gtm
+```
+
+A real run updates the plugin's `plugin.json` `version`, writes/updates its `CHANGELOG.md`, commits,
+and creates the `sdlc@X.Y.Z` / `gtm@X.Y.Z` git tag. It does not publish anywhere or open a GitHub
+Release — releases are maintainer-invoked, not run in CI.
+
+### One-time baseline-tag backfill
+
+`nx release` resolves each project's current version from its latest matching git tag
+(`{projectName}@{version}`), falling back to reading `plugin.json` from disk when no tag exists yet.
+Until the first baseline tags exist, every dry/real run recomputes the bump from the plugin's entire
+commit history instead of "since the last release." A maintainer backfills this **once**, cut from
+the tip of `main` (the published branch — not `develop`, which can be ahead of what's shipped):
+
+```bash
+git checkout main && git pull
+git tag -a sdlc@0.42.0 -m "sdlc 0.42.0 (baseline)"
+git tag -a gtm@0.5.0   -m "gtm 0.5.0 (baseline)"
+git push origin sdlc@0.42.0 gtm@0.5.0
+```
+
+These tag names use the exact `releaseTag.pattern` nx.json is configured with, so `nx release`
+matches them going forward. After backfill, the first real `feat`/`fix` release bumps from
+`0.42.0` / `0.5.0` and computes its changelog only from commits after these tags.
+
 ## Pull request checklist
 
 - [ ] `bash tools/portability-lint.sh` is clean.
 - [ ] No project-specific tokens added to `plugins/sdlc/**`.
 - [ ] JSON manifests validate.
 - [ ] If you added an agent/command, you tested it installed against a real repo.
-- [ ] Commit messages are conventional (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`).
+- [ ] Commit messages are conventional (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`) and scoped to
+      the plugin you changed (`sdlc`/`gtm`) — the scope and type now drive that plugin's `nx release`
+      version bump (see "Releasing" above).
 - [ ] README/docs updated if behavior or install steps changed.
 
 ## Reporting bugs & ideas

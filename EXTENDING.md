@@ -22,12 +22,13 @@ description: How we model entities, write migrations, and query with <your ORM>.
 ---
 
 When writing data-access code in this project:
+
 - Entities live in `src/db/entities/*.ts`; one file per entity.
 - Every migration is generated, never hand-written: `npm run db:generate`.
 - Always scope queries by `tenantId`. Never return cross-tenant rows.
 ```
 
-Skills can be anything an agent should *pull in on demand*: an ORM convention, an API-routing
+Skills can be anything an agent should _pull in on demand_: an ORM convention, an API-routing
 pattern, a design system, a deployment recipe. Skills from **any** installed plugin work too —
 just reference them by name.
 
@@ -40,23 +41,28 @@ generic agent reads:
 # Platform Engineer — <your-project> bindings
 
 ## Project skills (invoke in order via the Skill tool)
+
 1. my-orm
-2. my-api-patterns      # only when touching HTTP routes
+2. my-api-patterns # only when touching HTTP routes
 
 ## Directory guides (read before coding)
+
 - src/db/CLAUDE.md
 - src/api/CLAUDE.md
 
 ## Ownership
+
 - owns: src/api/, src/db/
 - never: src/web/ (web-engineer)
 - runs after: database-administrator · before: web-engineer
 
 ## Tech rules
+
 - <Framework + runtime>, TypeScript strict, no `any`, kebab-case files.
 - <Any "always do X / never do Y" your codebase enforces.>
 
 ## Local dev (tokens from project-context Tooling)
+
 - Build: `<your build cmd>` · Test: `<your test cmd>` · never run cloud deploys.
 ```
 
@@ -70,14 +76,16 @@ truth for who owns what, and the **Tooling** rows define the quality gate every 
 
 ```markdown
 ## Workspace → agent
-| Path       | Owner             |
-| ---------- | ----------------- |
-| src/api/   | platform-engineer |
-| src/web/   | web-engineer      |
+
+| Path     | Owner             |
+| -------- | ----------------- |
+| src/api/ | platform-engineer |
+| src/web/ | web-engineer      |
 
 ## Tooling
+
 | Typecheck | `npm run typecheck` |
-| Test      | `npm test`          |
+| Test | `npm test` |
 ```
 
 ## Patterns
@@ -88,3 +96,10 @@ truth for who owns what, and the **Tooling** rows define the quality gate every 
 - **A brand-new role** (e.g. `ml-engineer`) → fork the marketplace, add `agents/ml-engineer.md` to the plugin, and `/plugin marketplace update`. PRs for broadly useful roles are welcome.
 
 > Rule of thumb: **project-specific knowledge → your repo's `.claude/` (skills + overrides + project-context). Generic role behavior → the plugin.** Keep that line clean and upgrades never fight your customizations.
+
+## A note on plugin versions
+
+Never hand-edit a plugin's `.claude-plugin/plugin.json` `version` field. It's managed by
+`nx release`, driven by your conventional commits — see [CONTRIBUTING.md's "Releasing"
+section](CONTRIBUTING.md#releasing) for the commit contract, the release commands, and the
+one-time baseline-tag backfill.

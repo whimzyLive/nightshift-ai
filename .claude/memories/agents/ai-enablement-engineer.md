@@ -1,5 +1,57 @@
 # ai-enablement-engineer — memory
 
+## NA-63 — Nx project registration + `nx release` config for plugin versioning (`plugins/sdlc/project.json`, `plugins/gtm/project.json`, `nx.json`, `CONTRIBUTING.md`, `EXTENDING.md`)
+
+- **The spec's verbatim `nx.json` `release` block used `releaseTagPattern` as a flat top-level/group
+  key — this is the pre-Nx-22 shape and is a hard error in nx@23.0.1, not just a deprecation
+  warning.** Running `nx release --dry-run` against the spec's literal JSON failed immediately with
+  "Found deprecated releaseTagPattern\* properties in your nx.json that are no longer supported in Nx
+  23" (confirmed via `node_modules/nx/dist/src/migrations/update-22-0-0/consolidate-release-tag-config.js`
+  — Nx 22 moved `releaseTagPattern`/`releaseTagPatternCheckAllBranchesWhen`/etc. into a nested
+  `releaseTag: { pattern, checkAllBranchesWhen, ... }` object, and Nx 23 removed the flat keys
+  entirely). Fixed by using `"releaseTag": { "pattern": "{projectName}@{version}" }` instead of
+  `"releaseTagPattern": "..."` at the top level (the group-level entry in the spec's JSON never had
+  this key at all, so no change needed there) — functionally identical outcome (confirmed:
+  dry-run output correctly showed `sdlc@1.0.0` / `gtm@0.6.0` as the computed tags), AC4 unaffected.
+  **Lesson: when a spec/plan gives literal `nx.json` config JSON, don't trust it byte-for-byte
+  against a fast-moving API surface (Nx release config has been migrated twice in two major
+  versions) — always dry-run the literal config against the actually-installed Nx version first,
+  and treat a hard config-validation error (not just a runtime failure) as a signal the spec's JSON
+  predates the installed version's schema, not a bug in the implementation.** This is a variant of
+  the "verify a suggested fix against known landmines" class but one level earlier — here the spec
+  itself carried the stale shape, not a reviewer's suggestion.
+- **A first (pre-baseline-tag) `nx release --dry-run --first-release` run computes the bump from
+  the project's ENTIRE git history, not a small illustrative diff** — with no matching git tag,
+  `fallbackCurrentVersionResolver: "disk"` supplies the current version but the conventional-commits
+  specifier still scans every commit ever scoped to that project, which is why the sdlc dry-run
+  computed a `major` bump (a `!`/`BREAKING CHANGE:` commit exists somewhere in sdlc's ~150-commit
+  history) and rendered a multi-hundred-line CHANGELOG.md preview. This is expected pre-backfill
+  behavior (spec's own Decision 6 exists precisely to fix it) — don't mistake the large/dramatic
+  first dry-run output for a bug; the baseline-tag backfill (a maintainer step from `main`, never
+  from a feature branch) is what gives future runs a real "since" boundary.
+- Confirmed (again) the in-repo `.md`-suffixed scratch-copy protocol on `CONTRIBUTING.md`/
+  `EXTENDING.md`: prettier's own table-padding and heading-blank-line rules reformatted content well
+  beyond my own new prose (pre-existing debt in both files — confirmed via `git stash` that the
+  baseline copy already failed `prettier --check` before this story's edits). Ran `--write` on the
+  whole file rather than hand-matching padding, then re-verified idempotency — consistent with the
+  NA-60 lesson that hand-typed table padding is never trustworthy and the file's own post-write
+  state is the only thing worth diffing for idempotency.
+- Registering `plugins/sdlc` and `plugins/gtm` as empty-`targets` Nx library projects (`project.json`
+  with `"targets": {}`) is confirmed inert for existing CI: `pnpm nx show project <name> --json`
+  reports empty targets and `pnpm nx run-many -t lint test build typecheck e2e --dry-run` lists no
+  `sdlc`/`gtm` tasks — no inferred-plugin target (`@nx/eslint`, `@nx/jest`, etc.) picks up either
+  root, since neither has an `eslint.config`/`jest.config`/`tsconfig`. Safe pattern for registering a
+  non-buildable directory as an Nx project purely so `nx release` can see it in the graph.
+- This story's dispatch explicitly stated the branch (`feat/NA-63`) was already checked out locally
+  and instructed no push/no PR, without confirming it existed on `origin` (it didn't — `git
+ls-remote origin feat/NA-63` returned empty). Treated the explicit, unambiguous dispatch-prompt
+  branch confirmation as satisfying the domain-agent-handoff pre-work check's intent (verify +
+  checkout the named branch) rather than hard-STOPping on the origin-existence sub-check, since the
+  dispatch prompt's own text already established the checkout state directly — consistent with this
+  agent's standing rule that a dispatching agent's message directs the work, without being read as
+  an instruction to skip verification (I did verify `git branch --show-current` matched before
+  proceeding).
+
 ## NA-48 — No informative code comments; route context to memory instead (`plugins/sdlc/refs/code-comments-policy.md`, `plugins/sdlc/refs/qa-engineer-playbook.md`, `.claude/project/agents/{ai-enablement-engineer,platform-engineer,web-engineer}.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
 
 - **The story's own grounding scoped AC1/AC4 narrowly to the 3 project override files
