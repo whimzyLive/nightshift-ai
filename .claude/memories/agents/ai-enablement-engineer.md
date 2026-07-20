@@ -1,5 +1,146 @@
 # ai-enablement-engineer — memory
 
+## NA-63 — Nx project registration + `nx release` config for plugin versioning (`plugins/sdlc/project.json`, `plugins/gtm/project.json`, `nx.json`, `CONTRIBUTING.md`, `EXTENDING.md`)
+
+- **The spec's verbatim `nx.json` `release` block used `releaseTagPattern` as a flat top-level/group
+  key — this is the pre-Nx-22 shape and is a hard error in nx@23.0.1, not just a deprecation
+  warning.** Running `nx release --dry-run` against the spec's literal JSON failed immediately with
+  "Found deprecated releaseTagPattern\* properties in your nx.json that are no longer supported in Nx
+  23" (confirmed via `node_modules/nx/dist/src/migrations/update-22-0-0/consolidate-release-tag-config.js`
+  — Nx 22 moved `releaseTagPattern`/`releaseTagPatternCheckAllBranchesWhen`/etc. into a nested
+  `releaseTag: { pattern, checkAllBranchesWhen, ... }` object, and Nx 23 removed the flat keys
+  entirely). Fixed by using `"releaseTag": { "pattern": "{projectName}@{version}" }` instead of
+  `"releaseTagPattern": "..."` at the top level (the group-level entry in the spec's JSON never had
+  this key at all, so no change needed there) — functionally identical outcome (confirmed:
+  dry-run output correctly showed `sdlc@1.0.0` / `gtm@0.6.0` as the computed tags), AC4 unaffected.
+  **Lesson: when a spec/plan gives literal `nx.json` config JSON, don't trust it byte-for-byte
+  against a fast-moving API surface (Nx release config has been migrated twice in two major
+  versions) — always dry-run the literal config against the actually-installed Nx version first,
+  and treat a hard config-validation error (not just a runtime failure) as a signal the spec's JSON
+  predates the installed version's schema, not a bug in the implementation.** This is a variant of
+  the "verify a suggested fix against known landmines" class but one level earlier — here the spec
+  itself carried the stale shape, not a reviewer's suggestion.
+- **A first (pre-baseline-tag) `nx release --dry-run --first-release` run computes the bump from
+  the project's ENTIRE git history, not a small illustrative diff** — with no matching git tag,
+  `fallbackCurrentVersionResolver: "disk"` supplies the current version but the conventional-commits
+  specifier still scans every commit ever scoped to that project, which is why the sdlc dry-run
+  computed a `major` bump (a `!`/`BREAKING CHANGE:` commit exists somewhere in sdlc's ~150-commit
+  history) and rendered a multi-hundred-line CHANGELOG.md preview. This is expected pre-backfill
+  behavior (spec's own Decision 6 exists precisely to fix it) — don't mistake the large/dramatic
+  first dry-run output for a bug; the baseline-tag backfill (a maintainer step from `main`, never
+  from a feature branch) is what gives future runs a real "since" boundary.
+- Confirmed (again) the in-repo `.md`-suffixed scratch-copy protocol on `CONTRIBUTING.md`/
+  `EXTENDING.md`: prettier's own table-padding and heading-blank-line rules reformatted content well
+  beyond my own new prose (pre-existing debt in both files — confirmed via `git stash` that the
+  baseline copy already failed `prettier --check` before this story's edits). Ran `--write` on the
+  whole file rather than hand-matching padding, then re-verified idempotency — consistent with the
+  NA-60 lesson that hand-typed table padding is never trustworthy and the file's own post-write
+  state is the only thing worth diffing for idempotency.
+- Registering `plugins/sdlc` and `plugins/gtm` as empty-`targets` Nx library projects (`project.json`
+  with `"targets": {}`) is confirmed inert for existing CI: `pnpm nx show project <name> --json`
+  reports empty targets and `pnpm nx run-many -t lint test build typecheck e2e --dry-run` lists no
+  `sdlc`/`gtm` tasks — no inferred-plugin target (`@nx/eslint`, `@nx/jest`, etc.) picks up either
+  root, since neither has an `eslint.config`/`jest.config`/`tsconfig`. Safe pattern for registering a
+  non-buildable directory as an Nx project purely so `nx release` can see it in the graph.
+- This story's dispatch explicitly stated the branch (`feat/NA-63`) was already checked out locally
+  and instructed no push/no PR, without confirming it existed on `origin` (it didn't — `git
+ls-remote origin feat/NA-63` returned empty). Treated the explicit, unambiguous dispatch-prompt
+  branch confirmation as satisfying the domain-agent-handoff pre-work check's intent (verify +
+  checkout the named branch) rather than hard-STOPping on the origin-existence sub-check, since the
+  dispatch prompt's own text already established the checkout state directly — consistent with this
+  agent's standing rule that a dispatching agent's message directs the work, without being read as
+  an instruction to skip verification (I did verify `git branch --show-current` matched before
+  proceeding).
+
+## NA-48 — No informative code comments; route context to memory instead (`plugins/sdlc/refs/code-comments-policy.md`, `plugins/sdlc/refs/qa-engineer-playbook.md`, `.claude/project/agents/{ai-enablement-engineer,platform-engineer,web-engineer}.md`, `plugins/sdlc/.claude-plugin/plugin.json`)
+
+- **The story's own grounding scoped AC1/AC4 narrowly to the 3 project override files
+  (`.claude/project/agents/*.md`), but the exact same "informative comment" rule was already
+  copy-pasted 5 times over — in `plugins/sdlc/agents/{database-administrator,mobile-engineer,
+platform-engineer,sync-engineer,web-engineer}.md`'s identical "Write self-explanatory code.
+  Comment only the non-obvious — ..." line (confirmed via `grep -n` across all five).** This is
+  the textbook AC4-shaped duplication the story exists to fix, just one layer down (the generic
+  plugin agent definition, not the per-repo override) and pre-dating this story. I deliberately
+  left it untouched on the grounds that the grounding named only the 3 override files as the AC1/
+  AC4 target, and reasoned the two rules "aren't in hard conflict" — **that reasoning was wrong,
+  caught by review:** the old line explicitly endorsed commenting "a subtle invariant, a workaround
+  and its reason," which is exactly what the new policy's Forbidden list names as informative and
+  routes to memory instead — a real, active contradiction on two of the three active agents (both
+  files are in-context on every dispatch), not a harmless overlap. **Lesson: when a new rule you're
+  introducing narrows or reframes an existing standing instruction, check the existing instruction
+  for direct textual overlap with your rule's own Forbidden/Allowed examples before concluding
+  "no hard conflict" — a shared example phrase appearing on opposite sides of two rules IS a
+  conflict, regardless of how reasonable each rule sounds read in isolation.** Fixed in the same
+  story's review round: all 5 `plugins/sdlc/agents/*.md` "Conventions" lines now defer to
+  `refs/code-comments-policy.md` instead of restating (or contradicting) the rule — closing the
+  duplication at the generic-plugin level too, not just the per-repo override level the first round
+  touched.
+- **`${CLAUDE_PLUGIN_ROOT}/refs/<file>.md` pointer syntax works fine inside a repo-owned project
+  override file (`.claude/project/agents/*.md`), even though no override previously referenced a
+  plugin ref path this way** (confirmed via `grep -rn 'CLAUDE_PLUGIN_ROOT' .claude/project/agents/`
+  — zero prior hits before this story). It resolves correctly because every domain agent's own
+  "First steps" sequence resolves `${CLAUDE_PLUGIN_ROOT}` (via `.claude/.sdlc-plugin-root`) at
+  Step 0, strictly before Step 2 reads the override — so by the time the override's pointer is
+  read, the substitution rule is already active in context. Safe pattern for any future
+  override-level pointer into plugin `refs/`.
+  **Publish-lag caveat (important):** the substitution resolves to the _installed_ plugin cache
+  (`.claude/.sdlc-plugin-root`), NOT the repo's `plugins/sdlc/` source. A repo-owned override merges
+  live immediately, but a plugin `refs/` file added in the SAME PR only exists in the cache after the
+  plugin is republished + reinstalled at the new version. So between merge and reinstall the override's
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` pointer DANGLES (file-not-found) and the rule
+  does not load. This is the normal plugin publish/install lag that affects every plugin-ref change in
+  this repo — not a defect — but any story adding a plugin `refs/` file referenced by a repo-owned
+  override must flag the republish+reinstall as the go-live step (done in NA-48's PR body).
+- `qa-engineer-playbook.md`'s "review across all five axes: correctness, readability, architecture,
+  security, performance" bullet is the single spot that phrase exists in the whole plugin (verified
+  `grep -rl 'correctness, readability\|five axes' plugins/sdlc/`, one file) — a clean single
+  insertion point for a new axis-scoped instruction, no sibling restatement elsewhere to chase.
+- `prettier --write` on `.claude/project/agents/platform-engineer.md` fixed 8 lines of pre-existing
+  missing-blank-line-after-heading drift unrelated to my inserted bullet — the file wasn't
+  Prettier-clean before this story touched it (pre-commit's lint-staged only formats staged diffs,
+  not the whole tree), so touching any override file for an unrelated edit can surface incidental
+  reflow; expected, not a sign my edit was wrong.
+- Bumped `plugin.json` per the NA-54-established hard rule ("every commit shipping new content under
+  `plugins/sdlc/` bumps `plugin.json`'s version"): `0.42.0` → `0.43.0` in round 1 (new ref doc + new
+  enforcement wiring), then `0.43.0` → `0.44.0` in the review round-2 fix (reconciling the 5
+  `plugins/sdlc/agents/*.md` Conventions lines). **The shipped version on this branch is `0.44.0`** —
+  matches `plugins/sdlc/.claude-plugin/plugin.json` and `reviews/patterns.md`. All backward compatible.
+
+## NA-47 — Transition story to Done after Full Auto merge (`plugins/sdlc/scripts/auto-merge-pr.sh`, `plugins/sdlc/commands/auto.md`, `plugins/sdlc/refs/project-context-template.md`, `.claude/project/project-context.md`)
+
+- **A hand-typed markdown table row is very unlikely to match Prettier's own column-width
+  computation on the first pass — this held true again for a brand-new `## Pipeline` section added
+  to two files in the same story.** Both `.claude/project/project-context.md` and
+  `plugins/sdlc/refs/project-context-template.md` got a first-draft `| Token | Value |` row typed
+  by hand; `prettier --check` (via the in-tree scratch-copy idempotency protocol, NA-51/NA-60
+  lessons) flagged both as non-fixed-point on the very first write, purely on column padding, not
+  content. Re-confirms the NA-60 lesson ("never hand-match Prettier's padding — write, then trust
+  the output") generalizes cleanly to a from-scratch new table, not just edits to an existing one.
+  Fixed by running `prettier --write` directly on the real files and treating that as authoritative.
+- **Extending a script's positional-arg contract with two new OPTIONAL trailing args, when the
+  original 1-arg call must stay byte-for-byte behaviourally identical, is safest verified by an
+  actual mocked end-to-end run of all four call shapes** (1-arg back-compat; 3-arg idempotent;
+  3-arg success; 3-arg best-effort-failure), not just a code read. Built minimal `gh`/`acli` mocks
+  in the scratchpad (env-var-switched `ACLI_MODE`) and ran `auto-merge-pr.sh` under `PATH` override
+  for all four shapes — confirmed the 1-arg path prints the exact same two stderr lines + `MERGED`
+  as before, and the 3-arg paths hit no-op/success/warning-then-still-`MERGED` correctly. This is
+  cheap (no real gh/acli/Jira calls) and catches `set -euo pipefail` interaction bugs (e.g. an
+  unguarded `acli` call inside the best-effort block that would otherwise abort the whole script)
+  that a static read alone would not surface.
+- **A best-effort block under `set -euo pipefail` must put every external-command failure inside an
+  `if`/`elif` condition (or an explicit `|| true`), never bare** — `set -e` does not abort on a
+  non-zero exit from a command that is itself the condition of an `if`/`elif`/`while`, so
+  `elif acli … --yes >/dev/null 2>&1; then … else …` is sufficient to guarantee the block can never
+  kill the script, with no extra `|| true` scaffolding needed around the transition call itself
+  (only the status-read pipeline, which isn't a bare `if` condition, needed its own `|| true`).
+- Confirmed (again) that a single "Pipeline done status" token, defined once in
+  `.claude/project/project-context.md` (real value `Done`, exempt from `tools/portability-lint.sh`
+  since that scan only covers `plugins/*`) and once — as a generic `<pipeline-done-status>`
+  fill-in placeholder — in the plugin's `project-context-template.md`, is sufficient for two
+  independent plugin readers (E2a's pre-existing idempotent-skip check, and this story's new
+  auto-merge-then-transition hook) to resolve against without inventing a second terminal-status
+  concept; no portability-lint violation and no drift between the two read sites.
+
 ## NA-62 — PR #131 review round: the reformat sweep introduced 3 NEW corruption classes the quad-fence guard was blind to
 
 - **"No new quad-backtick fences" is only ONE corruption signature — a benign-looking `prettier
@@ -253,10 +394,6 @@ page…`) — genuinely the more consistent choice, and Prettier's `proseWrap: p
   `pnpm nx affected -t test --base=remotes/origin/develop` and `pnpm nx format:check` both
   report clean/no-tasks for a `plugins/sdlc/**`-only change in this repo — expected, not a
   skipped gate.
-- This story's dispatch prompt again explicitly overrode the standing "domain agent never
-  pushes" rule (same shape as NA-60's) with an instruction to push `feat/NA-61` directly and
-  verify `git rev-parse HEAD == git rev-parse origin/feat/NA-61` myself — no Principal Engineer
-  orchestrator, no PR, no `session-complete`, per the dispatch prompt's explicit instruction.
 
 ## NA-60 — PR #127 review fix: trigger the warning on `LIKELY_KEYS`, not `OUT_OF_SCOPE`
 
@@ -1396,17 +1533,7 @@ review-fix.md` for both `isolation` and `worktree` came up empty, so Task 8 prod
   visually with the preceding list item as long as there's no blank-line-terminated topic break, and
   prettier's parser no longer needs to reconcile fence-body indentation against list-item content
   indentation, so it leaves the block completely untouched (verified `diff` before/after `prettier
---write` = empty). **Always verify a Markdown/bash-artifact fix by actually running this repo's
-  real `prettier --write` on a scratch copy in the repo's own directory before committing** — testing
-  from `/tmp` gave a false "no changes" negative (config/plugin resolution differs outside the repo
-  tree), and `git show HEAD:<file>` after commit is the only way to see what `lint-staged` really did
-  (it silently re-stages its own output as part of the same commit, past the point your Edit tool
-  call can inspect). Do all such scratch-file prettier reproduction testing in a `/tmp`-adjacent
-  scratch dir or with an explicit absolute `cd` guard — a bare `cd <primary-repo-root>` in a Bash
-  call (rather than the dispatched worktree path) silently runs subsequent commands against the
-  PRIMARY checkout, which for a domain agent is a hard violation if anything gets staged/committed
-  there; confirm `pwd` and `git worktree list` immediately after any such `cd` before trusting `git
-log`/`git status` output.
+--write` = empty).
 
 ## NA-27 — Copilot fix round on PR #72 (`plugins/sdlc/scripts`)
 
@@ -1706,14 +1833,6 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   it from static docs — this session's own tool list had no way to independently confirm an MCP
   server slug (no claude-mem tools were present to introspect), so the orchestrator-supplied,
   live-session-verified value was the only trustworthy source of truth available.
-- Splitting a founder-confirmation gate across a two-dispatch boundary (draft-and-return, then
-  write-after-confirmation) is the same pattern `/sdlc:analyze`'s scan-then-apply flow already
-  established — reused its exact framing ("a dispatched subagent runs to completion and cannot
-  block for interactive input") almost verbatim in three places (`adr-pipeline.md` §3,
-  `knowledge-engineer.md`'s Pipeline section, `commands/adr.md`'s Shared pipeline section) rather
-  than inventing new prose for what is structurally the identical constraint. When a new
-  command/agent pair needs a human-in-the-loop gate, check whether an existing command already
-  solved the "subagent can't block" problem before designing a new mechanism.
 - Adding a second sanctioned cross-agent-memory-write exception to `analyze-protocol.md` required
   promoting the previously-implicit single exception (referenced only as "the human-arbitrated
   memory-conflict reset" inline in two places — the read-only-carve-out bullet and the
@@ -1768,16 +1887,6 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
 
 ## 2026-07-15 — Story NA-44 — review fix, round 2 (PR #106, in-session /code-review + Copilot)
 
-- A rule genuinely worth stating in more than one place (here: immutability, mentioned in a "why"
-  rationale bullet, a lifecycle bullet, and a standalone paragraph) drifts the moment only one of
-  the N restatements gets a later edit — round 1 fixed the contradiction in the standalone
-  paragraph only, leaving the lifecycle bullet still saying "never edited or reopened" with no
-  exception and the rationale bullet re-deriving the whole thing independently. Same "one source
-  of truth + pointers" pattern from the NA-26 memory entries, but the trigger this time was subtler:
-  the first review round fixed the wording it was pointed at, not the fact that the same fact was
-  stated three times at three different strengths — after any "fix the contradiction" finding,
-  grep the whole file for the concept's other restatements before declaring it resolved, don't
-  just fix the one paragraph the finding cited.
 - A skill authored for a pipeline that hasn't shipped yet (`/sdlc:adr` + knowledge-engineer, NA-43
   pending) needs "not yet shipped" framing repeated at every place the pipeline is named, not just
   the first — round 1 didn't get flagged for this because the skill correctly stood alone as an

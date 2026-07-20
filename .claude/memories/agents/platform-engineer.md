@@ -1,5 +1,90 @@
 # platform-engineer memory
 
+## 2026-07-19 — Story NA-63 (Phase 2) — custom PluginJsonVersionActions module
+
+**Learnings:**
+
+- The public barrel `nx/release` maps (via nx@23.0.1's package.json `exports`) to
+  `dist/release/index.d.ts`/`.js`, which re-exports `VersionActions` from the internal
+  `src/command-line/release/version/version-actions` module — confirmed this resolves both at
+  typecheck time and at runtime (loaded the compiled `.ts` file with `ts-node -e` and checked
+  `Object.getPrototypeOf(Cls).name === 'VersionActions'`). The deep path `nx/release/version-actions`
+  has a `./release/*` wildcard entry in `exports` but no `dist/release/version-actions.d.ts`/`.js`
+  actually exists on disk — the wildcard matches syntactically but the file 404s, hence
+  `MODULE_NOT_FOUND` at runtime (spec's warning verified, not just trusted).
+- The base `VersionActions.init(tree)` (called by Nx before any of the abstract methods run)
+  already resolves `manifestRootsToUpdate` + `validManifestFilenames` into `this.manifestsToUpdate`
+  (`{ manifestPath, preserveLocalDependencyProtocols }[]`), interpolating `{projectRoot}` for us.
+  Implementing methods should consume `this.manifestsToUpdate[0].manifestPath` rather than
+  re-deriving the join by hand from `projectGraphNode.data.root` — simpler and can't drift from
+  whatever `nx.json`'s `manifestRootsToUpdate` actually says.
+- `Tree`/`ProjectGraph` types aren't exported from any `nx` package.json `exports` entry by name,
+  but nx's `exports` map has a `./src/*` wildcard → `dist/src/*.d.ts` that genuinely has a compiled
+  `.d.ts` on disk (unlike the `version-actions` deep-path trap above) — `import type { Tree } from
+'nx/src/generators/tree'` resolves cleanly under `moduleResolution: "bundler"`. Since it's a
+  type-only import it's erased at runtime, so no `MODULE_NOT_FOUND` risk even though it's a "deep"
+  path.
+- Overriding/implementing an abstract base-class method under `noImplicitOverride` (this repo's
+  tsconfig.base.json setting) requires the `override` keyword even on members that only _implement_
+  an abstract member (not just concrete-method overrides) — omitting it is a tsc error.
+- A subclass method implementing an abstract member with more parameters (e.g.
+  `readCurrentVersionOfDependency(tree, projectGraph, name)`) can be declared with **zero**
+  parameters in the override — TS structural typing allows fewer declared params — which avoided
+  needing the `ProjectGraph` type import at all for the three members that ignore their inputs.
+- Preserving `plugin.json` key order/formatting on write: a JSON.parse→stringify round-trip risks
+  reordering/reformatting; instead did a line-anchored regex replace
+  (`/^(\s*"version"\s*:\s*)"[^"]*"/m`) that touches only the `"version"` value and leaves every
+  other byte (indentation, key order, trailing newline) untouched.
+
+**Pitfalls:**
+
+- `pnpm exec tsc ...` in this repo is silently rewritten by the user's global `rtk` proxy hook —
+  it printed `TypeScript: No errors found` but still exited `1`, which would have read as a false
+  failure. Calling `./node_modules/.bin/tsc` directly bypassed the hook and gave a trustworthy
+  `EXIT: 0`/no-output result. When a wrapped tool's exit code contradicts its own success message,
+  re-run via the raw binary path before trusting the exit code.
+- No Nx project (`project.json`) exists at the repo root and no `nx typecheck` target covers
+  `tools/` — there's nothing to `pnpm nx typecheck source`. Verified instead with a manual `tsc
+--noEmit` invocation replicating `tsconfig.base.json`'s compilerOptions by flag, plus a `ts-node -e`
+  smoke-load to prove the runtime import (not just the type) resolves.
+
+**Patterns:**
+
+- `bash tools/portability-lint.sh` only scans `plugins/**` (confirmed again, per the NA-3 memory
+  entry) — a green run is expected and uninformative for anything added under `tools/`; it's a
+  required gate per the plan, but not evidence the new file itself is clean of anything beyond
+  what the plan explicitly checked for (typecheck + no dependency changes).
+
+## 2026-07-19 — Story NA-63 review fix — updateProjectVersion fails loud instead of failing open
+
+**Learnings:**
+
+- Original code did `if (!contents || !VERSION_FIELD_PATTERN.test(contents)) continue;` — under
+  `git-tag`/`conventional-commits` resolvers `nx release` still tags + writes CHANGELOG.md even
+  when the version-bump write to `plugin.json` was silently skipped, producing permanent,
+  undetected tag↔manifest drift. Fixed by throwing instead of `continue`-ing on every failure path
+  (unreadable manifest, zero matches, >1 match) — a manifest that can't record the bump must abort
+  the whole release, not be silently skipped.
+- Closed the "first-match-wins on a future nested `version` key" risk in the same pass: switched
+  from `.test()` (which only proves ≥1 match exists) to `new RegExp(VERSION_FIELD_PATTERN.source,
+'gm').match(contents)` to _count_ matches — exactly 1 is required; 0 throws "no top-level
+  version field", >1 throws "ambiguous version fields (<n>)" naming the manifest path in both.
+  Kept the original anchored line-based `VERSION_FIELD_PATTERN` (`^(\s*"version"\s*:\s*)"[^"]*"`,
+  `m` flag) and the regex-replace write unchanged — this is a fail-fast guard in front of the
+  existing formatting-preserving write, not a rewrite of the write strategy itself (JSON.parse/
+  stringify was explicitly out of scope, would lose key order/formatting).
+- Re-ran `./node_modules/.bin/nx release --dry-run --first-release` after the fix to prove the
+  happy path is unaffected: both real plugins (`sdlc`→v1.0.0, `gtm`→v0.6.0) still bump
+  `plugin.json`, changelogs/tags preview normally, `git status --porcelain` shows zero mutation —
+  confirms the new throws only fire on the pathological 0-match/>1-match cases, never on the
+  existing well-formed manifests.
+
+**Pitfalls:**
+
+- Same `rtk` proxy risk as the original NA-63 Phase-2 dispatch (see next entry below) — reused the
+  raw `./node_modules/.bin/tsc --noEmit <flags-from-tsconfig.base.json>` invocation rather than
+  `pnpm exec tsc` for a trustworthy exit code.
+
 ## 2026-07-18 — Story NA-62 (Phase B) — wire check-plugin-docs-format.sh into ci.yml
 
 **Learnings:**
@@ -101,16 +186,6 @@ origin/feat/<STORY-KEY>`) to pick up commits (the plan doc) that existed on the 
   block) — not necessarily the top-level field. `jq -r '.name // empty' package.json` is the
   correct top-level-only, JSON-aware extraction; the `// empty` guards against `jq` emitting the
   literal string `null` when the field is absent (verified against a JSON file lacking `name`).
-
-**Pitfalls:**
-
-- Same isolated-worktree-can't-check-out-the-named-branch situation as the initial pass (see the
-  entry above) recurred on this review-fix dispatch too — `git checkout feat/NA-3` failed because
-  the shared main checkout already had it. Reused the same fix: stay in the default (non-`cd`'d)
-  Bash cwd of the assigned worktree, and `git merge --ff-only origin/feat/NA-3` to fast-forward
-  the worktree's local branch onto the remote branch's tip before editing anything. This is
-  evidently a recurring characteristic of this project's worktree-per-dispatch setup, not a one-off
-  — expect it on every dispatch for a story whose branch is also open in the main checkout.
 
 **Patterns:**
 
@@ -241,14 +316,6 @@ C:\\Users\\y\n'`) and the two false-positive shapes found in `plugins/sdlc/refs/
   session right before every CLI invocation. Don't conflate "the CLI's contract requires an env var"
   with "the value must be secret / env-only" — those are separate, independently-decidable design
   choices.
-
-**Pitfalls:**
-
-- Same isolated-worktree-can't-check-out-the-named-branch situation recurred yet again on this
-  dispatch — `git checkout feat/NA-3` would have failed since the shared main checkout already had
-  it open. Used the `git merge --ff-only origin/feat/NA-3` fix from the first NA-3 dispatch (not the
-  detach-and-checkout variant from the second) since it was the simplest option available without
-  touching the shared checkout at all.
 
 **Patterns:**
 

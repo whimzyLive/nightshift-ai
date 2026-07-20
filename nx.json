@@ -77,5 +77,37 @@
       }
     }
   },
+  "release": {
+    "projectsRelationship": "independent",
+    "releaseTag": {
+      "pattern": "{projectName}@{version}"
+    },
+    "groups": {
+      "plugins": {
+        "projects": ["sdlc", "gtm"],
+        "projectsRelationship": "independent",
+        "version": {
+          "specifierSource": "conventional-commits",
+          "currentVersionResolver": "git-tag",
+          "fallbackCurrentVersionResolver": "disk",
+          "manifestRootsToUpdate": ["{projectRoot}/.claude-plugin"],
+          "versionActions": "./tools/nx-release/plugin-json-version-actions.ts",
+          "adjustSemverBumpsForZeroMajorVersion": false
+        },
+        "changelog": {
+          "projectChangelogs": {
+            "file": "{projectRoot}/CHANGELOG.md"
+          },
+          "createRelease": false
+        }
+      }
+    },
+    "changelog": {
+      "workspaceChangelog": false
+    },
+    "conventionalCommits": {
+      "useCommitScope": true
+    }
+  },
   "analytics": false
 }

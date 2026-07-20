@@ -18,6 +18,9 @@
 
 ## Tech rules
 
+- No informative/explanatory comments — see the shared rule at
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` (excludes comments required by language or
+  lint conventions).
 - Markdown/Shell; kebab-case file naming; any shell script touched must pass `bash tools/portability-lint.sh` (gate present in this repo).
 - Skill layout (three tiers — do not mix):
   - `.agents/skills/<name>/` — installed by the skills CLI (`npx skills add <owner/repo>`), pinned in root `skills-lock.json`. Never hand-edit content or the lockfile; update via `npx skills update`.
