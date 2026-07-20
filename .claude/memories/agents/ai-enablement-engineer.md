@@ -1,5 +1,37 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-20 — Story NA-45 (fix round) — mocked-CLI regression tests can be false-green on the exact logic they claim to cover
+
+**Learnings:** A mock CLI that hardcodes its "resolved" output (e.g. `gh api ... --jq '...'` mocked
+to always `echo "--merge"`) never exercises the real script's jq expression at all — a verifier
+proved this by deliberately breaking the script's jq (line 67) and watching the test still PASS.
+Fixed by piping a realistic JSON payload through the REAL `jq` binary using the exact `--jq`
+expression the script passes, so a broken expression actually breaks the test. That alone was
+still insufficient: the downstream mock `gh pr merge` accepted ANY method flag unconditionally, so
+even a `--BROKEN-PROBE` string produced by the broken jq still "merged successfully." Had to add a
+second layer — the mock's `merge` case now validates the method arg is one of
+`--merge`/`--squash`/`--rebase` and rejects anything else with `unknown flag: <value>` (mirroring
+real gh's actual flag-parsing behaviour) — before the broken-jq-then-restore verification actually
+went red-then-green as claimed. **Lesson: when a mock stands in for a multi-step CLI contract
+(resolve -> act), every downstream mock step that consumes the resolved value must also validate
+it, or a broken resolver can silently degrade into "any string passes."** A reviewer's own
+prescribed verification step (temporarily break the real logic, confirm the test fails, restore)
+is the right adversarial check to run on your own mock before trusting it — I only caught the
+second gap because I actually ran that verification rather than assuming the first fix was enough.
+
+**Pitfalls:** also added a merge-rejection failure-contract case (env-var toggle
+`MOCK_GH_MERGE_REJECT=1` on the shared mock `gh`, since the mock script is a static heredoc written
+once — env vars set on the outer `PATH=... bash "$script"` invocation propagate to the mock
+subprocess it execs) asserting non-zero exit + the `ERROR: gh pr merge ... failed` line, per the
+bug's own Expected Result naming that failure contract explicitly. The 3-arg Jira-transition path
+stayed explicitly out of scope (noted in the test header) since the bug names only the merge-flag
+and failure-contract behaviour.
+
+**Patterns:** confirms/extends the "in-tree triage: write a real broken probe, diff, restore"
+protocol from prior stories — apply it to test infrastructure itself (deliberately break the
+production line the test claims to pin, confirm RED, restore, confirm GREEN) as a required step
+before trusting any newly-hardened mock-CLI regression test, not just as an initial-authoring step.
+
 ## 2026-07-20 — Story NA-45 — `auto-merge-pr.sh` dropped `--yes` from `gh pr merge` (removed flag on gh ≥2.90)
 
 **Learnings:** `gh pr merge <pr> <method>` (no `--yes`) is already non-interactive in a TTY-less
