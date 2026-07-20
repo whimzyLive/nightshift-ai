@@ -84,12 +84,13 @@ conversation that produced it, is the source of truth.
 
 ## The agent roster
 
-gtm carries three agents, each dispatched by a command rather than invoked directly:
+gtm carries three agents. Two are dispatched by a command today; the third ships with the
+foundation, but the workflows that dispatch it are not yet wired up:
 
 - **product-marketing-manager** turns a vague marketing request or the stored product context into a
   GTM brief — positioning, messaging, target audience, channel rationale, and launch angle. It
-  produces a brief, not a campaign execution, and is the entry point for a new marketing initiative
-  once the foundation exists.
+  produces a brief, not a campaign execution. It is the intended entry point for a new marketing
+  initiative once the foundation exists, but no command dispatches it yet; today it is run directly.
 - **content-writer** produces customer-facing copy. For a landing page it returns a page map, copy
   deck, conversion pass, and full SEO layer. It hard-requires locked product-marketing context and
   refuses to draft without it, which is the same config-before-action discipline enforced at the
@@ -142,7 +143,7 @@ an aspirational metric no tool can actually fetch.
 
 gtm depends on exactly two cross-marketplace plugins, both auto-installed with it:
 `marketing-skills@marketingskills` (the 47-skill marketingskills library, of which gtm uses
-`product-marketing`, `launch`, `content-strategy`, `copywriting`, `ai-seo`, `content-strategy`, and
+`product-marketing`, `launch`, `content-strategy`, `copywriting`, `ai-seo`, and
 `copy-editing`) and `postiz@postiz-agent` (the Postiz publishing backend). Notably, gtm does _not_
 depend on the sdlc plugin: every shared script it needs is vendored into its own `scripts/`
 directory, so it is fully standalone. The two plugins are siblings that mirror each other's design,
