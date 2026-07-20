@@ -3,3 +3,7 @@
 ## Reference
 
 Changelog — Release notes are generated from commit messages by nx release; this page points to the canonical GitHub Releases and plugin changelogs. — docs/changelog/index.md
+
+## Explanation
+
+What is the sdlc plugin — A repo-agnostic SDLC automation layer for Claude Code that drives Jira stories through spec, plan, implementation, and review — docs/concepts/what-is-the-sdlc-plugin.md
