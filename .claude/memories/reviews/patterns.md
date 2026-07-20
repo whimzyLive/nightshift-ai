@@ -116,4 +116,10 @@ the capability version-free.
 version-free (e.g. "shipped with this plugin", "where X is adopted") instead; reserve literal
 version numbers for `plugin.json` fields and CHANGELOG entries, the only surfaces meant to track
 releases.
+
+## 2026-07-20 — Bug NA-45 (defect path)
+
+**Issues found:** No Critical/Important — first-pass clean. The defect: `auto-merge-pr.sh` line 77 passed `--yes` to `gh pr merge`, a flag current gh (2.92.0) removed → `unknown flag: --yes`, exit non-zero, so every Full-Auto clean-exit auto-merge failed. Fixed by dropping `--yes` (a resolved-`$METHOD` `gh pr merge` is already non-interactive in a TTY-less session). 2 Minor (non-blocking follow-ups): regression test is happy-path only (doesn't also pin the merge-rejection failure contract or the 3-arg transition path); the mock `gh api` ignores `--jq` and stubs `--merge` unconditionally.
+**Root causes:** a hard-coded CLI confirmation flag (`--yes`) that a dependency (gh) later removed — no feature-detection, so a silent upstream CLI change broke the script. The flag was belt-and-suspenders (the resolved method already makes the call non-interactive), so it was pure removable risk.
+**Preventions:** don't pass third-party-CLI convenience flags the call doesn't strictly need — each one is a future breakage surface when the CLI evolves; prefer the minimal invocation that is already non-interactive under the resolved args. For a defect, a committed mock-CLI regression test (PATH-override, RED-before/GREEN-after) is the right evidence even with no pre-existing shell-test harness — build a minimal one under `plugins/sdlc/scripts/__tests__/` runnable via bare `bash`, keeping it portability-lint clean.
 **Domains affected:** ai-enablement-engineer
