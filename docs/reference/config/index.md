@@ -19,7 +19,7 @@ This file is the canonical template for `.claude/project/agents/<agent>.md`. `/i
 
 ### Docs manifest template
 
-Template for the consumer-repo artifact `.claude/project/docs-manifest.md`, written by `/sdlc:init` Step 4g on the docs opt-in. It is a **separate sibling file** to `refs/doc-types.md` (decided, founder review, PR #112): never a section inside `doc-types.md`, and never inside `refs/project-context-template.md`.
+Template for the consumer-repo artifact `.claude/project/docs-manifest.md`, written by `/sdlc:init` Step 4g on the docs opt-in. It is a **separate sibling file** to `refs/doc-types.md` (decided — founder review, PR #112): never a section inside `doc-types.md`, and never inside `refs/project-context-template.md`.
 
 **Source:** `plugins/sdlc/refs/docs-manifest-template.md`
 
