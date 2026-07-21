@@ -31,6 +31,7 @@
 - **`plugins/` and `skills/` are PUBLISHED artifacts** — this repo hosts them as public skills/plugins for others to consume. Presence on disk does NOT imply this project uses them (e.g. skills/hono-api, skills/typeorm, skills/electrodb have no matching deps here). Never delete or "clean up" entries under plugins/ or skills/ because they look unused locally.
 - Plugin sources live in plugins/ (sdlc, gtm) — repo IS the plugin source; installed versions resolve from the plugin cache via .claude/.\*-plugin-root markers (read-only pointers).
 - nx marketplace plugin generates cross-tool AI-config mirrors (agents/, .codex/, .opencode/, .gemini/, opencode.json) from the monitor-ci skill — machine-maintained, do not hand-edit.
+- **Never hand-bump a plugin `version`** in `plugins/sdlc/.claude-plugin/plugin.json` or `plugins/gtm/.claude-plugin/plugin.json` inside any feature/impl/fix PR — leave it exactly at develop's value. Versioning is owned by nx-release (`nx.json` `plugins` group: `specifierSource: conventional-commits`, `currentVersionResolver: git-tag`, `versionActions: tools/nx-release/plugin-json-version-actions.ts`). The bump is computed post-merge by `pnpm nx release version -p sdlc` (or the `plugins` group / `pnpm nx release` for version + CHANGELOG + GitHub release) from commits since the last `{projectName}@{version}` tag. A manual edit fights nx (wrong number, tag mismatch, dirty diff) and is a defect.
 
 ## Local dev (tokens from project-context Tooling)
 
