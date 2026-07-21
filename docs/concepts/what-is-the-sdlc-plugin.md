@@ -85,8 +85,8 @@ Two agents earn a longer note because their ownership is deliberately conditiona
 
 Running spec, plan, review-gate, and implementation for a one-line copy fix would be pure
 ceremony. The plugin avoids that by triaging every story on complexity before routing it, using
-one shared triage definition (`refs/triage.md`) applied inline so that `/auto`, `/impl`, and
-`/triage` all decide the same way.
+one shared triage definition (`plugins/sdlc/refs/triage.md`) applied inline so that `/auto`,
+`/impl`, and `/triage` all decide the same way.
 
 The decision is a story-points threshold. Stories at or below the configurable lightweight
 threshold (default 3 points, inclusive) are classified **lightweight** and go straight to
