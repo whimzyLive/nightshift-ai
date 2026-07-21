@@ -118,6 +118,24 @@ pattern `refs/adr-pipeline.md` §2 uses). Phase 2 writes what the founder saw; i
 
 ## 3. Deterministic regen algorithm
 
+> **Scope rule — plugin-only source-of-truth (standing; governs every `auto` row below, and
+> inherited by `audit`'s deterministic tier, §21, since it reuses this same regen procedure).**
+> This repo both **authors** and **dogfoods** the `sdlc` and `gtm` plugins. The public reference
+> docs this algorithm generates (`docs/reference/**`, and `llms.txt`) exist to document **what the
+> sdlc & gtm plugins provide to a consumer repo** — written from the plugin-user's perspective,
+> never a catalog of this repo's own development tooling. The source-of-truth for **every** `auto`
+> row is therefore scoped to `plugins/sdlc/**` and `plugins/gtm/**` **only** — the surface those
+> two plugins actually ship.
+>
+> **Explicitly excluded**, for every row, regardless of how broad a bare glob elsewhere in this
+> file might otherwise read: repo-root `skills/`, `.agents/skills/`, `.claude/skills/`; the
+> nx-generated cross-tool mirror directories (`.github/**`, `.opencode/**`, `.codex/**`,
+> `.gemini/**`, and repo-root `agents/`); this repo's own `.claude/settings*.json` and
+> `.claude/project/*` filled-in values; and any artifact belonging to a plugin other than `sdlc`/
+> `gtm`. If a future plugin authored in this repo should also be documented, it is added to this
+> allowlist **deliberately**, at the point someone extends this rule — never inferred from its mere
+> presence in the tree.
+
 For each **enabled** manifest row whose registry `trigger` contains `sync`, look up its registry
 row in `refs/doc-types.md` and resolve whether it is **affected** this run per the source-of-truth
 map below. The **keying** column states whether a row is matched against the name-only
@@ -125,11 +143,11 @@ map below. The **keying** column states whether a row is matched against the nam
 
 | Doc-type            | `generation-mode` | Keying  | Affected when…                                                                                                                                                                                         |
 | ------------------- | ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `command-reference` | auto              | path    | `CHANGED_FILES` contains any `commands/**` file                                                                                                                                                        |
-| `agent-reference`   | auto              | path    | `CHANGED_FILES` contains any `agents/**` file                                                                                                                                                          |
-| `skill-reference`   | auto              | path    | `CHANGED_FILES` contains any `**/SKILL.md`                                                                                                                                                             |
-| `config-reference`  | auto              | path    | `CHANGED_FILES` contains `.claude/project/project-context.md` or a config template under `refs/*-template.md`                                                                                          |
-| `hooks-contract`    | auto              | content | a name-matched `.claude/settings*.json`, any `plugins/**/hooks/hooks.json`, or a referenced hook script has hunks in `CHANGED_DIFF` touching a hooks block                                             |
+| `command-reference` | auto              | path    | `CHANGED_FILES` contains any `plugins/{sdlc,gtm}/commands/**` file                                                                                                                                     |
+| `agent-reference`   | auto              | path    | `CHANGED_FILES` contains any `plugins/{sdlc,gtm}/agents/**` file (never the repo-root `agents/` nx-generated mirror — see this section's scope rule)                                                   |
+| `skill-reference`   | auto              | path    | `CHANGED_FILES` contains any `plugins/{sdlc,gtm}/skills/**/SKILL.md`                                                                                                                                   |
+| `config-reference`  | auto              | path    | `CHANGED_FILES` contains a config-contract template under `plugins/{sdlc,gtm}/refs/*-template.md` (never `.claude/project/project-context.md`)                                                         |
+| `hooks-contract`    | auto              | content | any `plugins/{sdlc,gtm}/hooks/hooks.json`, or a referenced hook script, has hunks in `CHANGED_DIFF` touching a hooks block (never this repo's own `.claude/settings*.json`)                            |
 | `error-reference`   | auto              | content | a name-matched `commands/**`, `agents/**`, or `refs/**` file under `plugins/{sdlc,gtm}/**` has hunks in `CHANGED_DIFF` touching a real Error Handling section (see step 6's real-section-vs-stub test) |
 | `llms-txt`          | auto              | always  | **every run** (AC4)                                                                                                                                                                                    |
 | `how-to`            | draft-for-review  | path    | `CHANGED_FILES` intersects an existing how-to page's `source:` frontmatter glob-list (see §5)                                                                                                          |
@@ -140,10 +158,10 @@ committed script (matches the ADR index-regen algorithm in `refs/adr-pipeline.md
 plugin's "instructions not code" style). **Idempotent**: re-running with no source change yields
 byte-identical output.
 
-1. **`command-reference`** — for each `commands/**` file, parse **frontmatter only** — the body is
-   the command's runtime dispatch prompt (routinely tens of KB of directives to the agent that runs
-   it), not reader-facing prose, and is **never** copied into the generated page. Emit one reference
-   page per command, every page the same fixed shape:
+1. **`command-reference`** — for each `plugins/{sdlc,gtm}/commands/**` file, parse **frontmatter
+   only** — the body is the command's runtime dispatch prompt (routinely tens of KB of directives
+   to the agent that runs it), not reader-facing prose, and is **never** copied into the generated
+   page. Emit one reference page per command, every page the same fixed shape:
    - **H1** — the command's invocation name (e.g. `/sdlc:docs`), derived deterministically from the
      source file's path/slug under its plugin's `commands/` directory — never typed by hand.
    - **One-line purpose** — the `description:` frontmatter value, run through the Description/title
@@ -167,7 +185,8 @@ byte-identical output.
    output) without needing to re-derive prose from a multi-KB runtime prompt.
 
 2. **`agent-reference`** — same fixed-shape, frontmatter-only, link-to-source treatment, one page per
-   `agents/**` file:
+   `plugins/{sdlc,gtm}/agents/**` file — never the repo-root `agents/` nx-generated mirror (see this
+   section's scope rule):
    - **H1** — the agent name (`name:` frontmatter).
    - **Role/purpose** — the `description:` frontmatter value, sanitized identically.
    - **Tools** — the `tools:` frontmatter value, when present.
@@ -180,21 +199,27 @@ byte-identical output.
    Same rule: frontmatter + a fixed template + the source-path link, never the body, and never a
    prose summary of it.
 
-3. **`skill-reference`** — same, one page per `**/SKILL.md`'s frontmatter (`name`, `description`).
-4. **`config-reference`** — parse `.claude/project/project-context.md` plus any `refs/*-template.md`
-   config templates; emit a single reference page enumerating the config surface. **A derived
-   description captures the entry's full first paragraph** — every line up to the first blank line —
-   **not just the first physical source line** (see the "Description/title sanitization" rule below;
-   a paragraph that wraps across lines is one logical description, and truncating at the first `\n`
-   silently drops the rest of the sentence).
-5. **`hooks-contract`** — parse the hooks block of `.claude/settings*.json`, and, separately, every
-   plugin's own `hooks/hooks.json` (glob `plugins/*/hooks/hooks.json` — e.g.
-   `plugins/sdlc/hooks/hooks.json`, `plugins/gtm/hooks/hooks.json`, the SessionStart/SessionEnd/etc.
-   entries a plugin registers for the consumer), plus any script either references; emit a single
-   reference page describing the **full** hook contract (trigger, matcher, command) covering
-   repo-level and plugin-registered hooks together. A repo whose `.claude/settings*.json` carries
-   zero hooks does **not** mean "no hooks defined" — a repo with one or more plugins installed that
-   register hooks still has a real hook contract, and the page must say so.
+3. **`skill-reference`** — same, one page per `plugins/{sdlc,gtm}/skills/**/SKILL.md`'s frontmatter
+   (`name`, `description`) — the skills these two plugins bundle only; never repo-root `skills/`,
+   `.agents/skills/`, `.claude/skills/`, or a cross-tool mirror (see this section's scope rule).
+4. **`config-reference`** — parse the plugin config-contract templates under
+   `plugins/{sdlc,gtm}/refs/*-template.md` (e.g. `project-context-template.md`,
+   `docs-manifest-template.md`, the gtm `marketing-context-template.md`) — never this repo's own
+   filled-in `.claude/project/*.md` values (see this section's scope rule); emit a single reference
+   page enumerating the config surface **a consumer repo must provide**, described generically —
+   not this repo's own resolved values (Jira key, base branch, and similar nightshift-specific
+   settings never appear). **A derived description captures the entry's full first paragraph** —
+   every line up to the first blank line — **not just the first physical source line** (see the
+   "Description/title sanitization" rule below; a paragraph that wraps across lines is one logical
+   description, and truncating at the first `\n` silently drops the rest of the sentence).
+5. **`hooks-contract`** — parse every plugin's own `hooks/hooks.json` (glob
+   `plugins/{sdlc,gtm}/hooks/hooks.json` — e.g. `plugins/sdlc/hooks/hooks.json`,
+   `plugins/gtm/hooks/hooks.json`, the SessionStart/SessionEnd/etc. entries each plugin registers
+   for a consumer repo), plus any script either references; emit a single reference page describing
+   the hook contract these two plugins install (trigger, matcher, command), framed as **"the hooks
+   the sdlc & gtm plugins register in a consumer repo"** — never this repo's own
+   `.claude/settings*.json`, which is nightshift's own local configuration, not something either
+   plugin ships (see this section's scope rule).
 6. **`error-reference`** — aggregate every **real** Error Handling section into one reference page,
    one entry per scenario/behaviour row. The scan is **exhaustive**, every run: every file under
    `commands/**`, `agents/**`, and `refs/**` in **every** plugin directory (`plugins/{sdlc,gtm}/**`

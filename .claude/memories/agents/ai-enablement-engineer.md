@@ -2122,3 +2122,53 @@ fix to these same two files) again: no `plugin.json` version bump for a spec-pro
 code/schema surface changed), a two-pass `prettier --write` to confirm idempotence before committing,
 and "spec-only, regeneration deferred to a follow-up run after merge" stated explicitly in the commit
 body so a reviewer doesn't expect regenerated `docs/reference/**` pages in the same PR.
+
+## 2026-07-21 — Standalone spec fix (no story key) — plugin-only source-of-truth scope rule for docs generation
+
+**Learnings:** Founder-directed hardening, same day as the mirror-to-transform switch above: every
+`auto` reference-doc row's source-of-truth is now explicitly scoped to `plugins/sdlc/**` and
+`plugins/gtm/**` only, stated once as a standing "Scope rule" blockquote at the top of
+`docs-pipeline.md` §3 (inherited by `audit`'s deterministic tier via its own "reuses §3's procedure"
+pointer — no separate restatement needed there). Three rows had a **real** unscoped-glob hazard, not
+just a documentation-clarity gap: `skill-reference` read bare `**/SKILL.md` (would sweep this repo's
+own dev/third-party skills — `skills/nx-*`, `skills/payload`, etc. — none of which sdlc/gtm ship),
+`config-reference` read this repo's own filled-in `.claude/project/project-context.md` (Jira key,
+base branch — nightshift-specific, not a generic consumer contract), and `hooks-contract` read this
+repo's own `.claude/settings*.json` (nightshift's local hook config, not plugin-provided). Fixed by
+re-scoping all three source-of-truth cells/steps to `plugins/{sdlc,gtm}/**` paths only
+(`plugins/{sdlc,gtm}/skills/**/SKILL.md`; `plugins/{sdlc,gtm}/refs/*-template.md` config-contract
+templates instead of the filled-in project-context; `plugins/{sdlc,gtm}/hooks/hooks.json` instead of
+`.claude/settings*.json`) in both `doc-types.md`'s Rows table and `docs-pipeline.md` §3's per-row
+generation steps + affected-when table. `command-reference`/`agent-reference` had a **latent** version
+of the same hazard I hadn't previously caught: their affected-when keying read bare `commands/**` /
+`agents/**` — and this repo's own nx-generated mirror tree includes a real, literal repo-root
+`agents/` directory (confirmed via `find . -maxdepth 2`), so an unqualified `agents/**` glob could
+someday true-positive-match a mirror-directory change and regenerate agent-reference pages from it.
+Tightened both to `plugins/{sdlc,gtm}/commands/**` / `plugins/{sdlc,gtm}/agents/**` even though item 5
+of the directive called this "already correctly plugin-scoped" — the doc-types.md prose was scoped,
+but the docs-pipeline.md keying table wasn't, so the fix was still real, not just a confirmation.
+`error-reference` (already explicitly scoped to `plugins/{sdlc,gtm}/**` in both files) needed no
+change — confirmed, not touched.
+
+**Pitfalls:** My first draft of the new scope-rule blockquote wrapped a **bold** span around two
+adjacent inline code spans joined by the word "and"
+(``**`plugins/sdlc/**` and `plugins/gtm/**` only**``) — a **new** variant of the established
+"Prettier silently normalizes markdown you didn't expect" family (NA-27/NA-51/NA-61 entries document
+bare-`*`-escaping, code-span-line-break, and code-span-internal-whitespace variants). Here Prettier's
+first `--write` pass collapsed the spaces immediately surrounding "and" between the two code spans,
+producing `` `plugins/sdlc/**`and`plugins/gtm/**` only** `` — a real, silent prose corruption a bare
+idempotency `diff` on the untouched original would never have shown (only the mandatory copy →
+`--write` → diff protocol catches it, since the FIRST write is what corrupts, not a later one).
+Fix: never wrap a `**bold**` span around multiple adjacent inline code spans separated by plain
+words — bold only a single word/phrase outside the code spans instead (rewrote to
+`` `plugins/sdlc/**` and `plugins/gtm/**` **only** ``, bolding just "only"). Re-verified idempotent
+(second `--write` pass on the corrected text: zero diff) before committing.
+
+**Patterns:** New branch had to be cut from `origin/develop` while local `develop` was 2 commits
+behind (PRs #154/#156 merged same-day) — `git stash push -u`, `git checkout -b <branch>
+origin/develop`, `git stash pop`, then `git branch --unset-upstream` (the new branch briefly tracked
+`origin/develop` from the `checkout -b ... origin/develop` form, which would have made a bare
+`git push` target `develop` directly — unset before ever pushing). Standalone apply-mode branch
+naming followed `chore/ai-config-<slug>` per `refs/analyze-protocol.md`'s Apply flow convention
+(`chore/ai-config-docs-pipeline-plugin-scope`), since this was a direct spec-hardening task with no
+Jira story key, not a `principal-engineer` dispatch.
