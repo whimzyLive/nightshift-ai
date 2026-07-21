@@ -1,0 +1,9 @@
+# llms.txt
+
+## reference
+
+- helper - Assists with routine repo maintenance tasks. - docs/reference/agents/helper.md
+- /deploy - Deploy the current build to staging. - docs/reference/commands/deploy.md
+- Config Reference - Config surface a consumer must provide. - docs/reference/config/index.md
+- Hooks (testplugin) - Hook contract registered by this root. - docs/reference/hooks/index.md
+- greet - Greets a repo visitor with the project's own voice. - docs/reference/skills/greet.md
