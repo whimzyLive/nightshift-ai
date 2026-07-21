@@ -2043,3 +2043,50 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   after any earlier edit in the same file before doing a second targeted edit later in the same
   session, rather than trusting line numbers cited in a review finding against the pre-prettier
   draft.
+
+## 2026-07-21 — Standalone spec fix (no story key) — docs-pipeline.md/doc-types.md audit-defect fixes (PR #154)
+
+**Learnings:** Fixed 5 confirmed generation defects from a real `/sdlc:docs audit` run (PR #152)
+by editing only `plugins/sdlc/refs/docs-pipeline.md` + `refs/doc-types.md` — the spec prose the
+knowledge-engineer agent follows; there is no deterministic script to patch. Root cause for the
+em-dash defect (30 broken llms.txt entries) was that the "no em-dash in title/description" rule
+lived only inside `writing-docs`'s Self-Review checklist, and the `audit` dispatch never loads
+`writing-docs` (per `agents/knowledge-engineer.md`'s skill-loading table — audit loads only the 3
+always-on skills, by design, since it authors no narrative prose). A rule that only an
+authoring-time skill enforces silently never applies to a deterministic regen path that never
+loads that skill — the fix was to move the rule into the regen algorithm itself (docs-pipeline.md
+§3, a new "Description/title sanitization" subsection), not to just tell audit to also load
+`writing-docs` (audit correctly loads no authoring skill — there's no prose to author). For the
+"Error Handling" scan-coverage defect, grepping confirmed this repo genuinely mixes `## Error
+Handling` and `## Error handling` casing across files (agents use title-case, commands/refs use
+sentence-case) — a scan keyed on one exact casing silently drops half the real sections regardless
+of how exhaustive its file-glob is; both the casing fix and the exhaustive-glob fix were needed
+together.
+
+**Pitfalls:** Writing an inline-code em-dash literal as `` ` — ` `` (backtick, space, em-dash,
+space, backtick) to illustrate the llms.txt delimiter is not a stable spec pattern — CommonMark's
+own code-span rule strips a single leading/trailing space when the span's content would otherwise
+consist entirely of a delimited character, so Prettier (a correct CommonMark implementation)
+reformats it to `` `—` `` losing the spaces the sentence was relying on to read correctly, on
+every `prettier --write`. The original docs-pipeline.md text already avoided this by spelling the
+delimiter out in prose ("a space, an em-dash, and a space") rather than trying to fence it —
+matched that existing convention instead of reintroducing the bug. Separately, wrapping a
+backtick-fenced glob pattern that itself contains `**` (e.g. ``**`plugins/**/hooks/hooks.json`**``)
+in outer bold markers immediately adjacent to the span produced silently mangled output after
+`prettier --write` — lost list-item indentation on the following lines and an escaped `\*` that
+wasn't there before, with no error — because the glob's own `**` collided with the bold-emphasis
+delimiter parse. Avoided by not bold-wrapping text immediately adjacent to a code span containing
+`**`, and by preferring `plugins/*/hooks/hooks.json` (single-level, actually the correct glob for
+this repo's plugin layout) over the deeper `plugins/**/hooks/hooks.json`. **Always re-run
+`prettier --write` + a full Read of the affected region after any edit that mixes bold/emphasis
+markers with backtick-fenced content containing `*`, `**`, or em-dash — don't just trust the Edit
+tool's echoed diff; Prettier can silently corrupt adjacent unrelated lines when a markdown
+ambiguity resolves unexpectedly.\*\*
+
+**Patterns:** For a "spec prose is the generator" plugin (no deterministic script backing a
+pipeline step), a defect report against generated _output_ should always be traced back to
+(a) which spec file's prose governs that step, and (b) which dispatch-mode's skill-loading branch
+was active when the bad output was produced — a rule stated correctly in one skill can still be a
+live bug if the dispatch path that hit the defect never loads that skill. Fix at the layer that's
+unconditionally in effect (the deterministic algorithm prose itself), not by expanding what an
+unrelated dispatch mode loads.
