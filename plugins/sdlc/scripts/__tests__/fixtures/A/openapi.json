@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Example Widgets API", "version": "1.0.0" },
+  "paths": {
+    "/widgets": {
+      "get": { "summary": "List widgets" },
+      "post": { "summary": "Create a widget" }
+    }
+  }
+}

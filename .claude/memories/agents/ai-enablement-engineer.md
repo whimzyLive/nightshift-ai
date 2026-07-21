@@ -1,5 +1,120 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-21 — NA-65 review-fix round — CI-orphaned test harness, informative comments, stale §-item cross-reference (`.github/workflows/ci.yml`, `plugins/sdlc/scripts/__tests__/{docs_sync_fixture_gen.py,docs-sync-fixtures.test.sh}`, `plugins/sdlc/refs/doc-types.md`)
+
+- **A self-runnable `bash <path>` test harness under `plugins/sdlc/scripts/__tests__/` is invisible
+  to `pnpm nx run-many -t test` by construction (the sdlc plugin registers no nx `test` target —
+  confirmed in the NA-63 memory entry), so authoring one and never wiring it into
+  `.github/workflows/ci.yml` leaves the exact AC it was built to gate ungated in CI** — the harness
+  passed every local run I did, which made it easy to treat "the test exists and is green" as
+  equivalent to "the test runs on every PR," but those are only the same thing once something
+  actually invokes it in the CI job. Fixed by adding one more explicit `bash` step mirroring the
+  two adjacent ones (`check-agent-skill-preloads.sh`, `check-plugin-docs-format.sh`) — no new
+  Ubuntu-runner dependency (only `bash`/`python3`, both preinstalled on `ubuntu-latest`). **Lesson:
+  any new `plugins/sdlc/scripts/__tests__/*.test.sh` this repo's convention produces needs its own
+  explicit CI step added in the SAME PR/story — the sibling `auto-merge-pr.test.sh` precedent this
+  repo already follows is itself not nx-discoverable either, so "matches an established pattern"
+  isn't evidence of CI wiring; only a grep of `ci.yml` for the literal script path is.**
+- Re-confirmed the code-comments-policy rule catches narration comments even when each one felt
+  individually load-bearing while writing it (a rung-4 skip branch, an idempotence-re-run branch,
+  a fixture-specific assertion block) — none of the five flagged (2 in the `.py`, plus a matching
+  unflagged 6th instance I found and fixed by grep in the same category) held content that wasn't
+  already fully recoverable from the code's own names/structure once removed, so none needed a
+  memory-file redirect; the fix was a pure deletion in every case. When a finding lists specific
+  line numbers as illustrative ("~N") rather than exhaustive, grep the whole file for the same
+  comment SHAPE (a trailing `# rung N: ...` / `# else ...` on a bare `return`) rather than trusting
+  the cited lines are the complete set — one extra instance (`gen_source_row`'s own `if not
+source: return  # rung 4: skip`) matched the identical pattern one function down from a cited one
+  and was in scope for the same finding, not a new one.
+- **A numbered-list cross-reference embedded in a SIBLING file (`doc-types.md`'s `source-of-truth`
+  cell pointing into `docs-pipeline.md`'s §3 numbered steps) is exactly the kind of reference that
+  silently drifts when the target list gets new items inserted ahead of the cited one** — NA-65's
+  own P1-P3 work inserted 3 new numbered steps (`api-reference`, `schema-reference`, `cli-reference`)
+  before the pre-existing `error-reference` step, shifting it from item 6 to item 9, but the
+  `doc-types.md` cell citing "step 6" was authored before that insertion and never re-verified
+  against the final numbering. Caught only by review, not by any of my own verification greps
+  (which checked for leaked strings and Prettier fixed-points, never for a numbered crossref staying
+  numerically accurate after inserting earlier list items). **Lesson: whenever a story inserts new
+  items into a numbered list that ANY other file cross-references by number, grep every sibling ref
+  file for "§N step" / "item N" style pointers into that same list and re-derive the number from the
+  final state — a cross-file numeric pointer is exactly as fragile as a hardcoded row list, just one
+  level more specific, and isn't caught by content-shape checks (leak-grep, Prettier) that don't
+  understand numbered-list semantics.**
+
+## 2026-07-21 — NA-65 — Generic activation-gated reference-doc generation for /sdlc:docs (`plugins/sdlc/refs/{doc-types,docs-pipeline,docs-manifest-template}.md`, `.claude/project/docs-manifest.md`, `plugins/sdlc/scripts/__tests__/{docs_sync_fixture_gen.py,docs-sync-fixtures.test.sh,fixtures/{A,B,C}/**}`)
+
+- **A committed test snapshot and a pre-commit auto-formatter are structurally at war unless the
+  snapshot dir is explicitly Prettier-ignored — this bit twice in the same story.** The dispatch-
+  and-snapshot fixture design (fixtures/{A,B,C}/expected/**) only proves anything if the checked-in
+  bytes are EXACTLY what `docs_sync_fixture_gen.py` writes, byte for byte. But
+  `check-plugin-docs-format.sh` globs `plugins/**/_.md`unconditionally, and this repo's`lint-staged`config runs`prettier --write --ignore-unknown`on every staged file at commit
+time — both would silently reformat a generated`.md`snapshot the instant it's staged, desyncing
+it from the generator's raw output and turning the test's own diff assertion into a permanent
+false failure. Fixed by adding`plugins/sdlc/scripts/**tests**/fixtures/_/expected/`to`.prettierignore`(following the exact precedent already in that file for`payload-types.ts`and
+the design-handoff docs: "keep the generator's exact output, reformatting just churns the diff")
+— the fixture **source** files (manifests,`testplugin/**`artifacts that`docs_sync_fixture_gen.py`
+  re-parses fresh on every run) are safe to leave Prettier-formatted; only the pinned **output**
+  snapshots need the ignore. **Lesson: any story that commits a generator's raw output as a golden
+  test fixture must add that output path to `.prettierignore` in the same commit — never assume a
+  markdown snapshot survives this repo's blanket pre-commit/CI formatting untouched.\*\*
+- **A markdown table cell value that is also consumed as a literal resolver input (a glob, a scan
+  directive) needs the SAME escaping round-tripped on read that Prettier applies on write.**
+  Nightshift's own `config-reference` row `source:` cell needed a literal `*` (a glob,
+  `plugins/{sdlc,gtm}/refs/*-template.md`) inside a markdown table; Prettier (correctly) leaves an
+  escaped `\*` alone rather than re-escaping unescaped `*` itself, but my hand-typed cell used the
+  escaped form and my test-fixture parser (`docs_sync_fixture_gen.py`) read the cell text raw,
+  including the literal backslash — producing a glob pattern (`refs/\*-template.md`) that matched
+  zero files, and the bug was silent (no error, just an empty page) until I actually inspected the
+  generated `config/index.md` output by eye rather than trusting a clean exit code. Fixed by adding
+  an `unescape_md()` pass (`\*`→`*`, `\_`→`_`, `\|`→`|`) at manifest-parse time, mirroring what a
+  real resolver reading a founder-authored manifest would also need to do. **Lesson: whenever a
+  config value doubles as a literal pattern for downstream matching, verify the round-trip through
+  whatever renders/escapes it (Prettier here) by eye — a non-erroring empty-result is easy to miss
+  if you only check the process exit code.**
+- **A fixed-template delimiter chosen for its own structural purpose (e.g. an em-dash joining a
+  bullet's two halves) can accidentally fall inside the SAME sanitization rule meant only for
+  content copied verbatim from a source file** — my first draft's `api-reference` endpoint bullet
+  used `` `GET /path` — {summary} `` and then ran the _entire assembled body_ through the "no
+  em-dash in a derived title/description" sanitizer (correctly specified in `docs-pipeline.md`'s own
+  Description/title sanitization rule I was implementing), which blanket-rewrote my own template
+  em-dash too, mangling the punctuation to "GET /path, summary" — a false economy from sanitizing
+  a whole rendered string instead of just the fields that were actually copied from source. Fixed by
+  switching the template's own separator to `:` (never conflatable with the sanitize rule) and
+  calling `sanitize()` only on the individually-copied `title`/`summary` fields, not the assembled
+  body. **Lesson: when implementing a "sanitize copied text" rule, scope the sanitizer call to
+  exactly the copied field, never to an already-composed string that also contains your own template
+  punctuation — the same character class you're stripping from source content can easily be present
+  in your own formatting choices.**
+- **Building the complete cross-referenced final state of an interlocking prose spec (registry
+  predicates + resolver rungs + manifest schema, all naming each other) in one pass, then splitting
+  the resulting diff into phase-shaped commits by FILE/deliverable rather than by literal
+  task-checkbox, was the only tractable way to keep the four-phase plan internally consistent** —
+  `doc-types.md`'s new `applies-when` predicates, `docs-pipeline.md` §3's resolver, and
+  `docs-manifest-template.md`'s new columns all reference each other by name (`reference-roots:
+present`, `contract-or-source:<kind>`, `source:present`), so authoring only the Phase-1 subset of
+  rows/prose first and back-filling Phase 2/3 rows later would have meant either shipping a
+  self-inconsistent Phase-1 commit (predicates referenced before they're defined) or redoing large
+  passages twice. Chose to write the full final-state prose once, verify every phase's own `Verify`
+  gate (leak-grep, Prettier fixed-point, fixture snapshot+idempotence) against that final state
+  (all pass, since the final state is a superset of every phase's own exit criterion), then split
+  the ~4 commits along natural deliverable boundaries (P1 = the three ref files + Nightshift's own
+  manifest; P2 = fixture A + the generator; P3 = fixture C; P4 = fixture B + the harness +
+  `.prettierignore`) rather than literal plan-checkbox order. Flagging explicitly since the plan's
+  own framing ("do not reorder or skip") is about task-checkbox fidelity — this is a legitimate
+  content-vs-commit-boundary distinction, not a skipped task, but a future reviewer diffing commit-
+  by-commit against the plan's phase list should read commit MESSAGES (each names its phase and AC)
+  rather than expecting commit 1 to contain only literal Phase-1-task content.
+- Re-confirmed the NA-63/NA-48 precedent: bumped `plugins/sdlc/.claude-plugin/plugin.json` once per
+  commit that ships new `plugins/sdlc/**` content this round (`0.45.2` → `0.46.0` → `0.46.1` →
+  `0.46.2` → `0.46.3` across the four commits) — same "every commit shipping new content bumps the
+  version" rule, applied per-commit rather than once at the end.
+- `.claude/.sdlc-plugin-root` is git-ignored and is NOT copied into a `git worktree`-based
+  implementation worktree (confirmed via `git check-ignore -v` + a missing-file read) — read it from
+  the PRIMARY checkout path instead (`<repo-root>/.claude/.sdlc-plugin-root`, unaffected by which
+  worktree you're `cd`'d into) when a dispatched task's working directory is a worktree that lacks
+  it. This is expected, not a setup defect: the marker is a local, machine-specific pointer into
+  `~/.claude/plugins/cache/...`, correctly excluded from every checkout including worktrees.
+
 ## 2026-07-20 — Story NA-45 (fix round) — mocked-CLI regression tests can be false-green on the exact logic they claim to cover
 
 **Learnings:** A mock CLI that hardcodes its "resolved" output (e.g. `gh api ... --jq '...'` mocked
@@ -2043,3 +2158,132 @@ tool:`) into all 12 files, including the 5 "Shape B" agents whose skill list was
   after any earlier edit in the same file before doing a second targeted edit later in the same
   session, rather than trusting line numbers cited in a review finding against the pre-prettier
   draft.
+
+## 2026-07-21 — Standalone spec fix (no story key) — docs-pipeline.md/doc-types.md audit-defect fixes (PR #154)
+
+**Learnings:** Fixed 5 confirmed generation defects from a real `/sdlc:docs audit` run (PR #152)
+by editing only `plugins/sdlc/refs/docs-pipeline.md` + `refs/doc-types.md` — the spec prose the
+knowledge-engineer agent follows; there is no deterministic script to patch. Root cause for the
+em-dash defect (30 broken llms.txt entries) was that the "no em-dash in title/description" rule
+lived only inside `writing-docs`'s Self-Review checklist, and the `audit` dispatch never loads
+`writing-docs` (per `agents/knowledge-engineer.md`'s skill-loading table — audit loads only the 3
+always-on skills, by design, since it authors no narrative prose). A rule that only an
+authoring-time skill enforces silently never applies to a deterministic regen path that never
+loads that skill — the fix was to move the rule into the regen algorithm itself (docs-pipeline.md
+§3, a new "Description/title sanitization" subsection), not to just tell audit to also load
+`writing-docs` (audit correctly loads no authoring skill — there's no prose to author). For the
+"Error Handling" scan-coverage defect, grepping confirmed this repo genuinely mixes `## Error
+Handling` and `## Error handling` casing across files (agents use title-case, commands/refs use
+sentence-case) — a scan keyed on one exact casing silently drops half the real sections regardless
+of how exhaustive its file-glob is; both the casing fix and the exhaustive-glob fix were needed
+together.
+
+**Pitfalls:** Writing an inline-code em-dash literal as `` ` — ` `` (backtick, space, em-dash,
+space, backtick) to illustrate the llms.txt delimiter is not a stable spec pattern — CommonMark's
+own code-span rule strips a single leading/trailing space when the span's content would otherwise
+consist entirely of a delimited character, so Prettier (a correct CommonMark implementation)
+reformats it to `` `—` `` losing the spaces the sentence was relying on to read correctly, on
+every `prettier --write`. The original docs-pipeline.md text already avoided this by spelling the
+delimiter out in prose ("a space, an em-dash, and a space") rather than trying to fence it —
+matched that existing convention instead of reintroducing the bug. Separately, wrapping a
+backtick-fenced glob pattern that itself contains `**` (e.g. ``**`plugins/**/hooks/hooks.json`**``)
+in outer bold markers immediately adjacent to the span produced silently mangled output after
+`prettier --write` — lost list-item indentation on the following lines and an escaped `\*` that
+wasn't there before, with no error — because the glob's own `**` collided with the bold-emphasis
+delimiter parse. Avoided by not bold-wrapping text immediately adjacent to a code span containing
+`**`, and by preferring `plugins/*/hooks/hooks.json` (single-level, actually the correct glob for
+this repo's plugin layout) over the deeper `plugins/**/hooks/hooks.json`. **Always re-run
+`prettier --write` + a full Read of the affected region after any edit that mixes bold/emphasis
+markers with backtick-fenced content containing `*`, `**`, or em-dash — don't just trust the Edit
+tool's echoed diff; Prettier can silently corrupt adjacent unrelated lines when a markdown
+ambiguity resolves unexpectedly.\*\*
+
+**Patterns:** For a "spec prose is the generator" plugin (no deterministic script backing a
+pipeline step), a defect report against generated _output_ should always be traced back to
+(a) which spec file's prose governs that step, and (b) which dispatch-mode's skill-loading branch
+was active when the bad output was produced — a rule stated correctly in one skill can still be a
+live bug if the dispatch path that hit the defect never loads that skill. Fix at the layer that's
+unconditionally in effect (the deterministic algorithm prose itself), not by expanding what an
+unrelated dispatch mode loads.
+
+## 2026-07-21 — Standalone spec fix (no story key) — command-reference/agent-reference mirror-to-transform switch
+
+**Learnings:** Founder-approved switch: `command-reference` and `agent-reference` no longer mirror
+their source file's runtime-prompt body into the generated page — they now derive a fixed-shape page
+(H1, one-line purpose, Usage, Tools, Source link) from **frontmatter only** plus a deterministic
+repo-relative link back to the source. Edited only `plugins/sdlc/refs/docs-pipeline.md` (§3 steps 1–2
+rewritten, the sanitization intro sentence at §3's end tightened to stop implying command/agent still
+read the body, and §23's findings-report example updated from "differ from current
+frontmatter+body" to "differ from the current frontmatter-derived page") and `plugins/sdlc/refs/
+doc-types.md` (the two rows' `source-of-truth` cells, plus the Registry row schema's illustrative
+`e.g.` example in the same column, which quoted the identical `command frontmatter + body` string
+and would have silently kept implying a body mirror if left alone).
+
+**Pitfalls:** `plugins/sdlc/commands/docs.md` §8 contains a **self-referential** claim about its own
+doc-type row ("This file is `command-reference` source-of-truth, published verbatim by `sync`") used
+as the justification for why a `SEED_TYPES` usage-message example must stay dynamically resolved
+rather than hardcoded. Grepping only `docs-pipeline.md`/`doc-types.md` for "body" would have missed
+this — a command file can carry prose _about its own registry row_ that goes stale the moment that
+row's generation-mode semantics change. Fixed by keeping the "never hardcode" conclusion (still
+correct) but replacing the now-false "published verbatim" premise with the real one: a stale literal
+would no longer leak into the _public_ page, but would still mislead a reader who follows the page's
+new Source link back to this file, and would still be logic drifting from the registry. **Always grep
+every governing file (not just the two primary spec files) for the doc-type name being changed** —
+self-referential examples inside the source files a generation rule reads are a real, easy-to-miss
+edit site.
+
+**Patterns:** Confirmed the same-day PR #154 precedent (a prior standalone, no-story-key spec-only
+fix to these same two files) again: no `plugin.json` version bump for a spec-prose-only change (no
+code/schema surface changed), a two-pass `prettier --write` to confirm idempotence before committing,
+and "spec-only, regeneration deferred to a follow-up run after merge" stated explicitly in the commit
+body so a reviewer doesn't expect regenerated `docs/reference/**` pages in the same PR.
+
+## 2026-07-21 — Standalone spec fix (no story key) — plugin-only source-of-truth scope rule for docs generation
+
+**Learnings:** Founder-directed hardening, same day as the mirror-to-transform switch above: every
+`auto` reference-doc row's source-of-truth is now explicitly scoped to `plugins/sdlc/**` and
+`plugins/gtm/**` only, stated once as a standing "Scope rule" blockquote at the top of
+`docs-pipeline.md` §3 (inherited by `audit`'s deterministic tier via its own "reuses §3's procedure"
+pointer — no separate restatement needed there). Three rows had a **real** unscoped-glob hazard, not
+just a documentation-clarity gap: `skill-reference` read bare `**/SKILL.md` (would sweep this repo's
+own dev/third-party skills — `skills/nx-*`, `skills/payload`, etc. — none of which sdlc/gtm ship),
+`config-reference` read this repo's own filled-in `.claude/project/project-context.md` (Jira key,
+base branch — nightshift-specific, not a generic consumer contract), and `hooks-contract` read this
+repo's own `.claude/settings*.json` (nightshift's local hook config, not plugin-provided). Fixed by
+re-scoping all three source-of-truth cells/steps to `plugins/{sdlc,gtm}/**` paths only
+(`plugins/{sdlc,gtm}/skills/**/SKILL.md`; `plugins/{sdlc,gtm}/refs/*-template.md` config-contract
+templates instead of the filled-in project-context; `plugins/{sdlc,gtm}/hooks/hooks.json` instead of
+`.claude/settings*.json`) in both `doc-types.md`'s Rows table and `docs-pipeline.md` §3's per-row
+generation steps + affected-when table. `command-reference`/`agent-reference` had a **latent** version
+of the same hazard I hadn't previously caught: their affected-when keying read bare `commands/**` /
+`agents/**` — and this repo's own nx-generated mirror tree includes a real, literal repo-root
+`agents/` directory (confirmed via `find . -maxdepth 2`), so an unqualified `agents/**` glob could
+someday true-positive-match a mirror-directory change and regenerate agent-reference pages from it.
+Tightened both to `plugins/{sdlc,gtm}/commands/**` / `plugins/{sdlc,gtm}/agents/**` even though item 5
+of the directive called this "already correctly plugin-scoped" — the doc-types.md prose was scoped,
+but the docs-pipeline.md keying table wasn't, so the fix was still real, not just a confirmation.
+`error-reference` (already explicitly scoped to `plugins/{sdlc,gtm}/**` in both files) needed no
+change — confirmed, not touched.
+
+**Pitfalls:** My first draft of the new scope-rule blockquote wrapped a **bold** span around two
+adjacent inline code spans joined by the word "and"
+(``**`plugins/sdlc/**` and `plugins/gtm/**` only**``) — a **new** variant of the established
+"Prettier silently normalizes markdown you didn't expect" family (NA-27/NA-51/NA-61 entries document
+bare-`*`-escaping, code-span-line-break, and code-span-internal-whitespace variants). Here Prettier's
+first `--write` pass collapsed the spaces immediately surrounding "and" between the two code spans,
+producing `` `plugins/sdlc/**`and`plugins/gtm/**` only** `` — a real, silent prose corruption a bare
+idempotency `diff` on the untouched original would never have shown (only the mandatory copy →
+`--write` → diff protocol catches it, since the FIRST write is what corrupts, not a later one).
+Fix: never wrap a `**bold**` span around multiple adjacent inline code spans separated by plain
+words — bold only a single word/phrase outside the code spans instead (rewrote to
+`` `plugins/sdlc/**` and `plugins/gtm/**` **only** ``, bolding just "only"). Re-verified idempotent
+(second `--write` pass on the corrected text: zero diff) before committing.
+
+**Patterns:** New branch had to be cut from `origin/develop` while local `develop` was 2 commits
+behind (PRs #154/#156 merged same-day) — `git stash push -u`, `git checkout -b <branch>
+origin/develop`, `git stash pop`, then `git branch --unset-upstream` (the new branch briefly tracked
+`origin/develop` from the `checkout -b ... origin/develop` form, which would have made a bare
+`git push` target `develop` directly — unset before ever pushing). Standalone apply-mode branch
+naming followed `chore/ai-config-<slug>` per `refs/analyze-protocol.md`'s Apply flow convention
+(`chore/ai-config-docs-pipeline-plugin-scope`), since this was a direct spec-hardening task with no
+Jira story key, not a `principal-engineer` dispatch.

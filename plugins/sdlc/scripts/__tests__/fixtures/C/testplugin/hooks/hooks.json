@@ -1,0 +1,8 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "*",
+      "hooks": [{ "type": "command", "command": "echo ready" }]
+    }
+  ]
+}

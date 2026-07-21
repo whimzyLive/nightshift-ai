@@ -123,3 +123,10 @@ releases.
 **Root causes:** a hard-coded CLI confirmation flag (`--yes`) that a dependency (gh) later removed — no feature-detection, so a silent upstream CLI change broke the script. The flag was belt-and-suspenders (the resolved method already makes the call non-interactive), so it was pure removable risk.
 **Preventions:** don't pass third-party-CLI convenience flags the call doesn't strictly need — each one is a future breakage surface when the CLI evolves; prefer the minimal invocation that is already non-interactive under the resolved args. For a defect, a committed mock-CLI regression test (PATH-override, RED-before/GREEN-after) is the right evidence even with no pre-existing shell-test harness — build a minimal one under `plugins/sdlc/scripts/__tests__/` runnable via bare `bash`, keeping it portability-lint clean.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-21 — Story NA-65
+
+**Issues found:** Important: (1) new fixture harness (`docs-sync-fixtures.test.sh`) orphaned from CI — `pnpm nx run-many -t test` never ran it (sdlc plugin has no nx `test` target), so AC5 was unautomated; (2) informative/explanatory comments in `docs_sync_fixture_gen.py` + `docs-sync-fixtures.test.sh` violated code-comments-policy. Minor/correctness: stale `doc-types.md` cross-ref (§3 step 6 → step 9 after P2/P3 renumbered).
+**Root causes:** (1) Repo convention runs plugin gates as explicit `bash` steps in `.github/workflows/ci.yml`, NOT via nx targets — a new `.test.sh` is invisible to `nx run-many -t test` unless a project target is added or an explicit CI step is wired (the pre-existing `auto-merge-pr.test.sh` set the orphaned precedent). (2) narration habit. (3) inserting numbered §3 steps ahead of an existing one silently invalidates cross-refs that cite step numbers.
+**Preventions:** New `plugins/**/__tests__/*.test.sh` MUST be wired into `.github/workflows/ci.yml` as an explicit bash step (or given a real nx test target) — passing locally ≠ gated. Cite §-anchored guards by stable name/anchor, not mutable step numbers. Keep test scaffolding comment-free per code-comments-policy.
+**Domains affected:** ai-enablement-engineer

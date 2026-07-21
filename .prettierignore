@@ -15,3 +15,8 @@ apps/marketing/next-env.d.ts
 # Ignore generated docs
 docs/superpowers
 docs/features
+
+# NA-65 docs-sync fixture snapshots — pinned byte-for-byte to docs_sync_fixture_gen.py's raw
+# output; reformatting them would desync the committed golden files from what the generator
+# actually writes and break docs-sync-fixtures.test.sh's diff assertion.
+plugins/sdlc/scripts/__tests__/fixtures/*/expected/
