@@ -118,39 +118,81 @@ pattern `refs/adr-pipeline.md` §2 uses). Phase 2 writes what the founder saw; i
 
 ## 3. Deterministic regen algorithm
 
-> **Scope rule — plugin-only source-of-truth (standing; governs every `auto` row below, and
-> inherited by `audit`'s deterministic tier, §21, since it reuses this same regen procedure).**
-> This repo both **authors** and **dogfoods** the `sdlc` and `gtm` plugins. The public reference
-> docs this algorithm generates (`docs/reference/**`, and `llms.txt`) exist to document **what the
-> sdlc & gtm plugins provide to a consumer repo** — written from the plugin-user's perspective,
-> never a catalog of this repo's own development tooling. The source-of-truth for **every** `auto`
-> row is therefore scoped to `plugins/sdlc/**` and `plugins/gtm/**` **only** — the surface those
-> two plugins actually ship.
->
-> **Explicitly excluded**, for every row, regardless of how broad a bare glob elsewhere in this
-> file might otherwise read: repo-root `skills/`, `.agents/skills/`, `.claude/skills/`; the
-> nx-generated cross-tool mirror directories (`.github/**`, `.opencode/**`, `.codex/**`,
-> `.gemini/**`, and repo-root `agents/`); this repo's own `.claude/settings*.json` and
-> `.claude/project/*` filled-in values; and any artifact belonging to a plugin other than `sdlc`/
-> `gtm`. If a future plugin authored in this repo should also be documented, it is added to this
-> allowlist **deliberately**, at the point someone extends this rule — never inferred from its mere
-> presence in the tree.
+> **Activation note.** Every reference row (`refs/doc-types.md`'s artifact-reference and
+> product-reference families) is activation-gated per that registry's `applies-when` — resolved
+> against the consumer's own `.claude/project/docs-manifest.md` (repo-level `reference-roots`/
+> `reference-excludes`, and per-row `source:`/`contract:`; see `refs/docs-manifest-template.md`).
+> An inactive row is simply skipped by the resolver below (rung 4) — this section never hardcodes
+> which directories a consumer documents; that is entirely manifest-declared.
 
 For each **enabled** manifest row whose registry `trigger` contains `sync`, look up its registry
-row in `refs/doc-types.md` and resolve whether it is **affected** this run per the source-of-truth
-map below. The **keying** column states whether a row is matched against the name-only
-`CHANGED_FILES` list, against hunks in the unified `CHANGED_DIFF`, or is always affected:
+row in `refs/doc-types.md`, confirm it is **activated** per its `applies-when` predicate, then
+resolve whether it is **affected** this run and where its content comes from via the shared
+**source resolver** below.
 
-| Doc-type            | `generation-mode` | Keying  | Affected when…                                                                                                                                                                                         |
-| ------------------- | ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `command-reference` | auto              | path    | `CHANGED_FILES` contains any `plugins/{sdlc,gtm}/commands/**` file                                                                                                                                     |
-| `agent-reference`   | auto              | path    | `CHANGED_FILES` contains any `plugins/{sdlc,gtm}/agents/**` file (never the repo-root `agents/` nx-generated mirror — see this section's scope rule)                                                   |
-| `skill-reference`   | auto              | path    | `CHANGED_FILES` contains any `plugins/{sdlc,gtm}/skills/**/SKILL.md`                                                                                                                                   |
-| `config-reference`  | auto              | path    | `CHANGED_FILES` contains a config-contract template under `plugins/{sdlc,gtm}/refs/*-template.md` (never `.claude/project/project-context.md`)                                                         |
-| `hooks-contract`    | auto              | content | any `plugins/{sdlc,gtm}/hooks/hooks.json`, or a referenced hook script, has hunks in `CHANGED_DIFF` touching a hooks block (never this repo's own `.claude/settings*.json`)                            |
-| `error-reference`   | auto              | content | a name-matched `commands/**`, `agents/**`, or `refs/**` file under `plugins/{sdlc,gtm}/**` has hunks in `CHANGED_DIFF` touching a real Error Handling section (see step 6's real-section-vs-stub test) |
-| `llms-txt`          | auto              | always  | **every run** (AC4)                                                                                                                                                                                    |
-| `how-to`            | draft-for-review  | path    | `CHANGED_FILES` intersects an existing how-to page's `source:` frontmatter glob-list (see §5)                                                                                                          |
+### Source resolver
+
+Applied per enabled + activated row, the resolver is an ordered ladder — a row is generated by the
+**first** rung that produces a source, never more than one:
+
+```text
+resolve(row):
+  1. contract  — if row.family == product-reference and row.type ∈ {api, config, schema}:
+                 if row.contract is explicitly configured in the manifest it MUST resolve and
+                 parse — a missing OR malformed configured contract → FAIL LOUD at the confirm
+                 gate (surface the bad path to the founder); never fall through, never emit an
+                 empty page. Otherwise look for the conventional contract path for that kind (see
+                 Contract conventions below). If a contract is found → generate from it, emit a
+                 "Source:" link to the contract file. STOP. If NO `contract:` is configured and
+                 the conventional path is merely absent → fall through to rung 2 (an absent
+                 conventional contract is not an error).
+  2. source    — if row carries a manifest `source:` (path, glob/scan directive, or `command:`):
+                 read/execute it, applying `reference-excludes` to any glob/scan match set;
+                 generate from its output, emit a "Source:" link. STOP. (`cli`/`error` reach the
+                 resolver only through this rung; `error-reference`'s source is an aggregating
+                 scan directive — see the guards below.)
+  3. scan      — if row.family == artifact-reference and the manifest's repo-level
+                 `reference-roots` is non-empty: each declared root MUST exist — a
+                 declared-but-missing root → FAIL LOUD at the confirm gate (surface the bad root);
+                 never scan-as-empty (that would delete previously-generated artifact pages and
+                 break the always-present guarantee). Walk each existing root for the type's
+                 artifact files (`commands/**`, `agents/**`, `skills/**/SKILL.md`,
+                 `hooks/hooks.json`), minus `reference-excludes`; transform each (frontmatter +
+                 Source link, per the NA-64 transform-not-mirror rule — never copy the body). STOP.
+  4. skip      — no contract, no source, no roots → generate NOTHING for this row. No page, no
+                 empty stub, no `llms.txt` entry. This is the intended inactive-row case (no
+                 `reference-roots`/no `source`/no `contract` configured), distinct from a
+                 declared-but-missing root/contract, which FAILs LOUD instead.
+```
+
+**Idempotence:** each rung's output is a pure function of resolved source bytes + a fixed template
+
+- a fixed Source-path string. Re-running against an unchanged contract/source/root set yields
+  byte-identical pages.
+
+**Change-gate keying** (drives `sync`'s regenerate-vs-skip decision, restated per row below):
+
+- **path-keyed** — a row whose resolved source is a concrete file path (a contract file, a
+  path-valued `source:`, or a file under a `reference-roots` entry) is affected only when that
+  path intersects `CHANGED_FILES`/`CHANGED_DIFF`.
+- **content/always-keyed** — a row whose resolved source has no path to intersect (any
+  `command:`-prefixed `source:`, the `error-reference` aggregating scan, and `llms-txt`, which
+  keeps its own `always` keying independent of source-intersection) regenerates on **every**
+  `sync`, so it can never silently go stale.
+
+| Doc-type            | `generation-mode` | Keying         | Affected when…                                                                                                    |
+| ------------------- | ----------------- | -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `command-reference` | auto              | path           | activated (`reference-roots:present`) and `CHANGED_FILES` contains a `commands/**` file under a declared root     |
+| `agent-reference`   | auto              | path           | activated and `CHANGED_FILES` contains an `agents/**` file under a declared root                                  |
+| `skill-reference`   | auto              | path           | activated and `CHANGED_FILES` contains a `skills/**/SKILL.md` file under a declared root                          |
+| `hooks-contract`    | auto              | content        | activated and a `hooks/hooks.json` (or referenced hook script) under a declared root has hunks in `CHANGED_DIFF`  |
+| `api-reference`     | auto              | path           | activated (contract or configured `source:` resolves) and the resolved contract/source path is in `CHANGED_FILES` |
+| `schema-reference`  | auto              | path           | activated and the resolved contract/source path is in `CHANGED_FILES`                                             |
+| `config-reference`  | auto              | path           | activated and the resolved contract/source path (or template glob match) is in `CHANGED_FILES`                    |
+| `cli-reference`     | auto              | path or always | activated; path-keyed when `source:` is a path, always-keyed when `source:` is `command:`-prefixed                |
+| `error-reference`   | auto              | content/always | activated; the aggregating scan is content/always-keyed (see the guards below)                                    |
+| `llms-txt`          | auto              | always         | **every run** (AC4)                                                                                               |
+| `how-to`            | draft-for-review  | path           | `CHANGED_FILES` intersects an existing how-to page's `source:` frontmatter glob-list (see §5)                     |
 
 For each affected row, regenerate its reference-doc set **deterministically** into the row's
 manifest `target-path` — this is a prose algorithm executed inline by the dispatched agent, not a
@@ -158,12 +200,29 @@ committed script (matches the ADR index-regen algorithm in `refs/adr-pipeline.md
 plugin's "instructions not code" style). **Idempotent**: re-running with no source change yields
 byte-identical output.
 
-1. **`command-reference`** — for each `plugins/{sdlc,gtm}/commands/**` file, parse **frontmatter
-   only** — the body is the command's runtime dispatch prompt (routinely tens of KB of directives
-   to the agent that runs it), not reader-facing prose, and is **never** copied into the generated
-   page. Emit one reference page per command, every page the same fixed shape:
+### Contract conventions (product-reference detection)
+
+The resolver's rung-1 contract lookup uses a conventional path per kind, overridable by a row's
+manifest `contract:` value. No framework-specific route parsing — contract files only, and the
+generator never parses application source to synthesize a contract.
+
+| type               | contract kind         | conventional paths (first match wins)                                                                            |
+| ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `api-reference`    | OpenAPI / Swagger     | `openapi.json`, `openapi.yaml`, `openapi.yml`, `swagger.json`, `docs/openapi.*`                                  |
+| `schema-reference` | JSON-Schema / GraphQL | `schema.json`, `schema.graphql`, `*.schema.json`, `docs/schema.*`                                                |
+| `config-reference` | JSON-Schema / env     | `config.schema.json`, `.env.schema`, `.env.example` (env-schema); artifact repos: configured `source:`/templates |
+
+`cli-reference` and `error-reference` have **no** conventional contract — they resolve only via a
+manifest `source:` (rung 2); no invented CLI-arg or error parsers. When rung 1 finds a contract,
+the page is generated from the contract's own structure (paths + methods for OpenAPI; properties
+for JSON-Schema) with a prominent **Source:** link to the contract file.
+
+1. **`command-reference`** — for each `commands/**` file under a declared `reference-roots` entry,
+   parse **frontmatter only** — the body is the command's runtime dispatch prompt (routinely tens
+   of KB of directives to the agent that runs it), not reader-facing prose, and is **never** copied
+   into the generated page. Emit one reference page per command, every page the same fixed shape:
    - **H1** — the command's invocation name (e.g. `/sdlc:docs`), derived deterministically from the
-     source file's path/slug under its plugin's `commands/` directory — never typed by hand.
+     source file's path/slug under its root's `commands/` directory — never typed by hand.
    - **One-line purpose** — the `description:` frontmatter value, run through the Description/title
      sanitization rule below.
    - **Usage** — the `argument-hint:` frontmatter value, when the source carries one; the line is
@@ -171,7 +230,7 @@ byte-identical output.
    - **Tools** — the `allowed-tools:` (or equivalent tools-surface) frontmatter value, when present;
      omitted when absent.
    - **Source** — a prominent link to the repo-relative source path (e.g.
-     `plugins/sdlc/commands/docs.md`), with a one-line note that the source file is authoritative for
+     `commands/deploy.md` under a declared `reference-roots` entry), with a one-line note that the source file is authoritative for
      full behavior (modes, gates, control flow) — the page never paraphrases or summarizes that
      behavior itself.
 
@@ -184,9 +243,8 @@ byte-identical output.
    content, so the page is idempotent (re-running with no frontmatter change yields byte-identical
    output) without needing to re-derive prose from a multi-KB runtime prompt.
 
-2. **`agent-reference`** — same fixed-shape, frontmatter-only, link-to-source treatment, one page per
-   `plugins/{sdlc,gtm}/agents/**` file — never the repo-root `agents/` nx-generated mirror (see this
-   section's scope rule):
+2. **`agent-reference`** — same fixed-shape, frontmatter-only, link-to-source treatment, one page
+   per `agents/**` file under a declared `reference-roots` entry:
    - **H1** — the agent name (`name:` frontmatter).
    - **Role/purpose** — the `description:` frontmatter value, sanitized identically.
    - **Tools** — the `tools:` frontmatter value, when present.
@@ -199,34 +257,39 @@ byte-identical output.
    Same rule: frontmatter + a fixed template + the source-path link, never the body, and never a
    prose summary of it.
 
-3. **`skill-reference`** — same, one page per `plugins/{sdlc,gtm}/skills/**/SKILL.md`'s frontmatter
-   (`name`, `description`) — the skills these two plugins bundle only; never repo-root `skills/`,
-   `.agents/skills/`, `.claude/skills/`, or a cross-tool mirror (see this section's scope rule).
-4. **`config-reference`** — parse the plugin config-contract templates under
-   `plugins/{sdlc,gtm}/refs/*-template.md` (e.g. `project-context-template.md`,
-   `docs-manifest-template.md`, the gtm `marketing-context-template.md`) — never this repo's own
-   filled-in `.claude/project/*.md` values (see this section's scope rule); emit a single reference
-   page enumerating the config surface **a consumer repo must provide**, described generically —
-   not this repo's own resolved values (Jira key, base branch, and similar nightshift-specific
-   settings never appear). **A derived description captures the entry's full first paragraph** —
-   every line up to the first blank line — **not just the first physical source line** (see the
-   "Description/title sanitization" rule below; a paragraph that wraps across lines is one logical
-   description, and truncating at the first `\n` silently drops the rest of the sentence).
-5. **`hooks-contract`** — parse every plugin's own `hooks/hooks.json` (glob
-   `plugins/{sdlc,gtm}/hooks/hooks.json` — e.g. `plugins/sdlc/hooks/hooks.json`,
-   `plugins/gtm/hooks/hooks.json`, the SessionStart/SessionEnd/etc. entries each plugin registers
-   for a consumer repo), plus any script either references; emit a single reference page describing
-   the hook contract these two plugins install (trigger, matcher, command), framed as **"the hooks
-   the sdlc & gtm plugins register in a consumer repo"** — never this repo's own
-   `.claude/settings*.json`, which is nightshift's own local configuration, not something either
-   plugin ships (see this section's scope rule).
-6. **`error-reference`** — aggregate every **real** Error Handling section into one reference page,
-   one entry per scenario/behaviour row. The scan is **exhaustive**, every run: every file under
-   `commands/**`, `agents/**`, and `refs/**` in **every** plugin directory (`plugins/{sdlc,gtm}/**`
-   today; do not hand-curate a subset of plugins or a subset of files — a partial scan silently drops
-   real sections, the defect class this rule exists to close). The heading itself is matched
-   case-insensitively (`## Error Handling` and `## Error handling` are both real headings; this repo
-   uses both spellings) — do not key the scan on one exact casing.
+3. **`skill-reference`** — same, one page per `skills/**/SKILL.md`'s frontmatter (`name`,
+   `description`) under a declared `reference-roots` entry.
+4. **`hooks-contract`** — parse every declared root's own `hooks/hooks.json`, plus any script
+   either references; emit a single reference page per root describing the hook contract it
+   installs (trigger, matcher, command).
+5. **`api-reference`** — resolved per the Contract conventions above (rung 1) or a configured
+   `source:` (rung 2). Generate a single reference page from the contract's paths + methods (or the
+   configured source's own structure), with a prominent Source link — the page never paraphrases
+   application source, only the contract/source itself.
+6. **`schema-reference`** — same treatment as `api-reference`, generated from the JSON-Schema/
+   GraphQL contract's properties.
+7. **`config-reference`** — **family-resolved**, one registry row, resolved by the shared source
+   resolver: a product repo resolves it from a JSON-Schema/env-schema contract (rung 1); an
+   artifact repo (one that ships its own plugin/config-contract templates) resolves it from a
+   configured `source:`/`contract:` pointing at those templates (rung 2). Either way, emit a single
+   reference page enumerating the config surface **a consumer of that contract/template set must
+   provide**, described generically from the resolved source — never a repo's own filled-in
+   config values. **A derived description captures the entry's full first paragraph** — every line
+   up to the first blank line — **not just the first physical source line** (see the "Description/
+   title sanitization" rule below; a paragraph that wraps across lines is one logical description,
+   and truncating at the first `\n` silently drops the rest of the sentence).
+8. **`cli-reference`** — configured-`source:`-only (rung 2); no conventional contract, no invented
+   CLI-arg parsing. Generate a single reference page from the configured source's own output
+   (a file's content, or a `command:`'s captured stdout), with a prominent Source link/note.
+9. **`error-reference`** — **special aggregating type**: reached via rung 2, but its `source:` is
+   an aggregating **scan directive**, not a lone file/command, and it retains all of the following
+   guards (a family-resolved plain single-source reading that drops them is a defect):
+   - **Exhaustive cross-root scan** — every file under `commands/**`, `agents/**`, and `refs/**` in
+     **every** root the configured scan directive names (scoped by `reference-roots`/
+     `reference-excludes`) — do not hand-curate a subset; a partial scan silently drops real
+     sections, the defect class this rule exists to close.
+   - **Case-insensitive section match** — `## Error Handling` and `## Error handling` both match;
+     do not key the scan on one exact casing.
    - **A section is "real"** when it enumerates concrete scenario/behaviour rows — a table or list
      mapping a condition to a handling behaviour (e.g. a `| Scenario | Behaviour | … |` table).
      Aggregate its rows.
@@ -237,57 +300,22 @@ byte-identical output.
      nothing to aggregation itself — its rows are already captured wherever they're canonically
      defined, and duplicating them under the deferring file's name would misattribute the row's
      source.
-7. **`llms-txt`** — see §8's format; regenerated every run regardless of whether any other row was
-   affected (AC4). Every derived `title`/`description` is sanitized per the rule below before it is
-   emitted.
-8. **`how-to`** — NOT part of this deterministic step; affected how-to pages are drafted (not
-   auto-written) per §5/§2 step 6, and only written after founder confirmation.
+10. **`llms-txt`** — see §8's format; regenerated every run regardless of whether any other row was
+    affected (AC4). Every derived `title`/`description` is sanitized per the rule below before it
+    is emitted.
+11. **`how-to`** — NOT part of this deterministic step; affected how-to pages are drafted (not
+    auto-written) per §5/§2 step 6, and only written after founder confirmation.
 
 Regeneration for each `auto` row overwrites only the pages derived from files it found affected —
 it never touches an unaffected row's pages, and it never touches `how-to` pages (draft-for-review,
 gated).
-
-### Description/title sanitization + frontmatter escaping (hard rule — every dispatch, regardless of which skills are loaded)
-
-Steps 1–3 and 7 above copy a `description` (or a derived `title`) verbatim from a source file's own
-frontmatter into generated output — `command-reference` and `agent-reference` source theirs
-exclusively from frontmatter (never the body, per steps 1–2 above); `config-reference`'s derived
-title may instead come from a source file's body first paragraph (step 4); `skill-reference` sources
-from `SKILL.md` frontmatter; and `llms-txt` entries are derived from any of those pages' own
-frontmatter. Three rules apply to every such copy, enforced by **this deterministic regen algorithm
-itself** — never left to `writing-docs`'s Self-Review checklist, because that skill is not always
-loaded when this algorithm runs: **`audit` never loads `writing-docs`** at all (see
-`agents/knowledge-engineer.md`'s skill-loading table), and even on a `sync`/`release`/`seed` dispatch
-that does load it for an unrelated narrative draft, this regen is deterministic copying, not
-authoring — it never routes the copied text through that skill's checklist.
-
-1. **No em-dash in a derived `title`/`description`.** A source `description:` (command, agent, or
-   skill frontmatter) legitimately contains an em-dash (U+2014, surrounded by a space on each side)
-   as ordinary prose punctuation. §8's `llms.txt` format parses each entry positionally as
-   `title`, then a space, an em-dash, and a space, then `description`, then the same delimiter again,
-   then `link` — splitting on that space-em-dash-space sequence; a description that itself contains
-   one yields extra delimiters and the split is ambiguous or wrong — the same collision
-   `writing-docs`'s own craft rules warn a founder against when authoring narrative frontmatter by
-   hand. Before emitting a derived `title:`/`description:` into **(a)** a generated reference page's
-   own frontmatter **or (b)** an `llms.txt` entry, replace every em-dash in the copied text with a
-   colon, semicolon, comma, or plain hyphen — never simply strip it, which can fuse two clauses into
-   one unreadable run-on.
-2. **Full first paragraph, not first physical line.** Applies wherever a derived description is
-   sourced from a multi-line intro paragraph (see step 4's `config-reference` note above): capture
-   every line up to the first blank line, not just the first line of source text.
-3. **YAML single-quote escaping.** A generated page's frontmatter block MUST use correct YAML
-   single-quote escaping for any copied text placed inside a `'...'` scalar: a literal apostrophe in
-   the source text is doubled **exactly once** (`manager's` → `'manager''s'`), never doubled twice or
-   more (`manager''''s` is a corruption of the escaping, not an intensified form of it — it renders
-   as `manager''s`, two literal apostrophes, when the source had one). Before writing, verify the
-   emitted apostrophe-doubling count matches the source's apostrophe count.
 
 ## 4. Voice/format resolution
 
 Narrative drafting (the `how-to` refresh drafts) resolves voice and output format via
 `writing-docs`'s chain, never hardcoded: `.claude/project/docs-manifest.md` "Voice & format"
 section → `.claude/project/project-context.md` → a stated plain-Markdown, neutral-voice default
-when neither is present or silent on a point. See `plugins/sdlc/skills/writing-docs/SKILL.md`
+when neither is present or silent on a point. See `skills/writing-docs/SKILL.md`
 "Voice, Craft, and Output Format" for the full resolution rule and the craft rules that apply
 regardless of which source resolves it.
 
@@ -308,7 +336,7 @@ inconsistently between this ref and the how-to template it governs:
   `sync`. This is the deliberate opt-in boundary — authoring/opting a page in is a founder action
   (add `source:`), not something `sync` infers.
 - The template that emits this key at authoring time lives in
-  `plugins/sdlc/skills/writing-docs/SKILL.md`'s how-to structure template — see that file for the
+  `skills/writing-docs/SKILL.md`'s how-to structure template — see that file for the
   exact emitted shape (a one-line inline comment plus the `source:` glob list).
 
 ## 6. No-op / change-gate semantics
@@ -387,7 +415,7 @@ cell's wording singular within that file.
 
 The registry (`refs/doc-types.md`) and the manifest template (`refs/docs-manifest-template.md`)
 are read, not owned, by this pipeline — `sync` never edits either. The `writing-docs` skill
-(`plugins/sdlc/skills/writing-docs/SKILL.md`) owns the how-to structure template (including the
+(`skills/writing-docs/SKILL.md`) owns the how-to structure template (including the
 `source:` frontmatter emission, §5 above) and the voice/format resolution chain (§4 above) — this
 ref restates the pieces `sync` depends on but does not re-inline the full skill.
 
@@ -1452,13 +1480,18 @@ hand-list:**
 
 There is **no third bucket and no "unclassified" row**. An `auto` row is deterministic; **every**
 non-`auto` row is reference-integrity — **`changelog` (draft-for-review) included**, so published
-changelog drift is never left unscanned (AC1). Resolved against `refs/doc-types.md` today the sets
-are `auto` = `command-reference`, `agent-reference`, `skill-reference`, `config-reference`,
-`hooks-contract`, `error-reference`, `llms-txt`; reference-integrity = `changelog`, `release-notes`,
-`migration-guide`, `tutorial`, `how-to`, `integration-guide`, `concept`. **That enumeration is an
-illustrative snapshot, not the source of truth — derive tier membership from `generation-mode` at
-read time.** Building the scan from a copied row list reintroduces the `changelog`-omission defect
-(the hardcoded-list drift class NA-54 hit).
+changelog drift is never left unscanned (AC1). Resolved against `refs/doc-types.md` today the full
+`auto` row set is `command-reference`, `agent-reference`, `skill-reference`, `hooks-contract`,
+`api-reference`, `schema-reference`, `config-reference`, `cli-reference`, `error-reference`, and
+`llms-txt` — but the reference-family members of that set are also **activation-gated** (§3's
+activation note): only the subset **activated** in the consumer manifest is actually scanned, never
+the full registry list. Reference-integrity = `changelog`, `release-notes`, `migration-guide`,
+`tutorial`, `how-to`, `integration-guide`, `concept`. **Both enumerations are illustrative
+snapshots, not the source of truth — derive tier membership from `generation-mode` at read time,
+and derive live membership from each row's `applies-when` activation at read time.** Building the
+scan from a copied row list reintroduces the `changelog`-omission defect (the hardcoded-list drift
+class NA-54 hit); scanning an inactive reference row would reintroduce the empty-page defect this
+story (NA-65) exists to close.
 
 Row activation is resolved from the manifest **checkout-independently** at `origin/<BASE-BRANCH>`
 (the [manifest gate](#manifest-gate-shared-by-sync-release-seed-and-audit) already fetched and

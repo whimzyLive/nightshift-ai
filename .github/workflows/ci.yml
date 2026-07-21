@@ -35,3 +35,4 @@ jobs:
       - run: pnpm nx run-many -t lint test build typecheck e2e
       - run: bash plugins/sdlc/scripts/check-agent-skill-preloads.sh
       - run: bash plugins/sdlc/scripts/check-plugin-docs-format.sh
+      - run: bash plugins/sdlc/scripts/__tests__/docs-sync-fixtures.test.sh
