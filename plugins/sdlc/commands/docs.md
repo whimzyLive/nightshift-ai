@@ -141,11 +141,14 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    — see `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §15. The enumerated list in this message is
    **rendered from the resolved `SEED_TYPES`**, never typed as a literal — otherwise it becomes the
    hardcoded copy the derivation rule exists to avoid. **This file is `command-reference`
-   source-of-truth, published verbatim by `sync`** (`refs/doc-types.md`'s `command-reference` row),
-   so the placeholder above is deliberate, not merely illustrative — a literal value here would ship
-   stale reference copy the moment a registry `trigger` cell changes. As of this writing that
-   placeholder resolves to `concept, tutorial, integration-guide, how-to` (shown for the reader's
-   convenience only; never copy this list back into the template above).
+   source-of-truth** (`refs/doc-types.md`'s `command-reference` row) — the generated reference page
+   now derives only from this file's frontmatter plus a link back here (`refs/docs-pipeline.md` §3
+   steps 1–2, never a body copy), so a stale literal here would no longer leak into that published
+   page, but it would still mislead every reader who follows the Source link to see this file's real
+   runtime behavior, and it would still be logic that silently drifts from the registry. The
+   placeholder above stays deliberate, not merely illustrative, for that reason. As of this writing
+   that placeholder resolves to `concept, tutorial, integration-guide, how-to` (shown for the
+   reader's convenience only; never copy this list back into the template above).
 
 9. **`seed` `<topic>`, when supplied, is validated and normalised here — at the ladder, before any
    gate.** The slugify rule and its **three** reachable STOPs (empty / >80 chars / reserved page id)

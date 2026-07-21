@@ -140,10 +140,46 @@ committed script (matches the ADR index-regen algorithm in `refs/adr-pipeline.md
 plugin's "instructions not code" style). **Idempotent**: re-running with no source change yields
 byte-identical output.
 
-1. **`command-reference`** — for each `commands/**` file, parse its frontmatter (`description`)
-   and body; emit one reference page per command, structured identically (one entry per
-   symbol/command, consistent shape), under `target-path`.
-2. **`agent-reference`** — same, one page per `agents/**` file.
+1. **`command-reference`** — for each `commands/**` file, parse **frontmatter only** — the body is
+   the command's runtime dispatch prompt (routinely tens of KB of directives to the agent that runs
+   it), not reader-facing prose, and is **never** copied into the generated page. Emit one reference
+   page per command, every page the same fixed shape:
+   - **H1** — the command's invocation name (e.g. `/sdlc:docs`), derived deterministically from the
+     source file's path/slug under its plugin's `commands/` directory — never typed by hand.
+   - **One-line purpose** — the `description:` frontmatter value, run through the Description/title
+     sanitization rule below.
+   - **Usage** — the `argument-hint:` frontmatter value, when the source carries one; the line is
+     **omitted entirely** (not rendered empty) when the source has no `argument-hint`.
+   - **Tools** — the `allowed-tools:` (or equivalent tools-surface) frontmatter value, when present;
+     omitted when absent.
+   - **Source** — a prominent link to the repo-relative source path (e.g.
+     `plugins/sdlc/commands/docs.md`), with a one-line note that the source file is authoritative for
+     full behavior (modes, gates, control flow) — the page never paraphrases or summarizes that
+     behavior itself.
+
+   Runtime-only frontmatter (`model`, a raw `allowed-tools` dump beyond the surfaced list, internal
+   dispatch signals) is stripped from the rendered page — only the reader-relevant fields above are
+   surfaced. If the source states a short, cheaply and deterministically extractable modes/args list
+   in its own frontmatter, include it under Usage; otherwise defer to the Source link rather than
+   summarizing the body's prose. Every field above is a deterministic frontmatter read plus a fixed
+   template plus a fixed source-path string — no byte of the source's body is ever read for page
+   content, so the page is idempotent (re-running with no frontmatter change yields byte-identical
+   output) without needing to re-derive prose from a multi-KB runtime prompt.
+
+2. **`agent-reference`** — same fixed-shape, frontmatter-only, link-to-source treatment, one page per
+   `agents/**` file:
+   - **H1** — the agent name (`name:` frontmatter).
+   - **Role/purpose** — the `description:` frontmatter value, sanitized identically.
+   - **Tools** — the `tools:` frontmatter value, when present.
+   - **Triggers** — when-invoked/trigger information, only when the source states it as its own
+     frontmatter field (e.g. a dedicated `triggers:`/`invoked-by:` key); omitted when the source's
+     frontmatter is silent on this — never inferred from prose inside `description:` or from the
+     agent's body playbook.
+   - **Source** — the same prominent Source link and authoritative-body caveat as `command-reference`.
+
+   Same rule: frontmatter + a fixed template + the source-path link, never the body, and never a
+   prose summary of it.
+
 3. **`skill-reference`** — same, one page per `**/SKILL.md`'s frontmatter (`name`, `description`).
 4. **`config-reference`** — parse `.claude/project/project-context.md` plus any `refs/*-template.md`
    config templates; emit a single reference page enumerating the config surface. **A derived
@@ -189,8 +225,10 @@ gated).
 ### Description/title sanitization + frontmatter escaping (hard rule — every dispatch, regardless of which skills are loaded)
 
 Steps 1–3 and 7 above copy a `description` (or a derived `title`) verbatim from a source file's own
-frontmatter or body into generated output — `command-reference`, `agent-reference`,
-`skill-reference`, `config-reference`, and `llms-txt` entries derived from any of those pages'
+frontmatter into generated output — `command-reference` and `agent-reference` source theirs
+exclusively from frontmatter (never the body, per steps 1–2 above); `config-reference`'s derived
+title may instead come from a source file's body first paragraph (step 4); `skill-reference` sources
+from `SKILL.md` frontmatter; and `llms-txt` entries are derived from any of those pages' own
 frontmatter. Three rules apply to every such copy, enforced by **this deterministic regen algorithm
 itself** — never left to `writing-docs`'s Self-Review checklist, because that skill is not always
 loaded when this algorithm runs: **`audit` never loads `writing-docs`** at all (see
@@ -1492,9 +1530,10 @@ one entry per finding:
 <row-type> · <page path> · <drift kind> · <evidence>
 ```
 
-e.g. `command-reference · docs/reference/commands/docs.md · regen-diff · 12 lines differ from
-current frontmatter+body`; `concept · docs/concepts/offline-sync.md · adr-drift · docs/adr/0007-*.md
-changed 2 commits after page`. It is emitted to stdout in **both** modes; in default mode it is
+e.g. `command-reference · docs/reference/commands/docs.md · regen-diff · 3 lines differ from the
+current frontmatter-derived page`; `concept · docs/concepts/offline-sync.md · adr-drift ·
+docs/adr/0007-*.md changed 2 commits after page`. It is emitted to stdout in **both** modes; in
+default mode it is
 embedded verbatim in the PR body so a reviewer sees every flag — including narrative flags `audit`
 did **not** auto-correct — alongside the committed corrections.
 
