@@ -78,41 +78,7 @@ link` line). Switched every generator to the `$(cat <<'EOF' ... EOF)` command-su
 
 ## Audit re-run — 2026-07-21 (docs/audit-2026-07-21, PR #155, third commit — plugin-only scope rule)
 
-- **`docs-pipeline.md` §3 gained a standing scope-rule blockquote: every `auto` row's
-  source-of-truth is `plugins/{sdlc,gtm}/**`ONLY.** This retroactively invalidated the
-"dedup across mirrors" approach from the first commit above — that approach kept one
-canonical page per skill`name:`sourced from repo-root`skills/`(deduped against its`.github/`/`.opencode/`mirrors). Under the new rule, repo-root`skills/` is out of scope
-**entirely**, regardless of dedup — not just its mirrors. Deleted all 17 non-`plugins/sdlc/
-  skills/**`pages (7 former "canonical" mirror-dedup survivors plus 10 other repo-root-only
-skills), leaving exactly the 16 pages sourced from`plugins/sdlc/skills/**/SKILL.md` (`gtm`plugin ships no`skills/` dir at all — 0 pages from that side). A scope-rule change like this
-  needs a full re-partition of the source set, not an incremental fix on top of the old dedup
-  logic — the two rules solve different problems (mirror duplication vs. plugin-only
-  authorship) and don't compose by just intersecting.
-- **`skill-reference`'s fixed shape had silently drifted from `command-reference`/
-  `agent-reference`'s frontmatter-only treatment despite `docs-pipeline.md` §3 step 3 saying
-  "same."** The prior two audit commits fixed `command-reference`/`agent-reference` to
-  frontmatter-only + Source link but explicitly left `skill-reference` "unchanged, byte-identical"
-  — that claim was only ever checked against the OLD source-of-truth inputs, never against
-  whether the page SHAPE itself matched the "same" wording in step 3. All 16 kept skill pages
-  still carried a full verbatim `SKILL.md` body copy under the Source link. Regenerated every one
-  to the fixed shape (H1, one-line purpose from `description:`, `## Source`, Source link,
-  disclaimer) — frontmatter values themselves needed no change (already correctly sanitized from
-  the first commit), only the body. Lesson: "unchanged, byte-identical" claims from a prior audit
-  commit are scoped to the inputs that commit actually diffed — re-verify the SHAPE against the
-  current spec text on every re-run, don't inherit a sibling row's "already fixed" status by
-  association.
-- **`config-reference` and `hooks-contract` both had a repo-specific leak the scope rule now
-  forbids.** `config-reference` carried an extra top section documenting this repo's own filled
-  `.claude/project/project-context.md` field table (resolved values, not the template contract);
-  `hooks-contract` carried a "Repo-level hooks (`.claude/settings.json`)" section for this repo's
-  own settings file. Both dropped; both pages now describe only the plugin-owned contract
-  (`plugins/{sdlc,gtm}/refs/*-template.md` for config, `plugins/{sdlc,gtm}/hooks/hooks.json` for
-  hooks) — the 7 templates and 2 hook sets were already correctly enumerated from the first
-  commit, so only the extra repo-specific section needed removing, not the template/hook content
-  itself.
-- **`error-reference` and `command-reference`/`agent-reference` needed no changes this run** —
-  re-verified by regex-scanning `plugins/{sdlc,gtm}/{commands,agents,refs}` for real
-  `## [Ee]rror [Hh]andling` headings (11 files: 8 aggregated + 3 excluded-as-stub, matching the
-  existing page's `**Source:**` list exactly) and by comparing source-file-name sets against
-  generated-page-name sets for commands (18/18) and agents (16/16) — both were already correctly
-  plugin-scoped from an earlier run, before the scope rule was written down explicitly.
+- **`docs-pipeline.md` §3 gained a standing scope-rule blockquote: every `auto` row's source-of-truth is `plugins/{sdlc,gtm}/**`ONLY.** This retroactively invalidated the "dedup across mirrors" approach from the first commit above — that approach kept one canonical page per skill`name:`sourced from repo-root`skills/`(deduped against its`.github/`/`.opencode/`mirrors). Under the new rule, repo-root`skills/` is out of scope **entirely**, regardless of dedup — not just its mirrors. Deleted all 17 non-`plugins/sdlc/skills/**`pages (7 former "canonical" mirror-dedup survivors plus 10 other repo-root-only skills), leaving exactly the 16 pages sourced from`plugins/sdlc/skills/**/SKILL.md` (`gtm`plugin ships no`skills/` dir at all — 0 pages from that side). A scope-rule change like this needs a full re-partition of the source set, not an incremental fix on top of the old dedup logic — the two rules solve different problems (mirror duplication vs. plugin-only authorship) and don't compose by just intersecting.
+- **`skill-reference`'s fixed shape had silently drifted from `command-reference`/`agent-reference`'s frontmatter-only treatment despite `docs-pipeline.md` §3 step 3 saying "same."** The prior two audit commits fixed `command-reference`/`agent-reference` to frontmatter-only + Source link but explicitly left `skill-reference` "unchanged, byte-identical" — that claim was only ever checked against the OLD source-of-truth inputs, never against whether the page SHAPE itself matched the "same" wording in step 3. All 16 kept skill pages still carried a full verbatim `SKILL.md` body copy under the Source link. Regenerated every one to the fixed shape (H1, one-line purpose from `description:`, `## Source`, Source link, disclaimer) — frontmatter values themselves needed no change (already correctly sanitized from the first commit), only the body. Lesson: "unchanged, byte-identical" claims from a prior audit commit are scoped to the inputs that commit actually diffed — re-verify the SHAPE against the current spec text on every re-run, don't inherit a sibling row's "already fixed" status by association.
+- **`config-reference` and `hooks-contract` both had a repo-specific leak the scope rule now forbids.** `config-reference` carried an extra top section documenting this repo's own filled `.claude/project/project-context.md` field table (resolved values, not the template contract); `hooks-contract` carried a "Repo-level hooks (`.claude/settings.json`)" section for this repo's own settings file. Both dropped; both pages now describe only the plugin-owned contract (`plugins/{sdlc,gtm}/refs/*-template.md` for config, `plugins/{sdlc,gtm}/hooks/hooks.json` for hooks) — the 7 templates and 2 hook sets were already correctly enumerated from the first commit, so only the extra repo-specific section needed removing, not the template/hook content itself.
+- **`error-reference` and `command-reference`/`agent-reference` needed no changes this run** — re-verified by regex-scanning `plugins/{sdlc,gtm}/{commands,agents,refs}` for real `## [Ee]rror [Hh]andling` headings (11 files: 8 aggregated + 3 excluded-as-stub, matching the existing page's `**Source:**` list exactly) and by comparing source-file-name sets against generated-page-name sets for commands (18/18) and agents (16/16) — both were already correctly plugin-scoped from an earlier run, before the scope rule was written down explicitly.
