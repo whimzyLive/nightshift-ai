@@ -1,0 +1,5 @@
+# llms.txt
+
+## reference
+
+- Example Widgets API - Example Widgets API - docs/reference/api/index.md
