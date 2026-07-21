@@ -2090,3 +2090,35 @@ was active when the bad output was produced — a rule stated correctly in one s
 live bug if the dispatch path that hit the defect never loads that skill. Fix at the layer that's
 unconditionally in effect (the deterministic algorithm prose itself), not by expanding what an
 unrelated dispatch mode loads.
+
+## 2026-07-21 — Standalone spec fix (no story key) — command-reference/agent-reference mirror-to-transform switch
+
+**Learnings:** Founder-approved switch: `command-reference` and `agent-reference` no longer mirror
+their source file's runtime-prompt body into the generated page — they now derive a fixed-shape page
+(H1, one-line purpose, Usage, Tools, Source link) from **frontmatter only** plus a deterministic
+repo-relative link back to the source. Edited only `plugins/sdlc/refs/docs-pipeline.md` (§3 steps 1–2
+rewritten, the sanitization intro sentence at §3's end tightened to stop implying command/agent still
+read the body, and §23's findings-report example updated from "differ from current
+frontmatter+body" to "differ from the current frontmatter-derived page") and `plugins/sdlc/refs/
+doc-types.md` (the two rows' `source-of-truth` cells, plus the Registry row schema's illustrative
+`e.g.` example in the same column, which quoted the identical `command frontmatter + body` string
+and would have silently kept implying a body mirror if left alone).
+
+**Pitfalls:** `plugins/sdlc/commands/docs.md` §8 contains a **self-referential** claim about its own
+doc-type row ("This file is `command-reference` source-of-truth, published verbatim by `sync`") used
+as the justification for why a `SEED_TYPES` usage-message example must stay dynamically resolved
+rather than hardcoded. Grepping only `docs-pipeline.md`/`doc-types.md` for "body" would have missed
+this — a command file can carry prose _about its own registry row_ that goes stale the moment that
+row's generation-mode semantics change. Fixed by keeping the "never hardcode" conclusion (still
+correct) but replacing the now-false "published verbatim" premise with the real one: a stale literal
+would no longer leak into the _public_ page, but would still mislead a reader who follows the page's
+new Source link back to this file, and would still be logic drifting from the registry. **Always grep
+every governing file (not just the two primary spec files) for the doc-type name being changed** —
+self-referential examples inside the source files a generation rule reads are a real, easy-to-miss
+edit site.
+
+**Patterns:** Confirmed the same-day PR #154 precedent (a prior standalone, no-story-key spec-only
+fix to these same two files) again: no `plugin.json` version bump for a spec-prose-only change (no
+code/schema surface changed), a two-pass `prettier --write` to confirm idempotence before committing,
+and "spec-only, regeneration deferred to a follow-up run after merge" stated explicitly in the commit
+body so a reviewer doesn't expect regenerated `docs/reference/**` pages in the same PR.
