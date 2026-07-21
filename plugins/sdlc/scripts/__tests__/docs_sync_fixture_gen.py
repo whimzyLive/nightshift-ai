@@ -39,8 +39,6 @@ CONTRACT_PATHS = {
 
 
 def unescape_md(text):
-    # Undo the backslash-escaping the manifest applies so a glob like `*-template.md` survives
-    # Prettier's table formatting without being read as emphasis markup.
     return re.sub(r"\\([*_|])", r"\1", text)
 
 
@@ -113,7 +111,7 @@ def write(output_dir, relpath, content):
 
 def gen_artifact_row(row_type, fixture_dir, roots, excludes, target, pages, output_dir):
     if not roots:
-        return  # rung 4: skip — no page, no stub
+        return
     for root in roots:
         root_abs = os.path.join(fixture_dir, root)
         if not os.path.isdir(root_abs):
@@ -186,13 +184,12 @@ def gen_contract_row(row_type, fixture_dir, row_cfg, target, pages, output_dir):
         return
     if row_cfg["source"]:
         gen_source_row(row_type, fixture_dir, [], [], row_cfg, target, pages, output_dir)
-    # else rung 4: skip
 
 
 def gen_source_row(row_type, fixture_dir, roots, excludes, row_cfg, target, pages, output_dir):
     source = row_cfg["source"]
     if not source:
-        return  # rung 4: skip
+        return
 
     if row_type == "error-reference":
         entries = []

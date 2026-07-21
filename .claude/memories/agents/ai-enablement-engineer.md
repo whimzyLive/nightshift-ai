@@ -1,5 +1,46 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-21 — NA-65 review-fix round — CI-orphaned test harness, informative comments, stale §-item cross-reference (`.github/workflows/ci.yml`, `plugins/sdlc/scripts/__tests__/{docs_sync_fixture_gen.py,docs-sync-fixtures.test.sh}`, `plugins/sdlc/refs/doc-types.md`)
+
+- **A self-runnable `bash <path>` test harness under `plugins/sdlc/scripts/__tests__/` is invisible
+  to `pnpm nx run-many -t test` by construction (the sdlc plugin registers no nx `test` target —
+  confirmed in the NA-63 memory entry), so authoring one and never wiring it into
+  `.github/workflows/ci.yml` leaves the exact AC it was built to gate ungated in CI** — the harness
+  passed every local run I did, which made it easy to treat "the test exists and is green" as
+  equivalent to "the test runs on every PR," but those are only the same thing once something
+  actually invokes it in the CI job. Fixed by adding one more explicit `bash` step mirroring the
+  two adjacent ones (`check-agent-skill-preloads.sh`, `check-plugin-docs-format.sh`) — no new
+  Ubuntu-runner dependency (only `bash`/`python3`, both preinstalled on `ubuntu-latest`). **Lesson:
+  any new `plugins/sdlc/scripts/__tests__/*.test.sh` this repo's convention produces needs its own
+  explicit CI step added in the SAME PR/story — the sibling `auto-merge-pr.test.sh` precedent this
+  repo already follows is itself not nx-discoverable either, so "matches an established pattern"
+  isn't evidence of CI wiring; only a grep of `ci.yml` for the literal script path is.**
+- Re-confirmed the code-comments-policy rule catches narration comments even when each one felt
+  individually load-bearing while writing it (a rung-4 skip branch, an idempotence-re-run branch,
+  a fixture-specific assertion block) — none of the five flagged (2 in the `.py`, plus a matching
+  unflagged 6th instance I found and fixed by grep in the same category) held content that wasn't
+  already fully recoverable from the code's own names/structure once removed, so none needed a
+  memory-file redirect; the fix was a pure deletion in every case. When a finding lists specific
+  line numbers as illustrative ("~N") rather than exhaustive, grep the whole file for the same
+  comment SHAPE (a trailing `# rung N: ...` / `# else ...` on a bare `return`) rather than trusting
+  the cited lines are the complete set — one extra instance (`gen_source_row`'s own `if not
+source: return  # rung 4: skip`) matched the identical pattern one function down from a cited one
+  and was in scope for the same finding, not a new one.
+- **A numbered-list cross-reference embedded in a SIBLING file (`doc-types.md`'s `source-of-truth`
+  cell pointing into `docs-pipeline.md`'s §3 numbered steps) is exactly the kind of reference that
+  silently drifts when the target list gets new items inserted ahead of the cited one** — NA-65's
+  own P1-P3 work inserted 3 new numbered steps (`api-reference`, `schema-reference`, `cli-reference`)
+  before the pre-existing `error-reference` step, shifting it from item 6 to item 9, but the
+  `doc-types.md` cell citing "step 6" was authored before that insertion and never re-verified
+  against the final numbering. Caught only by review, not by any of my own verification greps
+  (which checked for leaked strings and Prettier fixed-points, never for a numbered crossref staying
+  numerically accurate after inserting earlier list items). **Lesson: whenever a story inserts new
+  items into a numbered list that ANY other file cross-references by number, grep every sibling ref
+  file for "§N step" / "item N" style pointers into that same list and re-derive the number from the
+  final state — a cross-file numeric pointer is exactly as fragile as a hardcoded row list, just one
+  level more specific, and isn't caught by content-shape checks (leak-grep, Prettier) that don't
+  understand numbered-list semantics.**
+
 ## 2026-07-21 — NA-65 — Generic activation-gated reference-doc generation for /sdlc:docs (`plugins/sdlc/refs/{doc-types,docs-pipeline,docs-manifest-template}.md`, `.claude/project/docs-manifest.md`, `plugins/sdlc/scripts/__tests__/{docs_sync_fixture_gen.py,docs-sync-fixtures.test.sh,fixtures/{A,B,C}/**}`)
 
 - **A committed test snapshot and a pre-commit auto-formatter are structurally at war unless the

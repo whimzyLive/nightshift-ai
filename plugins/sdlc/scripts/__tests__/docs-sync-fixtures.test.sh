@@ -42,7 +42,7 @@ trap 'rm -rf "$workdir"' EXIT
 
 failures=0
 
-run_fixture() { # $1=fixture name (A/B/C)
+run_fixture() {
   local name="$1"
   local fixture="$fixtures_dir/$name"
   local expected="$fixture/expected"
@@ -70,7 +70,6 @@ run_fixture() { # $1=fixture name (A/B/C)
   fi
   echo "PASS: fixture $name — generated output matches committed expected/ snapshot"
 
-  # Idempotence — re-run with no source change, assert byte-identical output (AC3 generalized).
   if ! python3 "$gen" "$fixture" "$out2" 2>"$workdir/$name-run2.err"; then
     echo "FAIL: fixture $name — generator run 2 (idempotence re-run) errored"
     cat "$workdir/$name-run2.err"
@@ -90,7 +89,6 @@ for fixture_name in A B C; do
   run_fixture "$fixture_name"
 done
 
-# Fixture A's own de-leak assertion: zero Nightshift/plugin-scope strings in the generated tree.
 if grep -rlE 'plugins/\{?sdlc|plugins/\{?gtm' "$workdir/A-run1" >/dev/null 2>&1; then
   echo "FAIL: fixture A — generated output leaked a plugins/{sdlc,gtm} string"
   failures=$((failures + 1))
@@ -98,7 +96,6 @@ else
   echo "PASS: fixture A — generated output carries zero plugins/{sdlc,gtm} strings"
 fi
 
-# Fixture B's own no-empty-stub assertion: no docs/reference/** tree at all, only llms.txt.
 if [ -d "$workdir/B-run1/docs" ]; then
   echo "FAIL: fixture B — a docs/reference/** tree was generated; expected none (skip, not an empty stub)"
   failures=$((failures + 1))
@@ -112,8 +109,6 @@ else
   echo "PASS: fixture B — llms.txt still regenerates with zero reference entries"
 fi
 
-# Fixture C's own inactive-row assertion: cli-reference / error-reference generate nothing
-# (no source: configured for either) even though both rows are enabled in the manifest.
 if [ -d "$workdir/C-run1/docs/reference/cli" ] || [ -d "$workdir/C-run1/docs/reference/errors" ]; then
   echo "FAIL: fixture C — cli-reference/error-reference generated a page despite no configured source:"
   failures=$((failures + 1))
