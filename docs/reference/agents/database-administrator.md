@@ -9,7 +9,7 @@ Database engineer: owns the relational schema: entities and migrations. ALWAYS r
 
 ## Tools
 
-Read, Write, Edit, Bash, Skill
+`Read`, `Write`, `Edit`, `Bash`, `Skill`
 
 ## Source
 

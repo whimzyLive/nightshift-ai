@@ -9,7 +9,7 @@ Backend & infrastructure engineer: owns server-side infrastructure and serverles
 
 ## Tools
 
-Read, Write, Edit, Bash, Skill
+`Read`, `Write`, `Edit`, `Bash`, `Skill`
 
 ## Source
 

@@ -9,7 +9,7 @@ Use to own the post-implementation code-quality lifecycle for a Jira story: runs
 
 ## Tools
 
-Read, Bash, Agent, Skill
+`Read`, `Bash`, `Agent`, `Skill`
 
 ## Source
 

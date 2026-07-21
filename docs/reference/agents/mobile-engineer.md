@@ -9,7 +9,7 @@ Mobile app engineer: owns mobile screens, components, navigation, and offline-re
 
 ## Tools
 
-Read, Write, Edit, Bash, Skill
+`Read`, `Write`, `Edit`, `Bash`, `Skill`
 
 ## Source
 

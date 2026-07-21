@@ -9,7 +9,7 @@ Use to convert an approved technical spec into a detailed implementation plan wi
 
 ## Tools
 
-Read, Write, Bash, Skill
+`Read`, `Write`, `Bash`, `Skill`
 
 ## Source
 

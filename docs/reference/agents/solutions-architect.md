@@ -9,7 +9,7 @@ Use to convert an approved Jira story into a technical design spec: data model, 
 
 ## Tools
 
-Read, Write, Bash, Skill
+`Read`, `Write`, `Bash`, `Skill`
 
 ## Source
 

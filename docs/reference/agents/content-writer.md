@@ -9,7 +9,7 @@ Use to produce customer-facing marketing copy. NA-6 ladder: task=landing-page: p
 
 ## Tools
 
-Read, Write, Bash, Skill
+`Read`, `Write`, `Bash`, `Skill`
 
 ## Source
 

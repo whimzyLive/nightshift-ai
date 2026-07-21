@@ -9,7 +9,7 @@ Use to audit this repo's existing documentation (README + docs/\*\*) against mar
 
 ## Tools
 
-Read, Write, Bash, Skill, Grep, Glob
+`Read`, `Write`, `Bash`, `Skill`, `Grep`, `Glob`
 
 ## Source
 

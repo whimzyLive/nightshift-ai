@@ -9,7 +9,7 @@ Offline-sync engineer: owns the sync layer: sync rules, transaction builders, sc
 
 ## Tools
 
-Read, Write, Edit, Bash, Skill
+`Read`, `Write`, `Edit`, `Bash`, `Skill`
 
 ## Source
 

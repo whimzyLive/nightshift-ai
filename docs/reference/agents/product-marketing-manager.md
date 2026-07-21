@@ -9,7 +9,7 @@ Use to convert a vague marketing request or product context into a GTM brief: po
 
 ## Tools
 
-Read, Write, Bash
+`Read`, `Write`, `Bash`
 
 ## Source
 

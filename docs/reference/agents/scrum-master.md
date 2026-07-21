@@ -9,7 +9,7 @@ Use to decompose an approved product feature into Jira user stories (decompose m
 
 ## Tools
 
-Read, Bash, Edit, Skill
+`Read`, `Bash`, `Edit`, `Skill`
 
 ## Source
 

@@ -9,7 +9,7 @@ Use to execute an implementation plan: reads a plan file, dispatches domain agen
 
 ## Tools
 
-Read, Bash, Agent, Skill
+`Read`, `Bash`, `Agent`, `Skill`
 
 ## Source
 

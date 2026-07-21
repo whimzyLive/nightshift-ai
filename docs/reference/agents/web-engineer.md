@@ -9,7 +9,7 @@ Web app engineer: owns the web frontend (pages, components, data hooks, client s
 
 ## Tools
 
-Read, Write, Edit, Bash, Skill
+`Read`, `Write`, `Edit`, `Bash`, `Skill`
 
 ## Source
 

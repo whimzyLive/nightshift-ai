@@ -9,7 +9,7 @@ Use to convert a vague feature idea or requirement into a detailed, product-orie
 
 ## Tools
 
-Read, Write, Bash, Skill
+`Read`, `Write`, `Bash`, `Skill`
 
 ## Source
 

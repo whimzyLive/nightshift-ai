@@ -9,7 +9,7 @@ AI workflow manager: SDLC domain agent that owns and keeps the repository's AI c
 
 ## Tools
 
-Read, Write, Edit, Bash, Skill
+`Read`, `Write`, `Edit`, `Bash`, `Skill`
 
 ## Source
 
