@@ -123,16 +123,16 @@ row in `refs/doc-types.md` and resolve whether it is **affected** this run per t
 map below. The **keying** column states whether a row is matched against the name-only
 `CHANGED_FILES` list, against hunks in the unified `CHANGED_DIFF`, or is always affected:
 
-| Doc-type            | `generation-mode` | Keying  | Affected when…                                                                                                       |
-| ------------------- | ----------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
-| `command-reference` | auto              | path    | `CHANGED_FILES` contains any `commands/**` file                                                                      |
-| `agent-reference`   | auto              | path    | `CHANGED_FILES` contains any `agents/**` file                                                                        |
-| `skill-reference`   | auto              | path    | `CHANGED_FILES` contains any `**/SKILL.md`                                                                           |
-| `config-reference`  | auto              | path    | `CHANGED_FILES` contains `.claude/project/project-context.md` or a config template under `refs/*-template.md`        |
-| `hooks-contract`    | auto              | content | a name-matched `.claude/settings*.json` or referenced hook script has hunks in `CHANGED_DIFF` touching a hooks block |
-| `error-reference`   | auto              | content | a name-matched command/agent/ref file has hunks in `CHANGED_DIFF` touching an "Error Handling" / error-table section |
-| `llms-txt`          | auto              | always  | **every run** (AC4)                                                                                                  |
-| `how-to`            | draft-for-review  | path    | `CHANGED_FILES` intersects an existing how-to page's `source:` frontmatter glob-list (see §5)                        |
+| Doc-type            | `generation-mode` | Keying  | Affected when…                                                                                                                                                                                         |
+| ------------------- | ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `command-reference` | auto              | path    | `CHANGED_FILES` contains any `commands/**` file                                                                                                                                                        |
+| `agent-reference`   | auto              | path    | `CHANGED_FILES` contains any `agents/**` file                                                                                                                                                          |
+| `skill-reference`   | auto              | path    | `CHANGED_FILES` contains any `**/SKILL.md`                                                                                                                                                             |
+| `config-reference`  | auto              | path    | `CHANGED_FILES` contains `.claude/project/project-context.md` or a config template under `refs/*-template.md`                                                                                          |
+| `hooks-contract`    | auto              | content | a name-matched `.claude/settings*.json`, any `plugins/**/hooks/hooks.json`, or a referenced hook script has hunks in `CHANGED_DIFF` touching a hooks block                                             |
+| `error-reference`   | auto              | content | a name-matched `commands/**`, `agents/**`, or `refs/**` file under `plugins/{sdlc,gtm}/**` has hunks in `CHANGED_DIFF` touching a real Error Handling section (see step 6's real-section-vs-stub test) |
+| `llms-txt`          | auto              | always  | **every run** (AC4)                                                                                                                                                                                    |
+| `how-to`            | draft-for-review  | path    | `CHANGED_FILES` intersects an existing how-to page's `source:` frontmatter glob-list (see §5)                                                                                                          |
 
 For each affected row, regenerate its reference-doc set **deterministically** into the row's
 manifest `target-path` — this is a prose algorithm executed inline by the dispatched agent, not a
@@ -146,19 +146,78 @@ byte-identical output.
 2. **`agent-reference`** — same, one page per `agents/**` file.
 3. **`skill-reference`** — same, one page per `**/SKILL.md`'s frontmatter (`name`, `description`).
 4. **`config-reference`** — parse `.claude/project/project-context.md` plus any `refs/*-template.md`
-   config templates; emit a single reference page enumerating the config surface.
-5. **`hooks-contract`** — parse the hooks block of `.claude/settings*.json` plus any referenced hook
-   script; emit a single reference page describing the hook contract (trigger, matcher, command).
-6. **`error-reference`** — aggregate every "Error Handling" / error-table section across
-   commands/agents/refs into one reference page, one entry per scenario/behaviour row.
+   config templates; emit a single reference page enumerating the config surface. **A derived
+   description captures the entry's full first paragraph** — every line up to the first blank line —
+   **not just the first physical source line** (see the "Description/title sanitization" rule below;
+   a paragraph that wraps across lines is one logical description, and truncating at the first `\n`
+   silently drops the rest of the sentence).
+5. **`hooks-contract`** — parse the hooks block of `.claude/settings*.json`, and, separately, every
+   plugin's own `hooks/hooks.json` (glob `plugins/*/hooks/hooks.json` — e.g.
+   `plugins/sdlc/hooks/hooks.json`, `plugins/gtm/hooks/hooks.json`, the SessionStart/SessionEnd/etc.
+   entries a plugin registers for the consumer), plus any script either references; emit a single
+   reference page describing the **full** hook contract (trigger, matcher, command) covering
+   repo-level and plugin-registered hooks together. A repo whose `.claude/settings*.json` carries
+   zero hooks does **not** mean "no hooks defined" — a repo with one or more plugins installed that
+   register hooks still has a real hook contract, and the page must say so.
+6. **`error-reference`** — aggregate every **real** Error Handling section into one reference page,
+   one entry per scenario/behaviour row. The scan is **exhaustive**, every run: every file under
+   `commands/**`, `agents/**`, and `refs/**` in **every** plugin directory (`plugins/{sdlc,gtm}/**`
+   today; do not hand-curate a subset of plugins or a subset of files — a partial scan silently drops
+   real sections, the defect class this rule exists to close). The heading itself is matched
+   case-insensitively (`## Error Handling` and `## Error handling` are both real headings; this repo
+   uses both spellings) — do not key the scan on one exact casing.
+   - **A section is "real"** when it enumerates concrete scenario/behaviour rows — a table or list
+     mapping a condition to a handling behaviour (e.g. a `| Scenario | Behaviour | … |` table).
+     Aggregate its rows.
+   - **A section is a stub or a deferral, not a source, and is excluded from aggregation**: a
+     template placeholder with no rows, or a section whose only content points at another file's
+     canonical Error Handling table (e.g. "mirrors the spec's Error Handling section", "see X's
+     Error Handling table") without listing any row of its own. A deferring section contributes
+     nothing to aggregation itself — its rows are already captured wherever they're canonically
+     defined, and duplicating them under the deferring file's name would misattribute the row's
+     source.
 7. **`llms-txt`** — see §8's format; regenerated every run regardless of whether any other row was
-   affected (AC4).
+   affected (AC4). Every derived `title`/`description` is sanitized per the rule below before it is
+   emitted.
 8. **`how-to`** — NOT part of this deterministic step; affected how-to pages are drafted (not
    auto-written) per §5/§2 step 6, and only written after founder confirmation.
 
 Regeneration for each `auto` row overwrites only the pages derived from files it found affected —
 it never touches an unaffected row's pages, and it never touches `how-to` pages (draft-for-review,
 gated).
+
+### Description/title sanitization + frontmatter escaping (hard rule — every dispatch, regardless of which skills are loaded)
+
+Steps 1–3 and 7 above copy a `description` (or a derived `title`) verbatim from a source file's own
+frontmatter or body into generated output — `command-reference`, `agent-reference`,
+`skill-reference`, `config-reference`, and `llms-txt` entries derived from any of those pages'
+frontmatter. Three rules apply to every such copy, enforced by **this deterministic regen algorithm
+itself** — never left to `writing-docs`'s Self-Review checklist, because that skill is not always
+loaded when this algorithm runs: **`audit` never loads `writing-docs`** at all (see
+`agents/knowledge-engineer.md`'s skill-loading table), and even on a `sync`/`release`/`seed` dispatch
+that does load it for an unrelated narrative draft, this regen is deterministic copying, not
+authoring — it never routes the copied text through that skill's checklist.
+
+1. **No em-dash in a derived `title`/`description`.** A source `description:` (command, agent, or
+   skill frontmatter) legitimately contains an em-dash (U+2014, surrounded by a space on each side)
+   as ordinary prose punctuation. §8's `llms.txt` format parses each entry positionally as
+   `title`, then a space, an em-dash, and a space, then `description`, then the same delimiter again,
+   then `link` — splitting on that space-em-dash-space sequence; a description that itself contains
+   one yields extra delimiters and the split is ambiguous or wrong — the same collision
+   `writing-docs`'s own craft rules warn a founder against when authoring narrative frontmatter by
+   hand. Before emitting a derived `title:`/`description:` into **(a)** a generated reference page's
+   own frontmatter **or (b)** an `llms.txt` entry, replace every em-dash in the copied text with a
+   colon, semicolon, comma, or plain hyphen — never simply strip it, which can fuse two clauses into
+   one unreadable run-on.
+2. **Full first paragraph, not first physical line.** Applies wherever a derived description is
+   sourced from a multi-line intro paragraph (see step 4's `config-reference` note above): capture
+   every line up to the first blank line, not just the first line of source text.
+3. **YAML single-quote escaping.** A generated page's frontmatter block MUST use correct YAML
+   single-quote escaping for any copied text placed inside a `'...'` scalar: a literal apostrophe in
+   the source text is doubled **exactly once** (`manager's` → `'manager''s'`), never doubled twice or
+   more (`manager''''s` is a corruption of the escaping, not an intensified form of it — it renders
+   as `manager''s`, two literal apostrophes, when the source had one). Before writing, verify the
+   emitted apostrophe-doubling count matches the source's apostrophe count.
 
 ## 4. Voice/format resolution
 
@@ -234,14 +293,32 @@ generated page's frontmatter. Idempotent, no narrative synthesis. This matches t
 than restating it here; `refs/doc-types.md`'s own Registry self-check section is what keeps that
 cell's wording singular within that file.
 
-> **Delimiter fragility — Open Question, NOT resolved this story (NA-61).** This positional format
-> splits each entry on a space, an em-dash, and a space, so a `title`/`description` whose own value
-> legitimately contains an em-dash breaks the split. NA-61 mitigates the authoring side —
-> `writing-docs`'s templates no longer model an em-dash in their placeholder text, and both the
-> skill's craft rules and its Self-Review checklist now warn against one in real filled copy — but
-> the format itself stays positional and is not robust against an em-dash a founder writes anyway.
-> Robustly closing this would mean changing this v1 format (e.g. a structured/escaped delimiter, or
-> per-field length-prefixing) — out of scope here; deferred as a follow-up.
+> **Delimiter fragility — mitigated on two independent layers; still an Open Question for founder-typed
+> prose that skips both.** This positional format splits each entry on a space, an em-dash, and a
+> space, so a `title`/`description` whose own value legitimately contains an em-dash breaks the
+> split.
+>
+> - **Machine-derived copies** — every `title`/`description` this format ultimately reads that was
+>   copied verbatim from a source file's own frontmatter/body (`command-reference`,
+>   `agent-reference`, `skill-reference`, `config-reference`) — are sanitized by §3's "Description/
+>   title sanitization" rule, which is part of the deterministic regen algorithm itself and therefore
+>   applies on **every** dispatch, including `audit` (which never loads `writing-docs`). This closes
+>   the gap that let 30 generated pages ship an un-split `llms.txt` line: the audit dispatch that
+>   regenerates these rows does not load `writing-docs`, so a rule that lived only in that skill's
+>   checklist never applied to them.
+> - **Founder-typed narrative prose** (`tutorial`/`how-to`/`concept`/`integration-guide`/etc.) —
+>   NA-61's mitigation stands: `writing-docs`'s templates no longer model an em-dash in their
+>   placeholder text, and both the skill's craft rules and its Self-Review checklist warn against one
+>   in real filled copy — mitigated at authoring time, when `writing-docs` is loaded (every seed/how-
+>   to/release-notes draft loads it per `agents/knowledge-engineer.md`'s skill-loading table).
+>
+> The format itself stays positional — a founder who ignores the craft-rule warning can still type an
+> em-dash into narrative frontmatter that reaches `llms.txt` unfiltered by the authoring-time
+> checklist, and this ref does not add a second sanitization pass over founder-confirmed narrative
+> content (§2's phase 2 rule — "Phase 2 writes what the founder saw; it never re-drafts" — forbids
+> re-deriving it at write time). Robustly closing this for every path would mean changing
+> this v1 format (e.g. a structured/escaped delimiter, or per-field length-prefixing) — out of scope
+> here; deferred as a follow-up.
 
 ## 9. Cross-reference
 
