@@ -1,3 +1,22 @@
+## 0.45.1 (2026-07-21)
+
+### 🚀 Features
+
+- **sdlc:** add plain-repo fixture B + docs-sync fixture harness (NA-65 P4) ([6f5870d](https://github.com/whimzyLive/nightshift-ai/commit/6f5870d))
+- **sdlc:** add artifact-repo dispatch-and-snapshot fixture C (NA-65 P3) ([a20e0db](https://github.com/whimzyLive/nightshift-ai/commit/a20e0db))
+- **sdlc:** add product-reference dispatch-and-snapshot fixture + generator (NA-65 P2) ([6d758ca](https://github.com/whimzyLive/nightshift-ai/commit/6d758ca))
+- **sdlc:** de-leak doc-types/docs-pipeline and activation-gate reference rows (NA-65 P1) ([db188e5](https://github.com/whimzyLive/nightshift-ai/commit/db188e5))
+
+### 🩹 Fixes
+
+- **sdlc:** wire docs-sync fixture harness into CI, drop informative comments, fix stale §3 crossref ([b1868e8](https://github.com/whimzyLive/nightshift-ai/commit/b1868e8))
+- **sdlc:** close 5 docs-pipeline audit generation defects ([#152](https://github.com/whimzyLive/nightshift-ai/issues/152))
+- **sdlc:** drop removed gh --yes flag from auto-merge-pr.sh (NA-45) ([2b41727](https://github.com/whimzyLive/nightshift-ai/commit/2b41727))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.0 (2026-07-20)
 
 ### 🚀 Features
