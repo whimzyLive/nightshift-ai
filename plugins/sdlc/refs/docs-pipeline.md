@@ -310,6 +310,41 @@ Regeneration for each `auto` row overwrites only the pages derived from files it
 it never touches an unaffected row's pages, and it never touches `how-to` pages (draft-for-review,
 gated).
 
+### Description/title sanitization + frontmatter escaping (hard rule — every dispatch, regardless of which skills are loaded)
+
+Steps 1–3 and 7 above copy a `description` (or a derived `title`) verbatim from a source file's own
+frontmatter into generated output — `command-reference` and `agent-reference` source theirs
+exclusively from frontmatter (never the body, per steps 1–2 above); `config-reference`'s derived
+title may instead come from a source file's body first paragraph (step 7); `skill-reference` sources
+from `SKILL.md` frontmatter; and `llms-txt` entries are derived from any of those pages' own
+frontmatter. Three rules apply to every such copy, enforced by **this deterministic regen algorithm
+itself** — never left to `writing-docs`'s Self-Review checklist, because that skill is not always
+loaded when this algorithm runs: **`audit` never loads `writing-docs`** at all (see
+`agents/knowledge-engineer.md`'s skill-loading table), and even on a `sync`/`release`/`seed` dispatch
+that does load it for an unrelated narrative draft, this regen is deterministic copying, not
+authoring — it never routes the copied text through that skill's checklist.
+
+1. **No em-dash in a derived `title`/`description`.** A source `description:` (command, agent, or
+   skill frontmatter) legitimately contains an em-dash (U+2014, surrounded by a space on each side)
+   as ordinary prose punctuation. §8's `llms.txt` format parses each entry positionally as
+   `title`, then a space, an em-dash, and a space, then `description`, then the same delimiter again,
+   then `link` — splitting on that space-em-dash-space sequence; a description that itself contains
+   one yields extra delimiters and the split is ambiguous or wrong — the same collision
+   `writing-docs`'s own craft rules warn a founder against when authoring narrative frontmatter by
+   hand. Before emitting a derived `title:`/`description:` into **(a)** a generated reference page's
+   own frontmatter **or (b)** an `llms.txt` entry, replace every em-dash in the copied text with a
+   colon, semicolon, comma, or plain hyphen — never simply strip it, which can fuse two clauses into
+   one unreadable run-on.
+2. **Full first paragraph, not first physical line.** Applies wherever a derived description is
+   sourced from a multi-line intro paragraph (see step 7's `config-reference` note above): capture
+   every line up to the first blank line, not just the first line of source text.
+3. **YAML single-quote escaping.** A generated page's frontmatter block MUST use correct YAML
+   single-quote escaping for any copied text placed inside a `'...'` scalar: a literal apostrophe in
+   the source text is doubled **exactly once** (`manager's` → `'manager''s'`), never doubled twice or
+   more (`manager''''s` is a corruption of the escaping, not an intensified form of it — it renders
+   as `manager''s`, two literal apostrophes, when the source had one). Before writing, verify the
+   emitted apostrophe-doubling count matches the source's apostrophe count.
+
 ## 4. Voice/format resolution
 
 Narrative drafting (the `how-to` refresh drafts) resolves voice and output format via

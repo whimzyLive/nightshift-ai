@@ -1,5 +1,51 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-22 — Direct fix — restore NA-65-deleted sanitization subsection, dangling xref regression (`plugins/sdlc/refs/docs-pipeline.md`)
+
+- **NA-65's P1 rewrite deleted `docs-pipeline.md` §3's "Description/title sanitization +
+  frontmatter escaping" subsection while leaving 7 live prose references to it dangling** — a
+  pure content-deletion regression that no leak-grep or Prettier fixed-point check would ever
+  catch (the file was still well-formed markdown, just missing a subsection other prose pointed
+  at). Confirms the general class from the NA-65 memory entry ("a numbered-list cross-reference
+  ... silently drifts") extends one level further: a whole-SUBSECTION deletion is the same failure
+  shape as a stale numbered pointer, just discovered by grepping for the referring phrase
+  (`sanitiz`) rather than a section number. **Lesson: when a rewrite touches a section that other
+  prose in the same file points at ("...rule below", "§N's ... rule"), grep the whole file for the
+  referring phrase BEFORE finalizing the rewrite, not just for leaked strings/Prettier — content
+  presence isn't caught by either of those gates.**
+- **A recovered historical subsection (`git show <commit>^:<path>`) can carry internally
+  inconsistent step-number references even within its OWN un-reconciled state** — the recovered
+  text's opening sentence already read "Steps 1–3 and 7" (matching the CURRENT numbering) while a
+  later clause in the same sentence, and a second rule two paragraphs down, both still said
+  "(step 4)" for the identical `config-reference` cross-reference. Restoring verbatim would have
+  reintroduced a self-contradiction, not just an out-of-date one. Fixed both stale "(step 4)"
+  instances to "(step 7)" (current `config-reference` position: command=1, agent=2, skill=3,
+  hooks=4, api=5, schema=6, **config=7**, cli=8, error=9, llms-txt=10, how-to=11) and left the
+  already-correct "1–3 and 7" phrase untouched — verified by hand-deriving the current numbered
+  list from the file's own §3 headings rather than trusting the recovered text's self-consistency.
+  **Lesson: when reconciling a recovered/historical block's numeric cross-refs to a renumbered
+  list, check EVERY occurrence of the referenced number independently — a partially-updated
+  historical draft can have some instances already correct and others stale, and "the phrase reads
+  plausibly" is not evidence every instance agrees.**
+- Verification for a pure textual restore (no logic/script changes) reduced to three greps
+  (heading now precedes the next `##` heading it was extracted from before deletion; zero leaked
+  nightshift-specific strings; `check-plugin-docs-format.sh` fixed-point) plus one hand-recount of
+  all `sanitiz`-matching lines to confirm the referrer count (7) now resolves — no test harness or
+  Nx target applicable to a `plugins/sdlc/refs/*.md`-only change (re-confirms the standing
+  `pnpm nx affected -t test` / `nx format:check` clean-for-plugins-refs pattern noted repeatedly in
+  prior entries).
+- **Also caught mid-task: this repo's worktree-based dispatch (`.claude/worktrees/<slug>`) has its
+  own independent copy of `.claude/memories/agents/*.md` — NOT a symlink into the primary
+  checkout.** A prior memory entry already documents `.claude/.sdlc-plugin-root` being git-ignored
+  and absent from worktrees; the memory files are the opposite case (tracked, present, but a
+  SEPARATE working-tree copy) — an absolute-path Read/Edit outside the dispatch's stated working
+  directory silently succeeds against the wrong copy with no error, since both paths are valid
+  files. Caught only by re-diffing `git status` in the primary checkout after the edit and noticing
+  an unexpected dirty file there. **Lesson: when a dispatch pins an explicit worktree working
+  directory, do not use the repo-root-relative memory-file path from habit/muscle-memory for
+  Read/Edit calls — always resolve it relative to the pinned worktree path, the same way the prior
+  `.sdlc-plugin-root` lesson already flags for plugin-root markers.**
+
 ## 2026-07-21 — NA-65 review-fix round — CI-orphaned test harness, informative comments, stale §-item cross-reference (`.github/workflows/ci.yml`, `plugins/sdlc/scripts/__tests__/{docs_sync_fixture_gen.py,docs-sync-fixtures.test.sh}`, `plugins/sdlc/refs/doc-types.md`)
 
 - **A self-runnable `bash <path>` test harness under `plugins/sdlc/scripts/__tests__/` is invisible
