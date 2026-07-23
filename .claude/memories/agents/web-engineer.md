@@ -1,3 +1,109 @@
+## 2026-07-23 — Story NA-69 — 11 restrained motion beats (Foundation + Tiers B/C/A/D)
+
+**Learnings:**
+
+- Consolidating a re-declared helper into a single `@nightshift-ai/ui` export
+  (`EASE_OUT`, `prefersReducedMotion()`) is a pure behaviour-preserving
+  refactor validated by the _existing_ per-component specs staying green
+  with zero spec edits — no new test needed for the migration itself, only
+  for genuinely new primitives. `useInViewOnce()` needed the opposite
+  treatment (new hook, new spec) since it's new surface, not a
+  re-declaration: it returns `{ ref, inView, immediate }` — `immediate`
+  distinguishes "became true via the reduced-motion/no-IntersectionObserver
+  degrade" from "became true via a real viewport entry," which `CountUp`/
+  `RollingNumber` both need to decide "skip the animation, snap to final"
+  vs "play it." A bare `inView` boolean alone can't make that distinction
+  since both paths set it `true`.
+- Framer Motion's `pathLength` on an SVG `motion.path` compiles to
+  `stroke-dasharray="X 1"` (not a `pathLength` DOM attribute check) —
+  `"0 1"` is undrawn, `"1 1"` is fully drawn. Discovered by a throwaway
+  `console.log(path.outerHTML)` spike rather than guessing the DOM shape;
+  worth doing this for any new Motion SVG primitive before hand-writing
+  assertions.
+- `motion.span`'s `x`/`y` style motion values render as `style.transform`,
+  but a component with an _unset_ motion value (both `x`/`y` at their
+  default 0, e.g. `MagneticCta` before any pointer move) serializes
+  `style.transform` as the literal string `"none"`, not `""` or
+  `"translateX(0px) translateY(0px)"` — same throwaway-spike-first approach
+  resolved this before writing the reduced-motion assertion.
+- A `whileTap`/spring-driven DOM style update (`MagneticCta` pointer-follow,
+  `ControlSection`'s `whileTap={{scale:0.96}}`) is **not necessarily
+  reflected synchronously** after `fireEvent.pointerDown`/`pointerMove` even
+  inside RTL's `act()`-wrapped `render()` — needs `waitFor`, and needs a
+  **generous** timeout (bumped to 3000ms) when the whole `nx test` suite
+  runs many files in parallel workers under CPU contention, or the same
+  assertion that passes reliably in isolation flakes when run alongside
+  other spec files. Isolate-vs-full-suite flakiness on a real (not mocked)
+  Motion transition is a legitimate reason to widen a `waitFor` timeout, not
+  a sign the test is wrong.
+- Wrapping a _live, post-mount_ state change (e.g. `TeamPreview`'s hover
+  `active` state) in `AnimatePresence mode="wait"` genuinely introduces an
+  async gap before the new keyed child's content lands — existing
+  synchronous `fireEvent.mouseEnter` → immediate `expect(...)` assertions
+  broke and needed `await waitFor(...)`. Contrast: `argument-rail.spec.tsx`'s
+  established `AnimatePresence mode="wait"` usage was never actually
+  exercising this async path in its existing tests (its `active` value came
+  from a mocked hook fixed **before** `render()`, never changed **after**
+  mount) — don't assume an existing AnimatePresence pattern's test file
+  proves the post-mount-transition case works synchronously; check whether
+  its tests ever actually change the key after mount.
+- `useScroll({ target, offset })` (Framer's per-element scroped scroll
+  tracking, used for `PipelineStrip`'s A2 5-band index) has **no prior
+  tested precedent in this codebase** — the existing `scroll-progress.tsx`
+  (why-sdlc gate rail) instead uses whole-page `useScroll()` +
+  `useMotionValueEvent` + manual `getBoundingClientRect()` thresholds
+  against `document.querySelectorAll`. Both are legitimate Framer patterns;
+  chose the `{target}` form because the plan named it explicitly for A2,
+  and confirmed via a real test (mocked `getBoundingClientRect` +
+  `fireEvent.scroll`) that it doesn't throw and settles to a valid
+  stage-status combination in jsdom — don't assume a hook not yet exercised
+  elsewhere in the repo is unsafe; spike it with a real render first.
+- Framer Motion's `useReducedMotion()` (the second established latch,
+  `night-sky.tsx`-only per the shared-conventions table) is backed by a
+  **module-level singleton** in `motion-dom` (`initPrefersReducedMotion`/
+  `hasReducedMotionListener.current`), not a per-component `matchMedia`
+  read — meaning, unlike the `prefersReducedMotion()` function pattern,
+  there's no reliable way to toggle it per-test within one Jest module
+  registry (first call wins, memoized). This is _why_ `night-sky.spec.tsx`
+  had zero reduced-motion tests before this story, and why the new A1 tests
+  only cover the dawn-backdrop's variant-gating and token usage, not an
+  actual reduced-motion assertion — a real, structural testing gap
+  inherited from the library, not something worth spending further budget
+  forcing via `jest.resetModules()` gymnastics for one story.
+
+**Pitfalls:**
+
+- An `eslint-disable-next-line react-hooks/exhaustive-deps` comment on a
+  deliberately-`[]`-deps effect (`useInViewOnce`'s mount-once observer)
+  fails oxlint with "Definition for rule ... was not found" — this repo's
+  ESLint config has no `react-hooks` plugin registered at all (confirmed via
+  the lint failure, not the config file). Drop the disable comment entirely
+  and just leave an explanatory prose comment instead; every other
+  intentionally-partial dependency array in this codebase (e.g.
+  `terminal.tsx`'s mount effects) already does this with no lint suppression
+  needed.
+- `pnpm nx build marketing` remains the only real `tsc`-equivalent signal
+  (no repo `typecheck` target, per prior stories' findings) — ran it after
+  all five task-group commits as an extra safety net beyond `lint`/`test`,
+  since several of this story's changes (new `layoutId`/`useTransform`/
+  `useVelocity` usages) are the kind of Motion-API surface where a typo in
+  a generic parameter wouldn't necessarily fail Jest's babel transform but
+  would fail a real type-check.
+
+**Patterns:**
+
+- Task-group-scoped commits (Foundation → B → C → A → D, one commit each)
+  made the "did the shared hook/const actually get consumed everywhere it
+  was supposed to" self-review trivial — `git show <task-group-commit>
+--stat` cleanly maps to the plan's own task-group boundaries.
+- For a brand-new Motion primitive whose committed DOM shape isn't obvious
+  from the source alone (SVG `pathLength`, a spring's `style.transform`,
+  digit `stroke-dasharray`), write the test with a throwaway
+  `console.log(el.outerHTML)`/`JSON.stringify(el.style.X)` assertion first,
+  run it once to observe the real value, then replace the console.log with
+  the real assertion — faster and more honest than guessing the shape from
+  Framer Motion's source/docs.
+
 ## 2026-07-13 — Brand the Payload admin (logo, icon, theme)
 
 **Learnings:**
