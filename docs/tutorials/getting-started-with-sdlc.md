@@ -118,6 +118,7 @@ pull request without writing the implementation yourself. Along the way you:
 From here:
 
 - To run the pipeline on real stories day to day, including larger ones that go through the full
-  spec and plan flow, see the how-to guide: docs/how-to/run-the-sdlc-pipeline-on-a-story.md
+  spec and plan flow, see the how-to guide:
+  [How to run the full sdlc pipeline on a story](../how-to/run-the-sdlc-pipeline-on-a-story.md).
 - To understand what the plugin is and how its pieces fit together, see the concept page:
-  docs/concepts/what-is-the-sdlc-plugin.md
+  [What is the sdlc plugin](../concepts/what-is-the-sdlc-plugin.md).

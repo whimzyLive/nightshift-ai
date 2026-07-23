@@ -12,7 +12,7 @@ related-adrs: []
 
 # How to run the full sdlc pipeline on a story
 
-Drive one Jira story from a raw ticket to a merged PR. Two routes get you there: the one-shot `/sdlc:auto`, which triages the story and runs the right flow end to end, or the individual commands run by hand when you want to gate each phase yourself. For why the pipeline is shaped this way, see [docs/concepts/what-is-the-sdlc-plugin.md](docs/concepts/what-is-the-sdlc-plugin.md).
+Drive one Jira story from a raw ticket to a merged PR. Two routes get you there: the one-shot `/sdlc:auto`, which triages the story and runs the right flow end to end, or the individual commands run by hand when you want to gate each phase yourself. For why the pipeline is shaped this way, see [docs/concepts/what-is-the-sdlc-plugin.md](../concepts/what-is-the-sdlc-plugin.md).
 
 ## Prerequisites
 
