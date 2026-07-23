@@ -3,9 +3,21 @@ import {
   InstallSnippet,
   Reveal,
   RevealGroup,
+  Terminal,
 } from '@nightshift-ai/ui';
+import type { TerminalLine } from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
+
+// C3 — a conventional-commit example, typed on when scrolled into view.
+// Excludes the page H1 (out of scope for any typewriter treatment).
+const COMMIT_LINES: readonly TerminalLine[] = [
+  { prompt: '$', text: 'git log -1 --oneline' },
+  {
+    text: 'a1b2c3d feat(auto): implement PROJ-142 — spec, plan, code, review',
+    tone: 'success',
+  },
+];
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L236-280).
 const STEPS: { step: string; runs: string; get: string }[] = [
@@ -264,6 +276,17 @@ export function HowItWorks() {
                 </span>
               </div>
             ))}
+          </Reveal>
+        </RevealGroup>
+
+        <RevealGroup>
+          <Reveal className="mx-auto mt-[22px]" style={{ maxWidth: 520 }}>
+            <Terminal
+              title="zsh — conventional commits"
+              lines={COMMIT_LINES}
+              revealOnView
+              minHeight={88}
+            />
           </Reveal>
         </RevealGroup>
 

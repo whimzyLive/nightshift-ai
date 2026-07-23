@@ -53,3 +53,9 @@ export type { UseInViewOnceResult } from './lib/nightshift/use-in-view-once';
 
 export { MagneticCta } from './lib/nightshift/magnetic-cta';
 export type { MagneticCtaProps } from './lib/nightshift/magnetic-cta';
+
+export { GateCheck } from './lib/nightshift/gate-check';
+export type { GateCheckProps } from './lib/nightshift/gate-check';
+
+export { RollingNumber } from './lib/nightshift/rolling-number';
+export type { RollingNumberProps } from './lib/nightshift/rolling-number';

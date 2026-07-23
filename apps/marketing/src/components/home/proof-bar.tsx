@@ -1,4 +1,4 @@
-import { CountUp, Reveal, RevealGroup } from '@nightshift-ai/ui';
+import { Reveal, RevealGroup, RollingNumber } from '@nightshift-ai/ui';
 
 // B2 settle spring (from the AC) — exempt from EASE_OUT (spring-driven).
 const SETTLE_SPRING = { stiffness: 120, damping: 18 };
@@ -7,7 +7,8 @@ const SETTLE_SPRING = { stiffness: 120, damping: 18 };
  * Full-bleed `--surface-card` band with top/bottom hairlines. Breaks out of
  * the shared `<main>` container to viewport width while keeping inner
  * content centered (Open-Question default 1) — the animated numerals reuse
- * one `CountUp` instance each, counting once on first viewport entry.
+ * one `RollingNumber` instance each, rolling their digits into place once on
+ * first viewport entry.
  */
 export function ProofBar() {
   return (
@@ -30,8 +31,8 @@ export function ProofBar() {
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
-          <CountUp value={11} className="text-[var(--accent)]" /> specialized
-          agents
+          <RollingNumber value={11} className="text-[var(--accent)]" />{' '}
+          specialized agents
         </Reveal>
         <Reveal
           as="span"
@@ -46,7 +47,8 @@ export function ProofBar() {
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
-          <CountUp value={10} className="text-[var(--accent)]" /> slash commands
+          <RollingNumber value={10} className="text-[var(--accent)]" /> slash
+          commands
         </Reveal>
         <Reveal
           as="span"
@@ -63,7 +65,7 @@ export function ProofBar() {
         >
           install in{' '}
           <span style={{ color: 'var(--accent)' }}>
-            <CountUp value={60} /> seconds
+            <RollingNumber value={60} /> seconds
           </span>
         </Reveal>
         <Reveal

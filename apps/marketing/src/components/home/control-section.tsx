@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import {
   CtaButton,
   Eyebrow,
+  GateCheck,
   prefersReducedMotion,
   Reveal,
   RevealGroup,
@@ -232,6 +233,7 @@ interface CtrlGate {
   conn: boolean;
   connBg: string;
   glyph: string;
+  done: boolean;
   border: string;
   bg: string;
   color: string;
@@ -260,6 +262,7 @@ function buildCtrlGates(
           ? 'rgba(217,119,87,.55)'
           : 'var(--border-strong)',
       glyph: done ? '✓' : '⊘',
+      done,
       border:
         done || current ? 'var(--border-accent)' : 'var(--border-default)',
       bg: done
@@ -1055,7 +1058,7 @@ function GateStrip({
                     'background .4s, border-color .4s, color .4s, box-shadow .4s',
                 }}
               >
-                {g.glyph}
+                {g.done ? <GateCheck reduced={reducedMotion} /> : g.glyph}
               </motion.span>
               <span
                 className="font-mono"

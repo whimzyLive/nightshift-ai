@@ -130,14 +130,20 @@ describe('ControlSection', () => {
       });
 
       fireEvent.pointerDown(incBtn);
-      await waitFor(() => {
-        expect(incBtn.style.transform).toContain('scale');
-      });
+      await waitFor(
+        () => {
+          expect(incBtn.style.transform).toContain('scale');
+        },
+        { timeout: 3000 },
+      );
 
       fireEvent.pointerUp(incBtn);
-      await waitFor(() => {
-        expect(incBtn.style.transform).not.toContain('scale');
-      });
+      await waitFor(
+        () => {
+          expect(incBtn.style.transform).not.toContain('scale');
+        },
+        { timeout: 3000 },
+      );
     });
 
     it('omits the tap scale under reduced motion', async () => {

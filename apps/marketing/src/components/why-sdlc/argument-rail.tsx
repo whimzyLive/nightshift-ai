@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 
 import { AnimatePresence, motion } from 'motion/react';
 
-import { Eyebrow, prefersReducedMotion } from '@nightshift-ai/ui';
+import { Eyebrow, GateCheck, prefersReducedMotion } from '@nightshift-ai/ui';
 
 import { useScrollProgress } from './scroll-progress';
 
@@ -199,7 +199,7 @@ function GateNode({ index, reached, active, reduced }: GateNodeProps) {
           'border-color .4s, color .4s, box-shadow .4s, background .4s',
       }}
     >
-      {state === 'passed' ? '✓' : '⊘'}
+      {state === 'passed' ? <GateCheck reduced={reduced} /> : '⊘'}
     </motion.span>
   );
 }
