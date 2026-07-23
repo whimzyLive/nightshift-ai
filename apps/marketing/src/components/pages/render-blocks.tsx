@@ -24,13 +24,12 @@ function renderBlock(block: PageBlock, index: number) {
       if (!media || typeof media !== 'object') return null;
       return (
         <figure key={index} className="my-8">
-          <img
-            src={media.url ?? ''}
-            alt={media.alt ?? ''}
-            className="w-full rounded-lg"
-          />
+          <img src={media.url ?? ''} alt={media.alt ?? ''} className="w-full" />
           {block.caption ? (
-            <figcaption className="mt-2 text-sm text-neutral-400">
+            <figcaption
+              className="mt-2 text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
               {block.caption}
             </figcaption>
           ) : null}
