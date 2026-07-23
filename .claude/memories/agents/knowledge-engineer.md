@@ -83,6 +83,23 @@ link` line). Switched every generator to the `$(cat <<'EOF' ... EOF)` command-su
 - **`config-reference` and `hooks-contract` both had a repo-specific leak the scope rule now forbids.** `config-reference` carried an extra top section documenting this repo's own filled `.claude/project/project-context.md` field table (resolved values, not the template contract); `hooks-contract` carried a "Repo-level hooks (`.claude/settings.json`)" section for this repo's own settings file. Both dropped; both pages now describe only the plugin-owned contract (`plugins/{sdlc,gtm}/refs/*-template.md` for config, `plugins/{sdlc,gtm}/hooks/hooks.json` for hooks) — the 7 templates and 2 hook sets were already correctly enumerated from the first commit, so only the extra repo-specific section needed removing, not the template/hook content itself.
 - **`error-reference` and `command-reference`/`agent-reference` needed no changes this run** — re-verified by regex-scanning `plugins/{sdlc,gtm}/{commands,agents,refs}` for real `## [Ee]rror [Hh]andling` headings (11 files: 8 aggregated + 3 excluded-as-stub, matching the existing page's `**Source:**` list exactly) and by comparing source-file-name sets against generated-page-name sets for commands (18/18) and agents (16/16) — both were already correctly plugin-scoped from an earlier run, before the scope rule was written down explicitly.
 
+## Post-QA inline sync — NA-69 (2026-07-23, clean no-op, no commit)
+
+- Story-branch-vs-base diff (`origin/develop...feat/NA-69`) touched only `apps/marketing/**` and
+  `packages/ui/src/lib/nightshift/**` (motion.dev animation components/tokens) plus a plan doc and
+  two memory files — zero bytes under `plugins/{sdlc,gtm}/**` or `docs/adr/**`. That means every
+  `auto` row's source-of-truth (`command-reference`/`agent-reference`/`skill-reference`/
+  `config-reference`/`hooks-contract`/`error-reference`) is provably unchanged, so their regen is
+  byte-identical without needing to actually re-run it — the source resolver's whole input set is
+  untouched, not just "looks similar".
+- Neither how-to page's `source:` glob list (`generate-landing-page-copy.md` →
+  `plugins/gtm/commands/site.md`; `run-the-sdlc-pipeline-on-a-story.md` → 5 `plugins/sdlc/commands/
+*.md` files) matched any changed path, so no narrative refresh was gated/drafted. A pure
+  client-side UI/animation story is a clean example of the "diff touches product code the doc
+  registry has no `source:` binding to" no-op case — confirms the §26 story-branch-vs-base
+  selection + §3 affected-row resolution correctly short-circuit to nothing-to-write without
+  needing any speculative regen-and-diff.
+
 ## Audit dispatch — 2026-07-22 (clean scan, no branch/PR)
 
 - **NA-65 landed the "activation-gated" resolver model between this run and PR #155** — `refs/doc-types.md` (+122), `refs/docs-manifest-template.md` (+79), and `refs/docs-pipeline.md` (+269 net, but 151 ins / 118 del — a real rewrite of §3, not just reflow) all changed; `.claude/project/docs-manifest.md` was migrated to the new 5-column shape (`type/enabled/target-path/source/contract`) plus a new "Reference roots" section. Despite that much churn in the _pipeline spec_, **zero bytes changed under any `auto` row's actual source-of-truth** (`plugins/{sdlc,gtm}/{commands,agents,skills,hooks}/**`) — confirmed via `git diff --stat <last-audit-merge-sha> origin/<BASE-BRANCH> -- plugins/sdlc plugins/gtm`, which only showed `plugin.json`, `CHANGELOG.md`, and the three refs files above (plus test fixtures). A spec rewrite is not itself evidence of drift — always check whether the rewrite changed a row's _resolved source content_ before assuming a re-regen is needed.
