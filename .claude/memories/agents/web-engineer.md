@@ -1926,3 +1926,75 @@ defined` under jsdom. Same class of "mock the transitive ESM/Node-only
   files alone (e.g. `revalidatePage.spec.ts`'s "minimal shape the hook
   reads" comment) since the QA finding scoped the ask to design-rationale
   narration in the implementation files, not test-scaffolding notes.
+
+## 2026-07-24 — Story NA-70 re-review: 2 QA fixes were themselves regressions (2 reverted/adjusted, 2 minor fixes)
+
+**Learnings:**
+
+- The prior round's "let DB errors propagate" fix for `getPageBySlug` was
+  right for the _request-time_ 500-vs-stale-404 tradeoff but missed that
+  the same function also runs at **build time** — `generateStaticParams`
+  enumerates published slugs, and Next then calls the page component (→
+  `getPageBySlug`) once per slug during `next build` to pre-render each
+  one. A rethrow there fails the whole build/deploy on a transient DB
+  blip, which is strictly worse than the ISR-cache-serves-stale-HTML
+  degrade a `null`→404 produces for an already-published page. Reverted
+  to `try { ... } catch (error) { console.error('[pages]', error); return
+null; }` — this now matches the exact `getPublishedPageSlugs` shape
+  (and ADR 0009's general catch-to-defaults CMS-read pattern) rather than
+  being the one exception to it. The lesson generalizes: before deciding
+  a data-access function's error-handling contract from its _runtime_
+  call site alone, grep for every caller — a function shared between a
+  request path and a `generateStaticParams`/build-time path needs the
+  build path's failure mode considered too, and the two can want opposite
+  contracts (a route handler's own error boundary could have absorbed a
+  rethrow; `next build` has no such boundary).
+- Regression-proved this revert the same red/green way as the original
+  fix: rewrote the spec's third `getPageBySlug` test from asserting
+  `.rejects.toThrow(...)` to asserting `toBeNull()` + a
+  `console.error` spy call, watched it fail against the still-rethrowing
+  code, then reverted the function body — confirms the test would have
+  caught either wrong shape.
+- The `loading="lazy"` fix from the prior round was unconditionally
+  applied to every media block including a page's first block (the
+  likely LCP element) — this is a straightforward "wrap sound but
+  overbroad instinct" issue: "add lazy-loading to images" without
+  excluding the one image that shouldn't be lazy (it needs to start
+  fetching immediately, before it's anywhere near the viewport, for a
+  good LCP timing). Fixed by threading the already-available block
+  `index` into the loading decision: `index === 0` → `loading="eager"` +
+  `fetchPriority="high"`, everything else stays `"lazy"`. Per the finding
+  wording ("or first block overall — use the block's index in content"),
+  this is deliberately "index 0 of the whole `content` array," not "first
+  media-typed block encountered" — simpler and matches what the finding
+  actually asked for; don't over-engineer a "track whether we've seen a
+  media block yet" scan when the literal instruction says use the raw
+  index.
+- The empty-`url` guard (`if (!media.url) return null`) from the prior
+  round threw out the editor-authored `caption` along with the missing
+  image — a null-media-doc guard clause reaching further than intended
+  is a common shape for this kind of regression: the _rendered element_
+  (`<img>`) should be conditional, but the guard was written at the
+  _whole-block_ level. Fixed by splitting the return-null decision
+  (`!hasUrl && !block.caption`) from the `<img>`-only conditional
+  (`hasUrl && media && typeof media === 'object' ? <img .../> : null`),
+  so a caption-only media block still renders its `<figure>` +
+  `<figcaption>` with no `<img>` at all.
+- The independent-`?? undefined` width/height emission (previous round)
+  let a Media doc with only one dimension field populated emit a
+  single-axis `width`/`height` pair — an unusable aspect-ratio hint (an
+  `<img>` with e.g. `width={800}` and no `height` has no computable
+  intrinsic ratio, so it doesn't actually prevent CLS, the exact thing
+  the original fix was for). Fixed with a single derived `dimensions`
+  object computed once (`width != null && height != null ? {width,
+height} : {}`) spread onto the `<img>` via `{...dimensions}` — either
+  both attributes are present or neither is, never one alone.
+- TypeScript note: computing `hasUrl` as a bare boolean-ish const (`media
+&& typeof media === 'object' && media.url`) does **not** narrow `media`'s
+  type at the JSX usage site the way an inline `if` would — `tsc` (run via
+  `pnpm nx build`) still sees `media: number | Media` there and complains
+  about `.url` on a possibly-`number` value. Repeating the same `media &&
+typeof media === 'object'` check directly in the JSX ternary's
+  condition (redundant at runtime, since `hasUrl` already implies it, but
+  necessary for the type narrowing) resolved it with zero `as` casts —
+  cheaper than extracting a type-guard function for a single call site.

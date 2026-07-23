@@ -34,6 +34,7 @@ describe('RenderBlocks', () => {
     render(
       <RenderBlocks
         blocks={[
+          { blockType: 'richText', richText: lexical } as never,
           {
             blockType: 'media',
             media: {
@@ -56,7 +57,33 @@ describe('RenderBlocks', () => {
     expect(screen.getByText('A caption')).not.toBeNull();
   });
 
-  it('renders nothing when the populated media has no usable url', () => {
+  it('loads the first block eagerly (LCP) and later blocks lazily', () => {
+    render(
+      <RenderBlocks
+        blocks={[
+          {
+            blockType: 'media',
+            media: { url: '/hero.png', alt: 'Hero', width: 800, height: 600 },
+          } as never,
+          {
+            blockType: 'media',
+            media: {
+              url: '/second.png',
+              alt: 'Second',
+              width: 400,
+              height: 300,
+            },
+          } as never,
+        ]}
+      />,
+    );
+    const images = screen.getAllByRole('img');
+    expect(images[0].getAttribute('loading')).not.toBe('lazy');
+    expect(images[0].getAttribute('fetchpriority')).toBe('high');
+    expect(images[1].getAttribute('loading')).toBe('lazy');
+  });
+
+  it('renders only a figcaption when media has a caption but no usable url', () => {
     const { container } = render(
       <RenderBlocks
         blocks={[
@@ -68,7 +95,33 @@ describe('RenderBlocks', () => {
         ]}
       />,
     );
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('A caption')).not.toBeNull();
+  });
+
+  it('renders nothing when media has neither a usable url nor a caption', () => {
+    const { container } = render(
+      <RenderBlocks
+        blocks={[{ blockType: 'media', media: { alt: 'Alt text' } } as never]}
+      />,
+    );
     expect(container.innerHTML).toBe('');
+  });
+
+  it('omits width/height entirely when the media doc has only one dimension', () => {
+    render(
+      <RenderBlocks
+        blocks={[
+          {
+            blockType: 'media',
+            media: { url: '/img.png', alt: 'Alt text', width: 800 },
+          } as never,
+        ]}
+      />,
+    );
+    const img = screen.getByRole('img');
+    expect(img.getAttribute('width')).toBeNull();
+    expect(img.getAttribute('height')).toBeNull();
   });
 
   it('renders nothing (and warns) for an unknown blockType', () => {

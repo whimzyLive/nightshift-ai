@@ -15,17 +15,28 @@ function renderBlock(block: PageBlock, index: number) {
       return <RichText key={index} data={block.richText} disableContainer />;
     case 'media': {
       const media = block.media;
-      if (!media || typeof media !== 'object' || !media.url) return null;
+      const hasUrl = media && typeof media === 'object' && media.url;
+      if (!hasUrl && !block.caption) return null;
+      const dimensions =
+        media &&
+        typeof media === 'object' &&
+        media.width != null &&
+        media.height != null
+          ? { width: media.width, height: media.height }
+          : {};
+      const isFirst = index === 0;
       return (
         <figure key={index} className="my-8">
-          <img
-            src={media.url}
-            alt={media.alt ?? ''}
-            width={media.width ?? undefined}
-            height={media.height ?? undefined}
-            loading="lazy"
-            className="w-full"
-          />
+          {hasUrl && media && typeof media === 'object' ? (
+            <img
+              src={media.url ?? undefined}
+              alt={media.alt ?? ''}
+              {...dimensions}
+              loading={isFirst ? 'eager' : 'lazy'}
+              fetchPriority={isFirst ? 'high' : undefined}
+              className="w-full"
+            />
+          ) : null}
           {block.caption ? (
             <figcaption
               className="mt-2 text-sm"

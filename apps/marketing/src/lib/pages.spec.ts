@@ -36,9 +36,14 @@ describe('getPageBySlug', () => {
     expect(await getPageBySlug('missing')).toBeNull();
   });
 
-  it('propagates a thrown Payload/DB error (does not become null)', async () => {
+  it('returns null on a thrown Payload/DB error (does not propagate)', async () => {
+    const errorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     mockFind.mockRejectedValue(new Error('db down'));
-    await expect(getPageBySlug('about')).rejects.toThrow('db down');
+    expect(await getPageBySlug('about')).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith('[pages]', expect.any(Error));
+    errorSpy.mockRestore();
   });
 });
 

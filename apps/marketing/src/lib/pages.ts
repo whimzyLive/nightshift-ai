@@ -12,18 +12,26 @@ export interface PageContent {
 
 export const getPageBySlug = cache(
   async (slug: string): Promise<PageContent | null> => {
-    const payload = await getPayload({ config });
-    const { docs } = await payload.find({
-      collection: 'pages',
-      where: {
-        and: [{ slug: { equals: slug } }, { _status: { equals: 'published' } }],
-      },
-      limit: 1,
-      depth: 1,
-    });
-    const doc = docs[0];
-    if (!doc) return null;
-    return { title: doc.title, content: doc.content };
+    try {
+      const payload = await getPayload({ config });
+      const { docs } = await payload.find({
+        collection: 'pages',
+        where: {
+          and: [
+            { slug: { equals: slug } },
+            { _status: { equals: 'published' } },
+          ],
+        },
+        limit: 1,
+        depth: 1,
+      });
+      const doc = docs[0];
+      if (!doc) return null;
+      return { title: doc.title, content: doc.content };
+    } catch (error) {
+      console.error('[pages]', error);
+      return null;
+    }
   },
 );
 
