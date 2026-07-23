@@ -42,4 +42,40 @@ describe('NightSky', () => {
       expect(backdrop.getAttribute('aria-hidden')).toBe('true');
     });
   });
+
+  describe('A1 dawn sun + clouds', () => {
+    it('renders the sun disc and cloud wisps only for variant="home"', () => {
+      const { queryByTestId, queryAllByTestId, unmount } = render(
+        <NightSky variant="home" />,
+      );
+      expect(queryByTestId('dawn-sun')).toBeTruthy();
+      expect(queryAllByTestId('dawn-cloud').length).toBeGreaterThanOrEqual(2);
+      expect(queryAllByTestId('dawn-cloud').length).toBeLessThanOrEqual(4);
+      unmount();
+
+      const { queryByTestId: queryDefaultSun } = render(<NightSky />);
+      expect(queryDefaultSun('dawn-sun')).toBeNull();
+    });
+
+    it('paints the sun with the low-key terracotta tokens, not a bright yellow disc', () => {
+      const { getByTestId } = render(<NightSky variant="home" />);
+      const sun = getByTestId('dawn-sun');
+      expect(sun.getAttribute('style')).toContain('--terra-300');
+      expect(sun.getAttribute('style')).toContain('--terra-500');
+      expect(sun.getAttribute('style')).toContain('--terra-glow');
+      expect(sun.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('starts hidden (opacity 0) at the top of the page, before the rise range begins', () => {
+      // Motion's `useReducedMotion()` is a module-level singleton (see the
+      // web-engineer memory entry on this) — it can't be forced per-test in
+      // this file, so this asserts the honest default (non-reduced) state at
+      // `scrollYProgress = 0` rather than a fabricated reduced-motion case:
+      // useTransform's default clamp holds the sun at its pre-range output
+      // (opacity 0) until scroll reaches SUN_RISE_RANGE's start.
+      const { getByTestId } = render(<NightSky variant="home" />);
+      const sun = getByTestId('dawn-sun');
+      expect(sun.style.opacity).toBe('0');
+    });
+  });
 });

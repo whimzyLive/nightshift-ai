@@ -130,16 +130,25 @@ const AMBIENT_METEOR_MS = 4200;
 const AMBIENT_METEOR_CHANCE = 0.55; // skip when Math.random() < this
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
 
-// A1 — moon Y/X arc across the whole page scroll: a visible descend-and-
-// drift as the page moves toward dawn, reaching its resting arc-end position
-// by the bottom of the page. Reduced motion binds directly to these end
-// values.
-const MOON_ARC_Y_PX = 340;
-const MOON_ARC_X_PX = -70;
+// A1 — moon SETS on its own (right) side, fully exiting the fixed viewport-
+// sized layer well before the page bottom (clamped via useTransform's
+// default clamp — progress past the end of the range holds at the end
+// value). Reduced motion binds directly to these end values.
+const MOON_SET_RANGE: [number, number] = [0, 0.74];
+const MOON_SET_Y_PX = 820;
+const MOON_SET_X_PX = 50;
 // A1 — dawn backdrop: ramps in from roughly the mid-page mark so it's
 // already visible well before the FinalCta/footer band, not just in the
 // final stretch.
 const DAWN_RAMP_RANGE: [number, number] = [0.42, 0.85];
+// A1 — sun rises on the opposite (left) side as the moon sets, resolving
+// before the page bottom so the footer reads "moon gone, sun + clouds up".
+const SUN_RISE_RANGE: [number, number] = [0.42, 0.8];
+const SUN_RISE_Y_PX = 150;
+// A1 — cloud drift: slow, small-amplitude horizontal wander, one duration
+// per cloud so they don't move in lockstep.
+const CLOUD_DRIFT_PX = 22;
+const CLOUD_DRIFT_DURATIONS_S = [27, 33, 24];
 
 // Easter egg: N rapid clicks on the same spot detonate a big bang there
 // instead of a meteor.
@@ -284,20 +293,38 @@ export function NightSky({
   const farX = useTransform(sx, (v) => -v * FAR_DEPTH);
   const farY = useTransform(sy, (v) => -v * FAR_DEPTH);
 
-  // A1 — whole-document scroll progress drives the moon's Y/X arc (outer
-  // wrapper) and the dawn backdrop's opacity, independently of the moon's
-  // own pointer-parallax `x`/`y` (inner nodes, untouched) and idle float.
+  // A1 — whole-document scroll progress drives the moon's set (outer
+  // wrapper), the sun's rise, and the dawn backdrop's opacity, independently
+  // of the moon's own pointer-parallax `x`/`y` (inner nodes, untouched) and
+  // idle float.
   const { scrollYProgress } = useScroll();
-  const scrollArcY = useTransform(scrollYProgress, [0, 1], [0, MOON_ARC_Y_PX]);
-  const scrollArcX = useTransform(scrollYProgress, [0, 1], [0, MOON_ARC_X_PX]);
+  const scrollSetY = useTransform(scrollYProgress, MOON_SET_RANGE, [
+    0,
+    MOON_SET_Y_PX,
+  ]);
+  const scrollSetX = useTransform(scrollYProgress, MOON_SET_RANGE, [
+    0,
+    MOON_SET_X_PX,
+  ]);
   const dawnOpacityFromScroll = useTransform(
     scrollYProgress,
     DAWN_RAMP_RANGE,
     [0, 1],
   );
-  const moonArcY = animate ? scrollArcY : MOON_ARC_Y_PX;
-  const moonArcX = animate ? scrollArcX : MOON_ARC_X_PX;
+  const sunRiseYFromScroll = useTransform(scrollYProgress, SUN_RISE_RANGE, [
+    SUN_RISE_Y_PX,
+    0,
+  ]);
+  const sunOpacityFromScroll = useTransform(
+    scrollYProgress,
+    SUN_RISE_RANGE,
+    [0, 1],
+  );
+  const moonSetY = animate ? scrollSetY : MOON_SET_Y_PX;
+  const moonSetX = animate ? scrollSetX : MOON_SET_X_PX;
   const dawnOpacity = animate ? dawnOpacityFromScroll : 1;
+  const sunRiseY = animate ? sunRiseYFromScroll : 0;
+  const sunOpacity = animate ? sunOpacityFromScroll : 1;
 
   const [meteors, setMeteors] = useState<Meteor[]>([]);
   const [bigBang, setBigBang] = useState<BigBang | null>(null);
@@ -504,14 +531,14 @@ export function NightSky({
         {/* Crescent moon — the one solid celestial asset. The crescent is
             carved by an inset shadow (dark bite bottom-right) + an indigo rim;
             an outer glow lifts it off the void. A1: an outer wrapper carries
-            the scroll-linked X/Y arc; the existing inner node keeps its
+            the scroll-linked set X/Y; the existing inner node keeps its
             pointer-parallax x/y untouched — one axis can't carry both a
-            scroll value and a pointer motion value, so the arc composes via
+            scroll value and a pointer motion value, so the set composes via
             nesting instead. Rides the mid parallax plane and drifts on a
             slow float. */}
         <motion.div
           className="absolute inset-0"
-          style={{ x: moonArcX, y: moonArcY }}
+          style={{ x: moonSetX, y: moonSetY }}
         >
           <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
             <motion.div
@@ -532,6 +559,52 @@ export function NightSky({
             />
           </motion.div>
         </motion.div>
+
+        {variant === 'home' && (
+          <>
+            {/* Sun rises on the opposite (left) side as the moon sets — a
+                soft, low-key terracotta glow disc (not a bright daytime
+                sun), same accent hue as the crescent moon's indigo rim
+                counterpart. */}
+            <motion.div
+              aria-hidden="true"
+              data-testid="dawn-sun"
+              className="absolute rounded-full"
+              style={{
+                bottom: 60,
+                left: '10%',
+                width: 130,
+                height: 130,
+                y: sunRiseY,
+                opacity: sunOpacity,
+                background:
+                  'radial-gradient(circle at 45% 42%, var(--terra-300), var(--terra-500) 45%, var(--terra-glow) 72%, transparent 100%)',
+                filter: 'blur(2px)',
+              }}
+            />
+            {/* Faint cloud wisps drifting near the sun — barely-there
+                atmosphere, warm-muted tint, restrained amplitude. */}
+            {CLOUD_DRIFT_DURATIONS_S.map((duration, i) => (
+              <motion.div
+                key={i}
+                aria-hidden="true"
+                data-testid="dawn-cloud"
+                className="absolute rounded-full"
+                style={{
+                  bottom: 96 + i * 44,
+                  left: `${6 + i * 14}%`,
+                  width: 170 - i * 20,
+                  height: 38,
+                  opacity: sunOpacity,
+                  background: 'rgba(217,119,87,0.1)',
+                  filter: 'blur(20px)',
+                }}
+                animate={animate ? { x: [0, CLOUD_DRIFT_PX, 0] } : undefined}
+                transition={{ duration, ease: 'easeInOut', repeat: Infinity }}
+              />
+            ))}
+          </>
+        )}
       </motion.div>
 
       {variant === 'home' && (

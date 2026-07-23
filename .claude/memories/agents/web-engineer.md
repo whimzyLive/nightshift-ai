@@ -1,3 +1,43 @@
+## 2026-07-23 — Story NA-69 — A1 evolved into moon-sets/sun-rises choreography
+
+**Learnings:**
+
+- Reconfirmed the `useReducedMotion()` module-singleton testing limitation
+  (already logged in an earlier NA-69 entry) the hard way: wrote a test
+  asserting the new sun disc's opacity===1 "under reduced motion" without
+  actually forcing it, and it failed — `animate` defaults `true` in this
+  spec file (no prior test in it ever gets a reduced-motion mock to stick),
+  so at `scrollYProgress = 0` the sun's `useTransform(scrollYProgress,
+SUN_RISE_RANGE, [0, 1])` correctly clamps to its pre-range output (`0`),
+  not `1`. Fixed by rewriting the test to honestly assert the default
+  (non-reduced) initial state instead of a reduced-motion state this file
+  structurally can't produce — same resolution as the earlier dawn-backdrop
+  entry, now also applies to the sun/cloud elements.
+- `useTransform`'s default `clamp: true` is what makes "resolve before the
+  page bottom" trivial to implement for a scroll-driven range: mapping
+  `scrollYProgress` through a sub-range like `[0, 0.74]` (moon set) or
+  `[0.42, 0.8]` (sun rise) means progress _outside_ that sub-range
+  automatically holds at the nearest end of the output range — no manual
+  min/max clamping logic needed to make an effect "finish early."
+- Composed the new sun-rise/cloud-drift motion values the same
+  nested-wrapper-safe way established for the moon: `style={{ y:
+sunRiseY, opacity: sunOpacity }}` (both scroll-driven MotionValues) sits
+  fine alongside a _separate_ `animate={{ x: [...] }}` keyframe prop on the
+  cloud elements — Motion lets a `style`-driven MotionValue and an
+  `animate`-prop keyframe target coexist on the same component as long as
+  they're different CSS properties (opacity/y via style, x via animate);
+  no conflict the way two motion values on the _same_ axis would collide
+  (the reason the moon's own scroll-arc vs pointer-parallax composition
+  needs nested wrappers in the first place).
+- "sets on its current side" from the user directly overrode my own earlier
+  retune's arbitrary leftward drift (`MOON_ARC_X_PX = -70`, chosen only to
+  "read as an arc") — flipped to a small _rightward_ drift (`+50`) so the
+  moon continues toward the same top-right corner it started in, rather
+  than arcing across toward center-left. A generic "make it read as an arc"
+  choice made without an explicit directional requirement is exactly the
+  kind of assumption a later, more specific instruction can override —
+  don't be surprised when it does.
+
 ## 2026-07-23 — Story NA-69 — A1 moon-arc/dawn invisible: root-caused + retuned
 
 **Learnings:**
