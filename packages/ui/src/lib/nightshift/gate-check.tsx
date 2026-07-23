@@ -20,6 +20,12 @@ export interface GateCheckProps {
    */
   reduced?: boolean;
   className?: string;
+  /**
+   * Accessible label. When set, the SVG exposes `role="img"` with this
+   * label instead of `aria-hidden`, so assistive tech announces the passed
+   * state the glyph it replaces used to convey as plain text.
+   */
+  label?: string;
 }
 
 /**
@@ -35,6 +41,7 @@ export function GateCheck({
   color = 'var(--success)',
   reduced = false,
   className = '',
+  label,
 }: GateCheckProps) {
   return (
     <motion.svg
@@ -42,7 +49,9 @@ export function GateCheck({
       width={size}
       height={size}
       fill="none"
-      aria-hidden="true"
+      aria-hidden={label ? undefined : true}
+      role={label ? 'img' : undefined}
+      aria-label={label}
       className={className}
     >
       <motion.path

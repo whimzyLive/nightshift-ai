@@ -1,3 +1,73 @@
+## 2026-07-23 — Story NA-69 — high-effort PR review round (6 findings)
+
+**Learnings:**
+
+- `position: fixed` on a descendant is scoped to the nearest ancestor with a
+  CSS transform (or `filter`/`perspective`/`will-change: transform`, per the
+  CSS spec's "containing block" rules) — a `motion.div` animating `y` (even
+  a small 16px rise) anywhere in the tree above a `fixed inset-0` layer
+  (`NightSky`) silently re-parents that layer's positioning context, so it
+  scrolls with the page instead of staying viewport-pinned. This is a
+  correctness constraint on _any_ transform-animating wrapper placed above
+  `NightSky` in the tree, not specific to `template.tsx` — worth checking
+  before adding a transform to anything that wraps page content. Fixed by
+  dropping the transform entirely (opacity-only fade) rather than trying to
+  keep the `y` rise; an opacity animation does not create a containing
+  block.
+- Moved D3 off Motion/JS entirely onto a CSS `@keyframes` + utility class
+  (`.ns-route-enter` in `global.css`) driven purely by the class name —
+  this repo already had exactly one site-wide mechanism for this
+  (`@media (prefers-reduced-motion: reduce) { animation-duration: 0.01ms
+!important }`) that every _other_ CSS-only animation in the codebase
+  relies on implicitly; a brand-new component can lean on it too instead of
+  adding its own JS `matchMedia` check — zero React state, zero SSR/client
+  divergence, zero hydration-mismatch risk. `template.tsx` no longer needs
+  `'use client'` at all once it has no hooks/motion — became a plain server
+  component.
+- A `useEffect` dependency array entry that's _sometimes_ semantically
+  irrelevant (here: `inView`, only relevant when `revealOnView` is true)
+  can't be conditionally included/excluded from the array (violates rules
+  of hooks), but CAN be replaced with a derived value that's _provably
+  stable_ when irrelevant: `const revealGate = revealOnView ? inView :
+true;` — collapses to the literal `true` (never changes) when
+  `revealOnView` is unset, so a dependent effect never re-fires from that
+  source, while still tracking `inView` normally when `revealOnView` is
+  set. General pattern for "this hook's output only matters in one branch"
+  without conditionally calling/omitting the hook itself.
+- Two elements sharing the exact same Motion `layoutId` **simultaneously
+  mounted** (not sequentially swapped) is the actual anti-pattern behind a
+  "duplicate layoutId" report — not merely reusing an id string across
+  renders. Fix pattern: the element that's ALWAYS mounted (the tree row's
+  dot, present for all 12 rows every render) must drop its `layoutId` the
+  moment the OTHER element sharing that id (the panel's dot, which only
+  exists while that exact row is active) mounts — i.e. gate the tree
+  element's `layoutId` on `!isActive` in addition to `!reducedMotion`, so
+  at any instant exactly one of the two carries the id and Framer has an
+  unambiguous single source/target for the FLIP.
+- `aria-hidden="true"` on an SVG that _replaces_ a plain-text glyph
+  (`'✓'` → `<GateCheck>`) silently deletes the accessible name that glyph
+  used to provide — decorative-icon defaults don't automatically carry over
+  when an icon is swapped in for real content. Added an optional
+  `label`/`role="img"`+`aria-label` prop to the shared primitive rather
+  than duplicating a visually-hidden text node at both call sites.
+
+**Patterns:**
+
+- For a review finding claiming "no accessible name" / "duplicate
+  layoutId" / "hydration mismatch" that has no simple DOM-attribute or
+  console-spy proxy, write the regression test at the level that IS
+  observable (accessible-name attributes for a11y; `console.warn`/`error`
+  spy across the exact state transition for the layoutId case) rather than
+  skipping verification because the underlying mechanism is a Framer/React
+  internal.
+- Repeated this round: revert the fix, rerun the new test to confirm RED,
+  restore the fix, rerun to confirm GREEN — did this again for both
+  Finding 3 (terminal restart) and implicitly relied on it for Finding 1/2
+  via the CSS-class + no-matchMedia assertions (structurally impossible to
+  regress to the old JS-latch shape without the test failing, since the
+  test asserts the _absence_ of a matchMedia call and the _presence_ of a
+  specific class name rather than an animation end-state).
+
 ## 2026-07-23 — Story NA-69 — QA fix round (template.tsx reduced-motion gap + 2 stray EASE_OUT re-declarations)
 
 **Learnings:**

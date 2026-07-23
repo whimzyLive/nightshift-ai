@@ -122,6 +122,21 @@ describe('ControlSection', () => {
     expect(screen.queryByRole('button', { name: 'approve ✓' })).toBeNull();
   });
 
+  it('exposes an accessible label on a passed gate, replacing the plain ✓ glyph (a11y)', () => {
+    jest.useFakeTimers();
+    const { container } = render(<ControlSection />);
+
+    act(() => {
+      jest.advanceTimersByTime(1700);
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'approve ✓' }));
+    });
+
+    const passedGate = container.querySelector('svg[role="img"]');
+    expect(passedGate?.getAttribute('aria-label')).toBe('passed');
+  });
+
   describe('B3 tap-scale (whileTap)', () => {
     it('scales the threshold stepper down on pointer press and releases on pointer up', async () => {
       render(<ControlSection />);

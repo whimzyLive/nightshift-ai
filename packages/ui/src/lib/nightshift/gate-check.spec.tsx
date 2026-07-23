@@ -12,6 +12,21 @@ describe('GateCheck', () => {
     expect(path?.getAttribute('stroke')).toBe('var(--success)');
   });
 
+  it('is aria-hidden with no accessible name by default', () => {
+    const { container } = render(<GateCheck />);
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(svg?.getAttribute('role')).toBeNull();
+  });
+
+  it('exposes an accessible label instead of aria-hidden when one is passed', () => {
+    const { container } = render(<GateCheck label="passed" />);
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBeNull();
+    expect(svg?.getAttribute('role')).toBe('img');
+    expect(svg?.getAttribute('aria-label')).toBe('passed');
+  });
+
   it('renders fully drawn immediately under reduced motion', () => {
     const { container } = render(<GateCheck reduced />);
     const path = container.querySelector('path');

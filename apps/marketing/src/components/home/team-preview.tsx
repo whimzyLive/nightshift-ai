@@ -454,7 +454,9 @@ export function TeamPreview() {
                       data-testid="team-dot"
                       data-twinkle={reducedMotion ? 'off' : 'on'}
                       layoutId={
-                        reducedMotion ? undefined : `agent-dot-${row.key}`
+                        reducedMotion || isActive
+                          ? undefined
+                          : `agent-dot-${row.key}`
                       }
                       animate={reducedMotion ? undefined : TWINKLE_ANIMATE}
                       transition={
@@ -471,7 +473,7 @@ export function TeamPreview() {
                   )}
                   <motion.span
                     layoutId={
-                      row.star && !reducedMotion
+                      row.star && !reducedMotion && !isActive
                         ? `agent-name-${row.key}`
                         : undefined
                     }

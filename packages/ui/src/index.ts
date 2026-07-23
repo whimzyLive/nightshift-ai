@@ -44,7 +44,7 @@ export type { CountUpProps } from './lib/nightshift/count-up';
 export { Reveal, RevealGroup } from './lib/nightshift/reveal';
 export type { RevealProps, RevealGroupProps } from './lib/nightshift/reveal';
 
-export { EASE_OUT } from './lib/nightshift/motion-tokens';
+export { EASE_OUT, SETTLE_SPRING } from './lib/nightshift/motion-tokens';
 
 export { prefersReducedMotion } from './lib/nightshift/prefers-reduced-motion';
 

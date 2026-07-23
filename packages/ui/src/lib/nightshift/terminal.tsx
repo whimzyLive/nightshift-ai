@@ -149,6 +149,8 @@ export function Terminal({
   // scaleX, so the bar tracks the clip every frame without re-rendering React.
   const progress = useMotionValue(0);
 
+  const revealGate = revealOnView ? inView : true;
+
   // Reveal cadence + loop — a single Motion tween of a counter, looping.
   // Skipped entirely in video mode (the body is a <video>, not lines).
   useEffect(() => {
@@ -157,9 +159,8 @@ export function Terminal({
       setVisibleCount(lines.length);
       return;
     }
-    // `revealOnView` defers the start until the terminal scrolls into view —
-    // stays on the deterministic first-line frame until then.
-    if (revealOnView && !inView) return;
+    // Stays on the deterministic first-line frame until `revealGate` opens.
+    if (!revealGate) return;
     setVisibleCount(1);
     const total = lines.length;
     // Reveal once, then stop (no infinite loop — that kept burning frames).
@@ -179,7 +180,7 @@ export function Terminal({
       onComplete: () => setVisibleCount(total),
     });
     return () => controls.stop();
-  }, [lines.length, replayNonce, video, revealOnView, inView]);
+  }, [lines.length, replayNonce, video, revealGate]);
 
   // Video mode: autoplay the muted loop unless reduced motion, where it rests
   // on its poster with native controls. `play()` may be blocked by the

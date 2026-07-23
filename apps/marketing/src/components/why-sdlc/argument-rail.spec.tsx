@@ -103,8 +103,12 @@ describe('ArgumentRail', () => {
     const { container } = render(<ArgumentRail args={FIVE_ARGS} />);
     const nodes = Array.from(container.querySelectorAll('[data-gate-state]'));
     expect(nodes[0].getAttribute('data-gate-state')).toBe('passed');
-    // Passed gates draw in a GateCheck svg instead of the plain '✓' glyph.
-    expect(nodes[0].querySelector('svg')).toBeTruthy();
+    // Passed gates draw in a GateCheck svg instead of the plain '✓' glyph —
+    // it still needs an accessible name in place of that glyph's own text.
+    const passedSvg = nodes[0].querySelector('svg');
+    expect(passedSvg).toBeTruthy();
+    expect(passedSvg?.getAttribute('role')).toBe('img');
+    expect(passedSvg?.getAttribute('aria-label')).toBe('passed');
     expect(nodes[1].getAttribute('data-gate-state')).toBe('current');
     expect(nodes[1].textContent).toBe('⊘');
     expect(nodes[2].getAttribute('data-gate-state')).toBe('idle');

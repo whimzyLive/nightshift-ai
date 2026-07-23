@@ -119,6 +119,25 @@ describe('TeamPreview', () => {
       // rather than the absence of an internal Framer prop.
       expect(queryByTestId('panel-dot')).toBeTruthy();
     });
+
+    it('never mounts the tree-row dot and the panel dot with the same layoutId at once (no Framer duplicate-layoutId warning)', async () => {
+      mockMatchMedia(false);
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { queryByTestId } = render(<TeamPreview />);
+      fireEvent.mouseEnter(rowFor('product-manager'));
+      await waitFor(() => expect(queryByTestId('panel-dot')).toBeTruthy());
+
+      const duplicateLayoutIdCalls = [
+        ...warnSpy.mock.calls,
+        ...errorSpy.mock.calls,
+      ].filter((call) => String(call[0]).toLowerCase().includes('layoutid'));
+      expect(duplicateLayoutIdCalls).toHaveLength(0);
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
   });
 
   describe('D2 draggable agent constellation', () => {

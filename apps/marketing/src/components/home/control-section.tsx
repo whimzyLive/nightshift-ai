@@ -1057,7 +1057,11 @@ function GateStrip({
                     'background .4s, border-color .4s, color .4s, box-shadow .4s',
                 }}
               >
-                {g.done ? <GateCheck reduced={reducedMotion} /> : g.glyph}
+                {g.done ? (
+                  <GateCheck reduced={reducedMotion} label="passed" />
+                ) : (
+                  g.glyph
+                )}
               </motion.span>
               <span
                 className="font-mono"

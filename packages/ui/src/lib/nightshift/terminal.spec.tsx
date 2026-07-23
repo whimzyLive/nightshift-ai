@@ -127,4 +127,38 @@ describe('Terminal', () => {
       expect(screen.getByText('→ opened PR #318')).toBeTruthy();
     });
   });
+
+  describe('non-revealOnView terminals ignore a later scroll-into-view', () => {
+    afterEach(() => {
+      FakeIntersectionObserver.instances = [];
+      // @ts-expect-error test-only cleanup of a possibly-installed global
+      delete window.IntersectionObserver;
+    });
+
+    it('does not restart an already-progressed reveal when the viewport observer fires afterward', async () => {
+      mockMatchMedia(false);
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+
+      render(<Terminal title="zsh — acme-api · claude code" lines={LINES} />);
+
+      await waitFor(
+        () => expect(screen.getByText('Reading ticket…')).toBeTruthy(),
+        { timeout: 3000 },
+      );
+
+      const [observer] = FakeIntersectionObserver.instances;
+      act(() => {
+        observer.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          observer,
+        );
+      });
+
+      // A restart would drop back to only line 1 — give it a moment, then
+      // confirm the already-revealed line is still there.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByText('Reading ticket…')).toBeTruthy();
+    });
+  });
 });

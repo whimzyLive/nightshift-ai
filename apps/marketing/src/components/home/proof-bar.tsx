@@ -1,7 +1,9 @@
-import { Reveal, RevealGroup, RollingNumber } from '@nightshift-ai/ui';
-
-// B2 settle spring (from the AC) — exempt from EASE_OUT (spring-driven).
-const SETTLE_SPRING = { stiffness: 120, damping: 18 };
+import {
+  Reveal,
+  RevealGroup,
+  RollingNumber,
+  SETTLE_SPRING,
+} from '@nightshift-ai/ui';
 
 /**
  * Full-bleed `--surface-card` band with top/bottom hairlines. Breaks out of

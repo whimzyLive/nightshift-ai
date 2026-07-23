@@ -5,13 +5,11 @@ import {
   MagneticCta,
   Reveal,
   RevealGroup,
+  SETTLE_SPRING,
   Terminal,
 } from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
-
-// B2 settle spring (from the AC) — exempt from EASE_OUT (spring-driven).
-const SETTLE_SPRING = { stiffness: 120, damping: 18 };
 
 /**
  * Above-the-fold hero: value line, install snippets, GitHub star CTA, and

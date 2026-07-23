@@ -202,7 +202,11 @@ function GateNode({ index, reached, active, reduced }: GateNodeProps) {
           'border-color .4s, color .4s, box-shadow .4s, background .4s',
       }}
     >
-      {state === 'passed' ? <GateCheck reduced={reduced} /> : '⊘'}
+      {state === 'passed' ? (
+        <GateCheck reduced={reduced} label="passed" />
+      ) : (
+        '⊘'
+      )}
     </motion.span>
   );
 }
