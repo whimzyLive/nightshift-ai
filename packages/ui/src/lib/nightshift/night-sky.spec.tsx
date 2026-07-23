@@ -33,11 +33,12 @@ describe('NightSky', () => {
       expect(queryDefault('dawn-backdrop')).toBeNull();
     });
 
-    it('paints the dawn backdrop with the terracotta glow/tint tokens', () => {
+    it('paints the dawn backdrop with the terracotta accent hue (--terra-500 rgb triplet)', () => {
       const { getByTestId } = render(<NightSky variant="home" />);
       const backdrop = getByTestId('dawn-backdrop');
-      expect(backdrop.getAttribute('style')).toContain('--terra-glow');
-      expect(backdrop.getAttribute('style')).toContain('--terra-tint');
+      // Same RGB as --terra-glow/--terra-tint/--terra-500 (217,119,87), at a
+      // richer alpha so the pre-dawn wash is clearly visible.
+      expect(backdrop.getAttribute('style')).toContain('217,119,87');
       expect(backdrop.getAttribute('aria-hidden')).toBe('true');
     });
   });

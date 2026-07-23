@@ -1,3 +1,59 @@
+## 2026-07-23 — Story NA-69 — A1 moon-arc/dawn invisible: root-caused + retuned
+
+**Learnings:**
+
+- Confirmed via Framer Motion's own source (`framer-motion/dist/es/render/dom/scroll/track.mjs`)
+  that `useScroll()` with no `target`/`container` defaults to `container =
+document.scrollingElement` and binds its scroll listener to `window` — the
+  standard whole-page-scroll mechanism, and structurally sound for this app
+  (plain `<body class="min-h-screen">`, no inner `overflow-y` container
+  anywhere in `layout.tsx`/`global.css` competing for the scroll role). **The
+  scroll signal itself was never the bug** — ruled this out at the source
+  level rather than assuming it from the reported symptom.
+- The REAL root cause was two-layered, and the second layer is the
+  non-obvious one: (1) `MOON_ARC_Y_PX`'s original `-70` was small enough to
+  be swallowed by the moon's own pre-existing 20s idle float (`y:[0,-22,0]`,
+  44px peak-to-peak) — comparable magnitude, so the scroll-driven component
+  read as noise; AND (2) **NightSky is `position:fixed`, painted behind
+  normal-flow page content — its visibility at any given scroll position is
+  gated entirely by whether the section currently occupying that screen
+  region has an opaque background.** Audited every home section's own
+  background: `ProofBar` (`--surface-card`), `HowItWorks`/`TeamPreview`/
+  `ControlSection`/`FinalCta` (all `--bg-void`) are OPAQUE; `Hero`/
+  `ProblemSection`/`DayNightWorkflow`/`WhyDifferent`/`FaqPreview` are
+  transparent (no `background` set, letting the fixed sky show through).
+  Since the original `DAWN_RAMP_RANGE` (`[0.72, 1]`) only ramped opacity
+  during the page's FINAL stretch — which is dominated by `ControlSection`
+  and `FinalCta`, **both opaque** — the dawn tint could reach 100% opacity
+  and _still never be visible_, because the opaque section painted on top
+  of the fixed background layer hides it completely regardless of its own
+  opacity. Retuned the range to `[0.42, 0.85]` so the ramp is well underway
+  during the transparent `WhyDifferent`/`FaqPreview` sections and fully
+  ramped (opacity pinned at 1) by the time the reader reaches `FinalCta` —
+  the tint is then visible again through `Footer`'s translucent
+  `--glass-footer-bg` (confirmed via `global.css`: `rgba(8,8,15,0.5→0.78)`,
+  not opaque). A "make the opacity ramp reach 1 sooner" fix alone (without
+  this occlusion-mapping) would have looked identical in every code review
+  but stayed just as invisible in the browser.
+- `.claude/skills/nightshift-design/scripts/check-tokens.mjs` (the
+  `npm run validate` token-drift gate) only scans the **skill's own** docs
+  (`SKILL.md`, `README.md`, `references/*.md`) plus its `_ds_manifest.json`
+  for stray hex values — it never touches `apps/marketing/src` or
+  `packages/ui/src`. A literal `rgba(217,119,87,0.42)` in application source
+  (reusing `--terra-500`'s exact RGB triplet at a deliberately richer alpha
+  than the `--terra-glow`/`--terra-tint` tokens provide) does not trip this
+  gate — confirmed by reading the script rather than assuming app source is
+  covered.
+
+**Patterns:**
+
+- When a scroll/viewport-driven effect is reported "invisible" on a real
+  page (not a component in isolation), map **every ancestor/overlapping
+  section's own background opacity** before touching amplitude or ranges —
+  a `position:fixed` background layer's reachable-opacity ceiling is capped
+  by whatever opaque content currently paints over it, independent of its
+  own computed opacity value.
+
 ## 2026-07-23 — Story NA-69 — 3 user-requested post-ship changes (remove C3 terminal, revert A3 morph, fix Star magnetic pull)
 
 **Learnings:**
