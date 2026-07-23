@@ -141,14 +141,20 @@ const MOON_SET_X_PX = 50;
 // already visible well before the FinalCta/footer band, not just in the
 // final stretch.
 const DAWN_RAMP_RANGE: [number, number] = [0.42, 0.85];
-// A1 — sun rises on the opposite (left) side as the moon sets, resolving
-// before the page bottom so the footer reads "moon gone, sun + clouds up".
+// A1 — VIBRANT MORNING variant: sun rises on the opposite (left) side as the
+// moon sets, resolving before the page bottom so the footer reads "moon
+// gone, sun + clouds up". Bigger/brighter than the subtle wisp treatment —
+// an intentional bolder departure the user asked to compare against
+// feat/NA-69-dawn-subtle.
 const SUN_RISE_RANGE: [number, number] = [0.42, 0.8];
 const SUN_RISE_Y_PX = 150;
-// A1 — cloud drift: slow, small-amplitude horizontal wander, one duration
-// per cloud so they don't move in lockstep.
-const CLOUD_DRIFT_PX = 22;
-const CLOUD_DRIFT_DURATIONS_S = [27, 33, 24];
+const SUN_DISC_SIZE_PX = 190;
+const SUN_RAY_SIZE_PX = 380;
+// A1 — cloud drift: slow horizontal wander, one duration per cloud so they
+// don't move in lockstep. Amplitude stays restrained even in the vibrant
+// variant — only the clouds' own definition/opacity got bolder.
+const CLOUD_DRIFT_PX = 24;
+const CLOUD_DRIFT_DURATIONS_S = [27, 33, 24, 30, 26];
 
 // Easter egg: N rapid clicks on the same spot detonate a big bang there
 // instead of a meteor.
@@ -562,10 +568,32 @@ export function NightSky({
 
         {variant === 'home' && (
           <>
-            {/* Sun rises on the opposite (left) side as the moon sets — a
-                soft, low-key terracotta glow disc (not a bright daytime
-                sun), same accent hue as the crescent moon's indigo rim
-                counterpart. */}
+            {/* Sun rays — a soft sunburst behind the disc, painted once as a
+                static repeating-conic-gradient (never animated itself; only
+                this whole layer's opacity/y ride the shared sun motion
+                values). Renders first so the disc paints on top of it. */}
+            <motion.div
+              aria-hidden="true"
+              data-testid="dawn-sun-rays"
+              className="absolute rounded-full"
+              style={{
+                bottom: 60 - (SUN_RAY_SIZE_PX - SUN_DISC_SIZE_PX) / 2,
+                left: `calc(10% - ${(SUN_RAY_SIZE_PX - SUN_DISC_SIZE_PX) / 2}px)`,
+                width: SUN_RAY_SIZE_PX,
+                height: SUN_RAY_SIZE_PX,
+                y: sunRiseY,
+                opacity: sunOpacity,
+                background:
+                  'repeating-conic-gradient(from 0deg, var(--amber-tint) 0deg 8deg, transparent 8deg 40deg)',
+                filter: 'blur(7px)',
+              }}
+            />
+            {/* Sun — a proper rounded disc with a bright warm core
+                (moon-100 → amber-400 → terra-400/600) and a static corona
+                glow (box-shadow painted once, never tweened — only opacity/y
+                animate). Bigger and clearly brighter than the subtle
+                variant's low-alpha wash; still dark-mode-restrained, not a
+                bright daytime yellow sun. */}
             <motion.div
               aria-hidden="true"
               data-testid="dawn-sun"
@@ -573,17 +601,21 @@ export function NightSky({
               style={{
                 bottom: 60,
                 left: '10%',
-                width: 130,
-                height: 130,
+                width: SUN_DISC_SIZE_PX,
+                height: SUN_DISC_SIZE_PX,
                 y: sunRiseY,
                 opacity: sunOpacity,
                 background:
-                  'radial-gradient(circle at 45% 42%, var(--terra-300), var(--terra-500) 45%, var(--terra-glow) 72%, transparent 100%)',
-                filter: 'blur(2px)',
+                  'radial-gradient(circle at 42% 38%, var(--moon-100), var(--amber-400) 32%, var(--terra-400) 58%, var(--terra-600) 84%, transparent 100%)',
+                boxShadow:
+                  '0 0 70px 22px rgba(224,164,88,0.55), 0 0 140px 50px rgba(217,119,87,0.35)',
+                filter: 'blur(0.5px)',
               }}
             />
-            {/* Faint cloud wisps drifting near the sun — barely-there
-                atmosphere, warm-muted tint, restrained amplitude. */}
+            {/* Clear-morning clouds — defined puff shapes (border-radius +
+                static, unanimated box-shadow offsets faking extra lobes),
+                warm-lit gradient fill. More visible/opaque than a faint
+                wisp — reads as an actual cloud, drifting slowly. */}
             {CLOUD_DRIFT_DURATIONS_S.map((duration, i) => (
               <motion.div
                 key={i}
@@ -591,13 +623,16 @@ export function NightSky({
                 data-testid="dawn-cloud"
                 className="absolute rounded-full"
                 style={{
-                  bottom: 96 + i * 44,
-                  left: `${6 + i * 14}%`,
-                  width: 170 - i * 20,
-                  height: 38,
+                  bottom: 70 + i * 40,
+                  left: `${4 + i * 13}%`,
+                  width: 92 - i * 6,
+                  height: 30,
                   opacity: sunOpacity,
-                  background: 'rgba(217,119,87,0.1)',
-                  filter: 'blur(20px)',
+                  background:
+                    'linear-gradient(180deg, rgba(245,243,239,0.42), rgba(240,164,136,0.22))',
+                  boxShadow:
+                    '30px 5px 0 -5px rgba(245,243,239,0.34), -26px 8px 0 -8px rgba(245,243,239,0.28)',
+                  filter: 'blur(5px)',
                 }}
                 animate={animate ? { x: [0, CLOUD_DRIFT_PX, 0] } : undefined}
                 transition={{ duration, ease: 'easeInOut', repeat: Infinity }}
@@ -614,10 +649,12 @@ export function NightSky({
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
             opacity: dawnOpacity,
-            // Same terracotta hue as --terra-glow/--terra-tint, at a richer
-            // alpha so the pre-dawn wash actually reads against the page.
+            // Vibrant sunrise wash — anchored toward the sun's side (left)
+            // rather than dead-center, amber-400 → terra-500 → terra-700,
+            // richer/more saturated than the subtle variant's flat terracotta
+            // veil, reading as the sun's own ambient light.
             background:
-              'radial-gradient(circle at 50% 100%, rgba(217,119,87,0.42), rgba(217,119,87,0.2) 55%, transparent 85%)',
+              'radial-gradient(circle at 18% 100%, rgba(224,164,88,0.55), rgba(217,119,87,0.4) 40%, rgba(157,77,58,0.22) 68%, transparent 90%)',
           }}
         />
       )}

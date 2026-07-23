@@ -1,3 +1,50 @@
+## 2026-07-23 — Story NA-69 — A1 "vibrant morning" variant (A/B against feat/NA-69-dawn-subtle)
+
+**Learnings:**
+
+- This dispatch was explicitly building a **second, bolder A/B variant of
+  the same feature on the same branch** the subtle version already shipped
+  on (`feat/NA-69-dawn-subtle` holds the subtle one; `feat/NA-69` — this
+  branch — got overwritten with the vibrant one). When a user wants to
+  compare two takes on one visual beat, the pattern is: same file, values
+  swapped/escalated in place (not two components/props) — kept every
+  scroll-linked motion value (`sunRiseY`, `sunOpacity`, `moonSetX/Y`) and
+  the whole reduced-motion/variant-gating structure identical, only the
+  _visual content_ (gradients, box-shadow corona, disc size, cloud shape)
+  changed. This kept the diff reviewable as "same choreography, richer
+  paint" rather than a rewrite.
+- Built a "proper sun" (vs. a glow blob) by literally composing THREE
+  scroll-synced elements sharing the same `sunRiseY`/`sunOpacity` motion
+  values: a `repeating-conic-gradient` rays layer (rendered first, painted
+  once, blurred), a radial-gradient disc with a bright warm core
+  (`--moon-100` → `--amber-400` → `--terra-400/600`), and a static
+  (never-tweened) two-layer `box-shadow` corona on the disc itself — same
+  "static box-shadow, only the _element's_ opacity/position animate"
+  convention the moon's own crescent-glow already established. All three
+  layers riding the _same_ motion values kept them visually locked together
+  with zero extra wiring.
+- A classic CSS "cloud" fake — `border-radius: 50%` base shape plus 1-2
+  **static, unanimated** `box-shadow` copies at horizontal offsets with
+  negative spread (`30px 5px 0 -5px rgba(...)`) — reads as a multi-lobe
+  puff silhouette with a single element and zero extra DOM nodes. Confirmed
+  this doesn't violate the "no box-shadow animation" perf rule: the
+  box-shadow value itself never changes after mount; only the element's own
+  `opacity` (motion value) and `x` (`animate` keyframe drift) move.
+- `--amber-400`/`--amber-tint` (`#e0a458` / `rgba(224,164,88,0.14)`) were
+  already in `tokens/colors.css` (used today only for `--warning`) but
+  completely unused elsewhere in the marketing app — a legitimate, on-brand
+  "brighter warm" step between `--moon-100` (near-white) and `--terra-400`
+  (mid terracotta) for a sun's core, without inventing an off-token hue
+  family (no "rose"/"gold" scale exists in this DS — checked the full
+  manifest dump before assuming one existed).
+- Re-confirmed (this is now the 3rd time this exact story) that
+  `.claude/skills/nightshift-design/scripts/check-tokens.mjs` only scans
+  the _skill's own_ docs/manifest for hex drift, never `apps/marketing/src`
+  or `packages/ui/src` — so literal `rgba(224,164,88,0.55)` etc. in
+  application source (matching a real token's RGB triplet at a custom
+  alpha) never trips `npm run validate`, regardless of how many new custom
+  alphas a variant introduces.
+
 ## 2026-07-23 — Story NA-69 — A1 evolved into moon-sets/sun-rises choreography
 
 **Learnings:**

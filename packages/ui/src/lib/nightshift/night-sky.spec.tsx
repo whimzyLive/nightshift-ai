@@ -33,37 +33,65 @@ describe('NightSky', () => {
       expect(queryDefault('dawn-backdrop')).toBeNull();
     });
 
-    it('paints the dawn backdrop with the terracotta accent hue (--terra-500 rgb triplet)', () => {
+    it('paints a vibrant sunrise wash — amber-400 through terra-500/terra-700 RGB triplets', () => {
       const { getByTestId } = render(<NightSky variant="home" />);
       const backdrop = getByTestId('dawn-backdrop');
-      // Same RGB as --terra-glow/--terra-tint/--terra-500 (217,119,87), at a
-      // richer alpha so the pre-dawn wash is clearly visible.
-      expect(backdrop.getAttribute('style')).toContain('217,119,87');
+      const style = backdrop.getAttribute('style') ?? '';
+      // --amber-400 (224,164,88), --terra-500 (217,119,87), --terra-700
+      // (157,77,58) — same RGB triplets as the design-token scale, at richer
+      // alphas than the subtle variant so the sunrise wash clearly reads.
+      expect(style).toContain('224,164,88');
+      expect(style).toContain('217,119,87');
+      expect(style).toContain('157,77,58');
       expect(backdrop.getAttribute('aria-hidden')).toBe('true');
     });
   });
 
-  describe('A1 dawn sun + clouds', () => {
-    it('renders the sun disc and cloud wisps only for variant="home"', () => {
+  describe('A1 vibrant morning — sun disc/rays + clouds', () => {
+    it('renders the sun disc, its rays, and 3-5 clouds only for variant="home"', () => {
       const { queryByTestId, queryAllByTestId, unmount } = render(
         <NightSky variant="home" />,
       );
       expect(queryByTestId('dawn-sun')).toBeTruthy();
-      expect(queryAllByTestId('dawn-cloud').length).toBeGreaterThanOrEqual(2);
-      expect(queryAllByTestId('dawn-cloud').length).toBeLessThanOrEqual(4);
+      expect(queryByTestId('dawn-sun-rays')).toBeTruthy();
+      expect(queryAllByTestId('dawn-cloud').length).toBeGreaterThanOrEqual(3);
+      expect(queryAllByTestId('dawn-cloud').length).toBeLessThanOrEqual(5);
       unmount();
 
       const { queryByTestId: queryDefaultSun } = render(<NightSky />);
       expect(queryDefaultSun('dawn-sun')).toBeNull();
+      expect(queryDefaultSun('dawn-sun-rays')).toBeNull();
     });
 
-    it('paints the sun with the low-key terracotta tokens, not a bright yellow disc', () => {
+    it('paints a proper bright sun disc — warm core (moon-100/amber-400) through terracotta, with a static corona glow', () => {
       const { getByTestId } = render(<NightSky variant="home" />);
       const sun = getByTestId('dawn-sun');
-      expect(sun.getAttribute('style')).toContain('--terra-300');
-      expect(sun.getAttribute('style')).toContain('--terra-500');
-      expect(sun.getAttribute('style')).toContain('--terra-glow');
+      const style = sun.getAttribute('style') ?? '';
+      expect(style).toContain('--moon-100');
+      expect(style).toContain('--amber-400');
+      expect(style).toContain('--terra-400');
+      expect(style).toContain('--terra-600');
+      // Corona/halo glow — a static (never-animated) box-shadow, same
+      // convention as the moon's own outer glow.
+      expect(style).toContain('box-shadow');
       expect(sun.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('paints the sun rays as a static repeating-conic-gradient using the amber tint token', () => {
+      const { getByTestId } = render(<NightSky variant="home" />);
+      const rays = getByTestId('dawn-sun-rays');
+      expect(rays.getAttribute('style')).toContain('--amber-tint');
+      expect(rays.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('paints clouds as defined puff shapes (warm-lit gradient + static box-shadow lobes), not a flat low-opacity wisp', () => {
+      const { getAllByTestId } = render(<NightSky variant="home" />);
+      for (const cloud of getAllByTestId('dawn-cloud')) {
+        const style = cloud.getAttribute('style') ?? '';
+        expect(style).toContain('linear-gradient');
+        expect(style).toContain('box-shadow');
+        expect(cloud.getAttribute('aria-hidden')).toBe('true');
+      }
     });
 
     it('starts hidden (opacity 0) at the top of the page, before the rise range begins', () => {
@@ -71,11 +99,17 @@ describe('NightSky', () => {
       // web-engineer memory entry on this) — it can't be forced per-test in
       // this file, so this asserts the honest default (non-reduced) state at
       // `scrollYProgress = 0` rather than a fabricated reduced-motion case:
-      // useTransform's default clamp holds the sun at its pre-range output
-      // (opacity 0) until scroll reaches SUN_RISE_RANGE's start.
-      const { getByTestId } = render(<NightSky variant="home" />);
-      const sun = getByTestId('dawn-sun');
-      expect(sun.style.opacity).toBe('0');
+      // useTransform's default clamp holds the sun (and rays/clouds, which
+      // share the same motion value) at their pre-range output (opacity 0)
+      // until scroll reaches SUN_RISE_RANGE's start.
+      const { getByTestId, getAllByTestId } = render(
+        <NightSky variant="home" />,
+      );
+      expect(getByTestId('dawn-sun').style.opacity).toBe('0');
+      expect(getByTestId('dawn-sun-rays').style.opacity).toBe('0');
+      for (const cloud of getAllByTestId('dawn-cloud')) {
+        expect(cloud.style.opacity).toBe('0');
+      }
     });
   });
 });
