@@ -6,6 +6,7 @@ import {
   motion,
   useMotionValue,
   useReducedMotion,
+  useScroll,
   useSpring,
   useTransform,
 } from 'motion/react';
@@ -128,6 +129,14 @@ const MAX_METEORS = 6;
 const AMBIENT_METEOR_MS = 4200;
 const AMBIENT_METEOR_CHANCE = 0.55; // skip when Math.random() < this
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
+
+// A1 — moon Y-arc: a small, restrained rise across the whole page scroll
+// (barely noticed until removed), reaching its resting arc-end position by
+// the bottom of the page. Reduced motion binds directly to this end value.
+const MOON_ARC_RISE_PX = -70;
+// A1 — dawn backdrop: ramps in only across the final stretch of the page
+// scroll, approaching the FinalCta ("#install") band at the bottom.
+const DAWN_RAMP_RANGE: [number, number] = [0.72, 1];
 
 // Easter egg: N rapid clicks on the same spot detonate a big bang there
 // instead of a meteor.
@@ -271,6 +280,23 @@ export function NightSky({
   const midY = useTransform(sy, (v) => -v * MID_DEPTH);
   const farX = useTransform(sx, (v) => -v * FAR_DEPTH);
   const farY = useTransform(sy, (v) => -v * FAR_DEPTH);
+
+  // A1 — whole-document scroll progress drives the moon's Y-arc (outer
+  // wrapper) and the dawn backdrop's opacity, independently of the moon's
+  // own pointer-parallax `x`/`y` (inner nodes, untouched) and idle float.
+  const { scrollYProgress } = useScroll();
+  const scrollArcY = useTransform(
+    scrollYProgress,
+    [0, 1],
+    [0, MOON_ARC_RISE_PX],
+  );
+  const dawnOpacityFromScroll = useTransform(
+    scrollYProgress,
+    DAWN_RAMP_RANGE,
+    [0, 1],
+  );
+  const moonArcY = animate ? scrollArcY : MOON_ARC_RISE_PX;
+  const dawnOpacity = animate ? dawnOpacityFromScroll : 1;
 
   const [meteors, setMeteors] = useState<Meteor[]>([]);
   const [bigBang, setBigBang] = useState<BigBang | null>(null);
@@ -476,27 +502,46 @@ export function NightSky({
 
         {/* Crescent moon — the one solid celestial asset. The crescent is
             carved by an inset shadow (dark bite bottom-right) + an indigo rim;
-            an outer glow lifts it off the void. Rides the mid parallax plane
-            and drifts on a slow float. */}
-        <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
-          <motion.div
-            className="absolute rounded-full"
-            style={{
-              top: 178,
-              left: '84%',
-              width: 110,
-              height: 110,
-              background:
-                'radial-gradient(circle at 40% 38%, #fffaf2, #efe8db 55%, #d3cabb 100%)',
-              boxShadow:
-                '0 0 52px 12px rgba(245,243,239,0.42), inset -30px -8px 0 -8px rgba(13,13,24,0.9), inset -20px 4px 26px -10px rgba(139,156,247,0.45)',
-              filter: 'blur(0.5px)',
-            }}
-            animate={animate ? { y: [0, -22, 0] } : undefined}
-            transition={{ duration: 20, ease: 'easeInOut', repeat: Infinity }}
-          />
+            an outer glow lifts it off the void. A1: an outer wrapper carries
+            the scroll-linked Y-arc; the existing inner node keeps its
+            pointer-parallax x/y untouched — one `y` axis can't carry both a
+            scroll value and a pointer motion value, so the arc composes via
+            nesting instead. Rides the mid parallax plane and drifts on a
+            slow float. */}
+        <motion.div className="absolute inset-0" style={{ y: moonArcY }}>
+          <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
+            <motion.div
+              className="absolute rounded-full"
+              style={{
+                top: 178,
+                left: '84%',
+                width: 110,
+                height: 110,
+                background:
+                  'radial-gradient(circle at 40% 38%, #fffaf2, #efe8db 55%, #d3cabb 100%)',
+                boxShadow:
+                  '0 0 52px 12px rgba(245,243,239,0.42), inset -30px -8px 0 -8px rgba(13,13,24,0.9), inset -20px 4px 26px -10px rgba(139,156,247,0.45)',
+                filter: 'blur(0.5px)',
+              }}
+              animate={animate ? { y: [0, -22, 0] } : undefined}
+              transition={{ duration: 20, ease: 'easeInOut', repeat: Infinity }}
+            />
+          </motion.div>
         </motion.div>
       </motion.div>
+
+      {variant === 'home' && (
+        <motion.div
+          aria-hidden="true"
+          data-testid="dawn-backdrop"
+          className="pointer-events-none fixed inset-0 -z-10"
+          style={{
+            opacity: dawnOpacity,
+            background:
+              'radial-gradient(circle at 50% 100%, var(--terra-glow), var(--terra-tint) 55%, transparent 82%)',
+          }}
+        />
+      )}
 
       {meteors.length > 0 && (
         <div
