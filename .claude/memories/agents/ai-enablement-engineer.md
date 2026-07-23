@@ -1,5 +1,34 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-23 — NA-68 — Add dangling-link check to audit's §22 reference-integrity tier (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/commands/docs.md`)
+
+- Pure spec/prose addition — no runtime code module exists for any §22 check; the "check" is a
+  deterministic path-existence rule the knowledge-engineer agent executes by following the prose.
+  Mirrored the existing "Dangling code reference" / "Dangling `related-adrs:` path" bullets'
+  structure and framing (deterministic, path-existence, flag-only, never a semantic/SEO judgment) —
+  placed the new "Dangling doc-to-doc link" bullet directly after its two siblings in §22 rather than
+  elsewhere, since all three share the identical primitive (does-this-path-exist) just applied to a
+  different reference kind (code path / ADR path / doc-to-doc link).
+- Touched all four AC-named surfaces in one pass: the §20 two-tier drift table's Reference-integrity
+  "Drift means" cell (appended a parenthetical naming the new check rather than replacing the
+  existing generic "verifiable anchor... has moved" framing, since the new check is a species of that
+  same genus, not a separate row), the §22 new bullet itself, a third `dangling-link` example line
+  appended to §23's existing report-example sentence (kept the two pre-existing examples verbatim,
+  just extended the sentence with a semicolon-joined third clause), and one new row in
+  `commands/docs.md`'s audit error/finding table, inserted directly after the sibling "diverges from
+  an ADR" row (§22's other narrative-flag findings — dangling code ref, dangling ADR path — have no
+  row of their own in that table either, so "one row per AC4/NA-68-named finding class" was the
+  right granularity to match, not "one row per §22 bullet").
+- Confirmed (again) the standing pattern: a hand-typed table-cell edit (the §20 Drift-means cell grew
+  from one clause to a much longer one, forcing every column's padding to re-derive) is never
+  Prettier-fixed-point on the first write — ran `./node_modules/.bin/prettier --write` on both
+  touched files directly rather than hand-padding, then verified `--check` clean and
+  `check-plugin-docs-format.sh` OK. `plugin.json`'s version was correctly left untouched (verified
+  `git diff --stat` on it is empty) — nx-release owns the bump post-merge, not this commit.
+- `pnpm nx affected -t test --base=remotes/origin/develop` and `pnpm nx format:check` both report
+  clean/no-tasks for this `plugins/sdlc/refs|commands/**`-only change, per the now-7th-time-confirmed
+  standing pattern in this repo (see NA-61/62/63/65 entries below).
+
 ## 2026-07-22 — Direct fix — restore NA-65-deleted sanitization subsection, dangling xref regression (`plugins/sdlc/refs/docs-pipeline.md`)
 
 - **NA-65's P1 rewrite deleted `docs-pipeline.md` §3's "Description/title sanitization +
