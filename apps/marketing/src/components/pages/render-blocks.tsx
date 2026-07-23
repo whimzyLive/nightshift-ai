@@ -24,7 +24,6 @@ function renderBlock(block: PageBlock, index: number) {
       if (!media || typeof media !== 'object') return null;
       return (
         <figure key={index} className="my-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={media.url ?? ''}
             alt={media.alt ?? ''}
