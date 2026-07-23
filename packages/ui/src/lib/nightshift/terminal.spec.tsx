@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 
 import { Terminal } from './terminal';
 import type { TerminalLine } from './terminal';
@@ -10,6 +10,22 @@ function mockMatchMedia(reduced: boolean) {
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
   })) as unknown as typeof window.matchMedia;
+}
+
+class FakeIntersectionObserver implements IntersectionObserver {
+  readonly root = null;
+  readonly rootMargin = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+  static instances: FakeIntersectionObserver[] = [];
+  callback: IntersectionObserverCallback;
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+    FakeIntersectionObserver.instances.push(this);
+  }
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
+  takeRecords = jest.fn(() => []);
 }
 
 const LINES: TerminalLine[] = [
@@ -41,5 +57,108 @@ describe('Terminal', () => {
     expect(setIntervalSpy).not.toHaveBeenCalled();
 
     setIntervalSpy.mockRestore();
+  });
+
+  describe('C3 revealOnView', () => {
+    afterEach(() => {
+      FakeIntersectionObserver.instances = [];
+      // @ts-expect-error test-only cleanup of a possibly-installed global
+      delete window.IntersectionObserver;
+    });
+
+    it('defers the scripted reveal until it scrolls into view', () => {
+      mockMatchMedia(false);
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+
+      render(
+        <Terminal
+          title="zsh — acme-api · claude code"
+          lines={LINES}
+          revealOnView
+        />,
+      );
+
+      // Not yet intersecting — stays on the deterministic first-line frame.
+      expect(screen.getByText('/auto PROJ-142')).toBeTruthy();
+      expect(screen.queryByText('Reading ticket…')).toBeNull();
+    });
+
+    it('starts revealing once the observer reports an intersection', async () => {
+      mockMatchMedia(false);
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+
+      render(
+        <Terminal
+          title="zsh — acme-api · claude code"
+          lines={LINES}
+          revealOnView
+        />,
+      );
+      const [observer] = FakeIntersectionObserver.instances;
+      act(() => {
+        observer.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          observer,
+        );
+      });
+
+      await waitFor(
+        () => expect(screen.getByText('→ opened PR #318')).toBeTruthy(),
+        { timeout: 3000 },
+      );
+    });
+
+    it('still renders every line immediately under reduced motion, regardless of viewport', () => {
+      mockMatchMedia(true);
+      // Intentionally no IntersectionObserver installed.
+
+      render(
+        <Terminal
+          title="zsh — acme-api · claude code"
+          lines={LINES}
+          revealOnView
+        />,
+      );
+
+      expect(screen.getByText('/auto PROJ-142')).toBeTruthy();
+      expect(screen.getByText('Reading ticket…')).toBeTruthy();
+      expect(screen.getByText('→ opened PR #318')).toBeTruthy();
+    });
+  });
+
+  describe('non-revealOnView terminals ignore a later scroll-into-view', () => {
+    afterEach(() => {
+      FakeIntersectionObserver.instances = [];
+      // @ts-expect-error test-only cleanup of a possibly-installed global
+      delete window.IntersectionObserver;
+    });
+
+    it('does not restart an already-progressed reveal when the viewport observer fires afterward', async () => {
+      mockMatchMedia(false);
+      window.IntersectionObserver =
+        FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+
+      render(<Terminal title="zsh — acme-api · claude code" lines={LINES} />);
+
+      await waitFor(
+        () => expect(screen.getByText('Reading ticket…')).toBeTruthy(),
+        { timeout: 3000 },
+      );
+
+      const [observer] = FakeIntersectionObserver.instances;
+      act(() => {
+        observer.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          observer,
+        );
+      });
+
+      // A restart would drop back to only line 1 — give it a moment, then
+      // confirm the already-revealed line is still there.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByText('Reading ticket…')).toBeTruthy();
+    });
   });
 });

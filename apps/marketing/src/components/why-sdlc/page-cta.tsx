@@ -1,6 +1,7 @@
 import {
   CtaButton,
   InstallSnippet,
+  MagneticCta,
   Reveal,
   RevealGroup,
 } from '@nightshift-ai/ui';
@@ -60,15 +61,17 @@ export function PageCta() {
             <InstallSnippet command="/plugin install sdlc@nightshift" />
           </Reveal>
           <Reveal className="flex flex-wrap justify-center gap-3">
-            <CtaButton
-              variant="secondary"
-              size="lg"
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener"
-            >
-              ★ Star nightshift on GitHub
-            </CtaButton>
+            <MagneticCta>
+              <CtaButton
+                variant="secondary"
+                size="lg"
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener"
+              >
+                ★ Star nightshift on GitHub
+              </CtaButton>
+            </MagneticCta>
           </Reveal>
           <Reveal as="p" style={{ margin: '22px 0 0' }}>
             <a

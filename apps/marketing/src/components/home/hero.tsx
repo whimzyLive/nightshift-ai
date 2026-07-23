@@ -2,8 +2,10 @@ import {
   Badge,
   CtaButton,
   InstallSnippet,
+  MagneticCta,
   Reveal,
   RevealGroup,
+  SETTLE_SPRING,
   Terminal,
 } from '@nightshift-ai/ui';
 
@@ -27,7 +29,10 @@ export function Hero() {
         style={{ maxWidth: 'var(--container-max)' }}
       >
         <RevealGroup>
-          <Reveal style={{ marginBottom: 'clamp(0.625rem, 2.2vh, 1.75rem)' }}>
+          <Reveal
+            spring={SETTLE_SPRING}
+            style={{ marginBottom: 'clamp(0.625rem, 2.2vh, 1.75rem)' }}
+          >
             <span className="inline-flex items-center gap-2">
               <Badge variant="accent" dot>
                 v0.4.0 · MIT
@@ -35,7 +40,7 @@ export function Hero() {
               <Badge variant="neutral">a Claude Code plugin</Badge>
             </span>
           </Reveal>
-          <Reveal>
+          <Reveal spring={SETTLE_SPRING}>
             <h1
               className="font-sans font-extrabold"
               style={{
@@ -56,6 +61,7 @@ export function Hero() {
           </Reveal>
           <Reveal
             as="p"
+            spring={SETTLE_SPRING}
             style={{
               fontSize: 'clamp(0.9375rem, 2.2vh, 1.25rem)',
               lineHeight: 1.7,
@@ -68,7 +74,7 @@ export function Hero() {
             team — product manager, architect, tech lead, engineers, and QA. It
             reads a Jira ticket and ships the spec, plan, code, and review.
           </Reveal>
-          <Reveal>
+          <Reveal spring={SETTLE_SPRING}>
             <div
               className="flex flex-col"
               style={{
@@ -88,15 +94,16 @@ export function Hero() {
               </span>
               <InstallSnippet command="/plugin marketplace add whimzyLive/nightshift-ai" />
               <InstallSnippet command="/plugin install sdlc@nightshift" />
-              <CtaButton
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener"
-                variant="secondary"
-                className="mt-1 self-start"
-              >
-                ★ Star nightshift on GitHub
-              </CtaButton>
+              <MagneticCta className="mt-1 self-start">
+                <CtaButton
+                  href={GITHUB_URL}
+                  target="_blank"
+                  rel="noopener"
+                  variant="secondary"
+                >
+                  ★ Star nightshift on GitHub
+                </CtaButton>
+              </MagneticCta>
             </div>
           </Reveal>
         </RevealGroup>

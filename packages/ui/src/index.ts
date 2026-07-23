@@ -43,3 +43,19 @@ export type { CountUpProps } from './lib/nightshift/count-up';
 
 export { Reveal, RevealGroup } from './lib/nightshift/reveal';
 export type { RevealProps, RevealGroupProps } from './lib/nightshift/reveal';
+
+export { EASE_OUT, SETTLE_SPRING } from './lib/nightshift/motion-tokens';
+
+export { prefersReducedMotion } from './lib/nightshift/prefers-reduced-motion';
+
+export { useInViewOnce } from './lib/nightshift/use-in-view-once';
+export type { UseInViewOnceResult } from './lib/nightshift/use-in-view-once';
+
+export { MagneticCta } from './lib/nightshift/magnetic-cta';
+export type { MagneticCtaProps } from './lib/nightshift/magnetic-cta';
+
+export { GateCheck } from './lib/nightshift/gate-check';
+export type { GateCheckProps } from './lib/nightshift/gate-check';
+
+export { RollingNumber } from './lib/nightshift/rolling-number';
+export type { RollingNumberProps } from './lib/nightshift/rolling-number';

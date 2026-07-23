@@ -47,4 +47,31 @@ describe('Reveal', () => {
     // The group wrapper carries it too.
     expect(item.parentElement?.getAttribute('data-lift')).toBe('true');
   });
+
+  it('accepts an opt-in spring transition without changing the default tween callers', () => {
+    render(
+      <RevealGroup>
+        <Reveal spring={{ stiffness: 120, damping: 18 }}>settle</Reveal>
+        <Reveal>default</Reveal>
+      </RevealGroup>,
+    );
+    expect(screen.getByText('settle')).toBeTruthy();
+    expect(screen.getByText('default')).toBeTruthy();
+  });
+
+  it('still renders visible under reduced motion when a spring is opted in', () => {
+    window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    })) as unknown as typeof window.matchMedia;
+
+    render(
+      <RevealGroup>
+        <Reveal spring={{ stiffness: 120, damping: 18 }}>reduced settle</Reveal>
+      </RevealGroup>,
+    );
+    expect(screen.getByText('reduced settle')).toBeTruthy();
+  });
 });

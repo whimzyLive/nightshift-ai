@@ -5,6 +5,8 @@ import {
   RevealGroup,
 } from '@nightshift-ai/ui';
 
+import { PipelineStrip } from './pipeline-strip';
+
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L236-280).
@@ -31,56 +33,6 @@ const STEPS: { step: string; runs: string; get: string }[] = [
     get: 'A reviewed PR, with the paper trail linked back to the ticket',
   },
 ];
-
-// The spec→plan→impl→review→PR pipeline, verbatim from the design handoff
-// (nightshift Landing.dc.html `pipelineStages`). Each stage carries its
-// command, human label, owning agent, and lifecycle status.
-type StageStatus = 'done' | 'active' | 'idle';
-const PIPELINE: {
-  command: string;
-  label: string;
-  agent: string;
-  status: StageStatus;
-}[] = [
-  {
-    command: '/spec',
-    label: 'Technical spec',
-    agent: 'solutions-architect',
-    status: 'done',
-  },
-  {
-    command: '/plan',
-    label: 'Ordered plan',
-    agent: 'tech-lead',
-    status: 'done',
-  },
-  {
-    command: '/impl',
-    label: 'Implementation',
-    agent: 'principal-engineer',
-    status: 'active',
-  },
-  {
-    command: '/review',
-    label: 'Quality gate',
-    agent: 'qa-engineer',
-    status: 'idle',
-  },
-  { command: 'PR', label: 'Ship it', agent: 'auto', status: 'idle' },
-];
-
-const STAGE_STYLE: Record<
-  StageStatus,
-  { border: string; cmd: string; glow?: string }
-> = {
-  done: { border: 'rgba(110,196,138,0.35)', cmd: 'var(--success)' },
-  active: {
-    border: 'var(--border-accent)',
-    cmd: 'var(--terra-400)',
-    glow: 'var(--glow-accent)',
-  },
-  idle: { border: 'var(--border-default)', cmd: 'var(--text-muted)' },
-};
 
 /**
  * How-it-works: eyebrow/header, static 5-stage strip, the reused
@@ -132,68 +84,7 @@ export function HowItWorks() {
           </Reveal>
         </RevealGroup>
 
-        <RevealGroup>
-          <Reveal className="mb-9 flex flex-col items-stretch md:flex-row md:flex-wrap md:items-stretch md:justify-center">
-            {PIPELINE.map((stage, i) => {
-              const s = STAGE_STYLE[stage.status];
-              return (
-                <div
-                  key={stage.command}
-                  className="flex flex-col items-stretch md:flex-row"
-                >
-                  <div
-                    data-lift
-                    className="flex w-full flex-col gap-1.5 text-center md:w-auto md:text-left"
-                    style={{
-                      minWidth: 148,
-                      padding: '14px 16px',
-                      background: 'var(--surface-card)',
-                      border: '1px solid',
-                      borderColor: s.border,
-                      // Active stage keeps its accent glow; the rest get a soft
-                      // drop + inset top highlight so the flat fill reads raised.
-                      boxShadow:
-                        s.glow ??
-                        'var(--elev-2), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    }}
-                  >
-                    <span
-                      className="font-mono font-medium"
-                      style={{ fontSize: 13, color: s.cmd }}
-                    >
-                      {stage.status === 'done' ? '✓ ' : ''}
-                      {stage.command}
-                    </span>
-                    <span style={{ fontSize: 13, color: 'var(--text-strong)' }}>
-                      {stage.label}
-                    </span>
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: 11, color: 'var(--text-dim)' }}
-                    >
-                      {stage.agent}
-                    </span>
-                  </div>
-                  {i < PIPELINE.length - 1 && (
-                    <span
-                      aria-hidden="true"
-                      className="flex rotate-90 items-center justify-center py-1.5 font-mono md:rotate-0 md:justify-start md:px-1.5 md:py-0"
-                      style={{
-                        fontSize: 14,
-                        color:
-                          stage.status === 'done'
-                            ? 'var(--success)'
-                            : 'var(--moon-500)',
-                      }}
-                    >
-                      →
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </Reveal>
-        </RevealGroup>
+        <PipelineStrip />
 
         <RevealGroup>
           <Reveal className="mx-auto mb-[22px]" style={{ maxWidth: 520 }}>

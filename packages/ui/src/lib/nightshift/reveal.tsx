@@ -4,20 +4,8 @@ import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
-// Matches the site-wide `--ease-out` token (cubic-bezier(.22,1,.36,1)) used
-// across the animated home/why-sdlc sections.
-const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-// Direct post-mount `matchMedia` check (not Motion's `useReducedMotion`) so the
-// deterministic server/first-hydration frame matches, then reveals are disabled
-// entirely for reduced-motion users — the same latch pattern the rest of the
-// kit uses (nav-bar, control-section, argument-rail).
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
+import { EASE_OUT } from './motion-tokens';
+import { prefersReducedMotion } from './prefers-reduced-motion';
 
 type MotionTag =
   | 'div'
@@ -89,6 +77,11 @@ export function RevealGroup({
   );
 }
 
+export interface RevealSpring {
+  stiffness: number;
+  damping: number;
+}
+
 export interface RevealProps {
   children: ReactNode;
   /** Upward travel distance in px (transform — no layout shift). */
@@ -100,8 +93,16 @@ export interface RevealProps {
    * sharpens — pairs with a glassmorphic surface for a materialise effect.
    */
   blur?: number;
-  /** Reveal duration in seconds. */
+  /** Reveal duration in seconds. Ignored when `spring` is set. */
   duration?: number;
+  /**
+   * Opt-in spring config for the shown transition, replacing the default
+   * `duration`/`EASE_OUT` tween with a gentle settle spring — exempt from
+   * `EASE_OUT` (spring-driven), stays transform/opacity-only. Does not
+   * change the reduced-motion identity-variants latch below, or the `y`
+   * travel distance.
+   */
+  spring?: RevealSpring;
   as?: MotionTag;
   className?: string;
   style?: CSSProperties;
@@ -121,6 +122,7 @@ export function Reveal({
   scale = 1,
   blur = 0,
   duration = 0.55,
+  spring,
   as = 'div',
   className,
   style,
@@ -132,6 +134,13 @@ export function Reveal({
   const Comp = motion[as];
   const blurFrom = blur ? `blur(${blur}px)` : undefined;
   const blurTo = blur ? 'blur(0px)' : undefined;
+  const shownTransition = spring
+    ? {
+        type: 'spring' as const,
+        stiffness: spring.stiffness,
+        damping: spring.damping,
+      }
+    : { duration, ease: EASE_OUT };
 
   return (
     <Comp
@@ -153,7 +162,7 @@ export function Reveal({
                 y: 0,
                 scale: 1,
                 filter: blurTo,
-                transition: { duration, ease: EASE_OUT },
+                transition: shownTransition,
               },
             }
       }

@@ -1,22 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { motion } from 'motion/react';
 
-import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
+import {
+  Eyebrow,
+  prefersReducedMotion,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 import { agents, ORG_LEVELS } from './team-data';
 import type { AgentTone } from './team-data';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L320-373).
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
 
 // Matches the retired `--dur-twinkle` token (3.4s) / `ns-twinkle` keyframes.
 const TWINKLE_ANIMATE = {
@@ -61,6 +59,16 @@ const TONE_COLOR: Record<AgentTone, string> = {
 };
 
 const AGENTS_BY_NAME = new Map(agents.map((a) => [a.name, a]));
+
+// Shared dot colour formula for the tree row's own dot.
+function dotColorFor(
+  row: Pick<TreeRow, 'standby' | 'tone'>,
+  isActive: boolean,
+): string {
+  if (row.standby) return 'var(--text-dim)';
+  if (isActive) return 'var(--terra-400)';
+  return row.tone ? TONE_COLOR[row.tone] : 'var(--moon-100)';
+}
 
 interface TreeRow {
   key: string;
@@ -221,6 +229,106 @@ function getSidePanel(active: string | null): SidePanel {
   return ORG_SUMMARY_PANEL;
 }
 
+// D2 — draggable agent constellation (hover/tab-gated easter egg).
+const CONSTELLATION_WIDTH_PX = 220;
+const CONSTELLATION_HEIGHT_PX = 140;
+// Deterministic scatter (percent of the cluster box) — no Math.random at
+// render time, matching the rest of the kit's SSR-safe pattern.
+const CONSTELLATION_POSITIONS: { x: number; y: number }[] = agents.map(
+  (_, i) => {
+    const angle = (i / agents.length) * Math.PI * 2;
+    const radiusX = 30 + (i % 3) * 12;
+    const radiusY = 24 + (i % 4) * 8;
+    return {
+      x: 50 + Math.cos(angle) * radiusX,
+      y: 50 + Math.sin(angle) * radiusY,
+    };
+  },
+);
+
+/**
+ * A non-headline easter egg: a small `✦` focus target reveals a loose
+ * cluster of the 11 agents as draggable star nodes (presentationally aligned
+ * with `NightSky`'s star aesthetic), on hover OR keyboard tab-focus only —
+ * never auto-presented, never promoted to a marketing element. Under
+ * `prefers-reduced-motion`, the cluster still reveals but with `drag`
+ * entirely omitted (no `drag`/`dragConstraints`/spring/inertia) — it
+ * degrades to its final static state like every other sub-item, no
+ * exception for the drag affordance.
+ */
+function AgentConstellation({ reducedMotion }: { reducedMotion: boolean }) {
+  const [revealed, setRevealed] = useState(false);
+  const boundsRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      className="relative mt-6 flex justify-center"
+      onMouseEnter={() => setRevealed(true)}
+      onMouseLeave={() => setRevealed(false)}
+      onFocus={() => setRevealed(true)}
+      onBlur={() => setRevealed(false)}
+    >
+      <button
+        type="button"
+        aria-label="Reveal the agent constellation"
+        className="font-mono"
+        style={{
+          fontSize: 13,
+          color: 'var(--text-dim)',
+          padding: 4,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        ✦
+      </button>
+      {revealed && (
+        <div
+          ref={boundsRef}
+          aria-hidden="true"
+          data-testid="agent-constellation"
+          className="pointer-events-none absolute"
+          style={{
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: CONSTELLATION_WIDTH_PX,
+            height: CONSTELLATION_HEIGHT_PX,
+          }}
+        >
+          {agents.map((agent, i) => {
+            const pos = CONSTELLATION_POSITIONS[i];
+            const dragProps = reducedMotion
+              ? {}
+              : {
+                  drag: true as const,
+                  dragConstraints: boundsRef,
+                  dragElastic: 0.2,
+                };
+            return (
+              <motion.span
+                key={agent.name}
+                data-testid="constellation-star"
+                className="pointer-events-auto absolute rounded-full"
+                {...dragProps}
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  width: 8,
+                  height: 8,
+                  background: TONE_COLOR[agent.tone],
+                  cursor: reducedMotion ? 'default' : 'grab',
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * The team preview: two-column terminal-tree + sticky charter panel. Local
  * `active` hover state only (no global store) — dims non-active rows,
@@ -307,13 +415,7 @@ export function TeamPreview() {
             </div>
             {TREE_ROWS.map((row) => {
               const isActive = active === row.key;
-              const dotColor = row.standby
-                ? 'var(--text-dim)'
-                : isActive
-                  ? 'var(--terra-400)'
-                  : row.tone
-                    ? TONE_COLOR[row.tone]
-                    : 'var(--moon-100)';
+              const dotColor = dotColorFor(row, isActive);
               return (
                 <div
                   key={row.key}
@@ -508,6 +610,8 @@ export function TeamPreview() {
             Meet the whole team — charters, handoffs, org chart →
           </a>
         </p>
+
+        <AgentConstellation reducedMotion={reducedMotion} />
       </div>
     </section>
   );

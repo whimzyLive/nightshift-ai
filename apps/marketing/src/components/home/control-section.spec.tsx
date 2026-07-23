@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
 import { ControlSection } from './control-section';
 
@@ -114,6 +120,59 @@ describe('ControlSection', () => {
 
     // Advanced past 'refine' onto 'spec', back to 'working' — approve gone.
     expect(screen.queryByRole('button', { name: 'approve ✓' })).toBeNull();
+  });
+
+  it('exposes an accessible label on a passed gate, replacing the plain ✓ glyph (a11y)', () => {
+    jest.useFakeTimers();
+    const { container } = render(<ControlSection />);
+
+    act(() => {
+      jest.advanceTimersByTime(1700);
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'approve ✓' }));
+    });
+
+    const passedGate = container.querySelector('svg[role="img"]');
+    expect(passedGate?.getAttribute('aria-label')).toBe('passed');
+  });
+
+  describe('B3 tap-scale (whileTap)', () => {
+    it('scales the threshold stepper down on pointer press and releases on pointer up', async () => {
+      render(<ControlSection />);
+      const incBtn = screen.getByRole('button', {
+        name: 'increase lightweight threshold',
+      });
+
+      fireEvent.pointerDown(incBtn);
+      await waitFor(
+        () => {
+          expect(incBtn.style.transform).toContain('scale');
+        },
+        { timeout: 3000 },
+      );
+
+      fireEvent.pointerUp(incBtn);
+      await waitFor(
+        () => {
+          expect(incBtn.style.transform).not.toContain('scale');
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it('omits the tap scale under reduced motion', async () => {
+      mockMatchMedia(true);
+      render(<ControlSection />);
+      const incBtn = screen.getByRole('button', {
+        name: 'increase lightweight threshold',
+      });
+
+      fireEvent.pointerDown(incBtn);
+      // Give any (unwanted) tap animation a chance to apply before asserting.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(incBtn.style.transform).not.toContain('scale');
+    });
   });
 
   describe('reduced motion (AC5)', () => {
