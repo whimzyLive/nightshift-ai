@@ -1600,18 +1600,31 @@ includes `changelog`, `release-notes`, `migration-guide`, `tutorial`, `how-to`, 
   commits, so the drift check (`git log` on the path → empty) **silently passes**; without this
   separate existence check a typo'd or deleted `docs/adr/` path would permanently advertise a phantom
   ADR audit never catches.
-- **Dangling doc-to-doc link.** An internal Markdown link whose target ends in `.md`/`.mdx` is flagged
-  when it does **not** resolve **file-relative from the linking page's own directory** at the base ref —
-  the same resolution a static-site build applies, and the same primitive as the two dangling checks
-  above, extended to the narrative prose's own doc-to-doc links. **External** links (`http://`,
-  `https://`, protocol-relative `//`), **`mailto:`**, and **pure-anchor** links (`#section`, no path
-  component) are skipped outright — they are never doc-to-doc targets. A fragment on a doc link
-  (`page.md#section`) is **stripped before resolving**; only the file's existence is checked, never
-  whether the fragment itself exists on the target page. Deterministic (path existence), never a
-  link-quality or SEO judgment, and flagged exactly like its siblings — never rewritten or
-  auto-corrected. This is the check that catches a link authored `docs/foo.md` from a page already
-  inside `docs/` (needs `foo.md` or `../foo.md` instead) — the target usually still exists somewhere in
-  the repo, just not at the resolved path, so no other check in this tier would catch it.
+- **Dangling doc-to-doc link.** The check runs in a fixed order, applied to every internal Markdown
+  link target in turn: **(1) strip any trailing `#fragment` first** — every later step operates on the
+  fragment-stripped path, never the raw target; **(2) classify and skip** — a target that is **empty**
+  after stripping (a pure-anchor link, `#section`, has nothing left once its own `#...` is removed),
+  **external** (`http://`, `https://`, protocol-relative `//`), or **`mailto:`** is skipped outright,
+  none of these are doc-to-doc targets; **(3) extension test** — of what remains, only a stripped path
+  **ending in `.md`/`.mdx`** is a doc-to-doc link; any other extension is not flagged; **(4)
+  existence check** — the surviving `.md`/`.mdx` path is flagged when it does **not** resolve
+  **file-relative from the linking page's own directory** at the base ref, the same resolution a
+  static-site build applies, and the same primitive as the two dangling checks above, extended to the
+  narrative prose's own doc-to-doc links. Running the extension test before the fragment strip would
+  silently exempt every fragmented dangling link (`broken.md#intro` ends in `#intro`, not `.md`) —
+  the fixed order above is load-bearing, not incidental. **A root-absolute target (a leading `/`)
+  is skipped at step (2), never resolved** — deciding whether a leading slash means repo-root or a
+  rendered site's URL root is site-routing knowledge this deterministic check deliberately does not
+  have, and guessing would risk a false-positive resolve (e.g. `/reference/errors.md` resolved
+  file-relative from `docs/how-to/` would wrongly become `docs/how-to/reference/errors.md`). Only the
+  file's existence is ever checked — never whether a stripped fragment exists on the target page.
+  Deterministic (path existence), never a link-quality or SEO judgment, and flagged exactly like its
+  siblings — never rewritten or auto-corrected. This is the check that catches a link authored
+  `docs/foo.md` from a page already inside `docs/`: for a page directly inside `docs/` (e.g.
+  `docs/foo.md` linking to `docs/bar.md`) the correct link is `bar.md`, not `docs/bar.md`; for a page
+  one directory deeper (e.g. `docs/how-to/foo.md`) linking back up, the correct link is `../bar.md`
+  — the target usually still exists somewhere in the repo, just not at the resolved path, so no other
+  check in this tier would catch it.
 
 **No narrative `title`/`description` presence flag (re-homed from §24).** `audit` does **not** add a
 flag for a narrative page that lacks `title`/`description` frontmatter. Even though NA-61's templates

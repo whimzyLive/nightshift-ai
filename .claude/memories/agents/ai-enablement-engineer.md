@@ -1,5 +1,52 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-23 — NA-68 review-fix round — fragment-strip ordering, root-absolute targets, depth-wrong remediation example (`plugins/sdlc/refs/docs-pipeline.md`)
+
+- **A deterministic multi-step check spec with an implicit/narrative step order is exactly as fragile
+  as a numbered list — a reader can legitimately apply the "ends in `.md`/`.mdx`" test to the RAW
+  target before ever reaching the later "fragment is stripped" sentence, silently exempting every
+  fragmented dangling link (`broken.md#intro` fails the raw-target extension test) from AC2's own
+  coverage claim.** My original NA-68 bullet stated the extension test and the fragment-strip as two
+  separate facts in prose order (extension test first, strip mentioned two sentences later) without
+  ever saying which one runs first — technically both true in isolation, but combinable into a wrong
+  reading. Fixed by making the bullet an explicit numbered pipeline `(1) strip → (2) classify/skip →
+(3) extension test → (4) existence check` and adding one explicit sentence naming the wrong order's
+  failure mode by name, not just stating the right order — a bare "do X then Y" restatement leaves
+  the SAME ambiguity for the next reader who skims past step numbers; naming the specific broken input
+  the wrong order would silently pass makes the ordering's load-bearing-ness undeniable. **Lesson:
+  for a multi-check spec bullet describing several tests applied to the same input in sequence, either
+  number the steps explicitly or don't claim determinism — narrative "also, X happens" sentences are
+  reader-order-dependent even when every individual clause is independently accurate.**
+- **A "resolve file-relative from the page's directory" rule needs an explicit carve-out for
+  root-absolute (`/`-prefixed) targets, or it silently mis-resolves them into a false-positive
+  dangling flag** — `/reference/errors.md` resolved file-relative from `docs/how-to/` naively becomes
+  `docs/how-to/reference/errors.md` (doesn't exist), when the author likely meant either repo-root or
+  a rendered site's URL root. Chose **skip, never resolve** (not "resolve from docs/repo root") because
+  disambiguating repo-root-relative from site-URL-root-relative requires knowing this repo's docs
+  site's own routing config — exactly the "site-routing knowledge" the check's own determinism framing
+  (path-existence only, no SEO/site judgment) forbids importing. Consistent with the check's own stated
+  boundary: when a deterministic-path check faces an ambiguous input whose correct resolution depends
+  on knowledge outside the check's declared primitive (git/filesystem path existence), skip rather than
+  guess — guessing risks the exact false-positive class the review caught, not just an undetected
+  negative.
+- **A remediation example inside a spec bullet is itself a claim that needs to be internally
+  consistent with the concrete scenario it's illustrating — "needs `foo.md` or `../foo.md` instead"
+  read as two interchangeable fixes for the SAME stated scenario ("a page already inside `docs/`"),
+  but only one of them is actually correct for that depth** (`../foo.md` from a page directly inside
+  `docs/` resolves to `<repo-root>/foo.md`, itself dangling). Fixed by splitting the example into two
+  depth-tagged cases (page directly inside `docs/` → `bar.md`; page one directory deeper, e.g.
+  `docs/how-to/` → `../bar.md`) rather than presenting two answers as options for one scenario.
+  **Lesson: when a spec bullet's own worked example offers "X or Y instead" as alternative fixes,
+  verify each alternative is actually correct for the SAME stated input, not just individually
+  plausible-sounding — an "or" between two fixes for one scenario is a claim that both work, and here
+  only one did.**
+- Re-confirmed (again) the standing Prettier/format-gate pattern for a `plugins/sdlc/refs/*.md`-only
+  change: `./node_modules/.bin/prettier --write` on the touched file reported `(unchanged)` this round
+  (unlike the initial feature commit, this rewrite didn't touch any table cell, only prose paragraphs),
+  `check-plugin-docs-format.sh` OK, `pnpm nx affected -t test` / `nx format:check` both report clean/
+  no-tasks — no surprises this round. `plugin.json` version diff confirmed empty (untouched), per the
+  standing constraint.
+
 ## 2026-07-23 — NA-68 — Add dangling-link check to audit's §22 reference-integrity tier (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/commands/docs.md`)
 
 - Pure spec/prose addition — no runtime code module exists for any §22 check; the "check" is a
