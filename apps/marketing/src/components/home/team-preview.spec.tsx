@@ -120,4 +120,76 @@ describe('TeamPreview', () => {
       expect(queryByTestId('panel-dot')).toBeTruthy();
     });
   });
+
+  describe('D2 draggable agent constellation', () => {
+    it('stays hidden until the reveal trigger is hovered or focused', () => {
+      mockMatchMedia(false);
+      const { getByRole, queryByTestId } = render(<TeamPreview />);
+      expect(queryByTestId('agent-constellation')).toBeNull();
+
+      const trigger = getByRole('button', {
+        name: 'Reveal the agent constellation',
+      });
+      fireEvent.mouseEnter(trigger.parentElement as HTMLElement);
+      expect(queryByTestId('agent-constellation')).toBeTruthy();
+    });
+
+    it('hides again once the pointer leaves', () => {
+      mockMatchMedia(false);
+      const { getByRole, queryByTestId } = render(<TeamPreview />);
+      const trigger = getByRole('button', {
+        name: 'Reveal the agent constellation',
+      });
+      const wrapper = trigger.parentElement as HTMLElement;
+
+      fireEvent.mouseEnter(wrapper);
+      expect(queryByTestId('agent-constellation')).toBeTruthy();
+
+      fireEvent.mouseLeave(wrapper);
+      expect(queryByTestId('agent-constellation')).toBeNull();
+    });
+
+    it('is keyboard-discoverable via tab focus, not just hover', () => {
+      mockMatchMedia(false);
+      const { getByRole, queryByTestId } = render(<TeamPreview />);
+      const trigger = getByRole('button', {
+        name: 'Reveal the agent constellation',
+      });
+
+      fireEvent.focus(trigger);
+      expect(queryByTestId('agent-constellation')).toBeTruthy();
+
+      fireEvent.blur(trigger);
+      expect(queryByTestId('agent-constellation')).toBeNull();
+    });
+
+    it('renders all 11 agents as star nodes once revealed', () => {
+      mockMatchMedia(false);
+      const { getByRole, getAllByTestId } = render(<TeamPreview />);
+      fireEvent.focus(
+        getByRole('button', { name: 'Reveal the agent constellation' }),
+      );
+      expect(getAllByTestId('constellation-star')).toHaveLength(11);
+    });
+
+    it('disables the drag affordance under reduced motion (cursor stays default, not grab)', () => {
+      mockMatchMedia(true);
+      const { getByRole, getAllByTestId } = render(<TeamPreview />);
+      fireEvent.focus(
+        getByRole('button', { name: 'Reveal the agent constellation' }),
+      );
+      const stars = getAllByTestId('constellation-star');
+      expect(stars.every((s) => s.style.cursor === 'default')).toBe(true);
+    });
+
+    it('offers a grab cursor when not reduced (drag enabled)', () => {
+      mockMatchMedia(false);
+      const { getByRole, getAllByTestId } = render(<TeamPreview />);
+      fireEvent.focus(
+        getByRole('button', { name: 'Reveal the agent constellation' }),
+      );
+      const stars = getAllByTestId('constellation-star');
+      expect(stars.every((s) => s.style.cursor === 'grab')).toBe(true);
+    });
+  });
 });
