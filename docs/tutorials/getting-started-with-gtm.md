@@ -122,6 +122,7 @@ copy brief:
 - `docs/gtm/` — the marketing working-directory scaffold.
 - `docs/gtm/site-brief.md` — the landing-page copy brief, ready to build from.
 
-To build a real page from that brief, follow docs/how-to/generate-landing-page-copy.md. To
+To build a real page from that brief, follow
+[How to generate landing-page copy with gtm](../how-to/generate-landing-page-copy.md). To
 understand what the plugin is doing under the hood and how its pieces fit together, read
-docs/concepts/what-is-the-gtm-plugin.md.
+[What is the gtm plugin](../concepts/what-is-the-gtm-plugin.md).

@@ -146,7 +146,7 @@ against.
 
 ## Related decisions
 
-- [docs/adr/0001-two-phase-dispatch-founder-confirmation-gate.md](docs/adr/0001-two-phase-dispatch-founder-confirmation-gate.md)
+- [docs/adr/0001-two-phase-dispatch-founder-confirmation-gate.md](../adr/0001-two-phase-dispatch-founder-confirmation-gate.md)
   records the two-phase dispatch pattern for founder-confirmation gates described above — why a
   gate lives at the command layer and a subagent drafts without writing. Refer to it for the
   decision's full context and consequences rather than treating this page as the source of
@@ -155,6 +155,6 @@ against.
 ## Where to go next
 
 - To run the pipeline end to end for the first time, follow the tutorial:
-  [docs/tutorials/getting-started-with-sdlc.md](docs/tutorials/getting-started-with-sdlc.md).
+  [docs/tutorials/getting-started-with-sdlc.md](../tutorials/getting-started-with-sdlc.md).
 - To drive a specific existing story through the pipeline, follow the how-to guide:
-  [docs/how-to/run-the-sdlc-pipeline-on-a-story.md](docs/how-to/run-the-sdlc-pipeline-on-a-story.md).
+  [docs/how-to/run-the-sdlc-pipeline-on-a-story.md](../how-to/run-the-sdlc-pipeline-on-a-story.md).

@@ -109,6 +109,6 @@ configured, with its ownership, voice, cadence, and content types filled in.
 
 ## Next steps
 
-- New to the plugin? See the tutorial: [docs/tutorials/getting-started-with-gtm.md](docs/tutorials/getting-started-with-gtm.md).
+- New to the plugin? See the tutorial: [docs/tutorials/getting-started-with-gtm.md](../tutorials/getting-started-with-gtm.md).
 - Want the reasoning behind gtm's design and the Postiz split? See
-  [docs/concepts/what-is-the-gtm-plugin.md](docs/concepts/what-is-the-gtm-plugin.md).
+  [docs/concepts/what-is-the-gtm-plugin.md](../concepts/what-is-the-gtm-plugin.md).
