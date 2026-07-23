@@ -1,5 +1,8 @@
 import { CountUp, Reveal, RevealGroup } from '@nightshift-ai/ui';
 
+// B2 settle spring (from the AC) — exempt from EASE_OUT (spring-driven).
+const SETTLE_SPRING = { stiffness: 120, damping: 18 };
+
 /**
  * Full-bleed `--surface-card` band with top/bottom hairlines. Breaks out of
  * the shared `<main>` container to viewport width while keeping inner
@@ -23,27 +26,38 @@ export function ProofBar() {
       >
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
           <CountUp value={11} className="text-[var(--accent)]" /> specialized
           agents
         </Reveal>
-        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+        <Reveal
+          as="span"
+          spring={SETTLE_SPRING}
+          style={{ color: 'var(--moon-500)' }}
+        >
           ·
         </Reveal>
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
           <CountUp value={10} className="text-[var(--accent)]" /> slash commands
         </Reveal>
-        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+        <Reveal
+          as="span"
+          spring={SETTLE_SPRING}
+          style={{ color: 'var(--moon-500)' }}
+        >
           ·
         </Reveal>
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
@@ -52,11 +66,16 @@ export function ProofBar() {
             <CountUp value={60} /> seconds
           </span>
         </Reveal>
-        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+        <Reveal
+          as="span"
+          spring={SETTLE_SPRING}
+          style={{ color: 'var(--moon-500)' }}
+        >
           ·
         </Reveal>
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >

@@ -853,15 +853,16 @@ function TriageCard({
               style={{ fontSize: 13, color: 'var(--moon-200)' }}
             >
               lightweight_threshold:
-              <button
+              <motion.button
                 type="button"
                 onClick={decThreshold}
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                 aria-label="decrease lightweight threshold"
                 className="font-mono flex cursor-pointer items-center justify-center"
                 style={{ width: 26, height: 26, fontSize: 14, padding: 0 }}
               >
                 −
-              </button>
+              </motion.button>
               <span
                 style={{
                   color: 'var(--terra-400)',
@@ -871,30 +872,32 @@ function TriageCard({
               >
                 {threshold}
               </span>
-              <button
+              <motion.button
                 type="button"
                 onClick={incThreshold}
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                 aria-label="increase lightweight threshold"
                 className="font-mono flex cursor-pointer items-center justify-center"
                 style={{ width: 26, height: 26, fontSize: 14, padding: 0 }}
               >
                 +
-              </button>
+              </motion.button>
             </div>
             <div
               className="font-mono mt-2.5 flex flex-wrap items-center gap-2.5"
               style={{ fontSize: 13, color: 'var(--moon-200)' }}
             >
               approval_mode:
-              <button
+              <motion.button
                 type="button"
                 onClick={cycleMode}
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                 title="click to cycle: assisted → auto → full-auto"
                 className="font-mono cursor-pointer"
                 style={{ fontSize: 12, padding: '3px 12px' }}
               >
                 {approvalMode} ⟳
-              </button>
+              </motion.button>
             </div>
             <div
               className="font-mono mt-1.5"
@@ -1238,9 +1241,14 @@ function ComparisonTerminals({
           ))}
           {ctrlAwaiting && (
             <div className="mt-auto flex justify-end pt-2.5">
-              <CtaButton variant="primary" size="sm" onClick={approveGate}>
-                approve ✓
-              </CtaButton>
+              <motion.span
+                className="inline-block"
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
+              >
+                <CtaButton variant="primary" size="sm" onClick={approveGate}>
+                  approve ✓
+                </CtaButton>
+              </motion.span>
             </div>
           )}
           {ctrlWorking && (

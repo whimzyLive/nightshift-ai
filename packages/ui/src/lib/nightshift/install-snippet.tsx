@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { CtaButton } from './button';
+import { MagneticCta } from './magnetic-cta';
 
 export interface InstallSnippetProps {
   /** The exact command text — copied verbatim, never re-derived. */
@@ -68,27 +69,29 @@ export function InstallSnippet({
         </span>
         {command}
       </span>
-      <CtaButton
-        type="button"
-        onClick={handleCopy}
-        aria-label={`Copy: ${command}`}
-        variant="primary"
-        size="sm"
-        className="flex-none overflow-hidden font-mono text-xs tracking-[0.02em] uppercase"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={copied ? 'copied' : 'copy'}
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="block"
-          >
-            {copied ? 'copied' : 'copy'}
-          </motion.span>
-        </AnimatePresence>
-      </CtaButton>
+      <MagneticCta className="flex-none">
+        <CtaButton
+          type="button"
+          onClick={handleCopy}
+          aria-label={`Copy: ${command}`}
+          variant="primary"
+          size="sm"
+          className="overflow-hidden font-mono text-xs tracking-[0.02em] uppercase"
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={copied ? 'copied' : 'copy'}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="block"
+            >
+              {copied ? 'copied' : 'copy'}
+            </motion.span>
+          </AnimatePresence>
+        </CtaButton>
+      </MagneticCta>
     </div>
   );
 }

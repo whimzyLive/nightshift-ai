@@ -50,3 +50,6 @@ export { prefersReducedMotion } from './lib/nightshift/prefers-reduced-motion';
 
 export { useInViewOnce } from './lib/nightshift/use-in-view-once';
 export type { UseInViewOnceResult } from './lib/nightshift/use-in-view-once';
+
+export { MagneticCta } from './lib/nightshift/magnetic-cta';
+export type { MagneticCtaProps } from './lib/nightshift/magnetic-cta';

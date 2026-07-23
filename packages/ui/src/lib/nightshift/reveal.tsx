@@ -77,6 +77,11 @@ export function RevealGroup({
   );
 }
 
+export interface RevealSpring {
+  stiffness: number;
+  damping: number;
+}
+
 export interface RevealProps {
   children: ReactNode;
   /** Upward travel distance in px (transform — no layout shift). */
@@ -88,8 +93,16 @@ export interface RevealProps {
    * sharpens — pairs with a glassmorphic surface for a materialise effect.
    */
   blur?: number;
-  /** Reveal duration in seconds. */
+  /** Reveal duration in seconds. Ignored when `spring` is set. */
   duration?: number;
+  /**
+   * Opt-in spring config for the shown transition, replacing the default
+   * `duration`/`EASE_OUT` tween with a gentle settle spring — exempt from
+   * `EASE_OUT` (spring-driven), stays transform/opacity-only. Does not
+   * change the reduced-motion identity-variants latch below, or the `y`
+   * travel distance.
+   */
+  spring?: RevealSpring;
   as?: MotionTag;
   className?: string;
   style?: CSSProperties;
@@ -109,6 +122,7 @@ export function Reveal({
   scale = 1,
   blur = 0,
   duration = 0.55,
+  spring,
   as = 'div',
   className,
   style,
@@ -120,6 +134,13 @@ export function Reveal({
   const Comp = motion[as];
   const blurFrom = blur ? `blur(${blur}px)` : undefined;
   const blurTo = blur ? 'blur(0px)' : undefined;
+  const shownTransition = spring
+    ? {
+        type: 'spring' as const,
+        stiffness: spring.stiffness,
+        damping: spring.damping,
+      }
+    : { duration, ease: EASE_OUT };
 
   return (
     <Comp
@@ -141,7 +162,7 @@ export function Reveal({
                 y: 0,
                 scale: 1,
                 filter: blurTo,
-                transition: { duration, ease: EASE_OUT },
+                transition: shownTransition,
               },
             }
       }

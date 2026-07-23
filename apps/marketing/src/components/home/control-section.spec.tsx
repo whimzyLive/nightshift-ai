@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
 import { ControlSection } from './control-section';
 
@@ -114,6 +120,38 @@ describe('ControlSection', () => {
 
     // Advanced past 'refine' onto 'spec', back to 'working' — approve gone.
     expect(screen.queryByRole('button', { name: 'approve ✓' })).toBeNull();
+  });
+
+  describe('B3 tap-scale (whileTap)', () => {
+    it('scales the threshold stepper down on pointer press and releases on pointer up', async () => {
+      render(<ControlSection />);
+      const incBtn = screen.getByRole('button', {
+        name: 'increase lightweight threshold',
+      });
+
+      fireEvent.pointerDown(incBtn);
+      await waitFor(() => {
+        expect(incBtn.style.transform).toContain('scale');
+      });
+
+      fireEvent.pointerUp(incBtn);
+      await waitFor(() => {
+        expect(incBtn.style.transform).not.toContain('scale');
+      });
+    });
+
+    it('omits the tap scale under reduced motion', async () => {
+      mockMatchMedia(true);
+      render(<ControlSection />);
+      const incBtn = screen.getByRole('button', {
+        name: 'increase lightweight threshold',
+      });
+
+      fireEvent.pointerDown(incBtn);
+      // Give any (unwanted) tap animation a chance to apply before asserting.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(incBtn.style.transform).not.toContain('scale');
+    });
   });
 
   describe('reduced motion (AC5)', () => {
