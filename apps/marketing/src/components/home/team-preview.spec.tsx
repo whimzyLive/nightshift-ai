@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { TeamPreview } from './team-preview';
 
@@ -37,17 +31,13 @@ describe('TeamPreview', () => {
     );
   });
 
-  it('updates the side panel and dims other rows on hover (AC3)', async () => {
+  it('updates the side panel and dims other rows on hover (AC3)', () => {
     const { container } = render(<TeamPreview />);
     const row = rowFor('product-manager');
     fireEvent.mouseEnter(row);
 
-    // The panel body now crossfades via AnimatePresence (A3) — its new
-    // content lands once the (near-instant) exit/enter transition settles.
-    await waitFor(() =>
-      expect(container.textContent).toContain(
-        'Vague idea → PRD with binary acceptance criteria',
-      ),
+    expect(container.textContent).toContain(
+      'Vague idea → PRD with binary acceptance criteria',
     );
     expect(rowFor('qa-engineer').getAttribute('style')).toContain(
       'opacity: 0.45',
@@ -55,7 +45,7 @@ describe('TeamPreview', () => {
     expect(row.getAttribute('style')).toContain('opacity: 1');
   });
 
-  it('restores the org summary and full opacity when the tree loses hover (AC3)', async () => {
+  it('restores the org summary and full opacity when the tree loses hover (AC3)', () => {
     const { container } = render(<TeamPreview />);
     fireEvent.mouseEnter(rowFor('product-manager'));
 
@@ -63,9 +53,7 @@ describe('TeamPreview', () => {
     if (!treeContainer) throw new Error('#ns-org tree container not found');
     fireEvent.mouseLeave(treeContainer);
 
-    await waitFor(() =>
-      expect(container.textContent).toContain('1 human · 11 agents'),
-    );
+    expect(container.textContent).toContain('1 human · 11 agents');
     expect(rowFor('qa-engineer').getAttribute('style')).toContain('opacity: 1');
   });
 
@@ -89,55 +77,6 @@ describe('TeamPreview', () => {
     const row = rowFor('product-manager');
     const dot = await within(row).findByTestId('team-dot');
     expect(dot.getAttribute('data-twinkle')).toBe('off');
-  });
-
-  describe('A3 dot→charter shared-element morph', () => {
-    it('renders a matching panel dot only for a star row (agent), not a phase row', async () => {
-      const { queryByTestId } = render(<TeamPreview />);
-
-      fireEvent.mouseEnter(rowFor('product-manager'));
-      await waitFor(() => expect(queryByTestId('panel-dot')).toBeTruthy());
-
-      fireEvent.mouseEnter(rowFor('spec'));
-      await waitFor(() => expect(queryByTestId('panel-dot')).toBeNull());
-    });
-
-    it('still updates the panel on hover under reduced motion, without the layout morph', async () => {
-      mockMatchMedia(true);
-      const { container, queryByTestId } = render(<TeamPreview />);
-
-      fireEvent.mouseEnter(rowFor('product-manager'));
-
-      await waitFor(() =>
-        expect(container.textContent).toContain(
-          'Vague idea → PRD with binary acceptance criteria',
-        ),
-      );
-      // The dot still renders (star row) — just without a layoutId driving
-      // a morph, which isn't independently observable via the DOM, so this
-      // asserts the functional outcome (panel dot present, content correct)
-      // rather than the absence of an internal Framer prop.
-      expect(queryByTestId('panel-dot')).toBeTruthy();
-    });
-
-    it('never mounts the tree-row dot and the panel dot with the same layoutId at once (no Framer duplicate-layoutId warning)', async () => {
-      mockMatchMedia(false);
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      const { queryByTestId } = render(<TeamPreview />);
-      fireEvent.mouseEnter(rowFor('product-manager'));
-      await waitFor(() => expect(queryByTestId('panel-dot')).toBeTruthy());
-
-      const duplicateLayoutIdCalls = [
-        ...warnSpy.mock.calls,
-        ...errorSpy.mock.calls,
-      ].filter((call) => String(call[0]).toLowerCase().includes('layoutid'));
-      expect(duplicateLayoutIdCalls).toHaveLength(0);
-
-      warnSpy.mockRestore();
-      errorSpy.mockRestore();
-    });
   });
 
   describe('D2 draggable agent constellation', () => {

@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 
 import {
-  EASE_OUT,
   Eyebrow,
   prefersReducedMotion,
   Reveal,
@@ -61,9 +60,7 @@ const TONE_COLOR: Record<AgentTone, string> = {
 
 const AGENTS_BY_NAME = new Map(agents.map((a) => [a.name, a]));
 
-// A3 — shared dot colour formula, reused for both the tree row's own dot and
-// the charter panel's shared-element morph target so both ends of the morph
-// agree on colour at every frame.
+// Shared dot colour formula for the tree row's own dot.
 function dotColorFor(
   row: Pick<TreeRow, 'standby' | 'tone'>,
   isActive: boolean,
@@ -343,9 +340,6 @@ export function TeamPreview() {
   const [active, setActive] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const panel = getSidePanel(active);
-  // A3 — the tree row backing the current panel, if any (only star rows —
-  // human + agents — have a matching dot/name to morph into the panel).
-  const activeRow = active ? TREE_ROWS.find((r) => r.key === active) : null;
 
   // Direct `matchMedia` check (not Motion's `useReducedMotion`) — checked
   // once post-mount so the deterministic server/first-hydration frame
@@ -453,11 +447,6 @@ export function TeamPreview() {
                       aria-hidden="true"
                       data-testid="team-dot"
                       data-twinkle={reducedMotion ? 'off' : 'on'}
-                      layoutId={
-                        reducedMotion || isActive
-                          ? undefined
-                          : `agent-dot-${row.key}`
-                      }
                       animate={reducedMotion ? undefined : TWINKLE_ANIMATE}
                       transition={
                         reducedMotion ? undefined : TWINKLE_TRANSITION
@@ -471,12 +460,7 @@ export function TeamPreview() {
                       }}
                     />
                   )}
-                  <motion.span
-                    layoutId={
-                      row.star && !reducedMotion && !isActive
-                        ? `agent-name-${row.key}`
-                        : undefined
-                    }
+                  <span
                     style={{
                       color: isActive
                         ? 'var(--terra-400)'
@@ -486,7 +470,7 @@ export function TeamPreview() {
                     }}
                   >
                     {row.label}
-                  </motion.span>
+                  </span>
                   {row.cmds && (
                     <span style={{ color: 'var(--terra-400)', opacity: 0.85 }}>
                       {row.cmds}
@@ -522,134 +506,91 @@ export function TeamPreview() {
               minHeight: 300,
             }}
           >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={active ?? 'summary'}
-                className="flex flex-col gap-3"
-                initial={reducedMotion ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={reducedMotion ? undefined : { opacity: 0 }}
-                transition={{
-                  duration: reducedMotion ? 0 : 0.2,
-                  ease: EASE_OUT,
-                }}
-              >
-                <div
-                  className="font-mono uppercase"
-                  style={{
-                    fontSize: 12,
-                    letterSpacing: '.16em',
-                    color: 'var(--accent)',
-                  }}
-                >
-                  {panel.eyebrow}
-                </div>
-                <div className="flex flex-wrap items-center gap-[10px]">
-                  {activeRow?.star && (
-                    <motion.span
-                      aria-hidden="true"
-                      data-testid="panel-dot"
-                      layoutId={
-                        reducedMotion ? undefined : `agent-dot-${active}`
-                      }
-                      style={{
-                        width: active === HUMAN_KEY ? 15 : 11,
-                        height: active === HUMAN_KEY ? 15 : 11,
-                        borderRadius: '50%',
-                        background: dotColorFor(activeRow, true),
-                        flex: 'none',
-                      }}
-                    />
-                  )}
-                  {panel.ini && (
-                    <span
-                      className="font-mono"
-                      style={{
-                        fontSize: 13,
-                        color: 'var(--accent)',
-                        border: '1px solid var(--border-accent)',
-                        padding: '2px 8px',
-                      }}
-                    >
-                      {panel.ini}
-                    </span>
-                  )}
-                  <motion.span
-                    layoutId={
-                      activeRow?.star && !reducedMotion
-                        ? `agent-name-${active}`
-                        : undefined
-                    }
-                    className="font-mono"
-                    style={{ fontSize: 16, color: 'var(--moon-100)' }}
-                  >
-                    {panel.name}
-                  </motion.span>
-                  {panel.standby && (
-                    <span
-                      className="font-mono"
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: '.12em',
-                        color: 'var(--text-dim)',
-                      }}
-                    >
-                      STANDBY
-                    </span>
-                  )}
-                </div>
-                <p
-                  style={{
-                    fontSize: 15,
-                    lineHeight: 1.6,
-                    color: 'var(--text-muted)',
-                    margin: 0,
-                  }}
-                >
-                  {panel.body}
-                </p>
-                {panel.cmds && (
-                  <p
-                    className="font-mono"
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--terra-400)',
-                      margin: 0,
-                    }}
-                  >
-                    {panel.cmds}
-                  </p>
-                )}
-                {panel.artifact && (
-                  <p
-                    className="font-mono"
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--text-dim)',
-                      margin: 0,
-                    }}
-                  >
-                    artifact →{' '}
-                    <span style={{ color: 'var(--cyan-400)' }}>
-                      {panel.artifact}
-                    </span>
-                  </p>
-                )}
-                <a
-                  href={panel.ref}
-                  target="_blank"
-                  rel="noopener"
+            <div
+              className="font-mono uppercase"
+              style={{
+                fontSize: 12,
+                letterSpacing: '.16em',
+                color: 'var(--accent)',
+              }}
+            >
+              {panel.eyebrow}
+            </div>
+            <div className="flex flex-wrap items-center gap-[10px]">
+              {panel.ini && (
+                <span
                   className="font-mono"
                   style={{
-                    fontSize: 12.5,
-                    color: 'var(--link)',
-                    marginTop: 'auto',
+                    fontSize: 13,
+                    color: 'var(--accent)',
+                    border: '1px solid var(--border-accent)',
+                    padding: '2px 8px',
                   }}
                 >
-                  {panel.refLabel} ↗
-                </a>
-              </motion.div>
-            </AnimatePresence>
+                  {panel.ini}
+                </span>
+              )}
+              <span
+                className="font-mono"
+                style={{ fontSize: 16, color: 'var(--moon-100)' }}
+              >
+                {panel.name}
+              </span>
+              {panel.standby && (
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: '.12em',
+                    color: 'var(--text-dim)',
+                  }}
+                >
+                  STANDBY
+                </span>
+              )}
+            </div>
+            <p
+              style={{
+                fontSize: 15,
+                lineHeight: 1.6,
+                color: 'var(--text-muted)',
+                margin: 0,
+              }}
+            >
+              {panel.body}
+            </p>
+            {panel.cmds && (
+              <p
+                className="font-mono"
+                style={{ fontSize: 13, color: 'var(--terra-400)', margin: 0 }}
+              >
+                {panel.cmds}
+              </p>
+            )}
+            {panel.artifact && (
+              <p
+                className="font-mono"
+                style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0 }}
+              >
+                artifact →{' '}
+                <span style={{ color: 'var(--cyan-400)' }}>
+                  {panel.artifact}
+                </span>
+              </p>
+            )}
+            <a
+              href={panel.ref}
+              target="_blank"
+              rel="noopener"
+              className="font-mono"
+              style={{
+                fontSize: 12.5,
+                color: 'var(--link)',
+                marginTop: 'auto',
+              }}
+            >
+              {panel.refLabel} ↗
+            </a>
           </div>
         </div>
 

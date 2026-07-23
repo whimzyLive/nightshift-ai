@@ -1,3 +1,62 @@
+## 2026-07-23 — Story NA-69 — 3 user-requested post-ship changes (remove C3 terminal, revert A3 morph, fix Star magnetic pull)
+
+**Learnings:**
+
+- **jsdom has no native `PointerEvent` constructor at all** (`'PointerEvent'
+  in window` is `false`; `new window.PointerEvent(...)` throws
+  "not a constructor"). `@testing-library/dom`'s `fireEvent.pointerMove(el,
+{clientX, clientY})` doesn't fail or warn about this — it silently
+  dispatches an event whose `clientX`/`clientY` read back as `undefined`,
+  which propagates into `(undefined - rect.left) / rect.width` → `NaN`.
+  Every existing `MagneticCta` pointer test (mine, from the original B1
+  commit) was asserting `transform !== 'translateX(0px)'`, which a NaN
+  transform (`"translateX(NaNpx) translateY(NaNpx)"`) also satisfies — a
+  false-positive that had been green since B1 landed. `MouseEvent` (used by
+  `fireEvent.mouseMove`/`mouseLeave`) **is** natively implemented in jsdom
+  with working `clientX`/`clientY` — switched `MagneticCta` from
+  `onPointerMove`/`onPointerLeave` to `onMouseMove`/`onMouseLeave` (a
+  legitimate, narrower-scoped choice for a desktop-only hover-follow effect
+  that never needed touch/pen data), which both plausibly fixes whatever
+  the user actually observed in a real browser and — more importantly —
+  makes the existing test suite capable of catching a real regression
+  instead of silently passing on garbage. Any _other_ component in this kit
+  still using `onPointerMove`/`onPointerLeave` inherits the same untested-
+  by-jsdom risk and is worth auditing the same way if a similar "should be
+  working but doesn't feel right" report comes in.
+- Root-caused via a disposable, temporarily-committed-then-deleted probe
+  spec (`__star-probe.spec.tsx`) plus one throwaway `console.log` inside
+  `magnetic-cta.tsx` itself (reverted before the real fix) — cheaper and
+  more conclusive than reasoning about CSS/DOM structure from first
+  principles alone, especially once several plausible code-level
+  hypotheses (wrapping, CSS transition lists, `pointer-events`, stacking
+  contexts) were individually ruled out by direct source inspection and
+  still left no explanation.
+- Reverting an already-shipped Motion feature (A3's shared-`layoutId`
+  morph) cleanly is mostly the _inverse_ of the original diff: drop the
+  `layoutId` props (tree row dot/name, panel dot/name), delete the
+  `AnimatePresence`-wrapped `motion.div` panel body back to a plain `div`
+  tree, delete the panel-only dot block entirely (the pre-feature version
+  never had one), and drop the now-unused `EASE_OUT`/`AnimatePresence`
+  imports and the `activeRow` lookup that only existed to gate the morph.
+  `git show <pre-feature-commit>:<path>` is the fastest way to get an exact
+  structural reference to diff a revert against, rather than trying to
+  recall/reconstruct the "before" shape from memory.
+- Removing a whole rendered sub-feature (C3's commit-example `Terminal`)
+  from a page component is a 3-part removal: the JSX block, the data
+  const it rendered (`COMMIT_LINES`), and the now-unused named imports
+  (`Terminal`, `TerminalLine`) — a partial removal (JSX only) would leave
+  an unused-import lint error.
+
+**Patterns:**
+
+- This dispatch ran in the **primary checkout** (not a worktree) because a
+  human had it checked out with a live dev server for hot-reload viewing —
+  confirmed via `pwd`/`git branch --show-current` before any edit, per the
+  coordinator's explicit redirection for this one dispatch. The workflow
+  (skills, verify gates, commit-not-push) is otherwise identical to the
+  worktree flow; only the working directory and the "don't touch
+  next-env.d.ts, it's not yours" caveat differ.
+
 ## 2026-07-23 — Story NA-69 — high-effort PR review round (6 findings)
 
 **Learnings:**

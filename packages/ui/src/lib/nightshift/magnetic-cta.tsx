@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 
 import { motion, useMotionValue, useSpring } from 'motion/react';
 
@@ -36,7 +36,7 @@ export function MagneticCta({ children, className = '' }: MagneticCtaProps) {
   const springX = useSpring(x, SPRING_CONFIG);
   const springY = useSpring(y, SPRING_CONFIG);
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
+  const handleMouseMove = (event: ReactMouseEvent<HTMLSpanElement>) => {
     if (reduced) return;
     const el = ref.current;
     if (!el) return;
@@ -48,7 +48,7 @@ export function MagneticCta({ children, className = '' }: MagneticCtaProps) {
     y.set(py * MAX_PULL_PX * 2);
   };
 
-  const handlePointerLeave = () => {
+  const handleMouseLeave = () => {
     x.set(0);
     y.set(0);
   };
@@ -58,8 +58,8 @@ export function MagneticCta({ children, className = '' }: MagneticCtaProps) {
       ref={ref}
       className={`inline-block ${className}`}
       style={{ x: springX, y: springY }}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
     >
       {children}
     </motion.span>

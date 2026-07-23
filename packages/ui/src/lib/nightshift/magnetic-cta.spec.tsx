@@ -23,7 +23,12 @@ function moveOverElement(el: Element) {
     y: 0,
     toJSON: () => ({}),
   } as DOMRect);
-  fireEvent.pointerMove(el, { clientX: 90, clientY: 36 });
+  // `MagneticCta` tracks `mousemove`/`mouseleave` (not `pointermove`) —
+  // jsdom has no native `PointerEvent` constructor, so `fireEvent.pointerMove`
+  // silently produces an event with `clientX`/`clientY` both `undefined`,
+  // which would make this assertion pass on a NaN transform. `MouseEvent`
+  // is natively implemented in jsdom, so this exercises the real math.
+  fireEvent.mouseMove(el, { clientX: 90, clientY: 36 });
 }
 
 describe('MagneticCta', () => {
@@ -49,7 +54,52 @@ describe('MagneticCta', () => {
 
     await waitFor(() => {
       expect(wrapper.style.transform).not.toBe('');
+      expect(wrapper.style.transform).not.toContain('NaN');
       expect(wrapper.style.transform).not.toContain('translateX(0px)');
+    });
+  });
+
+  it('pulls an anchor child (e.g. the Star-on-GitHub link) exactly like a button child', async () => {
+    mockMatchMedia(false);
+    const { container } = render(
+      <MagneticCta>
+        <a
+          href="https://github.com/whimzyLive/nightshift-ai"
+          target="_blank"
+          rel="noopener"
+        >
+          ★ Star nightshift on GitHub
+        </a>
+      </MagneticCta>,
+    );
+    const wrapper = container.firstElementChild as HTMLElement;
+    moveOverElement(wrapper);
+
+    await waitFor(() => {
+      expect(wrapper.style.transform).not.toBe('');
+      expect(wrapper.style.transform).not.toContain('NaN');
+      expect(wrapper.style.transform).not.toContain('translateX(0px)');
+    });
+  });
+
+  it('releases back to rest on mouse-leave', async () => {
+    mockMatchMedia(false);
+    const { container } = render(
+      <MagneticCta>
+        <button type="button">Install</button>
+      </MagneticCta>,
+    );
+    const wrapper = container.firstElementChild as HTMLElement;
+    moveOverElement(wrapper);
+    await waitFor(() =>
+      expect(wrapper.style.transform).not.toContain('translateX(0px)'),
+    );
+
+    fireEvent.mouseLeave(wrapper);
+    await waitFor(() => {
+      expect(
+        wrapper.style.transform === '' || wrapper.style.transform === 'none',
+      ).toBe(true);
     });
   });
 

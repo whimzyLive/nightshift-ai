@@ -39,12 +39,6 @@ describe('HowItWorks', () => {
     expect(container.textContent).toContain('/review');
   });
 
-  it('renders the conventional-commit example terminal (C3)', () => {
-    const { container } = render(<HowItWorks />);
-    expect(container.textContent).toContain('git log -1 --oneline');
-    expect(container.textContent).toContain('zsh — conventional commits');
-  });
-
   it('links to the commands on GitHub', () => {
     render(<HowItWorks />);
     const link = screen.getByRole('link', {
