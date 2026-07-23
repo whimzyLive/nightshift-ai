@@ -100,6 +100,25 @@ link` line). Switched every generator to the `$(cat <<'EOF' ... EOF)` command-su
   selection + §3 affected-row resolution correctly short-circuit to nothing-to-write without
   needing any speculative regen-and-diff.
 
+## Post-QA inline sync — NA-70 (2026-07-24, clean no-op, no commit)
+
+- Story-branch-vs-base diff (`origin/develop...feat/NA-70`) touched only `apps/marketing/**`
+  (Payload `Pages` collection, `(frontend)/[slug]` ISR route, revalidate hook, block renderer,
+  `lib/pages.ts`, a migration, and `payload-types.ts`/`payload.config.ts`), plus
+  `docs/superpowers/plans/NA-70.md` and two `.claude/memories/**` files — zero bytes under
+  `plugins/{sdlc,gtm}/**` or `docs/adr/**`. Every `auto` row's source-of-truth in this repo's
+  manifest (`command-reference`/`agent-reference`/`skill-reference`/`config-reference`/
+  `hooks-contract`/`error-reference`, all rooted at `reference-roots: plugins/sdlc, plugins/gtm`)
+  is therefore provably unchanged, and `llms-txt`'s content (derived from those same generated
+  pages' frontmatter) is provably byte-identical without needing to actually re-run the regen —
+  same short-circuit as NA-69's entry above.
+- Neither how-to page's `source:` glob list (`generate-landing-page-copy.md` →
+  `plugins/gtm/commands/site.md`; `run-the-sdlc-pipeline-on-a-story.md` → 5
+  `plugins/sdlc/commands/*.md` files) matched any changed path, so no narrative refresh was
+  drafted. A second clean confirmation that a pure product-feature story (new CMS collection +
+  route + hooks, no plugin/doc-registry surface touched) correctly short-circuits to nothing-to-
+  write under §25/§26 without speculative regen-and-diff.
+
 ## Audit dispatch — 2026-07-22 (clean scan, no branch/PR)
 
 - **NA-65 landed the "activation-gated" resolver model between this run and PR #155** — `refs/doc-types.md` (+122), `refs/docs-manifest-template.md` (+79), and `refs/docs-pipeline.md` (+269 net, but 151 ins / 118 del — a real rewrite of §3, not just reflow) all changed; `.claude/project/docs-manifest.md` was migrated to the new 5-column shape (`type/enabled/target-path/source/contract`) plus a new "Reference roots" section. Despite that much churn in the _pipeline spec_, **zero bytes changed under any `auto` row's actual source-of-truth** (`plugins/{sdlc,gtm}/{commands,agents,skills,hooks}/**`) — confirmed via `git diff --stat <last-audit-merge-sha> origin/<BASE-BRANCH> -- plugins/sdlc plugins/gtm`, which only showed `plugin.json`, `CHANGELOG.md`, and the three refs files above (plus test fixtures). A spec rewrite is not itself evidence of drift — always check whether the rewrite changed a row's _resolved source content_ before assuming a re-regen is needed.
