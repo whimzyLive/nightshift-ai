@@ -1,3 +1,45 @@
+## 2026-07-23 — Story NA-69 — QA fix round (template.tsx reduced-motion gap + 2 stray EASE_OUT re-declarations)
+
+**Learnings:**
+
+- The post-mount `useState(false)` + `useEffect(() => setReduced(...), [])`
+  latch (ADR 0006's own pattern) is only safe for a component that stays
+  **dormant until some later trigger** (`Reveal`/`RevealGroup`'s
+  `whileInView`, `Terminal`'s viewport/mount-reveal effect) — the effect has
+  a chance to flip the flag _before_ the animation actually starts. A
+  component whose enter animation starts on its **very first render with no
+  gate at all** (`(frontend)/template.tsx` — remounted by App Router on
+  every nav, animates immediately) commits `initial`/`animate` with the
+  stale `reduced=false` before the effect ever runs; since `animate`'s
+  target doesn't change when `reduced` later flips `true`, Motion doesn't
+  interrupt the already-started tween — a reduced-motion user sees the
+  animation play out fully, every navigation. Fix: `useState(() =>
+prefersReducedMotion())` (lazy initializer) resolves the flag synchronously
+  in the same render that produces `initial`/`animate`, before Motion ever
+  mounts — no third latch pattern, same guarded function, just invoked
+  earlier. Generalize this: any _new_ always-live (non-viewport-gated) enter
+  animation in this kit needs the lazy-initializer form, not the post-mount
+  effect form; the effect form remains correct for every dormant-until-
+  triggered case already in the codebase.
+- Proved the fix's test actually catches the regression by temporarily
+  reverting `template.tsx` to the buggy post-mount-effect version and
+  re-running the new synchronous (`no waitFor`) reduced-motion assertion —
+  it failed exactly as expected (`opacity` read `'0'` instead of `'1'`)
+  before restoring the fix. A test that only reads state through `waitFor`
+  can't distinguish "no animation ever started" from "animation started and
+  finished before the assertion" — for an always-live enter transition, the
+  regression-catching assertion has to be **synchronous, immediately after
+  `render()`**.
+
+**Pitfalls:**
+
+- Grepping the full kit for `const EASE_OUT` after "migrating everything"
+  turned up two more re-declarations (`faq-row.tsx`, `cta-kicker.tsx`)
+  outside NA-69's own touched-file list — left them alone since the QA
+  finding scoped the fix to `control-section.tsx`/`argument-rail.tsx` only
+  and neither of those two files was part of this story's diff; flagging
+  here rather than silently expanding scope on a fix-round dispatch.
+
 ## 2026-07-23 — Story NA-69 — 11 restrained motion beats (Foundation + Tiers B/C/A/D)
 
 **Learnings:**

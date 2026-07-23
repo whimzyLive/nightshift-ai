@@ -6,14 +6,17 @@ import type { ReactNode } from 'react';
 
 import { AnimatePresence, motion } from 'motion/react';
 
-import { Eyebrow, GateCheck, prefersReducedMotion } from '@nightshift-ai/ui';
+import {
+  EASE_OUT,
+  Eyebrow,
+  GateCheck,
+  prefersReducedMotion,
+} from '@nightshift-ai/ui';
 
 import { useScrollProgress } from './scroll-progress';
 
 import type { WhySdlcArgument } from '../../lib/why-sdlc';
 
-// Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)).
-const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 // Matches the retired `ns-gatepulse` keyframes (1.6s, scale + brightness).
 const GATE_PULSE_ANIMATE = {
   scale: [1, 1.14, 1],

@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 
 import {
   CtaButton,
+  EASE_OUT,
   Eyebrow,
   GateCheck,
   prefersReducedMotion,
@@ -49,8 +50,6 @@ const WORKING_MS_REDUCED = 400;
 const AUTO_ADVANCE_MS = 700;
 const FULL_AUTO_LOOP_MS = 3200;
 
-// Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)).
-const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 // Matches the retired `ns-twinkle` keyframes / `--dur-twinkle` token.
 const TWINKLE_ANIMATE = {
   opacity: [0.85, 1, 0.85],

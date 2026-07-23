@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { motion } from 'motion/react';
@@ -11,19 +11,12 @@ import { EASE_OUT, prefersReducedMotion } from '@nightshift-ai/ui';
 const RISE_DURATION_S = 0.4;
 
 /**
- * D3 — per-route enter transition (fade + small rise). `template.tsx` (not
- * `layout.tsx`) is the correct host: App Router **remounts** `template.tsx`
- * on every navigation, so the incoming page reliably re-runs its enter
- * animation across all four routes. This is **enter-only** — deliberately
- * not wrapped in `AnimatePresence` expecting a cross-fade: App Router
- * unmounts the outgoing page before an exit animation could ever run, so
- * only the enter half would play; a true cross-route cross-fade needs the
- * View Transitions API / `next-view-transitions` (out of scope). Reduced
- * motion renders children with no transition (instant route swap).
+ * D3 — per-route enter transition (fade + small rise), replayed by App
+ * Router on every navigation via `template.tsx`. Enter-only — no
+ * `AnimatePresence`/exit half.
  */
 export default function Template({ children }: { children: ReactNode }) {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => setReduced(prefersReducedMotion()), []);
+  const [reduced] = useState(() => prefersReducedMotion());
 
   return (
     <motion.div

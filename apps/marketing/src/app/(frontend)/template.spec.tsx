@@ -48,4 +48,31 @@ describe('Template (D3 route enter transition)', () => {
     });
     expect(screen.getByText('page content')).toBeTruthy();
   });
+
+  it('never starts the enter animation under reduced motion — already visible on the very first synchronous render', () => {
+    mockMatchMedia(true);
+    const { container } = render(
+      <Template>
+        <p>page content</p>
+      </Template>,
+    );
+    // No `waitFor` here on purpose: if reduced-motion were resolved via a
+    // post-mount effect (the bug this guards against), the first render
+    // would still commit `initial={{opacity:0,y:16}}` before the effect had
+    // a chance to flip it, so this synchronous read would catch it at 0.
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.style.opacity).toBe('1');
+    expect(wrapper.style.transform || 'none').not.toMatch(/16px/);
+  });
+
+  it('does start from the faded/offset initial state when not reduced', () => {
+    mockMatchMedia(false);
+    const { container } = render(
+      <Template>
+        <p>page content</p>
+      </Template>,
+    );
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.style.opacity).toBe('0');
+  });
 });
