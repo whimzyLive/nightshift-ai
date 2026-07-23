@@ -6,18 +6,11 @@ import type { ReactNode } from 'react';
 
 import { AnimatePresence, motion } from 'motion/react';
 
-import { Eyebrow } from '@nightshift-ai/ui';
+import { Eyebrow, prefersReducedMotion } from '@nightshift-ai/ui';
 
 import { useScrollProgress } from './scroll-progress';
 
 import type { WhySdlcArgument } from '../../lib/why-sdlc';
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
 
 // Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)).
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];

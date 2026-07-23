@@ -43,3 +43,10 @@ export type { CountUpProps } from './lib/nightshift/count-up';
 
 export { Reveal, RevealGroup } from './lib/nightshift/reveal';
 export type { RevealProps, RevealGroupProps } from './lib/nightshift/reveal';
+
+export { EASE_OUT } from './lib/nightshift/motion-tokens';
+
+export { prefersReducedMotion } from './lib/nightshift/prefers-reduced-motion';
+
+export { useInViewOnce } from './lib/nightshift/use-in-view-once';
+export type { UseInViewOnceResult } from './lib/nightshift/use-in-view-once';

@@ -3,12 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { animate, motion, useMotionValue } from 'motion/react';
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
+import { prefersReducedMotion } from './prefers-reduced-motion';
 
 // jsdom's HTMLMediaElement stub returns undefined from play(); a real browser
 // returns a Promise that rejects when autoplay is blocked. Swallow both — a

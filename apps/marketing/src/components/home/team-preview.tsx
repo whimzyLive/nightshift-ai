@@ -4,19 +4,17 @@ import { useEffect, useState } from 'react';
 
 import { motion } from 'motion/react';
 
-import { Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
+import {
+  Eyebrow,
+  prefersReducedMotion,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 import { agents, ORG_LEVELS } from './team-data';
 import type { AgentTone } from './team-data';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L320-373).
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
 
 // Matches the retired `--dur-twinkle` token (3.4s) / `ns-twinkle` keyframes.
 const TWINKLE_ANIMATE = {

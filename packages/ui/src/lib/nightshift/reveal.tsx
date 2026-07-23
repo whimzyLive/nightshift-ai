@@ -4,20 +4,8 @@ import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
-// Matches the site-wide `--ease-out` token (cubic-bezier(.22,1,.36,1)) used
-// across the animated home/why-sdlc sections.
-const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-// Direct post-mount `matchMedia` check (not Motion's `useReducedMotion`) so the
-// deterministic server/first-hydration frame matches, then reveals are disabled
-// entirely for reduced-motion users — the same latch pattern the rest of the
-// kit uses (nav-bar, control-section, argument-rail).
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
+import { EASE_OUT } from './motion-tokens';
+import { prefersReducedMotion } from './prefers-reduced-motion';
 
 type MotionTag =
   | 'div'

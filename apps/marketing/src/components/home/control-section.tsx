@@ -5,7 +5,13 @@ import type { ChangeEvent } from 'react';
 
 import { motion } from 'motion/react';
 
-import { CtaButton, Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
+import {
+  CtaButton,
+  Eyebrow,
+  prefersReducedMotion,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L404-532,
 // state/logic L620-663 + L1083-1340, `class Component`/`renderVals`).
@@ -137,13 +143,6 @@ function isGateAuto(
 function computeRouteName(isBug: boolean, lightStory: boolean): string {
   if (isBug) return 'defect route';
   return lightStory ? 'lightweight route' : 'full ceremony';
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
 }
 
 interface TicketChip {

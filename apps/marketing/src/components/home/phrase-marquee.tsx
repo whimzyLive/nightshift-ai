@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { animate, motion, useMotionValue } from 'motion/react';
 
+import { prefersReducedMotion } from '@nightshift-ai/ui';
+
 // Verbatim from the design handoff (nightshift Landing.dc.html L190-195) —
 // the duplicated-track phrase set. Two copies of the same line let the
 // Motion `x` loop translate seamlessly from 0% to -50%.
@@ -12,13 +14,6 @@ const PHRASE_LINE =
 
 // Matches the retired `--dur-marquee` token (34s).
 const MARQUEE_DURATION_S = 34;
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
 
 /**
  * Decorative looping mono ticker band — rendered twice on the home page,
