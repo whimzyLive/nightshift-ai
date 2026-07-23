@@ -36,9 +36,9 @@ describe('getPageBySlug', () => {
     expect(await getPageBySlug('missing')).toBeNull();
   });
 
-  it('returns null (not throw) on a Payload/DB error', async () => {
+  it('propagates a thrown Payload/DB error (does not become null)', async () => {
     mockFind.mockRejectedValue(new Error('db down'));
-    expect(await getPageBySlug('about')).toBeNull();
+    await expect(getPageBySlug('about')).rejects.toThrow('db down');
   });
 });
 

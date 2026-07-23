@@ -30,13 +30,18 @@ describe('RenderBlocks', () => {
     expect(screen.getByTestId('richtext')).not.toBeNull();
   });
 
-  it('renders a media block as a figure with img alt + caption', () => {
+  it('renders a media block as a figure with img alt + caption + dimensions', () => {
     render(
       <RenderBlocks
         blocks={[
           {
             blockType: 'media',
-            media: { url: '/img.png', alt: 'Alt text' },
+            media: {
+              url: '/img.png',
+              alt: 'Alt text',
+              width: 800,
+              height: 600,
+            },
             caption: 'A caption',
           } as never,
         ]}
@@ -45,7 +50,25 @@ describe('RenderBlocks', () => {
     const img = screen.getByRole('img');
     expect(img.getAttribute('src')).toBe('/img.png');
     expect(img.getAttribute('alt')).toBe('Alt text');
+    expect(img.getAttribute('width')).toBe('800');
+    expect(img.getAttribute('height')).toBe('600');
+    expect(img.getAttribute('loading')).toBe('lazy');
     expect(screen.getByText('A caption')).not.toBeNull();
+  });
+
+  it('renders nothing when the populated media has no usable url', () => {
+    const { container } = render(
+      <RenderBlocks
+        blocks={[
+          {
+            blockType: 'media',
+            media: { alt: 'Alt text' },
+            caption: 'A caption',
+          } as never,
+        ]}
+      />,
+    );
+    expect(container.innerHTML).toBe('');
   });
 
   it('renders nothing (and warns) for an unknown blockType', () => {

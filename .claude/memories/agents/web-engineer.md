@@ -1846,3 +1846,83 @@ reducedMotion ? 0 : N, ease: EASE_OUT }}`. `initial={false}` is Motion's
   and narrows cleanly in a plain `switch (block.blockType)` — no manual
   type guards needed, same as any other Payload-generated discriminated
   union (c.f. the `NumberFieldSingleValidation` factory note from NA-31).
+
+## 2026-07-24 — Story NA-70 QA review-fix round (7 findings: afterDelete hook, DB-error rethrow, React cache(), reserved-slug case/format, empty-src img, img CLS/lazy, comment-policy cleanup)
+
+**Learnings:**
+
+- `payload`'s `CollectionAfterDeleteHook` receives `{ doc, req, id, ... }`
+  where `doc` is the just-deleted document (not `previousDoc` — that field
+  only exists on `afterChange`). Reused the exact same `slugToPath` +
+  try/catch/`console.error` shape `revalidatePage` already established,
+  just narrower (single path, no previous-slug branch) — `revalidatePage`
+  and the new `revalidatePageOnDelete` now both live in
+  `hooks/revalidatePage.ts` and both get wired into `Pages.ts`'s
+  `hooks: { afterChange: [...], afterDelete: [...] }`.
+- For `getPageBySlug`'s "not-found vs. thrown" distinction: the fix is
+  simply deleting the `try/catch` around the whole function body. "No
+  matching published doc" was never a throw in the first place (`docs[0]`
+  is just `undefined`) — the `try/catch` only ever intercepted _real_
+  thrown errors (a bad connection, a malformed query) and silently
+  laundered them into the same `null` a legitimate 404 produces. Removing
+  the wrapper leaves the 404 path (`if (!doc) return null`) completely
+  untouched while letting a real DB error propagate to the route (Next
+  serves a 500, retryable) instead of a permanently-cached 404. Contrast
+  with `getPublishedPageSlugs` (build-time slug matrix for
+  `generateStaticParams`), which correctly keeps its own try/catch
+  returning `[]` — that one's failure mode is "skip a slug from the
+  static matrix, `dynamicParams` catches it on first hit," not "serve a
+  wrong HTTP status," so swallowing stays right there.
+- Confirmed (by reading `node_modules/.../react/cjs/react.development.js`
+  directly) that in this repo's Jest environment, `import { cache } from
+'react'` resolves to the **plain client-conditions build**, where
+  `exports.cache = fn => (...args) => fn.apply(null, args)` — a bare
+  passthrough with **zero memoization**, not the request-scoped RSC
+  version. Wrapping `getPageBySlug` in `cache()` is therefore silently a
+  no-op in every existing Jest spec (each call still hits the mocked
+  `payload.find` independently, tests pass unchanged) — the real
+  deduplication only happens under Next's actual `react-server` build
+  condition at request time (`generateMetadata` + the page component
+  sharing one `payload.find` call). There is no way to assert the
+  dedup behavior itself from this Jest setup; don't try to fake a test
+  for it (same class of "structural testing gap inherited from the
+  framework" as the `useReducedMotion()` singleton finding from NA-69).
+  `cache()`'s primitive-argument (`slug: string`) shallow-equality
+  requirement (from the `vercel-react-best-practices`
+  `server-cache-react` rule) is satisfied for free here — no inline
+  object args to worry about.
+- Reserved-slug validation fix reads case-insensitively
+  (`RESERVED_SLUGS.includes(value.toLowerCase())`) **before** the
+  kebab-case format regex (`^[a-z0-9]+(?:-[a-z0-9]+)*$`) — order matters
+  for which error message a user sees (`'Home'` hits the reserved-word
+  message, not the format message, since `'home'` is in the reserved
+  list), but either check alone would already reject any uppercase/space/
+  slash input; running reserved-check first just gives the more specific
+  message when both would fire.
+- `apps/marketing` has **zero existing `next/image` usage anywhere in the
+  repo** and no `images.remotePatterns`/`domains` configured in
+  `next.config.mjs` — for the media-block CLS/lazy-load fix, stayed on a
+  raw `<img>` with `width`/`height`/`loading="lazy"` (the finding's stated
+  "at minimum" fallback) rather than introducing `next/image` and its
+  required remote-pattern config as an unrelated, unscoped `next.config`
+  change in a QA fix-only dispatch.
+- Extending `Pages.spec.ts` (a _new_ spec file, collection had none before)
+  to import `./Pages` requires mocking `next/cache` in that spec too —
+  `Pages.ts` → `hooks/revalidatePage.ts` → `next/cache` is a transitive
+  import chain, and the real `next/cache` module drags in enough of
+  Next's server internals to throw `ReferenceError: TextEncoder is not
+defined` under jsdom. Same class of "mock the transitive ESM/Node-only
+  import three hops away" issue logged for NA-39's `richtext-lexical`
+  finding — any new spec that imports a collection config transitively
+  pulling in `revalidatePage.ts` needs the same `jest.mock('next/cache',
+() => ({ revalidatePath: jest.fn() }))` the hook's own spec already has.
+- Per this repo's code-comments-policy (JSDoc blocks not required by lint/
+  doc-gen count as informative comments in costume), stripped every
+  rationale-narrating comment the original NA-70 build introduced across
+  `page.tsx` (the two `dynamicParams`/force-dynamic NOTE comments),
+  `revalidatePage.ts` (both function JSDoc blocks), `lib/pages.ts` (both
+  function JSDoc blocks), and `render-blocks.tsx` (the block-registry
+  JSDoc) — left the pre-existing terser inline comments in the _spec_
+  files alone (e.g. `revalidatePage.spec.ts`'s "minimal shape the hook
+  reads" comment) since the QA finding scoped the ask to design-rationale
+  narration in the implementation files, not test-scaffolding notes.

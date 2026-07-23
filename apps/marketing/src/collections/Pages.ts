@@ -1,9 +1,23 @@
 import type { CollectionConfig } from 'payload';
 
-import { revalidatePage } from '../hooks/revalidatePage';
+import {
+  revalidatePage,
+  revalidatePageOnDelete,
+} from '../hooks/revalidatePage';
 
-/** The four hand-built static routes an editor must not shadow with a CMS page. */
 const RESERVED_SLUGS = ['home', 'faq', 'team', 'why-sdlc'];
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function validateSlug(value: unknown): string | true {
+  if (typeof value !== 'string') return true;
+  if (RESERVED_SLUGS.includes(value.toLowerCase())) {
+    return `"${value}" is a reserved route and cannot be used as a page slug.`;
+  }
+  if (!SLUG_PATTERN.test(value)) {
+    return `"${value}" must be lowercase letters, numbers, and hyphens only (e.g. "my-page").`;
+  }
+  return true;
+}
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
@@ -23,6 +37,7 @@ export const Pages: CollectionConfig = {
   },
   hooks: {
     afterChange: [revalidatePage],
+    afterDelete: [revalidatePageOnDelete],
   },
   fields: [
     {
@@ -31,12 +46,7 @@ export const Pages: CollectionConfig = {
       required: true,
       unique: true,
       index: true,
-      validate: (value: unknown) => {
-        if (typeof value === 'string' && RESERVED_SLUGS.includes(value)) {
-          return `"${value}" is a reserved route and cannot be used as a page slug.`;
-        }
-        return true;
-      },
+      validate: validateSlug,
       admin: {
         description:
           'URL path segment — the page is served at /{slug}. Reserved: home, faq, team, why-sdlc.',

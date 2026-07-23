@@ -1,6 +1,10 @@
 import { revalidatePath } from 'next/cache';
 
-import { revalidatePage, slugToPath } from './revalidatePage';
+import {
+  revalidatePage,
+  revalidatePageOnDelete,
+  slugToPath,
+} from './revalidatePage';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 
@@ -11,6 +15,9 @@ const call = (args: {
   doc: { slug: string };
   previousDoc?: { slug: string };
 }) => (revalidatePage as unknown as (a: typeof args) => unknown)(args);
+
+const callDelete = (args: { doc: { slug: string } | null }) =>
+  (revalidatePageOnDelete as unknown as (a: typeof args) => unknown)(args);
 
 describe('slugToPath', () => {
   it('maps a slug to its served path (no home special-case)', () => {
@@ -46,5 +53,24 @@ describe('revalidatePage', () => {
     });
     const doc = { slug: 'x' };
     expect(call({ doc })).toBe(doc);
+  });
+});
+
+describe('revalidatePageOnDelete', () => {
+  beforeEach(() => mockRevalidatePath.mockReset());
+
+  it('revalidates the deleted doc path', () => {
+    const doc = { slug: 'about' };
+    expect(callDelete({ doc })).toBe(doc);
+    expect(mockRevalidatePath).toHaveBeenCalledWith('/about');
+    expect(mockRevalidatePath).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows a revalidatePath throw and still returns doc', () => {
+    mockRevalidatePath.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    const doc = { slug: 'x' };
+    expect(callDelete({ doc })).toBe(doc);
   });
 });

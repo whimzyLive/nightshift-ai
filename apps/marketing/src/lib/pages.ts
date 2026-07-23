@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
@@ -8,14 +10,8 @@ export interface PageContent {
   content: Page['content'];
 }
 
-/**
- * The published page for `slug`, or null when none matches (route then calls
- * notFound()). depth: 1 populates each `media` block's Media upload (url/alt)
- * and any inline richText upload — depth 0 would leave a bare id and render
- * broken images. Graceful null on any Payload/DB error (lib/faq.ts convention).
- */
-export async function getPageBySlug(slug: string): Promise<PageContent | null> {
-  try {
+export const getPageBySlug = cache(
+  async (slug: string): Promise<PageContent | null> => {
     const payload = await getPayload({ config });
     const { docs } = await payload.find({
       collection: 'pages',
@@ -28,17 +24,9 @@ export async function getPageBySlug(slug: string): Promise<PageContent | null> {
     const doc = docs[0];
     if (!doc) return null;
     return { title: doc.title, content: doc.content };
-  } catch (error) {
-    console.error('[pages]', error);
-    return null;
-  }
-}
+  },
+);
 
-/**
- * Published slugs for generateStaticParams. depth: 0 + select slug reads slugs
- * only (no relationships). Returns [] on any build-time DB failure so the build
- * still succeeds and dynamicParams covers first-hit rendering (NA-16 memory).
- */
 export async function getPublishedPageSlugs(): Promise<
   Array<{ slug: string }>
 > {
