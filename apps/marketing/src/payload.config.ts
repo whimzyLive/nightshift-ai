@@ -8,6 +8,7 @@ import sharp from 'sharp';
 
 import { Faq } from './collections/Faq';
 import { Media } from './collections/Media';
+import { Pages } from './collections/Pages';
 import { Users } from './collections/Users';
 import { WhySdlc } from './globals/WhySdlc';
 
@@ -39,7 +40,7 @@ export default buildConfig({
       },
     },
   },
-  collections: [Faq, Media, Users],
+  collections: [Faq, Media, Pages, Users],
   globals: [WhySdlc],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
