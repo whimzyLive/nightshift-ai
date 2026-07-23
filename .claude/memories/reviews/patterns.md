@@ -130,3 +130,10 @@ releases.
 **Root causes:** (1) Repo convention runs plugin gates as explicit `bash` steps in `.github/workflows/ci.yml`, NOT via nx targets — a new `.test.sh` is invisible to `nx run-many -t test` unless a project target is added or an explicit CI step is wired (the pre-existing `auto-merge-pr.test.sh` set the orphaned precedent). (2) narration habit. (3) inserting numbered §3 steps ahead of an existing one silently invalidates cross-refs that cite step numbers.
 **Preventions:** New `plugins/**/__tests__/*.test.sh` MUST be wired into `.github/workflows/ci.yml` as an explicit bash step (or given a real nx test target) — passing locally ≠ gated. Cite §-anchored guards by stable name/anchor, not mutable step numbers. Keep test scaffolding comment-free per code-comments-policy.
 **Domains affected:** ai-enablement-engineer
+
+## 2026-07-23 — Story NA-68
+
+**Issues found:** none — clean review (first-pass). One Minor observation (non-blocking): the dangling-link check is scoped to targets literally ending in `.md`/`.mdx`, so extensionless Mintlify MDX internal links (e.g. `/how-to/deploy`) are not caught — faithful to the AC's verbatim scoping, flagged as a known coverage limit for a future story.
+**Root causes:** n/a
+**Preventions:** When an AC pins a literal file-extension scope (`.md`/`.mdx`), note the extensionless-link coverage gap explicitly so a follow-up story can widen it rather than it being mistaken for full internal-link coverage.
+**Domains affected:** ai-enablement-engineer
