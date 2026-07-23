@@ -1769,3 +1769,80 @@ reducedMotion ? 0 : N, ease: EASE_OUT }}`. `initial={false}` is Motion's
   "Pattern 1" easing curve (`[0.22, 1, 0.36, 1]`) — no translation needed
   between the design system's token and Motion's array-tuple easing
   format when porting a design-authored `var(--ease-out)` CSS animation.
+
+## 2026-07-24 — Story NA-70 — On-demand ISR for CMS pages (generic Pages collection + `[slug]` route)
+
+**Learnings:**
+
+- **`@testing-library/jest-dom` is not installed anywhere in this repo**
+  (not in `package.json`, not in `pnpm-lock.yaml`, not nested under any
+  other package) — confirmed via `find node_modules -iname jest-dom` and a
+  lockfile grep, both empty. A spec written against jest-dom matchers
+  (`toBeInTheDocument()`, `toHaveAttribute()`, `toBeEmptyDOMElement()`,
+  `toHaveTextContent()`) fails with `TypeError: ... is not a function`,
+  not a normal assertion failure. Since adding a dependency is out of
+  scope for a domain-agent dispatch, rewrite those assertions with plain
+  DOM/JS instead: `getByTestId(...)` already throws if the element is
+  absent (drop the redundant `toBeInTheDocument()` or replace with `.not.toBeNull()`),
+  `img.getAttribute('src')`/`.getAttribute('alt')` instead of
+  `toHaveAttribute`, `container.innerHTML === ''` instead of
+  `toBeEmptyDOMElement()`, `el.textContent` instead of `toHaveTextContent()`.
+- **This repo's Jest is v30** — `--testPathPattern` (singular) was removed;
+  use `--testPathPatterns` (plural). The CLI errors immediately
+  ("was replaced by --testPathPatterns") rather than silently matching
+  nothing, so it's an easy fix once seen, but plan/spec snippets written
+  against the old flag name need this substitution before they'll run.
+- **`pnpm nx migrate <project>` is Nx's own migrate command** (for
+  updating Nx itself / codemods), NOT a way to invoke a project's custom
+  `migrate` target — it tries `pnpm add -w <project>@latest` and fails
+  ("packages field missing or empty"). To run the project's own `migrate`
+  target (defined in this app for Payload's `payload migrate`), use
+  `pnpm nx run <project>:migrate` instead of `pnpm nx migrate <project>`.
+- **`payload migrate` prompts an interactive y/N confirmation** ("It looks
+  like you've run Payload in dev mode... data loss will occur. Would you
+  like to proceed?") whenever the target DB has ever been touched by
+  `getPayload()`'s dev-mode schema push (see NA-31 memory) — even if the
+  actual diff is a no-op relative to the new migration. In a non-interactive
+  shell this just sits waiting for stdin (looks like a hang, not a crash);
+  pipe an answer in: `printf 'y\n' | pnpm exec payload migrate`.
+- **The shared local Postgres (`docker-compose.yml`'s `nightshift_postgres`
+  container) is a single global instance, not per-worktree** — the
+  `container_name` is fixed, so any worktree/session that runs
+  `docker compose up` reuses the same container + volume every other
+  worktree sees. A fresh worktree still needs its own `apps/marketing/.env`
+  (gitignored, not copied by `git worktree add`) pointing at it:
+  `DATABASE_URL=postgres://postgresql:password123@127.0.0.1:5432/nightshift`
+  (creds/db name are the compose file's own defaults) + any placeholder
+  `PAYLOAD_SECRET`. Check `docker ps` first — if the container's already
+  `Up (healthy)` from another session, you don't need to start it yourself,
+  just add the matching `.env`.
+- **nightshift-design's `npm run validate` gate is scoped to the skill's
+  own `components/`/`ui_kits/` directories only** (see its `package.json`:
+  `check:tokens`/`check:contrast`/`lint` all point at paths inside the
+  skill, not at the consuming app). It does not scan `apps/marketing` at
+  all, so there is nothing to run there for an app-level UI change — the
+  design-adherence check for app code has to be a manual token review
+  instead: grep the new markup for raw Tailwind color/radius utilities
+  that shadow a token (e.g. `text-neutral-400` should be
+  `style={{ color: 'var(--text-muted)' }}` per the existing
+  `components/faq/faq-hero.tsx` convention — this repo consumes design
+  tokens via inline `style` referencing the CSS custom property, not
+  generated Tailwind utility classes like `text-muted`), and drop any
+  `rounded-*` utility entirely (the design system's radius scale is
+  overridden to `0` — see `nightshift-design` skill's "Radius: SHARP" —
+  so a non-zero Tailwind default radius silently fights the brand token
+  even though Tailwind itself doesn't error on it).
+- `apps/marketing`'s `eslint.config.mjs` registers `@next/eslint-plugin-next`
+  as a plugin but never turns on any of its rules (no `rules` block
+  referencing `@next/next/*`) — an `eslint-disable-next-line
+@next/next/no-img-element` comment copied from a plan/spec snippet
+  written against a default Next.js ESLint config produces an "Unused
+  eslint-disable directive" **warning** here (not an error, so it doesn't
+  fail the gate, but it's not clean either). Check whether the rule is
+  actually active in this app's flat config before adding a disable
+  comment for it; if it isn't, drop the comment.
+- Payload's generated `Page['content']` type (from a `blocks`-type field)
+  is a discriminated union on `blockType` (`{ blockType: 'richText'; richText: ... } | { blockType: 'media'; media: ...; caption?: ... }`)
+  and narrows cleanly in a plain `switch (block.blockType)` — no manual
+  type guards needed, same as any other Payload-generated discriminated
+  union (c.f. the `NumberFieldSingleValidation` factory note from NA-31).
