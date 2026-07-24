@@ -130,11 +130,15 @@ const AMBIENT_METEOR_MS = 4200;
 const AMBIENT_METEOR_CHANCE = 0.55; // skip when Math.random() < this
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
 
-// A1 — moon SETS on its own (right) side, fully exiting the fixed viewport-
-// sized layer well before the page bottom (clamped via useTransform's
-// default clamp — progress past the end of the range holds at the end
-// value). Reduced motion binds directly to these end values.
-const MOON_SET_RANGE: [number, number] = [0, 0.74];
+// A1 — moon SETS on its own (right) side, exiting the fixed viewport-
+// sized layer by the page bottom (clamped via useTransform's default
+// clamp — progress past the end of the range holds at the end value).
+// Reduced motion binds directly to these end values.
+// The set is spread over the FULL document scroll (range end 1.0) — the
+// slowest a scroll-linked descent can go while still fully resolving by
+// the footer (~25% slower than the original 0.74). Going slower than
+// this would leave the moon still visible at the bottom.
+const MOON_SET_RANGE: [number, number] = [0, 1.0];
 const MOON_SET_Y_PX = 820;
 const MOON_SET_X_PX = 50;
 // A1 — dawn backdrop: ramps in from roughly the mid-page mark so it's
