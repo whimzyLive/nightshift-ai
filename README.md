@@ -32,8 +32,8 @@ AI coding assistants are great at the middle 20%. nightshift automates the other
 
 **nightshift** is a Claude Code plugin marketplace. Its flagship plugin, **`sdlc`**, installs a repo-agnostic software-delivery team:
 
-- **11 specialized agents** — one per role, each with a tight charter and clean handoff protocol.
-- **10 slash commands** — the whole lifecycle, one verb at a time: `/spec`, `/plan`, `/impl`, `/review`, plus a one-shot `/auto`.
+- **A full team of specialized agents** — one per role, each with a tight charter and clean handoff protocol.
+- **The whole lifecycle as slash commands** — one verb at a time: `/spec`, `/plan`, `/impl`, `/review`, plus a one-shot `/auto`.
 - **Issue-tracker native** — reads a ticket, derives the branch, the plan path, the PR. Closes the loop back to Jira/GitHub.
 - **Zero hardcoding** — every project-specific fact (stack, paths, Jira key, base branch) lives in one config file per repo. The agents are 100% generic. Install once, use everywhere.
 
@@ -100,34 +100,15 @@ Three ideas do all the heavy lifting:
 
 ## 👥 Meet your team
 
-| Agent                      | Owns                                                                 |
-| -------------------------- | -------------------------------------------------------------------- |
-| **product-manager**        | Vague idea → PRD with binary acceptance criteria                     |
-| **solutions-architect**    | PRD → technical design / spec                                        |
-| **scrum-master**           | Story slicing, mapping, splitting                                    |
-| **tech-lead**              | Spec → ordered, verifiable implementation plan                       |
-| **principal-engineer**     | Orchestrates the build, dispatches domain agents in dependency order |
-| **platform-engineer**      | Backend / infrastructure / serverless                                |
-| **web-engineer**           | Web UI                                                               |
-| **mobile-engineer**        | Mobile apps                                                          |
-| **database-administrator** | Schema, migrations, data                                             |
-| **sync-engineer**          | Offline / sync layer                                                 |
-| **qa-engineer**            | Always-on review → quality gate → AC verification → PR               |
+Each stage of the lifecycle is owned by a separate agent with its own charter and a clean handoff to the next — from the Product Manager who turns a ticket into a PRD, through the Solutions Architect, Tech Lead, and domain Engineers (platform, web, mobile, database, sync), to the always-on QA Engineer that gates the merge. Standby roles activate only when your `project-context.md` says your project has them — a backend-only repo never spins up the mobile engineer.
 
-Standby roles activate only when your `project-context.md` says your project has them — a backend-only repo never spins up the mobile engineer.
+📖 **Every agent and its charter, always current → [`docs/reference/agents/`](docs/reference/agents/)** — generated from the plugin sources, so the roster never drifts as roles are added.
 
 ## 🎛️ The commands
 
-| Command                            | Does                                                                           |
-| ---------------------------------- | ------------------------------------------------------------------------------ |
-| `/init`                            | Onboard a repo — scaffold `project-context.md` + agent overrides interactively |
-| `/auto <TICKET>`                   | The whole pipeline, end to end                                                 |
-| `/refine-feature`, `/refine-issue` | Sharpen a raw idea or ticket before work starts                                |
-| `/prd`, `/stories`                 | Product definition + story breakdown                                           |
-| `/spec`                            | Produce the technical spec                                                     |
-| `/plan`                            | Break the spec into an ordered plan                                            |
-| `/impl`                            | Execute the plan with domain agents                                            |
-| `/review`, `/review-fix`           | Review against the spec, then fix what review found                            |
+Run one verb at a time — `/spec`, `/plan`, `/impl`, `/review` — or the whole pipeline end to end with `/auto`. Onboard a repo with `/init`, sharpen raw tickets with `/refine-issue`, and break epics down with `/prd` and `/stories`.
+
+📖 **Full command list with usage, always current → [`docs/reference/commands/`](docs/reference/commands/)** — generated from the command sources, so a newly added command shows up automatically and this README never advertises a stale set.
 
 ## 🔧 Configure your repo
 

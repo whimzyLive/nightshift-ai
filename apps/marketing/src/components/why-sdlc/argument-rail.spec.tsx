@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import { ArgumentRail } from './argument-rail';
 import { useScrollProgress } from './scroll-progress';
@@ -103,13 +103,34 @@ describe('ArgumentRail', () => {
     const { container } = render(<ArgumentRail args={FIVE_ARGS} />);
     const nodes = Array.from(container.querySelectorAll('[data-gate-state]'));
     expect(nodes[0].getAttribute('data-gate-state')).toBe('passed');
-    expect(nodes[0].textContent).toBe('✓');
+    // Passed gates draw in a GateCheck svg instead of the plain '✓' glyph —
+    // it still needs an accessible name in place of that glyph's own text.
+    const passedSvg = nodes[0].querySelector('svg');
+    expect(passedSvg).toBeTruthy();
+    expect(passedSvg?.getAttribute('role')).toBe('img');
+    expect(passedSvg?.getAttribute('aria-label')).toBe('passed');
     expect(nodes[1].getAttribute('data-gate-state')).toBe('current');
     expect(nodes[1].textContent).toBe('⊘');
     expect(nodes[2].getAttribute('data-gate-state')).toBe('idle');
     expect(nodes[2].textContent).toBe('⊘');
     expect(nodes[3].getAttribute('data-gate-state')).toBe('idle');
     expect(nodes[4].getAttribute('data-gate-state')).toBe('idle');
+  });
+
+  it('renders the passed-gate check fully drawn immediately under reduced motion', async () => {
+    window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    })) as unknown as typeof window.matchMedia;
+
+    mockUseScrollProgress.mockReturnValue({ reached: 2, active: 1 });
+    const { container } = render(<ArgumentRail args={FIVE_ARGS} />);
+    await waitFor(() => {
+      const path = container.querySelector('[data-gate-state="passed"] path');
+      expect(path?.getAttribute('stroke-dasharray')).toBe('1 1');
+    });
   });
 
   it('shows the active illustration and the n/5 · caption footer for active', () => {

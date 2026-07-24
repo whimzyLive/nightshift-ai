@@ -1,6 +1,9 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
+import { isDbConfigured, warnDbNotConfiguredOnce } from './db-config';
+import { withDbFallback } from './with-db-fallback';
+
 import type { Faq } from '../payload-types';
 
 export interface HomeFaqItem {
@@ -12,14 +15,21 @@ export interface HomeFaqItem {
 /**
  * Top-5 FAQs for the home preview accordion, ordered by `homeOrder`.
  * `homeAnswer` (the shorter, home-tuned copy) wins over `answer` when set —
- * mirrors the seed data's own convention (see seed/data.ts). Falls back to
- * an empty list on any Payload/DB failure so the section simply renders
- * nothing rather than throwing (same convention as the NA-16 findGlobal
- * fallback).
+ * mirrors the seed data's own convention (see seed/data.ts). Rethrows on a
+ * connection/init failure so a DB outage fails the build; swallows an
+ * isolated row-level defect to an empty list. Short-circuits to the empty
+ * fallback (no connection attempt) when `DATABASE_URL` isn't configured —
+ * e.g. a CI build without secrets — rather than treating that as an outage.
  */
 export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
-  try {
-    const payload = await getPayload({ config });
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return [];
+  }
+
+  const payload = await getPayload({ config });
+
+  return withDbFallback('[faq]', [], async () => {
     const { docs } = await payload.find({
       collection: 'faq',
       where: { showOnHome: { equals: true } },
@@ -33,10 +43,7 @@ export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
       question: doc.question,
       answer: doc.homeAnswer ?? doc.answer,
     }));
-  } catch (error) {
-    console.error('[faq]', error);
-    return [];
-  }
+  });
 }
 
 type FaqGroup = Faq['group'];
@@ -67,12 +74,20 @@ const FAQ_GROUP_EYEBROW: Record<NonNullable<FaqGroup>, string> = {
 /**
  * All FAQs for the standalone /faq page, ordered by `faqOrder`, partitioned
  * into topic groups in first-appearance order. Uses the full `answer` field
- * (not `homeAnswer`). Returns [] on any Payload/DB failure — same
- * graceful-empty convention as getHomeFaqs.
+ * (not `homeAnswer`). Rethrows on a connection/init failure so a DB outage
+ * fails the build; swallows an isolated row-level defect to an empty list —
+ * same convention as getHomeFaqs, including the DATABASE_URL-unset
+ * short-circuit.
  */
 export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
-  try {
-    const payload = await getPayload({ config });
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return [];
+  }
+
+  const payload = await getPayload({ config });
+
+  return withDbFallback('[faq]', [], async () => {
     const { docs } = await payload.find({
       collection: 'faq',
       sort: 'faqOrder',
@@ -103,8 +118,5 @@ export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
     }
 
     return groups;
-  } catch (error) {
-    console.error('[faq]', error);
-    return [];
-  }
+  });
 }

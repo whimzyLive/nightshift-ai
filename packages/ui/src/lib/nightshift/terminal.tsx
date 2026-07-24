@@ -1,14 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { animate, motion, useMotionValue } from 'motion/react';
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
+import { prefersReducedMotion } from './prefers-reduced-motion';
+import { useInViewOnce } from './use-in-view-once';
 
 // jsdom's HTMLMediaElement stub returns undefined from play(); a real browser
 // returns a Promise that rejects when autoplay is blocked. Swallow both — a
@@ -58,6 +54,15 @@ export interface TerminalProps {
    * `clamp(...)` string) to reserve space / scale with the viewport.
    */
   minHeight?: number | string;
+  /**
+   * Defer the scripted-line reveal until the terminal scrolls into view
+   * (via the shared `useInViewOnce()` hook) instead of starting immediately
+   * on mount. Default: false — every existing call site keeps its current
+   * mount-reveal behaviour unchanged. Reduced motion (or an unsupported
+   * `IntersectionObserver`) still renders every line immediately regardless
+   * of this flag.
+   */
+  revealOnView?: boolean;
   className?: string;
 }
 
@@ -112,6 +117,7 @@ export function Terminal({
   lines = [],
   video,
   minHeight = 360,
+  revealOnView = false,
   className = '',
 }: TerminalProps) {
   const [visibleCount, setVisibleCount] = useState(1);
@@ -122,6 +128,16 @@ export function Terminal({
   const [playing, setPlaying] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Only consulted when `revealOnView` is set — the reveal effect below is
+  // otherwise indifferent to `inView`.
+  const { ref: viewRef, inView } = useInViewOnce<HTMLDivElement>();
+  const setWrapRefs = useCallback(
+    (el: HTMLDivElement | null) => {
+      wrapRef.current = el;
+      viewRef.current = el;
+    },
+    [viewRef],
+  );
 
   useEffect(() => setReduced(prefersReducedMotion()), []);
 
@@ -133,6 +149,8 @@ export function Terminal({
   // scaleX, so the bar tracks the clip every frame without re-rendering React.
   const progress = useMotionValue(0);
 
+  const revealGate = revealOnView ? inView : true;
+
   // Reveal cadence + loop — a single Motion tween of a counter, looping.
   // Skipped entirely in video mode (the body is a <video>, not lines).
   useEffect(() => {
@@ -141,6 +159,8 @@ export function Terminal({
       setVisibleCount(lines.length);
       return;
     }
+    // Stays on the deterministic first-line frame until `revealGate` opens.
+    if (!revealGate) return;
     setVisibleCount(1);
     const total = lines.length;
     // Reveal once, then stop (no infinite loop — that kept burning frames).
@@ -160,7 +180,7 @@ export function Terminal({
       onComplete: () => setVisibleCount(total),
     });
     return () => controls.stop();
-  }, [lines.length, replayNonce, video]);
+  }, [lines.length, replayNonce, video, revealGate]);
 
   // Video mode: autoplay the muted loop unless reduced motion, where it rests
   // on its poster with native controls. `play()` may be blocked by the
@@ -306,7 +326,7 @@ export function Terminal({
 
   return (
     <motion.div
-      ref={wrapRef}
+      ref={setWrapRefs}
       className={`rounded-none border ${className}`}
       style={{
         rotateX,

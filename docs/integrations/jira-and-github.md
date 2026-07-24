@@ -10,7 +10,7 @@ related-adrs: []
 
 Connect this repo's sdlc plugin to Jira Cloud and GitHub. When done, the pipeline can read stories from Jira and open PRs on GitHub. `/sdlc:init` gates on both integrations before it writes any config, so wire them first.
 
-For what the pipeline does with these connections, see [docs/concepts/what-is-the-sdlc-plugin.md](docs/concepts/what-is-the-sdlc-plugin.md). For a first end-to-end run, see [docs/tutorials/getting-started-with-sdlc.md](docs/tutorials/getting-started-with-sdlc.md).
+For what the pipeline does with these connections, see [docs/concepts/what-is-the-sdlc-plugin.md](../concepts/what-is-the-sdlc-plugin.md). For a first end-to-end run, see [docs/tutorials/getting-started-with-sdlc.md](../tutorials/getting-started-with-sdlc.md).
 
 ## Prerequisites
 
@@ -116,4 +116,4 @@ Confirm each integration before running the pipeline.
 
   The first returns the story-point value; the second lists any stories carrying an AI Workflow mode.
 
-Once all four checks pass, run `/auto <KEY>-<n>` to put a story through the pipeline. See [docs/tutorials/getting-started-with-sdlc.md](docs/tutorials/getting-started-with-sdlc.md) for a guided first run.
+Once all four checks pass, run `/auto <KEY>-<n>` to put a story through the pipeline. See [docs/tutorials/getting-started-with-sdlc.md](../tutorials/getting-started-with-sdlc.md) for a guided first run.

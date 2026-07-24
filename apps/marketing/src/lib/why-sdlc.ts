@@ -1,6 +1,9 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
+import { isDbConfigured, warnDbNotConfiguredOnce } from './db-config';
+import { withDbFallback } from './with-db-fallback';
+
 import type { Faq, WhySdlc } from '../payload-types';
 
 export interface WhySdlcArgument {
@@ -28,13 +31,21 @@ export interface WhySdlcFaqItem {
 }
 
 /**
- * The `whySdlc` global — intro block + the five argument sections. Falls
- * back to `null` on any Payload/DB failure (NA-16 findGlobal convention) so
- * the hero/argument sections simply render nothing rather than throwing.
+ * The `whySdlc` global — intro block + the five argument sections. Rethrows
+ * on a connection/init failure so a DB outage fails the build; swallows an
+ * isolated row-level defect to `null` so the hero/argument sections simply
+ * render nothing. Short-circuits to `null` (no connection attempt) when
+ * `DATABASE_URL` isn't configured — e.g. a CI build without secrets.
  */
 export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
-  try {
-    const payload = await getPayload({ config });
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return null;
+  }
+
+  const payload = await getPayload({ config });
+
+  return withDbFallback('[why-sdlc]', null, async () => {
     const global = await payload.findGlobal({ slug: 'whySdlc', depth: 0 });
 
     return {
@@ -50,21 +61,26 @@ export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
         body: row.body,
       })),
     };
-  } catch (error) {
-    console.error('[why-sdlc]', error);
-    return null;
-  }
+  });
 }
 
 /**
  * The 2-question page FAQ, ordered by `whySdlcOrder`. `whySdlcAnswer` (the
  * page-tuned richText override) wins over `answer` when set — mirrors
- * `getHomeFaqs`'s `homeAnswer` convention (see faq.ts). Falls back to an
- * empty list on any Payload/DB failure.
+ * `getHomeFaqs`'s `homeAnswer` convention (see faq.ts). Rethrows on a
+ * connection/init failure so a DB outage fails the build; swallows an
+ * isolated row-level defect to an empty list. Short-circuits to the empty
+ * fallback (no connection attempt) when `DATABASE_URL` isn't configured.
  */
 export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
-  try {
-    const payload = await getPayload({ config });
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return [];
+  }
+
+  const payload = await getPayload({ config });
+
+  return withDbFallback('[why-sdlc]', [], async () => {
     const { docs } = await payload.find({
       collection: 'faq',
       where: { showOnWhySdlc: { equals: true } },
@@ -78,8 +94,5 @@ export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
       question: doc.question,
       answer: doc.whySdlcAnswer ?? doc.answer,
     }));
-  } catch (error) {
-    console.error('[why-sdlc]', error);
-    return [];
-  }
+  });
 }

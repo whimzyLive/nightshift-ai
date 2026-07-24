@@ -1,3 +1,493 @@
+## 2026-07-24 — Story NA-71 — render marketing site as static build output (force-dynamic removal + helper-catch narrowing)
+
+**Learnings:**
+
+- Chose a simpler mechanism than the plan's suggested regex hack for
+  distinguishing "getPayload init failure" from "query failure": moved
+  `const payload = await getPayload({ config });` **outside** the
+  try/catch entirely in all four `lib/faq.ts`/`lib/why-sdlc.ts` helpers, so
+  a `getPayload` init throw (missing `PAYLOAD_SECRET`, adapter construction,
+  connection refused) always propagates unconditionally — no
+  `isConnectionOrInitError`/message-sniffing needed for that half. Only the
+  `payload.find`/`payload.findGlobal` **query** rejection goes through the
+  classifier (`is-connection-error.ts`, pure `code`-based check for
+  `ECONNREFUSED`/`ENOTFOUND`/`ETIMEDOUT`/`ECONNRESET` or SQLSTATE `08*`/`28*`).
+  This is DRY, avoids fragile `/getPayload|PAYLOAD_SECRET|adapter/i` message
+  regex, and the plan's own literal test (`mockGetPayload.mockRejectedValueOnce`
+  with an `ECONNREFUSED`-coded error, asserting `rejects.toThrow`) passes
+  identically either way — the plan explicitly left the mechanism open
+  ("implementer's choice"), so this simplification is in-bounds.
+- Proved the "outage fails the build" AC (NA-71 Task 3 Step 4) with a single
+  inline env override — `DATABASE_URL='postgres://invalid:invalid@127.0.0.1:1/none' pnpm nx build @nightshift-ai/marketing`
+  — rather than touching the committed `.env` file. Next's dotenv loading
+  does not override an already-set `process.env` var, so the shell-inlined
+  bogus `DATABASE_URL` wins over `.env`'s real value for that one process,
+  and the real `.env` is untouched/needs no restore step. Confirmed the
+  build fails with `Export encountered an error on /(frontend)/page: /,
+exiting the build` and a non-zero exit — the connection error propagates
+  straight from `getPayload({config})`'s pg-pool init (no classifier
+  involvement needed since it's outside the try).
+- Confirmed the build-reaches-DB AC (build succeeds with **populated**
+  content, not just a green exit code) by grepping the actual generated
+  static HTML (`apps/marketing/.next/server/app/faq.html`) for real FAQ
+  question text (`Isn't this just another AI code-writer wrapper?` etc.) —
+  a successful build alone doesn't prove the CMS read wasn't silently
+  swallowed to an empty fallback; reading the emitted HTML does.
+- This story's diff **directly reverses** the conventions codified in
+  **ADR 0009** (try/catch-to-defaults fallback for public-route CMS reads —
+  "any error" swallowed) and **ADR 0010** (force-dynamic rendering +
+  production-migration requirement for CMS-backed routes), both currently
+  `status: accepted` and both listed in this agent's ADR-index section. Per
+  the domain-agent-handoff ADR-check rule, an `accepted` ADR match means
+  soft-skip re-appending the **same** learning — but this is the opposite
+  case (the implementation now contradicts the ADR's stated convention, not
+  duplicates it), so it is NOT a skip candidate; flagging here instead since
+  superseding an ADR's `status:` field is the knowledge-engineer/ADR-pipeline's
+  job (`docs/adr/` is outside web-engineer's ownership per project-context),
+  not something to hand-edit from this dispatch.
+- `vercel-react-best-practices` was the only override skill with applicable
+  surface for this story (Next.js rendering-mode change + async
+  server-component data-fetching helpers) — same "applicable, not all 7"
+  pattern as the NA-39 non-visual story. Skipped `nightshift-design`,
+  `payload`, `tailwind-design-system`, `vercel-composition-patterns`,
+  `atomic-design`, `motion-dev-animations`: zero visual/UI/copy change, zero
+  Payload collection/hook/config touch (only pre-existing Local API
+  consumer calls), zero component composition/animation work — the whole
+  diff is a rendering-mode flag removal + an error-classification refactor.
+
+**Patterns:**
+
+- Existing generic-error tests (`new Error('db unreachable')`, no `code`
+  property) needed **no changes** under the new narrowed catch — a plain
+  `Error` with no `code` fails `isConnectionOrInitError`'s `typeof code ===
+'string'` check and falls through to the swallow branch exactly as before,
+  so pre-existing "returns [] instead of throwing" tests stayed green
+  unmodified. Only needed new tests for the newly-introduced rethrow branch
+  (errors carrying a real connection `code`) plus one retitle (row-level
+  defect tests switched their thrown value from a bare `Error` to a
+  `TypeError` to make the "this is NOT a connection error" intent explicit
+  in the test itself, though a bare `Error` would have passed too).
+
+## 2026-07-23 — Story NA-69 — A1 "vibrant morning" variant (A/B against feat/NA-69-dawn-subtle)
+
+**Learnings:**
+
+- This dispatch was explicitly building a **second, bolder A/B variant of
+  the same feature on the same branch** the subtle version already shipped
+  on (`feat/NA-69-dawn-subtle` holds the subtle one; `feat/NA-69` — this
+  branch — got overwritten with the vibrant one). When a user wants to
+  compare two takes on one visual beat, the pattern is: same file, values
+  swapped/escalated in place (not two components/props) — kept every
+  scroll-linked motion value (`sunRiseY`, `sunOpacity`, `moonSetX/Y`) and
+  the whole reduced-motion/variant-gating structure identical, only the
+  _visual content_ (gradients, box-shadow corona, disc size, cloud shape)
+  changed. This kept the diff reviewable as "same choreography, richer
+  paint" rather than a rewrite.
+- Built a "proper sun" (vs. a glow blob) by literally composing THREE
+  scroll-synced elements sharing the same `sunRiseY`/`sunOpacity` motion
+  values: a `repeating-conic-gradient` rays layer (rendered first, painted
+  once, blurred), a radial-gradient disc with a bright warm core
+  (`--moon-100` → `--amber-400` → `--terra-400/600`), and a static
+  (never-tweened) two-layer `box-shadow` corona on the disc itself — same
+  "static box-shadow, only the _element's_ opacity/position animate"
+  convention the moon's own crescent-glow already established. All three
+  layers riding the _same_ motion values kept them visually locked together
+  with zero extra wiring.
+- A classic CSS "cloud" fake — `border-radius: 50%` base shape plus 1-2
+  **static, unanimated** `box-shadow` copies at horizontal offsets with
+  negative spread (`30px 5px 0 -5px rgba(...)`) — reads as a multi-lobe
+  puff silhouette with a single element and zero extra DOM nodes. Confirmed
+  this doesn't violate the "no box-shadow animation" perf rule: the
+  box-shadow value itself never changes after mount; only the element's own
+  `opacity` (motion value) and `x` (`animate` keyframe drift) move.
+- `--amber-400`/`--amber-tint` (`#e0a458` / `rgba(224,164,88,0.14)`) were
+  already in `tokens/colors.css` (used today only for `--warning`) but
+  completely unused elsewhere in the marketing app — a legitimate, on-brand
+  "brighter warm" step between `--moon-100` (near-white) and `--terra-400`
+  (mid terracotta) for a sun's core, without inventing an off-token hue
+  family (no "rose"/"gold" scale exists in this DS — checked the full
+  manifest dump before assuming one existed).
+- Re-confirmed (this is now the 3rd time this exact story) that
+  `.claude/skills/nightshift-design/scripts/check-tokens.mjs` only scans
+  the _skill's own_ docs/manifest for hex drift, never `apps/marketing/src`
+  or `packages/ui/src` — so literal `rgba(224,164,88,0.55)` etc. in
+  application source (matching a real token's RGB triplet at a custom
+  alpha) never trips `npm run validate`, regardless of how many new custom
+  alphas a variant introduces.
+
+## 2026-07-23 — Story NA-69 — A1 evolved into moon-sets/sun-rises choreography
+
+**Learnings:**
+
+- Reconfirmed the `useReducedMotion()` module-singleton testing limitation
+  (already logged in an earlier NA-69 entry) the hard way: wrote a test
+  asserting the new sun disc's opacity===1 "under reduced motion" without
+  actually forcing it, and it failed — `animate` defaults `true` in this
+  spec file (no prior test in it ever gets a reduced-motion mock to stick),
+  so at `scrollYProgress = 0` the sun's `useTransform(scrollYProgress,
+SUN_RISE_RANGE, [0, 1])` correctly clamps to its pre-range output (`0`),
+  not `1`. Fixed by rewriting the test to honestly assert the default
+  (non-reduced) initial state instead of a reduced-motion state this file
+  structurally can't produce — same resolution as the earlier dawn-backdrop
+  entry, now also applies to the sun/cloud elements.
+- `useTransform`'s default `clamp: true` is what makes "resolve before the
+  page bottom" trivial to implement for a scroll-driven range: mapping
+  `scrollYProgress` through a sub-range like `[0, 0.74]` (moon set) or
+  `[0.42, 0.8]` (sun rise) means progress _outside_ that sub-range
+  automatically holds at the nearest end of the output range — no manual
+  min/max clamping logic needed to make an effect "finish early."
+- Composed the new sun-rise/cloud-drift motion values the same
+  nested-wrapper-safe way established for the moon: `style={{ y:
+sunRiseY, opacity: sunOpacity }}` (both scroll-driven MotionValues) sits
+  fine alongside a _separate_ `animate={{ x: [...] }}` keyframe prop on the
+  cloud elements — Motion lets a `style`-driven MotionValue and an
+  `animate`-prop keyframe target coexist on the same component as long as
+  they're different CSS properties (opacity/y via style, x via animate);
+  no conflict the way two motion values on the _same_ axis would collide
+  (the reason the moon's own scroll-arc vs pointer-parallax composition
+  needs nested wrappers in the first place).
+- "sets on its current side" from the user directly overrode my own earlier
+  retune's arbitrary leftward drift (`MOON_ARC_X_PX = -70`, chosen only to
+  "read as an arc") — flipped to a small _rightward_ drift (`+50`) so the
+  moon continues toward the same top-right corner it started in, rather
+  than arcing across toward center-left. A generic "make it read as an arc"
+  choice made without an explicit directional requirement is exactly the
+  kind of assumption a later, more specific instruction can override —
+  don't be surprised when it does.
+
+## 2026-07-23 — Story NA-69 — A1 moon-arc/dawn invisible: root-caused + retuned
+
+**Learnings:**
+
+- Confirmed via Framer Motion's own source (`framer-motion/dist/es/render/dom/scroll/track.mjs`)
+  that `useScroll()` with no `target`/`container` defaults to `container =
+document.scrollingElement` and binds its scroll listener to `window` — the
+  standard whole-page-scroll mechanism, and structurally sound for this app
+  (plain `<body class="min-h-screen">`, no inner `overflow-y` container
+  anywhere in `layout.tsx`/`global.css` competing for the scroll role). **The
+  scroll signal itself was never the bug** — ruled this out at the source
+  level rather than assuming it from the reported symptom.
+- The REAL root cause was two-layered, and the second layer is the
+  non-obvious one: (1) `MOON_ARC_Y_PX`'s original `-70` was small enough to
+  be swallowed by the moon's own pre-existing 20s idle float (`y:[0,-22,0]`,
+  44px peak-to-peak) — comparable magnitude, so the scroll-driven component
+  read as noise; AND (2) **NightSky is `position:fixed`, painted behind
+  normal-flow page content — its visibility at any given scroll position is
+  gated entirely by whether the section currently occupying that screen
+  region has an opaque background.** Audited every home section's own
+  background: `ProofBar` (`--surface-card`), `HowItWorks`/`TeamPreview`/
+  `ControlSection`/`FinalCta` (all `--bg-void`) are OPAQUE; `Hero`/
+  `ProblemSection`/`DayNightWorkflow`/`WhyDifferent`/`FaqPreview` are
+  transparent (no `background` set, letting the fixed sky show through).
+  Since the original `DAWN_RAMP_RANGE` (`[0.72, 1]`) only ramped opacity
+  during the page's FINAL stretch — which is dominated by `ControlSection`
+  and `FinalCta`, **both opaque** — the dawn tint could reach 100% opacity
+  and _still never be visible_, because the opaque section painted on top
+  of the fixed background layer hides it completely regardless of its own
+  opacity. Retuned the range to `[0.42, 0.85]` so the ramp is well underway
+  during the transparent `WhyDifferent`/`FaqPreview` sections and fully
+  ramped (opacity pinned at 1) by the time the reader reaches `FinalCta` —
+  the tint is then visible again through `Footer`'s translucent
+  `--glass-footer-bg` (confirmed via `global.css`: `rgba(8,8,15,0.5→0.78)`,
+  not opaque). A "make the opacity ramp reach 1 sooner" fix alone (without
+  this occlusion-mapping) would have looked identical in every code review
+  but stayed just as invisible in the browser.
+- `.claude/skills/nightshift-design/scripts/check-tokens.mjs` (the
+  `npm run validate` token-drift gate) only scans the **skill's own** docs
+  (`SKILL.md`, `README.md`, `references/*.md`) plus its `_ds_manifest.json`
+  for stray hex values — it never touches `apps/marketing/src` or
+  `packages/ui/src`. A literal `rgba(217,119,87,0.42)` in application source
+  (reusing `--terra-500`'s exact RGB triplet at a deliberately richer alpha
+  than the `--terra-glow`/`--terra-tint` tokens provide) does not trip this
+  gate — confirmed by reading the script rather than assuming app source is
+  covered.
+
+**Patterns:**
+
+- When a scroll/viewport-driven effect is reported "invisible" on a real
+  page (not a component in isolation), map **every ancestor/overlapping
+  section's own background opacity** before touching amplitude or ranges —
+  a `position:fixed` background layer's reachable-opacity ceiling is capped
+  by whatever opaque content currently paints over it, independent of its
+  own computed opacity value.
+
+## 2026-07-23 — Story NA-69 — 3 user-requested post-ship changes (remove C3 terminal, revert A3 morph, fix Star magnetic pull)
+
+**Learnings:**
+
+- **jsdom has no native `PointerEvent` constructor at all** (`'PointerEvent'
+  in window` is `false`; `new window.PointerEvent(...)` throws
+  "not a constructor"). `@testing-library/dom`'s `fireEvent.pointerMove(el,
+{clientX, clientY})` doesn't fail or warn about this — it silently
+  dispatches an event whose `clientX`/`clientY` read back as `undefined`,
+  which propagates into `(undefined - rect.left) / rect.width` → `NaN`.
+  Every existing `MagneticCta` pointer test (mine, from the original B1
+  commit) was asserting `transform !== 'translateX(0px)'`, which a NaN
+  transform (`"translateX(NaNpx) translateY(NaNpx)"`) also satisfies — a
+  false-positive that had been green since B1 landed. `MouseEvent` (used by
+  `fireEvent.mouseMove`/`mouseLeave`) **is** natively implemented in jsdom
+  with working `clientX`/`clientY` — switched `MagneticCta` from
+  `onPointerMove`/`onPointerLeave` to `onMouseMove`/`onMouseLeave` (a
+  legitimate, narrower-scoped choice for a desktop-only hover-follow effect
+  that never needed touch/pen data), which both plausibly fixes whatever
+  the user actually observed in a real browser and — more importantly —
+  makes the existing test suite capable of catching a real regression
+  instead of silently passing on garbage. Any _other_ component in this kit
+  still using `onPointerMove`/`onPointerLeave` inherits the same untested-
+  by-jsdom risk and is worth auditing the same way if a similar "should be
+  working but doesn't feel right" report comes in.
+- Root-caused via a disposable, temporarily-committed-then-deleted probe
+  spec (`__star-probe.spec.tsx`) plus one throwaway `console.log` inside
+  `magnetic-cta.tsx` itself (reverted before the real fix) — cheaper and
+  more conclusive than reasoning about CSS/DOM structure from first
+  principles alone, especially once several plausible code-level
+  hypotheses (wrapping, CSS transition lists, `pointer-events`, stacking
+  contexts) were individually ruled out by direct source inspection and
+  still left no explanation.
+- Reverting an already-shipped Motion feature (A3's shared-`layoutId`
+  morph) cleanly is mostly the _inverse_ of the original diff: drop the
+  `layoutId` props (tree row dot/name, panel dot/name), delete the
+  `AnimatePresence`-wrapped `motion.div` panel body back to a plain `div`
+  tree, delete the panel-only dot block entirely (the pre-feature version
+  never had one), and drop the now-unused `EASE_OUT`/`AnimatePresence`
+  imports and the `activeRow` lookup that only existed to gate the morph.
+  `git show <pre-feature-commit>:<path>` is the fastest way to get an exact
+  structural reference to diff a revert against, rather than trying to
+  recall/reconstruct the "before" shape from memory.
+- Removing a whole rendered sub-feature (C3's commit-example `Terminal`)
+  from a page component is a 3-part removal: the JSX block, the data
+  const it rendered (`COMMIT_LINES`), and the now-unused named imports
+  (`Terminal`, `TerminalLine`) — a partial removal (JSX only) would leave
+  an unused-import lint error.
+
+**Patterns:**
+
+- This dispatch ran in the **primary checkout** (not a worktree) because a
+  human had it checked out with a live dev server for hot-reload viewing —
+  confirmed via `pwd`/`git branch --show-current` before any edit, per the
+  coordinator's explicit redirection for this one dispatch. The workflow
+  (skills, verify gates, commit-not-push) is otherwise identical to the
+  worktree flow; only the working directory and the "don't touch
+  next-env.d.ts, it's not yours" caveat differ.
+
+## 2026-07-23 — Story NA-69 — high-effort PR review round (6 findings)
+
+**Learnings:**
+
+- `position: fixed` on a descendant is scoped to the nearest ancestor with a
+  CSS transform (or `filter`/`perspective`/`will-change: transform`, per the
+  CSS spec's "containing block" rules) — a `motion.div` animating `y` (even
+  a small 16px rise) anywhere in the tree above a `fixed inset-0` layer
+  (`NightSky`) silently re-parents that layer's positioning context, so it
+  scrolls with the page instead of staying viewport-pinned. This is a
+  correctness constraint on _any_ transform-animating wrapper placed above
+  `NightSky` in the tree, not specific to `template.tsx` — worth checking
+  before adding a transform to anything that wraps page content. Fixed by
+  dropping the transform entirely (opacity-only fade) rather than trying to
+  keep the `y` rise; an opacity animation does not create a containing
+  block.
+- Moved D3 off Motion/JS entirely onto a CSS `@keyframes` + utility class
+  (`.ns-route-enter` in `global.css`) driven purely by the class name —
+  this repo already had exactly one site-wide mechanism for this
+  (`@media (prefers-reduced-motion: reduce) { animation-duration: 0.01ms
+!important }`) that every _other_ CSS-only animation in the codebase
+  relies on implicitly; a brand-new component can lean on it too instead of
+  adding its own JS `matchMedia` check — zero React state, zero SSR/client
+  divergence, zero hydration-mismatch risk. `template.tsx` no longer needs
+  `'use client'` at all once it has no hooks/motion — became a plain server
+  component.
+- A `useEffect` dependency array entry that's _sometimes_ semantically
+  irrelevant (here: `inView`, only relevant when `revealOnView` is true)
+  can't be conditionally included/excluded from the array (violates rules
+  of hooks), but CAN be replaced with a derived value that's _provably
+  stable_ when irrelevant: `const revealGate = revealOnView ? inView :
+true;` — collapses to the literal `true` (never changes) when
+  `revealOnView` is unset, so a dependent effect never re-fires from that
+  source, while still tracking `inView` normally when `revealOnView` is
+  set. General pattern for "this hook's output only matters in one branch"
+  without conditionally calling/omitting the hook itself.
+- Two elements sharing the exact same Motion `layoutId` **simultaneously
+  mounted** (not sequentially swapped) is the actual anti-pattern behind a
+  "duplicate layoutId" report — not merely reusing an id string across
+  renders. Fix pattern: the element that's ALWAYS mounted (the tree row's
+  dot, present for all 12 rows every render) must drop its `layoutId` the
+  moment the OTHER element sharing that id (the panel's dot, which only
+  exists while that exact row is active) mounts — i.e. gate the tree
+  element's `layoutId` on `!isActive` in addition to `!reducedMotion`, so
+  at any instant exactly one of the two carries the id and Framer has an
+  unambiguous single source/target for the FLIP.
+- `aria-hidden="true"` on an SVG that _replaces_ a plain-text glyph
+  (`'✓'` → `<GateCheck>`) silently deletes the accessible name that glyph
+  used to provide — decorative-icon defaults don't automatically carry over
+  when an icon is swapped in for real content. Added an optional
+  `label`/`role="img"`+`aria-label` prop to the shared primitive rather
+  than duplicating a visually-hidden text node at both call sites.
+
+**Patterns:**
+
+- For a review finding claiming "no accessible name" / "duplicate
+  layoutId" / "hydration mismatch" that has no simple DOM-attribute or
+  console-spy proxy, write the regression test at the level that IS
+  observable (accessible-name attributes for a11y; `console.warn`/`error`
+  spy across the exact state transition for the layoutId case) rather than
+  skipping verification because the underlying mechanism is a Framer/React
+  internal.
+- Repeated this round: revert the fix, rerun the new test to confirm RED,
+  restore the fix, rerun to confirm GREEN — did this again for both
+  Finding 3 (terminal restart) and implicitly relied on it for Finding 1/2
+  via the CSS-class + no-matchMedia assertions (structurally impossible to
+  regress to the old JS-latch shape without the test failing, since the
+  test asserts the _absence_ of a matchMedia call and the _presence_ of a
+  specific class name rather than an animation end-state).
+
+## 2026-07-23 — Story NA-69 — QA fix round (template.tsx reduced-motion gap + 2 stray EASE_OUT re-declarations)
+
+**Learnings:**
+
+- The post-mount `useState(false)` + `useEffect(() => setReduced(...), [])`
+  latch (ADR 0006's own pattern) is only safe for a component that stays
+  **dormant until some later trigger** (`Reveal`/`RevealGroup`'s
+  `whileInView`, `Terminal`'s viewport/mount-reveal effect) — the effect has
+  a chance to flip the flag _before_ the animation actually starts. A
+  component whose enter animation starts on its **very first render with no
+  gate at all** (`(frontend)/template.tsx` — remounted by App Router on
+  every nav, animates immediately) commits `initial`/`animate` with the
+  stale `reduced=false` before the effect ever runs; since `animate`'s
+  target doesn't change when `reduced` later flips `true`, Motion doesn't
+  interrupt the already-started tween — a reduced-motion user sees the
+  animation play out fully, every navigation. Fix: `useState(() =>
+prefersReducedMotion())` (lazy initializer) resolves the flag synchronously
+  in the same render that produces `initial`/`animate`, before Motion ever
+  mounts — no third latch pattern, same guarded function, just invoked
+  earlier. Generalize this: any _new_ always-live (non-viewport-gated) enter
+  animation in this kit needs the lazy-initializer form, not the post-mount
+  effect form; the effect form remains correct for every dormant-until-
+  triggered case already in the codebase.
+- Proved the fix's test actually catches the regression by temporarily
+  reverting `template.tsx` to the buggy post-mount-effect version and
+  re-running the new synchronous (`no waitFor`) reduced-motion assertion —
+  it failed exactly as expected (`opacity` read `'0'` instead of `'1'`)
+  before restoring the fix. A test that only reads state through `waitFor`
+  can't distinguish "no animation ever started" from "animation started and
+  finished before the assertion" — for an always-live enter transition, the
+  regression-catching assertion has to be **synchronous, immediately after
+  `render()`**.
+
+**Pitfalls:**
+
+- Grepping the full kit for `const EASE_OUT` after "migrating everything"
+  turned up two more re-declarations (`faq-row.tsx`, `cta-kicker.tsx`)
+  outside NA-69's own touched-file list — left them alone since the QA
+  finding scoped the fix to `control-section.tsx`/`argument-rail.tsx` only
+  and neither of those two files was part of this story's diff; flagging
+  here rather than silently expanding scope on a fix-round dispatch.
+
+## 2026-07-23 — Story NA-69 — 11 restrained motion beats (Foundation + Tiers B/C/A/D)
+
+**Learnings:**
+
+- Consolidating a re-declared helper into a single `@nightshift-ai/ui` export
+  (`EASE_OUT`, `prefersReducedMotion()`) is a pure behaviour-preserving
+  refactor validated by the _existing_ per-component specs staying green
+  with zero spec edits — no new test needed for the migration itself, only
+  for genuinely new primitives. `useInViewOnce()` needed the opposite
+  treatment (new hook, new spec) since it's new surface, not a
+  re-declaration: it returns `{ ref, inView, immediate }` — `immediate`
+  distinguishes "became true via the reduced-motion/no-IntersectionObserver
+  degrade" from "became true via a real viewport entry," which `CountUp`/
+  `RollingNumber` both need to decide "skip the animation, snap to final"
+  vs "play it." A bare `inView` boolean alone can't make that distinction
+  since both paths set it `true`.
+- Framer Motion's `pathLength` on an SVG `motion.path` compiles to
+  `stroke-dasharray="X 1"` (not a `pathLength` DOM attribute check) —
+  `"0 1"` is undrawn, `"1 1"` is fully drawn. Discovered by a throwaway
+  `console.log(path.outerHTML)` spike rather than guessing the DOM shape;
+  worth doing this for any new Motion SVG primitive before hand-writing
+  assertions.
+- `motion.span`'s `x`/`y` style motion values render as `style.transform`,
+  but a component with an _unset_ motion value (both `x`/`y` at their
+  default 0, e.g. `MagneticCta` before any pointer move) serializes
+  `style.transform` as the literal string `"none"`, not `""` or
+  `"translateX(0px) translateY(0px)"` — same throwaway-spike-first approach
+  resolved this before writing the reduced-motion assertion.
+- A `whileTap`/spring-driven DOM style update (`MagneticCta` pointer-follow,
+  `ControlSection`'s `whileTap={{scale:0.96}}`) is **not necessarily
+  reflected synchronously** after `fireEvent.pointerDown`/`pointerMove` even
+  inside RTL's `act()`-wrapped `render()` — needs `waitFor`, and needs a
+  **generous** timeout (bumped to 3000ms) when the whole `nx test` suite
+  runs many files in parallel workers under CPU contention, or the same
+  assertion that passes reliably in isolation flakes when run alongside
+  other spec files. Isolate-vs-full-suite flakiness on a real (not mocked)
+  Motion transition is a legitimate reason to widen a `waitFor` timeout, not
+  a sign the test is wrong.
+- Wrapping a _live, post-mount_ state change (e.g. `TeamPreview`'s hover
+  `active` state) in `AnimatePresence mode="wait"` genuinely introduces an
+  async gap before the new keyed child's content lands — existing
+  synchronous `fireEvent.mouseEnter` → immediate `expect(...)` assertions
+  broke and needed `await waitFor(...)`. Contrast: `argument-rail.spec.tsx`'s
+  established `AnimatePresence mode="wait"` usage was never actually
+  exercising this async path in its existing tests (its `active` value came
+  from a mocked hook fixed **before** `render()`, never changed **after**
+  mount) — don't assume an existing AnimatePresence pattern's test file
+  proves the post-mount-transition case works synchronously; check whether
+  its tests ever actually change the key after mount.
+- `useScroll({ target, offset })` (Framer's per-element scroped scroll
+  tracking, used for `PipelineStrip`'s A2 5-band index) has **no prior
+  tested precedent in this codebase** — the existing `scroll-progress.tsx`
+  (why-sdlc gate rail) instead uses whole-page `useScroll()` +
+  `useMotionValueEvent` + manual `getBoundingClientRect()` thresholds
+  against `document.querySelectorAll`. Both are legitimate Framer patterns;
+  chose the `{target}` form because the plan named it explicitly for A2,
+  and confirmed via a real test (mocked `getBoundingClientRect` +
+  `fireEvent.scroll`) that it doesn't throw and settles to a valid
+  stage-status combination in jsdom — don't assume a hook not yet exercised
+  elsewhere in the repo is unsafe; spike it with a real render first.
+- Framer Motion's `useReducedMotion()` (the second established latch,
+  `night-sky.tsx`-only per the shared-conventions table) is backed by a
+  **module-level singleton** in `motion-dom` (`initPrefersReducedMotion`/
+  `hasReducedMotionListener.current`), not a per-component `matchMedia`
+  read — meaning, unlike the `prefersReducedMotion()` function pattern,
+  there's no reliable way to toggle it per-test within one Jest module
+  registry (first call wins, memoized). This is _why_ `night-sky.spec.tsx`
+  had zero reduced-motion tests before this story, and why the new A1 tests
+  only cover the dawn-backdrop's variant-gating and token usage, not an
+  actual reduced-motion assertion — a real, structural testing gap
+  inherited from the library, not something worth spending further budget
+  forcing via `jest.resetModules()` gymnastics for one story.
+
+**Pitfalls:**
+
+- An `eslint-disable-next-line react-hooks/exhaustive-deps` comment on a
+  deliberately-`[]`-deps effect (`useInViewOnce`'s mount-once observer)
+  fails oxlint with "Definition for rule ... was not found" — this repo's
+  ESLint config has no `react-hooks` plugin registered at all (confirmed via
+  the lint failure, not the config file). Drop the disable comment entirely
+  and just leave an explanatory prose comment instead; every other
+  intentionally-partial dependency array in this codebase (e.g.
+  `terminal.tsx`'s mount effects) already does this with no lint suppression
+  needed.
+- `pnpm nx build marketing` remains the only real `tsc`-equivalent signal
+  (no repo `typecheck` target, per prior stories' findings) — ran it after
+  all five task-group commits as an extra safety net beyond `lint`/`test`,
+  since several of this story's changes (new `layoutId`/`useTransform`/
+  `useVelocity` usages) are the kind of Motion-API surface where a typo in
+  a generic parameter wouldn't necessarily fail Jest's babel transform but
+  would fail a real type-check.
+
+**Patterns:**
+
+- Task-group-scoped commits (Foundation → B → C → A → D, one commit each)
+  made the "did the shared hook/const actually get consumed everywhere it
+  was supposed to" self-review trivial — `git show <task-group-commit>
+--stat` cleanly maps to the plan's own task-group boundaries.
+- For a brand-new Motion primitive whose committed DOM shape isn't obvious
+  from the source alone (SVG `pathLength`, a spring's `style.transform`,
+  digit `stroke-dasharray`), write the test with a throwaway
+  `console.log(el.outerHTML)`/`JSON.stringify(el.style.X)` assertion first,
+  run it once to observe the real value, then replace the console.log with
+  the real assertion — faster and more honest than guessing the shape from
+  Framer Motion's source/docs.
+
 ## 2026-07-13 — Brand the Payload admin (logo, icon, theme)
 
 **Learnings:**

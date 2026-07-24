@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { animate } from 'motion/react';
 
+import { useInViewOnce } from './use-in-view-once';
+
 export interface CountUpProps {
   /** Target integer to count to. */
   value: number;
@@ -17,18 +19,12 @@ export interface CountUpProps {
 
 const DEFAULT_DURATION_MS = 1200;
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
-
 /**
  * Animates 0 → `value` once, the first time the element scrolls into view,
  * using Motion's `animate`. Deterministic server frame renders `0` so
  * hydration matches. Degrades to the final value immediately under reduced
- * motion or when IntersectionObserver is unsupported.
+ * motion or when IntersectionObserver is unsupported — both delivered by the
+ * shared {@link useInViewOnce} hook, not re-implemented here.
  */
 export function CountUp({
   value,
@@ -38,48 +34,27 @@ export function CountUp({
   className = '',
 }: CountUpProps) {
   const [display, setDisplay] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
+  const { ref, inView, immediate } = useInViewOnce<HTMLSpanElement>({
+    threshold: 0.3,
+  });
   const started = useRef(false);
 
   useEffect(() => {
-    const supportsIO =
-      typeof window !== 'undefined' &&
-      typeof window.IntersectionObserver === 'function';
+    if (!inView || started.current) return;
+    started.current = true;
 
-    if (prefersReducedMotion() || !supportsIO) {
+    if (immediate) {
       setDisplay(value);
       return;
     }
 
-    const el = ref.current;
-    if (!el) return;
-
-    let controls: ReturnType<typeof animate> | null = null;
-    const run = () => {
-      if (started.current) return;
-      started.current = true;
-      controls = animate(0, value, {
-        duration: durationMs / 1000,
-        ease: 'easeOut',
-        onUpdate: (v) => setDisplay(Math.round(v)),
-      });
-    };
-
-    const observer = new window.IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          run();
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.3 },
-    );
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      controls?.stop();
-    };
-  }, [value, durationMs]);
+    const controls = animate(0, value, {
+      duration: durationMs / 1000,
+      ease: 'easeOut',
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return () => controls.stop();
+  }, [inView, immediate, value, durationMs]);
 
   return (
     <span ref={ref} className={className}>

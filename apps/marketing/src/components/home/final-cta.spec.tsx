@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { FinalCta } from './final-cta';
 
@@ -48,5 +48,31 @@ describe('FinalCta', () => {
     );
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toBe('noopener');
+  });
+
+  it('pulls the star button toward the pointer on hover (B1 MagneticCta)', async () => {
+    render(<FinalCta />);
+    const link = screen.getByRole('link', {
+      name: /star nightshift on github/i,
+    });
+    const wrapper = link.parentElement as HTMLElement;
+    jest.spyOn(wrapper, 'getBoundingClientRect').mockReturnValue({
+      width: 100,
+      height: 40,
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.mouseMove(wrapper, { clientX: 90, clientY: 36 });
+    await waitFor(() => {
+      expect(wrapper.style.transform).not.toBe('');
+      expect(wrapper.style.transform).not.toContain('NaN');
+      expect(wrapper.style.transform).not.toContain('translateX(0px)');
+    });
   });
 });

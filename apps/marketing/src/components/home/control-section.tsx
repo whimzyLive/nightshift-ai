@@ -5,7 +5,15 @@ import type { ChangeEvent } from 'react';
 
 import { motion } from 'motion/react';
 
-import { CtaButton, Eyebrow, Reveal, RevealGroup } from '@nightshift-ai/ui';
+import {
+  CtaButton,
+  EASE_OUT,
+  Eyebrow,
+  GateCheck,
+  prefersReducedMotion,
+  Reveal,
+  RevealGroup,
+} from '@nightshift-ai/ui';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L404-532,
 // state/logic L620-663 + L1083-1340, `class Component`/`renderVals`).
@@ -42,8 +50,6 @@ const WORKING_MS_REDUCED = 400;
 const AUTO_ADVANCE_MS = 700;
 const FULL_AUTO_LOOP_MS = 3200;
 
-// Matches the retired `--ease-out` token (cubic-bezier(.22,1,.36,1)).
-const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 // Matches the retired `ns-twinkle` keyframes / `--dur-twinkle` token.
 const TWINKLE_ANIMATE = {
   opacity: [0.85, 1, 0.85],
@@ -139,13 +145,6 @@ function computeRouteName(isBug: boolean, lightStory: boolean): string {
   return lightStory ? 'lightweight route' : 'full ceremony';
 }
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
-
 interface TicketChip {
   label: string;
   color: string;
@@ -233,6 +232,7 @@ interface CtrlGate {
   conn: boolean;
   connBg: string;
   glyph: string;
+  done: boolean;
   border: string;
   bg: string;
   color: string;
@@ -261,6 +261,7 @@ function buildCtrlGates(
           ? 'rgba(217,119,87,.55)'
           : 'var(--border-strong)',
       glyph: done ? '✓' : '⊘',
+      done,
       border:
         done || current ? 'var(--border-accent)' : 'var(--border-default)',
       bg: done
@@ -854,15 +855,16 @@ function TriageCard({
               style={{ fontSize: 13, color: 'var(--moon-200)' }}
             >
               lightweight_threshold:
-              <button
+              <motion.button
                 type="button"
                 onClick={decThreshold}
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                 aria-label="decrease lightweight threshold"
                 className="font-mono flex cursor-pointer items-center justify-center"
                 style={{ width: 26, height: 26, fontSize: 14, padding: 0 }}
               >
                 −
-              </button>
+              </motion.button>
               <span
                 style={{
                   color: 'var(--terra-400)',
@@ -872,30 +874,32 @@ function TriageCard({
               >
                 {threshold}
               </span>
-              <button
+              <motion.button
                 type="button"
                 onClick={incThreshold}
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                 aria-label="increase lightweight threshold"
                 className="font-mono flex cursor-pointer items-center justify-center"
                 style={{ width: 26, height: 26, fontSize: 14, padding: 0 }}
               >
                 +
-              </button>
+              </motion.button>
             </div>
             <div
               className="font-mono mt-2.5 flex flex-wrap items-center gap-2.5"
               style={{ fontSize: 13, color: 'var(--moon-200)' }}
             >
               approval_mode:
-              <button
+              <motion.button
                 type="button"
                 onClick={cycleMode}
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
                 title="click to cycle: assisted → auto → full-auto"
                 className="font-mono cursor-pointer"
                 style={{ fontSize: 12, padding: '3px 12px' }}
               >
                 {approvalMode} ⟳
-              </button>
+              </motion.button>
             </div>
             <div
               className="font-mono mt-1.5"
@@ -1053,7 +1057,11 @@ function GateStrip({
                     'background .4s, border-color .4s, color .4s, box-shadow .4s',
                 }}
               >
-                {g.glyph}
+                {g.done ? (
+                  <GateCheck reduced={reducedMotion} label="passed" />
+                ) : (
+                  g.glyph
+                )}
               </motion.span>
               <span
                 className="font-mono"
@@ -1239,9 +1247,14 @@ function ComparisonTerminals({
           ))}
           {ctrlAwaiting && (
             <div className="mt-auto flex justify-end pt-2.5">
-              <CtaButton variant="primary" size="sm" onClick={approveGate}>
-                approve ✓
-              </CtaButton>
+              <motion.span
+                className="inline-block"
+                whileTap={reducedMotion ? undefined : { scale: 0.96 }}
+              >
+                <CtaButton variant="primary" size="sm" onClick={approveGate}>
+                  approve ✓
+                </CtaButton>
+              </motion.span>
             </div>
           )}
           {ctrlWorking && (

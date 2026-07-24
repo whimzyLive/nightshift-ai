@@ -1,4 +1,9 @@
-import { CtaButton, Eyebrow, InstallSnippet } from '@nightshift-ai/ui';
+import {
+  CtaButton,
+  Eyebrow,
+  InstallSnippet,
+  MagneticCta,
+} from '@nightshift-ai/ui';
 
 const GITHUB_URL = 'https://github.com/whimzyLive/nightshift-ai';
 
@@ -83,15 +88,17 @@ export function FinalCta() {
           <InstallSnippet command="/plugin install sdlc@nightshift" />
         </div>
         <div className="flex justify-center">
-          <CtaButton
-            variant="secondary"
-            size="lg"
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener"
-          >
-            ★ Star nightshift on GitHub
-          </CtaButton>
+          <MagneticCta>
+            <CtaButton
+              variant="secondary"
+              size="lg"
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener"
+            >
+              ★ Star nightshift on GitHub
+            </CtaButton>
+          </MagneticCta>
         </div>
       </div>
     </section>

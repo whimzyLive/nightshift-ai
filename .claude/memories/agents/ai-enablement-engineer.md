@@ -1,5 +1,127 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-23 — NA-68 review-fix round — fragment-strip ordering, root-absolute targets, depth-wrong remediation example (`plugins/sdlc/refs/docs-pipeline.md`)
+
+- **A deterministic multi-step check spec with an implicit/narrative step order is exactly as fragile
+  as a numbered list — a reader can legitimately apply the "ends in `.md`/`.mdx`" test to the RAW
+  target before ever reaching the later "fragment is stripped" sentence, silently exempting every
+  fragmented dangling link (`broken.md#intro` fails the raw-target extension test) from AC2's own
+  coverage claim.** My original NA-68 bullet stated the extension test and the fragment-strip as two
+  separate facts in prose order (extension test first, strip mentioned two sentences later) without
+  ever saying which one runs first — technically both true in isolation, but combinable into a wrong
+  reading. Fixed by making the bullet an explicit numbered pipeline `(1) strip → (2) classify/skip →
+(3) extension test → (4) existence check` and adding one explicit sentence naming the wrong order's
+  failure mode by name, not just stating the right order — a bare "do X then Y" restatement leaves
+  the SAME ambiguity for the next reader who skims past step numbers; naming the specific broken input
+  the wrong order would silently pass makes the ordering's load-bearing-ness undeniable. **Lesson:
+  for a multi-check spec bullet describing several tests applied to the same input in sequence, either
+  number the steps explicitly or don't claim determinism — narrative "also, X happens" sentences are
+  reader-order-dependent even when every individual clause is independently accurate.**
+- **A "resolve file-relative from the page's directory" rule needs an explicit carve-out for
+  root-absolute (`/`-prefixed) targets, or it silently mis-resolves them into a false-positive
+  dangling flag** — `/reference/errors.md` resolved file-relative from `docs/how-to/` naively becomes
+  `docs/how-to/reference/errors.md` (doesn't exist), when the author likely meant either repo-root or
+  a rendered site's URL root. Chose **skip, never resolve** (not "resolve from docs/repo root") because
+  disambiguating repo-root-relative from site-URL-root-relative requires knowing this repo's docs
+  site's own routing config — exactly the "site-routing knowledge" the check's own determinism framing
+  (path-existence only, no SEO/site judgment) forbids importing. Consistent with the check's own stated
+  boundary: when a deterministic-path check faces an ambiguous input whose correct resolution depends
+  on knowledge outside the check's declared primitive (git/filesystem path existence), skip rather than
+  guess — guessing risks the exact false-positive class the review caught, not just an undetected
+  negative.
+- **A remediation example inside a spec bullet is itself a claim that needs to be internally
+  consistent with the concrete scenario it's illustrating — "needs `foo.md` or `../foo.md` instead"
+  read as two interchangeable fixes for the SAME stated scenario ("a page already inside `docs/`"),
+  but only one of them is actually correct for that depth** (`../foo.md` from a page directly inside
+  `docs/` resolves to `<repo-root>/foo.md`, itself dangling). Fixed by splitting the example into two
+  depth-tagged cases (page directly inside `docs/` → `bar.md`; page one directory deeper, e.g.
+  `docs/how-to/` → `../bar.md`) rather than presenting two answers as options for one scenario.
+  **Lesson: when a spec bullet's own worked example offers "X or Y instead" as alternative fixes,
+  verify each alternative is actually correct for the SAME stated input, not just individually
+  plausible-sounding — an "or" between two fixes for one scenario is a claim that both work, and here
+  only one did.**
+- Re-confirmed (again) the standing Prettier/format-gate pattern for a `plugins/sdlc/refs/*.md`-only
+  change: `./node_modules/.bin/prettier --write` on the touched file reported `(unchanged)` this round
+  (unlike the initial feature commit, this rewrite didn't touch any table cell, only prose paragraphs),
+  `check-plugin-docs-format.sh` OK, `pnpm nx affected -t test` / `nx format:check` both report clean/
+  no-tasks — no surprises this round. `plugin.json` version diff confirmed empty (untouched), per the
+  standing constraint.
+
+## 2026-07-23 — NA-68 — Add dangling-link check to audit's §22 reference-integrity tier (`plugins/sdlc/refs/docs-pipeline.md`, `plugins/sdlc/commands/docs.md`)
+
+- Pure spec/prose addition — no runtime code module exists for any §22 check; the "check" is a
+  deterministic path-existence rule the knowledge-engineer agent executes by following the prose.
+  Mirrored the existing "Dangling code reference" / "Dangling `related-adrs:` path" bullets'
+  structure and framing (deterministic, path-existence, flag-only, never a semantic/SEO judgment) —
+  placed the new "Dangling doc-to-doc link" bullet directly after its two siblings in §22 rather than
+  elsewhere, since all three share the identical primitive (does-this-path-exist) just applied to a
+  different reference kind (code path / ADR path / doc-to-doc link).
+- Touched all four AC-named surfaces in one pass: the §20 two-tier drift table's Reference-integrity
+  "Drift means" cell (appended a parenthetical naming the new check rather than replacing the
+  existing generic "verifiable anchor... has moved" framing, since the new check is a species of that
+  same genus, not a separate row), the §22 new bullet itself, a third `dangling-link` example line
+  appended to §23's existing report-example sentence (kept the two pre-existing examples verbatim,
+  just extended the sentence with a semicolon-joined third clause), and one new row in
+  `commands/docs.md`'s audit error/finding table, inserted directly after the sibling "diverges from
+  an ADR" row (§22's other narrative-flag findings — dangling code ref, dangling ADR path — have no
+  row of their own in that table either, so "one row per AC4/NA-68-named finding class" was the
+  right granularity to match, not "one row per §22 bullet").
+- Confirmed (again) the standing pattern: a hand-typed table-cell edit (the §20 Drift-means cell grew
+  from one clause to a much longer one, forcing every column's padding to re-derive) is never
+  Prettier-fixed-point on the first write — ran `./node_modules/.bin/prettier --write` on both
+  touched files directly rather than hand-padding, then verified `--check` clean and
+  `check-plugin-docs-format.sh` OK. `plugin.json`'s version was correctly left untouched (verified
+  `git diff --stat` on it is empty) — nx-release owns the bump post-merge, not this commit.
+- `pnpm nx affected -t test --base=remotes/origin/develop` and `pnpm nx format:check` both report
+  clean/no-tasks for this `plugins/sdlc/refs|commands/**`-only change, per the now-7th-time-confirmed
+  standing pattern in this repo (see NA-61/62/63/65 entries below).
+
+## 2026-07-22 — Direct fix — restore NA-65-deleted sanitization subsection, dangling xref regression (`plugins/sdlc/refs/docs-pipeline.md`)
+
+- **NA-65's P1 rewrite deleted `docs-pipeline.md` §3's "Description/title sanitization +
+  frontmatter escaping" subsection while leaving 7 live prose references to it dangling** — a
+  pure content-deletion regression that no leak-grep or Prettier fixed-point check would ever
+  catch (the file was still well-formed markdown, just missing a subsection other prose pointed
+  at). Confirms the general class from the NA-65 memory entry ("a numbered-list cross-reference
+  ... silently drifts") extends one level further: a whole-SUBSECTION deletion is the same failure
+  shape as a stale numbered pointer, just discovered by grepping for the referring phrase
+  (`sanitiz`) rather than a section number. **Lesson: when a rewrite touches a section that other
+  prose in the same file points at ("...rule below", "§N's ... rule"), grep the whole file for the
+  referring phrase BEFORE finalizing the rewrite, not just for leaked strings/Prettier — content
+  presence isn't caught by either of those gates.**
+- **A recovered historical subsection (`git show <commit>^:<path>`) can carry internally
+  inconsistent step-number references even within its OWN un-reconciled state** — the recovered
+  text's opening sentence already read "Steps 1–3 and 7" (matching the CURRENT numbering) while a
+  later clause in the same sentence, and a second rule two paragraphs down, both still said
+  "(step 4)" for the identical `config-reference` cross-reference. Restoring verbatim would have
+  reintroduced a self-contradiction, not just an out-of-date one. Fixed both stale "(step 4)"
+  instances to "(step 7)" (current `config-reference` position: command=1, agent=2, skill=3,
+  hooks=4, api=5, schema=6, **config=7**, cli=8, error=9, llms-txt=10, how-to=11) and left the
+  already-correct "1–3 and 7" phrase untouched — verified by hand-deriving the current numbered
+  list from the file's own §3 headings rather than trusting the recovered text's self-consistency.
+  **Lesson: when reconciling a recovered/historical block's numeric cross-refs to a renumbered
+  list, check EVERY occurrence of the referenced number independently — a partially-updated
+  historical draft can have some instances already correct and others stale, and "the phrase reads
+  plausibly" is not evidence every instance agrees.**
+- Verification for a pure textual restore (no logic/script changes) reduced to three greps
+  (heading now precedes the next `##` heading it was extracted from before deletion; zero leaked
+  nightshift-specific strings; `check-plugin-docs-format.sh` fixed-point) plus one hand-recount of
+  all `sanitiz`-matching lines to confirm the referrer count (7) now resolves — no test harness or
+  Nx target applicable to a `plugins/sdlc/refs/*.md`-only change (re-confirms the standing
+  `pnpm nx affected -t test` / `nx format:check` clean-for-plugins-refs pattern noted repeatedly in
+  prior entries).
+- **Also caught mid-task: this repo's worktree-based dispatch (`.claude/worktrees/<slug>`) has its
+  own independent copy of `.claude/memories/agents/*.md` — NOT a symlink into the primary
+  checkout.** A prior memory entry already documents `.claude/.sdlc-plugin-root` being git-ignored
+  and absent from worktrees; the memory files are the opposite case (tracked, present, but a
+  SEPARATE working-tree copy) — an absolute-path Read/Edit outside the dispatch's stated working
+  directory silently succeeds against the wrong copy with no error, since both paths are valid
+  files. Caught only by re-diffing `git status` in the primary checkout after the edit and noticing
+  an unexpected dirty file there. **Lesson: when a dispatch pins an explicit worktree working
+  directory, do not use the repo-root-relative memory-file path from habit/muscle-memory for
+  Read/Edit calls — always resolve it relative to the pinned worktree path, the same way the prior
+  `.sdlc-plugin-root` lesson already flags for plugin-root markers.**
+
 ## 2026-07-21 — NA-65 review-fix round — CI-orphaned test harness, informative comments, stale §-item cross-reference (`.github/workflows/ci.yml`, `plugins/sdlc/scripts/__tests__/{docs_sync_fixture_gen.py,docs-sync-fixtures.test.sh}`, `plugins/sdlc/refs/doc-types.md`)
 
 - **A self-runnable `bash <path>` test harness under `plugins/sdlc/scripts/__tests__/` is invisible

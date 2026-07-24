@@ -5,9 +5,9 @@ import HomePage from './page';
 import type { HomeFaqItem } from '../../lib/faq';
 
 // Hero embeds the Terminal primitive (checks prefers-reduced-motion) and
-// ProofBar embeds CountUp (checks IntersectionObserver support) — both are
-// client components exercising browser-only APIs jsdom doesn't implement by
-// default. Mirrors the mocking pattern used in cursor-glow.spec.tsx.
+// ProofBar embeds RollingNumber (checks IntersectionObserver support) — both
+// are client components exercising browser-only APIs jsdom doesn't implement
+// by default. Mirrors the mocking pattern used in cursor-glow.spec.tsx.
 function mockMatchMedia() {
   window.matchMedia = jest.fn().mockImplementation((query: string) => ({
     matches: false,
@@ -100,7 +100,7 @@ describe('HomePage', () => {
     expect(
       screen.getAllByRole('link', { name: /star nightshift on github/i }),
     ).toHaveLength(2);
-    // Numbers + labels are split across CountUp's own <span> and the
+    // Numbers + labels are split across RollingNumber's own <span> and the
     // surrounding static text, so assert on the flattened text content
     // rather than a single-node text match.
     expect(container.textContent).toContain('specialized agents');

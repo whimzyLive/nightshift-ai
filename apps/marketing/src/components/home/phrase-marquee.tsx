@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { animate, motion, useMotionValue } from 'motion/react';
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useScroll,
+  useTransform,
+  useVelocity,
+} from 'motion/react';
+
+import { prefersReducedMotion } from '@nightshift-ai/ui';
 
 // Verbatim from the design handoff (nightshift Landing.dc.html L190-195) —
 // the duplicated-track phrase set. Two copies of the same line let the
@@ -12,13 +21,11 @@ const PHRASE_LINE =
 
 // Matches the retired `--dur-marquee` token (34s).
 const MARQUEE_DURATION_S = 34;
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false;
-}
+// D1 — small, clamped skew response to scroll velocity (single-digit
+// degrees either direction); scroll-progress-per-second input range is a
+// practical normalisation, not a physical unit.
+const VELOCITY_INPUT_RANGE: [number, number] = [-3, 3];
+const SKEW_OUTPUT_RANGE: [number, number] = [-4, 4];
 
 /**
  * Decorative looping mono ticker band — rendered twice on the home page,
@@ -41,6 +48,17 @@ export function PhraseMarquee() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const x = useMotionValue('0%');
   const controlsRef = useRef<ReturnType<typeof animate> | null>(null);
+
+  // D1 — velocity-responsive skew: a small, clamped `skewX` nudge driven by
+  // page-scroll velocity, additive on top of the base linear loop. Settles
+  // back to rest as scroll velocity returns to 0.
+  const { scrollYProgress } = useScroll();
+  const scrollVelocity = useVelocity(scrollYProgress);
+  const velocitySkew = useTransform(
+    scrollVelocity,
+    VELOCITY_INPUT_RANGE,
+    SKEW_OUTPUT_RANGE,
+  );
 
   useEffect(() => {
     setReducedMotion(prefersReducedMotion());
@@ -72,7 +90,7 @@ export function PhraseMarquee() {
     >
       <motion.div
         className="flex w-max"
-        style={{ x }}
+        style={{ x, skewX: reducedMotion ? 0 : velocitySkew }}
         onHoverStart={pause}
         onHoverEnd={resume}
       >

@@ -6,6 +6,7 @@ import {
   motion,
   useMotionValue,
   useReducedMotion,
+  useScroll,
   useSpring,
   useTransform,
 } from 'motion/react';
@@ -128,6 +129,36 @@ const MAX_METEORS = 6;
 const AMBIENT_METEOR_MS = 4200;
 const AMBIENT_METEOR_CHANCE = 0.55; // skip when Math.random() < this
 const SPRING = { stiffness: 90, damping: 20, mass: 0.6 } as const;
+
+// A1 — moon SETS on its own (right) side, exiting the fixed viewport-
+// sized layer by the page bottom (clamped via useTransform's default
+// clamp — progress past the end of the range holds at the end value).
+// Reduced motion binds directly to these end values.
+// The set is spread over the FULL document scroll (range end 1.0) — the
+// slowest a scroll-linked descent can go while still fully resolving by
+// the footer (~25% slower than the original 0.74). Going slower than
+// this would leave the moon still visible at the bottom.
+const MOON_SET_RANGE: [number, number] = [0, 1.0];
+const MOON_SET_Y_PX = 820;
+const MOON_SET_X_PX = 50;
+// A1 — dawn backdrop: ramps in from roughly the mid-page mark so it's
+// already visible well before the FinalCta/footer band, not just in the
+// final stretch.
+const DAWN_RAMP_RANGE: [number, number] = [0.42, 0.85];
+// A1 — VIBRANT MORNING variant: sun rises on the opposite (left) side as the
+// moon sets, resolving before the page bottom so the footer reads "moon
+// gone, sun + clouds up". Bigger/brighter than the subtle wisp treatment —
+// an intentional bolder departure the user asked to compare against
+// feat/NA-69-dawn-subtle.
+const SUN_RISE_RANGE: [number, number] = [0.42, 0.8];
+const SUN_RISE_Y_PX = 150;
+const SUN_DISC_SIZE_PX = 190;
+const SUN_RAY_SIZE_PX = 380;
+// A1 — cloud drift: slow horizontal wander, one duration per cloud so they
+// don't move in lockstep. Amplitude stays restrained even in the vibrant
+// variant — only the clouds' own definition/opacity got bolder.
+const CLOUD_DRIFT_PX = 24;
+const CLOUD_DRIFT_DURATIONS_S = [27, 33, 24, 30, 26];
 
 // Easter egg: N rapid clicks on the same spot detonate a big bang there
 // instead of a meteor.
@@ -271,6 +302,39 @@ export function NightSky({
   const midY = useTransform(sy, (v) => -v * MID_DEPTH);
   const farX = useTransform(sx, (v) => -v * FAR_DEPTH);
   const farY = useTransform(sy, (v) => -v * FAR_DEPTH);
+
+  // A1 — whole-document scroll progress drives the moon's set (outer
+  // wrapper), the sun's rise, and the dawn backdrop's opacity, independently
+  // of the moon's own pointer-parallax `x`/`y` (inner nodes, untouched) and
+  // idle float.
+  const { scrollYProgress } = useScroll();
+  const scrollSetY = useTransform(scrollYProgress, MOON_SET_RANGE, [
+    0,
+    MOON_SET_Y_PX,
+  ]);
+  const scrollSetX = useTransform(scrollYProgress, MOON_SET_RANGE, [
+    0,
+    MOON_SET_X_PX,
+  ]);
+  const dawnOpacityFromScroll = useTransform(
+    scrollYProgress,
+    DAWN_RAMP_RANGE,
+    [0, 1],
+  );
+  const sunRiseYFromScroll = useTransform(scrollYProgress, SUN_RISE_RANGE, [
+    SUN_RISE_Y_PX,
+    0,
+  ]);
+  const sunOpacityFromScroll = useTransform(
+    scrollYProgress,
+    SUN_RISE_RANGE,
+    [0, 1],
+  );
+  const moonSetY = animate ? scrollSetY : MOON_SET_Y_PX;
+  const moonSetX = animate ? scrollSetX : MOON_SET_X_PX;
+  const dawnOpacity = animate ? dawnOpacityFromScroll : 1;
+  const sunRiseY = animate ? sunRiseYFromScroll : 0;
+  const sunOpacity = animate ? sunOpacityFromScroll : 1;
 
   const [meteors, setMeteors] = useState<Meteor[]>([]);
   const [bigBang, setBigBang] = useState<BigBang | null>(null);
@@ -476,27 +540,128 @@ export function NightSky({
 
         {/* Crescent moon — the one solid celestial asset. The crescent is
             carved by an inset shadow (dark bite bottom-right) + an indigo rim;
-            an outer glow lifts it off the void. Rides the mid parallax plane
-            and drifts on a slow float. */}
-        <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
-          <motion.div
-            className="absolute rounded-full"
-            style={{
-              top: 178,
-              left: '84%',
-              width: 110,
-              height: 110,
-              background:
-                'radial-gradient(circle at 40% 38%, #fffaf2, #efe8db 55%, #d3cabb 100%)',
-              boxShadow:
-                '0 0 52px 12px rgba(245,243,239,0.42), inset -30px -8px 0 -8px rgba(13,13,24,0.9), inset -20px 4px 26px -10px rgba(139,156,247,0.45)',
-              filter: 'blur(0.5px)',
-            }}
-            animate={animate ? { y: [0, -22, 0] } : undefined}
-            transition={{ duration: 20, ease: 'easeInOut', repeat: Infinity }}
-          />
+            an outer glow lifts it off the void. A1: an outer wrapper carries
+            the scroll-linked set X/Y; the existing inner node keeps its
+            pointer-parallax x/y untouched — one axis can't carry both a
+            scroll value and a pointer motion value, so the set composes via
+            nesting instead. Rides the mid parallax plane and drifts on a
+            slow float. */}
+        <motion.div
+          className="absolute inset-0"
+          style={{ x: moonSetX, y: moonSetY }}
+        >
+          <motion.div className="absolute inset-0" style={{ x: midX, y: midY }}>
+            <motion.div
+              className="absolute rounded-full"
+              style={{
+                top: 178,
+                left: '84%',
+                width: 110,
+                height: 110,
+                background:
+                  'radial-gradient(circle at 40% 38%, #fffaf2, #efe8db 55%, #d3cabb 100%)',
+                boxShadow:
+                  '0 0 52px 12px rgba(245,243,239,0.42), inset -30px -8px 0 -8px rgba(13,13,24,0.9), inset -20px 4px 26px -10px rgba(139,156,247,0.45)',
+                filter: 'blur(0.5px)',
+              }}
+              animate={animate ? { y: [0, -22, 0] } : undefined}
+              transition={{ duration: 20, ease: 'easeInOut', repeat: Infinity }}
+            />
+          </motion.div>
         </motion.div>
+
+        {variant === 'home' && (
+          <>
+            {/* Sun rays — a soft sunburst behind the disc, painted once as a
+                static repeating-conic-gradient (never animated itself; only
+                this whole layer's opacity/y ride the shared sun motion
+                values). Renders first so the disc paints on top of it. */}
+            <motion.div
+              aria-hidden="true"
+              data-testid="dawn-sun-rays"
+              className="absolute rounded-full"
+              style={{
+                bottom: 60 - (SUN_RAY_SIZE_PX - SUN_DISC_SIZE_PX) / 2,
+                left: `calc(10% - ${(SUN_RAY_SIZE_PX - SUN_DISC_SIZE_PX) / 2}px)`,
+                width: SUN_RAY_SIZE_PX,
+                height: SUN_RAY_SIZE_PX,
+                y: sunRiseY,
+                opacity: sunOpacity,
+                background:
+                  'repeating-conic-gradient(from 0deg, var(--amber-tint) 0deg 8deg, transparent 8deg 40deg)',
+                filter: 'blur(7px)',
+              }}
+            />
+            {/* Sun — a proper rounded disc with a bright warm core
+                (moon-100 → amber-400 → terra-400/600) and a static corona
+                glow (box-shadow painted once, never tweened — only opacity/y
+                animate). Bigger and clearly brighter than the subtle
+                variant's low-alpha wash; still dark-mode-restrained, not a
+                bright daytime yellow sun. */}
+            <motion.div
+              aria-hidden="true"
+              data-testid="dawn-sun"
+              className="absolute rounded-full"
+              style={{
+                bottom: 60,
+                left: '10%',
+                width: SUN_DISC_SIZE_PX,
+                height: SUN_DISC_SIZE_PX,
+                y: sunRiseY,
+                opacity: sunOpacity,
+                background:
+                  'radial-gradient(circle at 42% 38%, var(--moon-100), var(--amber-400) 32%, var(--terra-400) 58%, var(--terra-600) 84%, transparent 100%)',
+                boxShadow:
+                  '0 0 70px 22px rgba(224,164,88,0.55), 0 0 140px 50px rgba(217,119,87,0.35)',
+                filter: 'blur(0.5px)',
+              }}
+            />
+            {/* Clear-morning clouds — defined puff shapes (border-radius +
+                static, unanimated box-shadow offsets faking extra lobes),
+                warm-lit gradient fill. More visible/opaque than a faint
+                wisp — reads as an actual cloud, drifting slowly. */}
+            {CLOUD_DRIFT_DURATIONS_S.map((duration, i) => (
+              <motion.div
+                key={i}
+                aria-hidden="true"
+                data-testid="dawn-cloud"
+                className="absolute rounded-full"
+                style={{
+                  bottom: 70 + i * 40,
+                  left: `${4 + i * 13}%`,
+                  width: 92 - i * 6,
+                  height: 30,
+                  opacity: sunOpacity,
+                  background:
+                    'linear-gradient(180deg, rgba(245,243,239,0.42), rgba(240,164,136,0.22))',
+                  boxShadow:
+                    '30px 5px 0 -5px rgba(245,243,239,0.34), -26px 8px 0 -8px rgba(245,243,239,0.28)',
+                  filter: 'blur(5px)',
+                }}
+                animate={animate ? { x: [0, CLOUD_DRIFT_PX, 0] } : undefined}
+                transition={{ duration, ease: 'easeInOut', repeat: Infinity }}
+              />
+            ))}
+          </>
+        )}
       </motion.div>
+
+      {variant === 'home' && (
+        <motion.div
+          aria-hidden="true"
+          data-testid="dawn-backdrop"
+          className="pointer-events-none fixed inset-0 -z-10"
+          style={{
+            opacity: dawnOpacity,
+            // Vibrant sunrise wash — anchored toward the sun's side (left)
+            // rather than dead-center, amber-400 → terra-500 → terra-700,
+            // richer/more saturated than the subtle variant's flat terracotta
+            // veil, reading as the sun's own ambient light.
+            background:
+              'radial-gradient(circle at 18% 100%, rgba(224,164,88,0.55), rgba(217,119,87,0.4) 40%, rgba(157,77,58,0.22) 68%, transparent 90%)',
+          }}
+        />
+      )}
 
       {meteors.length > 0 && (
         <div

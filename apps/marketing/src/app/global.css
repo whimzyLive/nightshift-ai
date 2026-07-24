@@ -410,6 +410,20 @@
   }
 }
 
+/* D3 per-route enter transition — see `(frontend)/template.tsx`. */
+@keyframes ns-route-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ns-route-enter {
+  animation: ns-route-enter var(--dur-rise) var(--ease-out);
+}
+
 /* Single global reduced-motion guard — statically disables ambient/
  * transition motion site-wide. Components that drive effects from JS
  * (NavBar detach, CursorGlow, NightSky twinkle) additionally check

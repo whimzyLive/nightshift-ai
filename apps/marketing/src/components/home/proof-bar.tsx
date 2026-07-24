@@ -1,10 +1,16 @@
-import { CountUp, Reveal, RevealGroup } from '@nightshift-ai/ui';
+import {
+  Reveal,
+  RevealGroup,
+  RollingNumber,
+  SETTLE_SPRING,
+} from '@nightshift-ai/ui';
 
 /**
  * Full-bleed `--surface-card` band with top/bottom hairlines. Breaks out of
  * the shared `<main>` container to viewport width while keeping inner
  * content centered (Open-Question default 1) — the animated numerals reuse
- * one `CountUp` instance each, counting once on first viewport entry.
+ * one `RollingNumber` instance each, rolling their digits into place once on
+ * first viewport entry.
  */
 export function ProofBar() {
   return (
@@ -23,40 +29,57 @@ export function ProofBar() {
       >
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
-          <CountUp value={11} className="text-[var(--accent)]" /> specialized
-          agents
+          <RollingNumber value={11} className="text-[var(--accent)]" />{' '}
+          specialized agents
         </Reveal>
-        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+        <Reveal
+          as="span"
+          spring={SETTLE_SPRING}
+          style={{ color: 'var(--moon-500)' }}
+        >
           ·
         </Reveal>
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
-          <CountUp value={10} className="text-[var(--accent)]" /> slash commands
+          <RollingNumber value={10} className="text-[var(--accent)]" /> slash
+          commands
         </Reveal>
-        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+        <Reveal
+          as="span"
+          spring={SETTLE_SPRING}
+          style={{ color: 'var(--moon-500)' }}
+        >
           ·
         </Reveal>
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
           install in{' '}
           <span style={{ color: 'var(--accent)' }}>
-            <CountUp value={60} /> seconds
+            <RollingNumber value={60} /> seconds
           </span>
         </Reveal>
-        <Reveal as="span" style={{ color: 'var(--moon-500)' }}>
+        <Reveal
+          as="span"
+          spring={SETTLE_SPRING}
+          style={{ color: 'var(--moon-500)' }}
+        >
           ·
         </Reveal>
         <Reveal
           as="span"
+          spring={SETTLE_SPRING}
           className="font-mono whitespace-nowrap"
           style={{ fontSize: 17, color: 'var(--moon-100)' }}
         >
