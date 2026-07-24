@@ -42,13 +42,24 @@ describe('isConnectionOrInitError', () => {
     expect(isConnectionOrInitError(withCode('28000'))).toBe(true);
   });
 
-  it('returns true for operator-intervention SQLSTATE (57P01 admin_shutdown, 57P03 cannot_connect_now)', () => {
+  it('returns true for the specific server-unavailable SQLSTATEs (57P01 admin_shutdown, 57P02 crash_shutdown, 57P03 cannot_connect_now)', () => {
     expect(isConnectionOrInitError(withCode('57P01'))).toBe(true);
+    expect(isConnectionOrInitError(withCode('57P02'))).toBe(true);
     expect(isConnectionOrInitError(withCode('57P03'))).toBe(true);
   });
 
-  it('returns true for insufficient-resources SQLSTATE (53300 too_many_connections)', () => {
+  it('returns true for the specific insufficient-resources SQLSTATE (53300 too_many_connections)', () => {
     expect(isConnectionOrInitError(withCode('53300'))).toBe(true);
+  });
+
+  it('does NOT broaden to the whole 57/53 class — a query-scoped condition (57014 query_canceled / statement_timeout) SWALLOWS, does not rethrow', () => {
+    expect(isConnectionOrInitError(withCode('57014'))).toBe(false);
+  });
+
+  it('does NOT broaden to the whole 53 class — 53100/53200/53400 (disk_full/out_of_memory/config_limit_exceeded) swallow', () => {
+    expect(isConnectionOrInitError(withCode('53100'))).toBe(false);
+    expect(isConnectionOrInitError(withCode('53200'))).toBe(false);
+    expect(isConnectionOrInitError(withCode('53400'))).toBe(false);
   });
 
   it('does NOT broaden to the whole 42 class — a row/column-shape defect (42703 undefined_column) still returns false', () => {
@@ -89,6 +100,22 @@ describe('isConnectionOrInitError', () => {
 
   it('inspects a non-Error object for a code (e.g. a serialized/aggregate error)', () => {
     expect(isConnectionOrInitError({ code: 'ECONNREFUSED' })).toBe(true);
+  });
+
+  it('walks AggregateError.errors[] (Node happy-eyeballs multi-address connect) to find a connection code', () => {
+    const aggregate = new AggregateError(
+      [withCode('ECONNREFUSED'), withCode('ETIMEDOUT')],
+      'connect failed against all resolved addresses',
+    );
+    expect(isConnectionOrInitError(aggregate)).toBe(true);
+  });
+
+  it('returns false for an AggregateError whose sub-errors are all row-level defects', () => {
+    const aggregate = new AggregateError(
+      [new TypeError('bad row'), new Error('plain business error')],
+      'not a connection issue',
+    );
+    expect(isConnectionOrInitError(aggregate)).toBe(false);
   });
 
   it('returns false for a non-Error object with no code', () => {

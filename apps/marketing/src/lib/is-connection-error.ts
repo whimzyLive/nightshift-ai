@@ -9,9 +9,20 @@ const NETWORK_CODES = [
   'EAI_AGAIN',
 ];
 
-const SQLSTATE_EXACT_CODES = ['42P01', '3F000'];
+const SQLSTATE_EXACT_CODES = [
+  '42P01', // undefined_table (unmigrated schema)
+  '3F000', // invalid_schema_name (unmigrated schema)
+  '57P01', // admin_shutdown
+  '57P02', // crash_shutdown
+  '57P03', // cannot_connect_now (server starting/recovering)
+  '53300', // too_many_connections
+];
 
-const SQLSTATE_CLASS_PATTERN = /^(08|28|57|53)/;
+// Connection (08*) / auth (28*) classes only — 57/53 are NOT matched
+// class-wide because they also cover query-scoped conditions (57014
+// query_canceled/statement_timeout) and other resource states (53100/
+// 53200/53400) that don't indicate the DB itself is unavailable.
+const SQLSTATE_CLASS_PATTERN = /^(08|28)/;
 
 const MAX_CAUSE_DEPTH = 5;
 
@@ -30,6 +41,14 @@ function readCause(value: unknown): unknown {
   return undefined;
 }
 
+function readSubErrors(value: unknown): unknown[] | undefined {
+  if (value && typeof value === 'object' && 'errors' in value) {
+    const errors = (value as { errors?: unknown }).errors;
+    if (Array.isArray(errors)) return errors;
+  }
+  return undefined;
+}
+
 function isUnavailableCode(code: string): boolean {
   return (
     NETWORK_CODES.includes(code) ||
@@ -42,17 +61,26 @@ function isUnavailableCode(code: string): boolean {
  * True when an error indicates the database is unavailable — unreachable,
  * unauthenticated, on an unmigrated schema, restarting, or overloaded — i.e.
  * a build-breaking outage, not an isolated row/data-shape defect. Inspects
- * a Node/pg network `code` or Postgres SQLSTATE on the error itself and
+ * a Node/pg network `code` or Postgres SQLSTATE on the error itself,
  * recurses through `error.cause` (Payload/Drizzle commonly wrap the driver
- * error), depth-guarded against pathological/cyclic cause chains. Accepts
- * any thrown value, not just `Error` instances, since a serialized or
- * aggregate error may carry a `code` without being an `Error`.
+ * error) and through `error.errors[]` (Node's `AggregateError` from
+ * happy-eyeballs multi-address connect attempts), depth-guarded against
+ * pathological/cyclic chains. Accepts any thrown value, not just `Error`
+ * instances, since a serialized or aggregate error may carry a `code`
+ * without being an `Error`.
  */
 export function isConnectionOrInitError(error: unknown, depth = 0): boolean {
   if (depth > MAX_CAUSE_DEPTH || error == null) return false;
 
   const code = readCode(error);
   if (code && isUnavailableCode(code)) return true;
+
+  const subErrors = readSubErrors(error);
+  if (
+    subErrors?.some((subError) => isConnectionOrInitError(subError, depth + 1))
+  ) {
+    return true;
+  }
 
   const cause = readCause(error);
   if (cause === undefined) return false;
