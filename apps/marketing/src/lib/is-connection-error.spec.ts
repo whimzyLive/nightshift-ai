@@ -34,6 +34,10 @@ describe('isConnectionOrInitError', () => {
     expect(isConnectionOrInitError(withCode('3F000'))).toBe(true);
   });
 
+  it('returns true for a dropped/renamed database (3D000 invalid_catalog_name)', () => {
+    expect(isConnectionOrInitError(withCode('3D000'))).toBe(true);
+  });
+
   it('returns true for connection-class SQLSTATE (08*)', () => {
     expect(isConnectionOrInitError(withCode('08006'))).toBe(true);
   });
@@ -68,6 +72,55 @@ describe('isConnectionOrInitError', () => {
 
   it('returns false for a plain business-logic error with no code', () => {
     expect(isConnectionOrInitError(new Error('bad row'))).toBe(false);
+  });
+
+  it('rethrows a code-less pg pool-acquisition timeout ("timeout exceeded when trying to connect")', () => {
+    expect(
+      isConnectionOrInitError(
+        new Error('timeout exceeded when trying to connect (5000ms)'),
+      ),
+    ).toBe(true);
+  });
+
+  it('rethrows a code-less "Connection terminated unexpectedly"', () => {
+    expect(
+      isConnectionOrInitError(new Error('Connection terminated unexpectedly')),
+    ).toBe(true);
+  });
+
+  it('rethrows a code-less "Connection terminated due to connection timeout"', () => {
+    expect(
+      isConnectionOrInitError(
+        new Error('Connection terminated due to connection timeout'),
+      ),
+    ).toBe(true);
+  });
+
+  it('matches the pg driver message allowlist case-insensitively', () => {
+    expect(
+      isConnectionOrInitError(new Error('CONNECTION TERMINATED UNEXPECTEDLY')),
+    ).toBe(true);
+  });
+
+  it('does NOT broaden to general message matching — an unrelated message still swallows', () => {
+    expect(
+      isConnectionOrInitError(new Error('Cannot read properties of undefined')),
+    ).toBe(false);
+  });
+
+  it('matches a code-less pg message wrapped in error.cause', () => {
+    const wrapped = new Error('Payload query failed', {
+      cause: new Error('Connection terminated unexpectedly'),
+    });
+    expect(isConnectionOrInitError(wrapped)).toBe(true);
+  });
+
+  it('matches a code-less pg message inside an AggregateError.errors[]', () => {
+    const aggregate = new AggregateError(
+      [new Error('timeout exceeded when trying to connect (5000ms)')],
+      'pool acquisition failed',
+    );
+    expect(isConnectionOrInitError(aggregate)).toBe(true);
   });
 
   it('returns false for a TypeError data-shape defect', () => {
