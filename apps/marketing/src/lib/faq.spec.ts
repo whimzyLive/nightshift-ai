@@ -1,5 +1,6 @@
 import { getPayload } from 'payload';
 
+import { __resetDbConfigWarningForTests } from './db-config';
 import { getFaqPageGroups, getHomeFaqs } from './faq';
 
 import type { Faq } from '../payload-types';
@@ -256,5 +257,75 @@ describe('getFaqPageGroups', () => {
     await expect(getFaqPageGroups()).resolves.toEqual([]);
     expect(consoleErrorSpy).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('DATABASE_URL not configured (CI build without secrets)', () => {
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+
+  beforeEach(() => {
+    mockFind.mockReset();
+    mockGetPayload.mockReset().mockResolvedValue({ find: mockFind });
+    __resetDbConfigWarningForTests();
+  });
+
+  afterEach(() => {
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
+  });
+
+  it('getHomeFaqs returns [] without calling getPayload when DATABASE_URL is unset', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getHomeFaqs()).resolves.toEqual([]);
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('getFaqPageGroups returns [] without calling getPayload when DATABASE_URL is unset', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getFaqPageGroups()).resolves.toEqual([]);
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('treats an empty-string DATABASE_URL as unconfigured', async () => {
+    process.env.DATABASE_URL = '';
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getHomeFaqs()).resolves.toEqual([]);
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('treats a whitespace-only DATABASE_URL as unconfigured', async () => {
+    process.env.DATABASE_URL = '   ';
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getHomeFaqs()).resolves.toEqual([]);
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('still rethrows a connection error when DATABASE_URL IS set but the DB is unreachable', async () => {
+    process.env.DATABASE_URL = 'postgres://user:pass@127.0.0.1:1/db';
+    mockGetPayload.mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getHomeFaqs()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('warns at most once across multiple reader calls in the same process', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await getHomeFaqs();
+    await getFaqPageGroups();
+    await getHomeFaqs();
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    consoleWarnSpy.mockRestore();
   });
 });

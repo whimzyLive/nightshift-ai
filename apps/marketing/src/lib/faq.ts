@@ -1,6 +1,7 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
+import { isDbConfigured, warnDbNotConfiguredOnce } from './db-config';
 import { withDbFallback } from './with-db-fallback';
 
 import type { Faq } from '../payload-types';
@@ -16,9 +17,16 @@ export interface HomeFaqItem {
  * `homeAnswer` (the shorter, home-tuned copy) wins over `answer` when set —
  * mirrors the seed data's own convention (see seed/data.ts). Rethrows on a
  * connection/init failure so a DB outage fails the build; swallows an
- * isolated row-level defect to an empty list.
+ * isolated row-level defect to an empty list. Short-circuits to the empty
+ * fallback (no connection attempt) when `DATABASE_URL` isn't configured —
+ * e.g. a CI build without secrets — rather than treating that as an outage.
  */
 export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return [];
+  }
+
   const payload = await getPayload({ config });
 
   return withDbFallback('[faq]', [], async () => {
@@ -68,9 +76,15 @@ const FAQ_GROUP_EYEBROW: Record<NonNullable<FaqGroup>, string> = {
  * into topic groups in first-appearance order. Uses the full `answer` field
  * (not `homeAnswer`). Rethrows on a connection/init failure so a DB outage
  * fails the build; swallows an isolated row-level defect to an empty list —
- * same convention as getHomeFaqs.
+ * same convention as getHomeFaqs, including the DATABASE_URL-unset
+ * short-circuit.
  */
 export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return [];
+  }
+
   const payload = await getPayload({ config });
 
   return withDbFallback('[faq]', [], async () => {

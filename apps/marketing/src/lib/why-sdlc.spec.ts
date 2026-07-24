@@ -1,5 +1,6 @@
 import { getPayload } from 'payload';
 
+import { __resetDbConfigWarningForTests } from './db-config';
 import { getWhySdlcContent, getWhySdlcFaqs } from './why-sdlc';
 
 import type { Faq, WhySdlc } from '../payload-types';
@@ -244,5 +245,70 @@ describe('getWhySdlcFaqs', () => {
     await expect(getWhySdlcFaqs()).resolves.toEqual([]);
     expect(consoleErrorSpy).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('DATABASE_URL not configured (CI build without secrets)', () => {
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+
+  beforeEach(() => {
+    mockFindGlobal.mockReset();
+    mockFind.mockReset();
+    mockGetPayload
+      .mockReset()
+      .mockResolvedValue({ findGlobal: mockFindGlobal, find: mockFind });
+    __resetDbConfigWarningForTests();
+  });
+
+  afterEach(() => {
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
+  });
+
+  it('getWhySdlcContent returns null without calling getPayload when DATABASE_URL is unset', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getWhySdlcContent()).resolves.toBeNull();
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('getWhySdlcFaqs returns [] without calling getPayload when DATABASE_URL is unset', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getWhySdlcFaqs()).resolves.toEqual([]);
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('treats an empty-string / whitespace-only DATABASE_URL as unconfigured', async () => {
+    process.env.DATABASE_URL = '   ';
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getWhySdlcContent()).resolves.toBeNull();
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('still rethrows a connection error when DATABASE_URL IS set but the DB is unreachable', async () => {
+    process.env.DATABASE_URL = 'postgres://user:pass@127.0.0.1:1/db';
+    mockGetPayload.mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('warns at most once across multiple reader calls in the same process', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await getWhySdlcContent();
+    await getWhySdlcFaqs();
+    await getWhySdlcContent();
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    consoleWarnSpy.mockRestore();
   });
 });

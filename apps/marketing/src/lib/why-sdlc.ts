@@ -1,6 +1,7 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
+import { isDbConfigured, warnDbNotConfiguredOnce } from './db-config';
 import { withDbFallback } from './with-db-fallback';
 
 import type { Faq, WhySdlc } from '../payload-types';
@@ -33,9 +34,15 @@ export interface WhySdlcFaqItem {
  * The `whySdlc` global — intro block + the five argument sections. Rethrows
  * on a connection/init failure so a DB outage fails the build; swallows an
  * isolated row-level defect to `null` so the hero/argument sections simply
- * render nothing.
+ * render nothing. Short-circuits to `null` (no connection attempt) when
+ * `DATABASE_URL` isn't configured — e.g. a CI build without secrets.
  */
 export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return null;
+  }
+
   const payload = await getPayload({ config });
 
   return withDbFallback('[why-sdlc]', null, async () => {
@@ -62,9 +69,15 @@ export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
  * page-tuned richText override) wins over `answer` when set — mirrors
  * `getHomeFaqs`'s `homeAnswer` convention (see faq.ts). Rethrows on a
  * connection/init failure so a DB outage fails the build; swallows an
- * isolated row-level defect to an empty list.
+ * isolated row-level defect to an empty list. Short-circuits to the empty
+ * fallback (no connection attempt) when `DATABASE_URL` isn't configured.
  */
 export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
+  if (!isDbConfigured()) {
+    warnDbNotConfiguredOnce();
+    return [];
+  }
+
   const payload = await getPayload({ config });
 
   return withDbFallback('[why-sdlc]', [], async () => {
