@@ -11,7 +11,7 @@
     "*": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "next": "~16.2.6",
+    "next": "~16.2.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
