@@ -17,12 +17,6 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = whySdlcMetadata;
 
-// Payload's Local API calls below would otherwise make this route attempt
-// static prerendering at `next build` time, which requires a migrated
-// Postgres schema to exist (NA-16 memory). force-dynamic also means the
-// page reflects CMS edits immediately, with no redeploy.
-export const dynamic = 'force-dynamic';
-
 // Async page — the single top-level boundary where both Payload fetches
 // happen (see NA-16 memory: a second nested async Server Component breaks
 // RTL's render()). Every section below stays a plain synchronous

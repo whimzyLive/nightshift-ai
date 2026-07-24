@@ -1,5 +1,6 @@
 import { getPayload } from 'payload';
 
+import { __resetDbConfigWarningForTests } from './db-config';
 import { getWhySdlcContent, getWhySdlcFaqs } from './why-sdlc';
 
 import type { Faq, WhySdlc } from '../payload-types';
@@ -16,6 +17,29 @@ jest.mock('payload', () => ({ getPayload: jest.fn() }));
 const mockGetPayload = getPayload as jest.Mock;
 const mockFindGlobal = jest.fn();
 const mockFind = jest.fn();
+
+// Every reader guards on DATABASE_URL being configured before it ever calls
+// getPayload (see db-config.ts) — CI has no .env at all, so without this the
+// pre-existing getPayload-path tests below would silently hit the guard's
+// empty fallback instead of exercising the mocked payload client. Set a
+// dummy value for every test in this file; the "DATABASE_URL not configured"
+// describe further down deliberately unsets/blanks it per-test and restores
+// its own snapshot afterward.
+const TEST_DATABASE_URL = 'postgres://test:test@localhost:5432/test';
+let originalDatabaseUrl: string | undefined;
+
+beforeEach(() => {
+  originalDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = TEST_DATABASE_URL;
+});
+
+afterEach(() => {
+  if (originalDatabaseUrl === undefined) {
+    delete process.env.DATABASE_URL;
+  } else {
+    process.env.DATABASE_URL = originalDatabaseUrl;
+  }
+});
 
 function richText(text: string) {
   return {
@@ -111,12 +135,56 @@ describe('getWhySdlcContent', () => {
     expect(result?.intro.heading).toBe('You decide how it gets built');
   });
 
-  it('returns null (and logs) when findGlobal rejects', async () => {
-    mockFindGlobal.mockRejectedValue(new Error('db unreachable'));
+  it('returns null (and logs) on a row-level/data-shape defect', async () => {
+    mockFindGlobal.mockRejectedValue(new TypeError('bad global shape'));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     await expect(getWhySdlcContent()).resolves.toBeNull();
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+
+  it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
+    mockGetPayload.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('rethrows when findGlobal rejects with a connection-class error', async () => {
+    mockFindGlobal.mockRejectedValue(
+      Object.assign(new Error('connection refused'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/connection refused/);
+  });
+
+  it('rethrows on a transient DNS failure (EAI_AGAIN)', async () => {
+    mockFindGlobal.mockRejectedValue(
+      Object.assign(new Error('getaddrinfo EAI_AGAIN'), {
+        code: 'EAI_AGAIN',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/EAI_AGAIN/);
+  });
+
+  it('rethrows when a wrapped driver error carries the connection code via error.cause', async () => {
+    mockFindGlobal.mockRejectedValue(
+      new Error('Payload query failed', {
+        cause: Object.assign(new Error('socket hang up'), {
+          code: 'ECONNRESET',
+        }),
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/Payload query failed/);
+  });
+
+  it('returns null for a legitimately empty/absent global (not an error)', async () => {
+    mockFindGlobal.mockResolvedValue(makeWhySdlcGlobal({ arguments: [] }));
+    const result = await getWhySdlcContent();
+    expect(result?.arguments).toEqual([]);
   });
 });
 
@@ -156,11 +224,122 @@ describe('getWhySdlcFaqs', () => {
     expect(result).toEqual([{ id: 3, question: 'Q3', answer }]);
   });
 
-  it('returns an empty array when the Payload call fails, instead of throwing', async () => {
-    mockFind.mockRejectedValue(new Error('db unreachable'));
+  it('returns an empty array on a row-level/data-shape defect, instead of throwing', async () => {
+    mockFind.mockRejectedValue(new TypeError("Cannot read 'answer' of null"));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     await expect(getWhySdlcFaqs()).resolves.toEqual([]);
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+
+  it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
+    mockGetPayload.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcFaqs()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('rethrows when the query rejects with a connection-class error', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('host not found'), { code: 'ENOTFOUND' }),
+    );
+    await expect(getWhySdlcFaqs()).rejects.toThrow(/host not found/);
+  });
+
+  it('rethrows on an operator-intervention SQLSTATE (57P03 cannot_connect_now)', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('the database system is starting up'), {
+        code: '57P03',
+      }),
+    );
+    await expect(getWhySdlcFaqs()).rejects.toThrow(/starting up/);
+  });
+
+  it('rethrows a non-Error thrown value that carries a connection code', async () => {
+    mockFind.mockRejectedValue({ code: 'ECONNREFUSED' });
+    await expect(getWhySdlcFaqs()).rejects.toEqual({ code: 'ECONNREFUSED' });
+  });
+
+  it('returns [] for a legitimately empty result set (not an error)', async () => {
+    mockFind.mockResolvedValue({ docs: [] });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    await expect(getWhySdlcFaqs()).resolves.toEqual([]);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('DATABASE_URL not configured (CI build without secrets)', () => {
+  // Captured inside this describe's own beforeEach — which Jest runs AFTER
+  // the file-level beforeEach above — so this snapshots the dummy value
+  // that beforeEach just set, not whatever was ambient at file-load time.
+  // Each test below then unsets/blanks DATABASE_URL itself; this describe's
+  // own afterEach (which Jest runs BEFORE the file-level afterEach) restores
+  // that snapshot, and the file-level afterEach then restores the true
+  // original on top — both layers stay symmetric regardless of run order.
+  let innerOriginalDatabaseUrl: string | undefined;
+
+  beforeEach(() => {
+    innerOriginalDatabaseUrl = process.env.DATABASE_URL;
+    mockFindGlobal.mockReset();
+    mockFind.mockReset();
+    mockGetPayload
+      .mockReset()
+      .mockResolvedValue({ findGlobal: mockFindGlobal, find: mockFind });
+    __resetDbConfigWarningForTests();
+  });
+
+  afterEach(() => {
+    if (innerOriginalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = innerOriginalDatabaseUrl;
+    }
+  });
+
+  it('getWhySdlcContent returns null without calling getPayload when DATABASE_URL is unset', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getWhySdlcContent()).resolves.toBeNull();
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('getWhySdlcFaqs returns [] without calling getPayload when DATABASE_URL is unset', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getWhySdlcFaqs()).resolves.toEqual([]);
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('treats an empty-string / whitespace-only DATABASE_URL as unconfigured', async () => {
+    process.env.DATABASE_URL = '   ';
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await expect(getWhySdlcContent()).resolves.toBeNull();
+    expect(mockGetPayload).not.toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('still rethrows a connection error when DATABASE_URL IS set but the DB is unreachable', async () => {
+    process.env.DATABASE_URL = 'postgres://user:pass@127.0.0.1:1/db';
+    mockGetPayload.mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('warns at most once across multiple reader calls in the same process', async () => {
+    delete process.env.DATABASE_URL;
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    await getWhySdlcContent();
+    await getWhySdlcFaqs();
+    await getWhySdlcContent();
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    consoleWarnSpy.mockRestore();
   });
 });
