@@ -1,3 +1,73 @@
+## 2026-07-24 — Story NA-71 — render marketing site as static build output (force-dynamic removal + helper-catch narrowing)
+
+**Learnings:**
+
+- Chose a simpler mechanism than the plan's suggested regex hack for
+  distinguishing "getPayload init failure" from "query failure": moved
+  `const payload = await getPayload({ config });` **outside** the
+  try/catch entirely in all four `lib/faq.ts`/`lib/why-sdlc.ts` helpers, so
+  a `getPayload` init throw (missing `PAYLOAD_SECRET`, adapter construction,
+  connection refused) always propagates unconditionally — no
+  `isConnectionOrInitError`/message-sniffing needed for that half. Only the
+  `payload.find`/`payload.findGlobal` **query** rejection goes through the
+  classifier (`is-connection-error.ts`, pure `code`-based check for
+  `ECONNREFUSED`/`ENOTFOUND`/`ETIMEDOUT`/`ECONNRESET` or SQLSTATE `08*`/`28*`).
+  This is DRY, avoids fragile `/getPayload|PAYLOAD_SECRET|adapter/i` message
+  regex, and the plan's own literal test (`mockGetPayload.mockRejectedValueOnce`
+  with an `ECONNREFUSED`-coded error, asserting `rejects.toThrow`) passes
+  identically either way — the plan explicitly left the mechanism open
+  ("implementer's choice"), so this simplification is in-bounds.
+- Proved the "outage fails the build" AC (NA-71 Task 3 Step 4) with a single
+  inline env override — `DATABASE_URL='postgres://invalid:invalid@127.0.0.1:1/none' pnpm nx build @nightshift-ai/marketing`
+  — rather than touching the committed `.env` file. Next's dotenv loading
+  does not override an already-set `process.env` var, so the shell-inlined
+  bogus `DATABASE_URL` wins over `.env`'s real value for that one process,
+  and the real `.env` is untouched/needs no restore step. Confirmed the
+  build fails with `Export encountered an error on /(frontend)/page: /,
+exiting the build` and a non-zero exit — the connection error propagates
+  straight from `getPayload({config})`'s pg-pool init (no classifier
+  involvement needed since it's outside the try).
+- Confirmed the build-reaches-DB AC (build succeeds with **populated**
+  content, not just a green exit code) by grepping the actual generated
+  static HTML (`apps/marketing/.next/server/app/faq.html`) for real FAQ
+  question text (`Isn't this just another AI code-writer wrapper?` etc.) —
+  a successful build alone doesn't prove the CMS read wasn't silently
+  swallowed to an empty fallback; reading the emitted HTML does.
+- This story's diff **directly reverses** the conventions codified in
+  **ADR 0009** (try/catch-to-defaults fallback for public-route CMS reads —
+  "any error" swallowed) and **ADR 0010** (force-dynamic rendering +
+  production-migration requirement for CMS-backed routes), both currently
+  `status: accepted` and both listed in this agent's ADR-index section. Per
+  the domain-agent-handoff ADR-check rule, an `accepted` ADR match means
+  soft-skip re-appending the **same** learning — but this is the opposite
+  case (the implementation now contradicts the ADR's stated convention, not
+  duplicates it), so it is NOT a skip candidate; flagging here instead since
+  superseding an ADR's `status:` field is the knowledge-engineer/ADR-pipeline's
+  job (`docs/adr/` is outside web-engineer's ownership per project-context),
+  not something to hand-edit from this dispatch.
+- `vercel-react-best-practices` was the only override skill with applicable
+  surface for this story (Next.js rendering-mode change + async
+  server-component data-fetching helpers) — same "applicable, not all 7"
+  pattern as the NA-39 non-visual story. Skipped `nightshift-design`,
+  `payload`, `tailwind-design-system`, `vercel-composition-patterns`,
+  `atomic-design`, `motion-dev-animations`: zero visual/UI/copy change, zero
+  Payload collection/hook/config touch (only pre-existing Local API
+  consumer calls), zero component composition/animation work — the whole
+  diff is a rendering-mode flag removal + an error-classification refactor.
+
+**Patterns:**
+
+- Existing generic-error tests (`new Error('db unreachable')`, no `code`
+  property) needed **no changes** under the new narrowed catch — a plain
+  `Error` with no `code` fails `isConnectionOrInitError`'s `typeof code ===
+'string'` check and falls through to the swallow branch exactly as before,
+  so pre-existing "returns [] instead of throwing" tests stayed green
+  unmodified. Only needed new tests for the newly-introduced rethrow branch
+  (errors carrying a real connection `code`) plus one retitle (row-level
+  defect tests switched their thrown value from a bare `Error` to a
+  `TypeError` to make the "this is NOT a connection error" intent explicit
+  in the test itself, though a bare `Error` would have passed too).
+
 ## 2026-07-23 — Story NA-69 — A1 "vibrant morning" variant (A/B against feat/NA-69-dawn-subtle)
 
 **Learnings:**
