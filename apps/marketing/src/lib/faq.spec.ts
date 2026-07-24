@@ -17,6 +17,29 @@ jest.mock('payload', () => ({ getPayload: jest.fn() }));
 const mockGetPayload = getPayload as jest.Mock;
 const mockFind = jest.fn();
 
+// Every reader guards on DATABASE_URL being configured before it ever calls
+// getPayload (see db-config.ts) — CI has no .env at all, so without this the
+// pre-existing getPayload-path tests below would silently hit the guard's
+// empty fallback instead of exercising the mocked payload client. Set a
+// dummy value for every test in this file; the "DATABASE_URL not configured"
+// describe further down deliberately unsets/blanks it per-test and restores
+// its own snapshot afterward.
+const TEST_DATABASE_URL = 'postgres://test:test@localhost:5432/test';
+let originalDatabaseUrl: string | undefined;
+
+beforeEach(() => {
+  originalDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = TEST_DATABASE_URL;
+});
+
+afterEach(() => {
+  if (originalDatabaseUrl === undefined) {
+    delete process.env.DATABASE_URL;
+  } else {
+    process.env.DATABASE_URL = originalDatabaseUrl;
+  }
+});
+
 function makeFaqDoc(overrides: Partial<Faq>): Faq {
   return {
     id: 1,
@@ -261,19 +284,27 @@ describe('getFaqPageGroups', () => {
 });
 
 describe('DATABASE_URL not configured (CI build without secrets)', () => {
-  const originalDatabaseUrl = process.env.DATABASE_URL;
+  // Captured inside this describe's own beforeEach — which Jest runs AFTER
+  // the file-level beforeEach above — so this snapshots the dummy value
+  // that beforeEach just set, not whatever was ambient at file-load time.
+  // Each test below then unsets/blanks DATABASE_URL itself; this describe's
+  // own afterEach (which Jest runs BEFORE the file-level afterEach) restores
+  // that snapshot, and the file-level afterEach then restores the true
+  // original on top — both layers stay symmetric regardless of run order.
+  let innerOriginalDatabaseUrl: string | undefined;
 
   beforeEach(() => {
+    innerOriginalDatabaseUrl = process.env.DATABASE_URL;
     mockFind.mockReset();
     mockGetPayload.mockReset().mockResolvedValue({ find: mockFind });
     __resetDbConfigWarningForTests();
   });
 
   afterEach(() => {
-    if (originalDatabaseUrl === undefined) {
+    if (innerOriginalDatabaseUrl === undefined) {
       delete process.env.DATABASE_URL;
     } else {
-      process.env.DATABASE_URL = originalDatabaseUrl;
+      process.env.DATABASE_URL = innerOriginalDatabaseUrl;
     }
   });
 
