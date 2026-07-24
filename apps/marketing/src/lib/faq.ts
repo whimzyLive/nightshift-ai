@@ -1,6 +1,8 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
+import { isConnectionOrInitError } from './is-connection-error';
+
 import type { Faq } from '../payload-types';
 
 export interface HomeFaqItem {
@@ -12,14 +14,14 @@ export interface HomeFaqItem {
 /**
  * Top-5 FAQs for the home preview accordion, ordered by `homeOrder`.
  * `homeAnswer` (the shorter, home-tuned copy) wins over `answer` when set —
- * mirrors the seed data's own convention (see seed/data.ts). Falls back to
- * an empty list on any Payload/DB failure so the section simply renders
- * nothing rather than throwing (same convention as the NA-16 findGlobal
- * fallback).
+ * mirrors the seed data's own convention (see seed/data.ts). Rethrows on a
+ * connection/init failure so a DB outage fails the build; swallows an
+ * isolated row-level defect to an empty list.
  */
 export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
+  const payload = await getPayload({ config });
+
   try {
-    const payload = await getPayload({ config });
     const { docs } = await payload.find({
       collection: 'faq',
       where: { showOnHome: { equals: true } },
@@ -34,6 +36,7 @@ export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
       answer: doc.homeAnswer ?? doc.answer,
     }));
   } catch (error) {
+    if (isConnectionOrInitError(error)) throw error;
     console.error('[faq]', error);
     return [];
   }
@@ -67,12 +70,14 @@ const FAQ_GROUP_EYEBROW: Record<NonNullable<FaqGroup>, string> = {
 /**
  * All FAQs for the standalone /faq page, ordered by `faqOrder`, partitioned
  * into topic groups in first-appearance order. Uses the full `answer` field
- * (not `homeAnswer`). Returns [] on any Payload/DB failure — same
- * graceful-empty convention as getHomeFaqs.
+ * (not `homeAnswer`). Rethrows on a connection/init failure so a DB outage
+ * fails the build; swallows an isolated row-level defect to an empty list —
+ * same convention as getHomeFaqs.
  */
 export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
+  const payload = await getPayload({ config });
+
   try {
-    const payload = await getPayload({ config });
     const { docs } = await payload.find({
       collection: 'faq',
       sort: 'faqOrder',
@@ -104,6 +109,7 @@ export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
 
     return groups;
   } catch (error) {
+    if (isConnectionOrInitError(error)) throw error;
     console.error('[faq]', error);
     return [];
   }

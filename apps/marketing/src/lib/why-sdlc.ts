@@ -1,6 +1,8 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
+import { isConnectionOrInitError } from './is-connection-error';
+
 import type { Faq, WhySdlc } from '../payload-types';
 
 export interface WhySdlcArgument {
@@ -28,13 +30,15 @@ export interface WhySdlcFaqItem {
 }
 
 /**
- * The `whySdlc` global — intro block + the five argument sections. Falls
- * back to `null` on any Payload/DB failure (NA-16 findGlobal convention) so
- * the hero/argument sections simply render nothing rather than throwing.
+ * The `whySdlc` global — intro block + the five argument sections. Rethrows
+ * on a connection/init failure so a DB outage fails the build; swallows an
+ * isolated row-level defect to `null` so the hero/argument sections simply
+ * render nothing.
  */
 export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
+  const payload = await getPayload({ config });
+
   try {
-    const payload = await getPayload({ config });
     const global = await payload.findGlobal({ slug: 'whySdlc', depth: 0 });
 
     return {
@@ -51,6 +55,7 @@ export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
       })),
     };
   } catch (error) {
+    if (isConnectionOrInitError(error)) throw error;
     console.error('[why-sdlc]', error);
     return null;
   }
@@ -59,12 +64,14 @@ export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
 /**
  * The 2-question page FAQ, ordered by `whySdlcOrder`. `whySdlcAnswer` (the
  * page-tuned richText override) wins over `answer` when set — mirrors
- * `getHomeFaqs`'s `homeAnswer` convention (see faq.ts). Falls back to an
- * empty list on any Payload/DB failure.
+ * `getHomeFaqs`'s `homeAnswer` convention (see faq.ts). Rethrows on a
+ * connection/init failure so a DB outage fails the build; swallows an
+ * isolated row-level defect to an empty list.
  */
 export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
+  const payload = await getPayload({ config });
+
   try {
-    const payload = await getPayload({ config });
     const { docs } = await payload.find({
       collection: 'faq',
       where: { showOnWhySdlc: { equals: true } },
@@ -79,6 +86,7 @@ export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
       answer: doc.whySdlcAnswer ?? doc.answer,
     }));
   } catch (error) {
+    if (isConnectionOrInitError(error)) throw error;
     console.error('[why-sdlc]', error);
     return [];
   }

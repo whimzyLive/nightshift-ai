@@ -111,12 +111,36 @@ describe('getWhySdlcContent', () => {
     expect(result?.intro.heading).toBe('You decide how it gets built');
   });
 
-  it('returns null (and logs) when findGlobal rejects', async () => {
-    mockFindGlobal.mockRejectedValue(new Error('db unreachable'));
+  it('returns null (and logs) on a row-level/data-shape defect', async () => {
+    mockFindGlobal.mockRejectedValue(new TypeError('bad global shape'));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     await expect(getWhySdlcContent()).resolves.toBeNull();
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+
+  it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
+    mockGetPayload.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('rethrows when findGlobal rejects with a connection-class error', async () => {
+    mockFindGlobal.mockRejectedValue(
+      Object.assign(new Error('connection refused'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/connection refused/);
+  });
+
+  it('returns null for a legitimately empty/absent global (not an error)', async () => {
+    mockFindGlobal.mockResolvedValue(makeWhySdlcGlobal({ arguments: [] }));
+    const result = await getWhySdlcContent();
+    expect(result?.arguments).toEqual([]);
   });
 });
 
@@ -156,11 +180,35 @@ describe('getWhySdlcFaqs', () => {
     expect(result).toEqual([{ id: 3, question: 'Q3', answer }]);
   });
 
-  it('returns an empty array when the Payload call fails, instead of throwing', async () => {
-    mockFind.mockRejectedValue(new Error('db unreachable'));
+  it('returns an empty array on a row-level/data-shape defect, instead of throwing', async () => {
+    mockFind.mockRejectedValue(new TypeError("Cannot read 'answer' of null"));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     await expect(getWhySdlcFaqs()).resolves.toEqual([]);
     expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
+    mockGetPayload.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getWhySdlcFaqs()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('rethrows when the query rejects with a connection-class error', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('host not found'), { code: 'ENOTFOUND' }),
+    );
+    await expect(getWhySdlcFaqs()).rejects.toThrow(/host not found/);
+  });
+
+  it('returns [] for a legitimately empty result set (not an error)', async () => {
+    mockFind.mockResolvedValue({ docs: [] });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    await expect(getWhySdlcFaqs()).resolves.toEqual([]);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
 });

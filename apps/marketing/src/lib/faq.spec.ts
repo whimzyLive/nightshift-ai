@@ -86,11 +86,40 @@ describe('getHomeFaqs', () => {
     expect(result).toEqual([{ id: 3, question: 'Q3', answer }]);
   });
 
-  it('returns an empty array when the Payload call fails, instead of throwing', async () => {
-    mockFind.mockRejectedValue(new Error('db unreachable'));
+  it('returns an empty array when the Payload call fails with a row-level defect, instead of throwing', async () => {
+    mockFind.mockRejectedValue(new TypeError("Cannot read 'answer' of null"));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     await expect(getHomeFaqs()).resolves.toEqual([]);
     expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
+    mockGetPayload.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getHomeFaqs()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('rethrows when the query rejects with a connection-class error', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }),
+    );
+    await expect(getHomeFaqs()).rejects.toThrow(/timeout/);
+  });
+
+  it('swallows a row-level/data-shape defect and returns []', async () => {
+    mockFind.mockRejectedValue(new TypeError("Cannot read 'answer' of null"));
+    await expect(getHomeFaqs()).resolves.toEqual([]);
+  });
+
+  it('returns [] for a legitimately empty result set (not an error)', async () => {
+    mockFind.mockResolvedValue({ docs: [] });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    await expect(getHomeFaqs()).resolves.toEqual([]);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
 });
@@ -173,8 +202,32 @@ describe('getFaqPageGroups', () => {
     expect(groups[0].items[0].answer).toBe(answer);
   });
 
-  it('returns [] on any Payload/DB failure', async () => {
-    mockFind.mockRejectedValue(new Error('db down'));
+  it('returns [] on a row-level/data-shape defect', async () => {
+    mockFind.mockRejectedValue(new TypeError('bad row'));
     await expect(getFaqPageGroups()).resolves.toEqual([]);
+  });
+
+  it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
+    mockGetPayload.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNREFUSED',
+      }),
+    );
+    await expect(getFaqPageGroups()).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it('rethrows when the query rejects with a connection-class error', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('auth failed'), { code: '28000' }),
+    );
+    await expect(getFaqPageGroups()).rejects.toThrow(/auth failed/);
+  });
+
+  it('returns [] for a legitimately empty result set (not an error)', async () => {
+    mockFind.mockResolvedValue({ docs: [] });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    await expect(getFaqPageGroups()).resolves.toEqual([]);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 });
