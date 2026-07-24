@@ -24,6 +24,35 @@
       "scope:web"
     ],
     "targets": {
+      "build": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": true,
+        "inputs": [
+          "default",
+          "^default",
+          {
+            "externalDependencies": [
+              "next"
+            ]
+          },
+          {
+            "dependentTasksOutputFiles": "**/*.d.ts",
+            "transitive": true
+          }
+        ],
+        "outputs": [
+          "{workspaceRoot}/apps/marketing/.next/!(cache)/**/*",
+          "{workspaceRoot}/apps/marketing/.next/!(cache)"
+        ],
+        "options": {
+          "command": "next build",
+          "cwd": "apps/marketing",
+          "tty": false
+        }
+      },
       "local-start": {
         "executor": "nx:run-commands",
         "options": {
