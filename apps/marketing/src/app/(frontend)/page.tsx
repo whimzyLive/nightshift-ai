@@ -28,12 +28,6 @@ import type { Metadata } from 'next';
 // request/CMS dependency — a plain const export, no generateMetadata.
 export const metadata: Metadata = homeMetadata;
 
-// Payload's Local API call below (getHomeFaqs) would otherwise make this
-// route attempt static prerendering at `next build` time, which requires a
-// migrated Postgres schema to exist (NA-16 memory). force-dynamic also
-// means the FAQ preview reflects CMS edits immediately, with no redeploy.
-export const dynamic = 'force-dynamic';
-
 // Async page — the single top-level boundary where the Payload fetch for
 // the FAQ preview happens (see NA-16 memory: a second nested async Server
 // Component breaks RTL's render()). Every section below FaqPreview stays a
