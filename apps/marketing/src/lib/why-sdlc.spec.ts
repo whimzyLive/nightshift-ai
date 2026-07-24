@@ -137,6 +137,26 @@ describe('getWhySdlcContent', () => {
     await expect(getWhySdlcContent()).rejects.toThrow(/connection refused/);
   });
 
+  it('rethrows on a transient DNS failure (EAI_AGAIN)', async () => {
+    mockFindGlobal.mockRejectedValue(
+      Object.assign(new Error('getaddrinfo EAI_AGAIN'), {
+        code: 'EAI_AGAIN',
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/EAI_AGAIN/);
+  });
+
+  it('rethrows when a wrapped driver error carries the connection code via error.cause', async () => {
+    mockFindGlobal.mockRejectedValue(
+      new Error('Payload query failed', {
+        cause: Object.assign(new Error('socket hang up'), {
+          code: 'ECONNRESET',
+        }),
+      }),
+    );
+    await expect(getWhySdlcContent()).rejects.toThrow(/Payload query failed/);
+  });
+
   it('returns null for a legitimately empty/absent global (not an error)', async () => {
     mockFindGlobal.mockResolvedValue(makeWhySdlcGlobal({ arguments: [] }));
     const result = await getWhySdlcContent();
@@ -202,6 +222,20 @@ describe('getWhySdlcFaqs', () => {
       Object.assign(new Error('host not found'), { code: 'ENOTFOUND' }),
     );
     await expect(getWhySdlcFaqs()).rejects.toThrow(/host not found/);
+  });
+
+  it('rethrows on an operator-intervention SQLSTATE (57P03 cannot_connect_now)', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('the database system is starting up'), {
+        code: '57P03',
+      }),
+    );
+    await expect(getWhySdlcFaqs()).rejects.toThrow(/starting up/);
+  });
+
+  it('rethrows a non-Error thrown value that carries a connection code', async () => {
+    mockFind.mockRejectedValue({ code: 'ECONNREFUSED' });
+    await expect(getWhySdlcFaqs()).rejects.toEqual({ code: 'ECONNREFUSED' });
   });
 
   it('returns [] for a legitimately empty result set (not an error)', async () => {

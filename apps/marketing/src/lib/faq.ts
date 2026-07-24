@@ -1,7 +1,7 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
-import { isConnectionOrInitError } from './is-connection-error';
+import { withDbFallback } from './with-db-fallback';
 
 import type { Faq } from '../payload-types';
 
@@ -21,7 +21,7 @@ export interface HomeFaqItem {
 export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
   const payload = await getPayload({ config });
 
-  try {
+  return withDbFallback('[faq]', [], async () => {
     const { docs } = await payload.find({
       collection: 'faq',
       where: { showOnHome: { equals: true } },
@@ -35,11 +35,7 @@ export async function getHomeFaqs(): Promise<HomeFaqItem[]> {
       question: doc.question,
       answer: doc.homeAnswer ?? doc.answer,
     }));
-  } catch (error) {
-    if (isConnectionOrInitError(error)) throw error;
-    console.error('[faq]', error);
-    return [];
-  }
+  });
 }
 
 type FaqGroup = Faq['group'];
@@ -77,7 +73,7 @@ const FAQ_GROUP_EYEBROW: Record<NonNullable<FaqGroup>, string> = {
 export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
   const payload = await getPayload({ config });
 
-  try {
+  return withDbFallback('[faq]', [], async () => {
     const { docs } = await payload.find({
       collection: 'faq',
       sort: 'faqOrder',
@@ -108,9 +104,5 @@ export async function getFaqPageGroups(): Promise<FaqPageGroup[]> {
     }
 
     return groups;
-  } catch (error) {
-    if (isConnectionOrInitError(error)) throw error;
-    console.error('[faq]', error);
-    return [];
-  }
+  });
 }

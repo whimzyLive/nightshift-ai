@@ -1,7 +1,7 @@
 import config from '@payload-config';
 import { getPayload } from 'payload';
 
-import { isConnectionOrInitError } from './is-connection-error';
+import { withDbFallback } from './with-db-fallback';
 
 import type { Faq, WhySdlc } from '../payload-types';
 
@@ -38,7 +38,7 @@ export interface WhySdlcFaqItem {
 export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
   const payload = await getPayload({ config });
 
-  try {
+  return withDbFallback('[why-sdlc]', null, async () => {
     const global = await payload.findGlobal({ slug: 'whySdlc', depth: 0 });
 
     return {
@@ -54,11 +54,7 @@ export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
         body: row.body,
       })),
     };
-  } catch (error) {
-    if (isConnectionOrInitError(error)) throw error;
-    console.error('[why-sdlc]', error);
-    return null;
-  }
+  });
 }
 
 /**
@@ -71,7 +67,7 @@ export async function getWhySdlcContent(): Promise<WhySdlcContent | null> {
 export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
   const payload = await getPayload({ config });
 
-  try {
+  return withDbFallback('[why-sdlc]', [], async () => {
     const { docs } = await payload.find({
       collection: 'faq',
       where: { showOnWhySdlc: { equals: true } },
@@ -85,9 +81,5 @@ export async function getWhySdlcFaqs(): Promise<WhySdlcFaqItem[]> {
       question: doc.question,
       answer: doc.whySdlcAnswer ?? doc.answer,
     }));
-  } catch (error) {
-    if (isConnectionOrInitError(error)) throw error;
-    console.error('[why-sdlc]', error);
-    return [];
-  }
+  });
 }

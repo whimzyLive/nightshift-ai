@@ -110,6 +110,24 @@ describe('getHomeFaqs', () => {
     await expect(getHomeFaqs()).rejects.toThrow(/timeout/);
   });
 
+  it('rethrows on an unmigrated-schema SQLSTATE (42P01 undefined_table)', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('relation "faq" does not exist'), {
+        code: '42P01',
+      }),
+    );
+    await expect(getHomeFaqs()).rejects.toThrow(/does not exist/);
+  });
+
+  it('swallows a row-level SQLSTATE (42703 undefined_column) to the empty fallback', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('column "foo" does not exist'), {
+        code: '42703',
+      }),
+    );
+    await expect(getHomeFaqs()).resolves.toEqual([]);
+  });
+
   it('swallows a row-level/data-shape defect and returns []', async () => {
     mockFind.mockRejectedValue(new TypeError("Cannot read 'answer' of null"));
     await expect(getHomeFaqs()).resolves.toEqual([]);
@@ -205,6 +223,15 @@ describe('getFaqPageGroups', () => {
   it('returns [] on a row-level/data-shape defect', async () => {
     mockFind.mockRejectedValue(new TypeError('bad row'));
     await expect(getFaqPageGroups()).resolves.toEqual([]);
+  });
+
+  it('rethrows on an unmigrated-schema SQLSTATE (3F000 invalid_schema_name)', async () => {
+    mockFind.mockRejectedValue(
+      Object.assign(new Error('schema "public" does not exist'), {
+        code: '3F000',
+      }),
+    );
+    await expect(getFaqPageGroups()).rejects.toThrow(/does not exist/);
   });
 
   it('rethrows when getPayload fails to initialise (connection/init class)', async () => {
