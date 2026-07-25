@@ -168,7 +168,6 @@ if [ -f "$legacy_file" ]; then
   printf 'LEGACY\n'
   cat "$legacy_file"
   echo "collect-memory: WARNING — $legacy_file is a v1 flat diary; migrate to .claude/memories/agents/$agent/<rule-id>.md (NA-74)." >&2
-  exit 0
 fi
 
 rule_dir="$repo_root/.claude/memories/agents/$agent"

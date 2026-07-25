@@ -20,7 +20,7 @@ fi
 vocab_display="$(printf '%s' "$vocab_list" | paste -sd, - | sed 's/,/, /g')"
 
 vocab_contains() {
-  printf '%s\n' "$vocab_list" | grep -qx "$1"
+  printf '%s\n' "$vocab_list" | grep -qxF -- "$1"
 }
 
 extract_fm() {
@@ -153,7 +153,9 @@ validate_rule_file() {
   uses_val="$(field_value "$parsed" uses)"
   status_val="$(field_value "$parsed" status)"
 
-  if [ -n "$id" ]; then
+  if [ -z "$id" ]; then
+    issues+="id is empty; "
+  else
     id_records+="$id|$file"$'\n'
     [ "$id" != "$stem" ] && issues+="id '$id' does not equal filename stem '$stem'; "
   fi
@@ -176,7 +178,9 @@ validate_rule_file() {
     issues+="trigger must have 1-6 items, got $trig_len; "
   fi
 
-  if [ -n "$rule_val" ] && [ "${#rule_val}" -gt 200 ]; then
+  if [ -z "$rule_val" ]; then
+    issues+="rule is empty; "
+  elif [ "${#rule_val}" -gt 200 ]; then
     issues+="rule exceeds 200 chars (${#rule_val}); "
   fi
 

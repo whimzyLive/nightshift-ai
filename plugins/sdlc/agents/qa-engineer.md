@@ -74,10 +74,16 @@ banner in the output means this repo has not migrated yet (NA-74) — read what 
 on. This matters because `/sdlc:docs distill` can promote — and delete — rule entries nominated
 from review round files under `.claude/memories/reviews/`, which the playbook's Step 1 pre-review
 scan consults; without this collection, a promoted-and-deleted rule would vanish from QA's view
-instead of surfacing via its canonical ADR. This is guaranteed to work: the pipeline's
-review-file tagging rule (`refs/adr-pipeline.md` §7) requires every ADR promoted from a
-review-file-sourced candidate to always carry `qa-engineer` in its `agents:` list, so it always
-surfaces in your own collection pass — it can never be tagged away from your read path.
+instead of surfacing via its canonical ADR. **Once this repo has migrated to the per-file rule
+layout (NA-74)**, this is guaranteed to work: the pipeline's review-file tagging rule
+(`refs/adr-pipeline.md` §7) requires every ADR promoted from a review-file-sourced candidate to
+always carry `qa-engineer` in its `agents:` list, so it always surfaces in your own collection
+pass — it can never be tagged away from your read path. **In legacy mode** (a flat
+`.claude/memories/agents/qa-engineer.md` diary, no rule directory yet) there is no per-rule
+`status`/promotion semantics to guarantee over — collection still scans `docs/adr/**` for any
+`accepted` ADR regardless of legacy status, so an already-authored ADR still surfaces, but the
+"a promoted rule can never be tagged away" guarantee specifically only applies once rule entries
+exist to promote.
 
 ## Role & Scope
 
