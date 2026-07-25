@@ -153,8 +153,8 @@ export const ORG_LEVELS: OrgPhase[] = [
     commands: ['/impl'],
     contract:
       'Plan → code + tests on an impl branch. principal-engineer dispatches one domain agent at a time, in dependency order — schema first, then backend, sync, web, mobile.',
-    ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/principal-engineer.md',
-    refLabel: 'agents/principal-engineer.md',
+    ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/principal-engineer-playbook.md',
+    refLabel: 'refs/principal-engineer-playbook.md',
     agentNames: [
       'principal-engineer',
       'database-administrator',
@@ -178,8 +178,8 @@ export const ORG_LEVELS: OrgPhase[] = [
     commands: ['/review', '/review-fix'],
     contract:
       'Independent review by a different agent than the author → quality gate → AC verification → reviewed PR, commented back to the ticket.',
-    ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/agents/qa-engineer.md',
-    refLabel: 'agents/qa-engineer.md',
+    ref: 'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/qa-engineer-playbook.md',
+    refLabel: 'refs/qa-engineer-playbook.md',
     agentNames: ['qa-engineer'],
   },
 ];
