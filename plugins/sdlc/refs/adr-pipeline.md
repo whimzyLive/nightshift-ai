@@ -246,8 +246,8 @@ its agents would narrow its visibility from that whole list down to tag-list-onl
 
 **Review-file tagging rule (same audience-preservation concern, applied at tagging time rather
 than deletion time).** `.claude/memories/reviews/*.md` round files are `qa-engineer`'s working
-evidence — every QA round's Step 1 pre-review scan reads them (see `qa-engineer.md`'s collection
-read-path and `qa-engineer-playbook.md` Step 1/5). A candidate nominated from a rule that a review
+evidence — every QA round's Step 1 pre-review scan reads them (see `qa-engineer-playbook.md`
+Step 1/5). A candidate nominated from a rule that a review
 round file's `## Rules written` cited, whose proposed `agents:` tags name only the agent(s) whose
 _work_ the pattern constrains (e.g. `web-engineer`) and omit `qa-engineer`, would silently drop the
 pattern out of QA's own read path — QA would no longer see, via its own index section, a pattern it

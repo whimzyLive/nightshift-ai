@@ -1,3 +1,9 @@
+## Unreleased
+
+### 🚨 Breaking Changes
+
+- **sdlc:** remove the `principal-engineer` and `qa-engineer` agent types — `plugins/sdlc/agents/principal-engineer.md` and `plugins/sdlc/agents/qa-engineer.md` are deleted (NA-75). Both were undispatchable tombstones: Claude Code's one-level subagent-nesting limit already forced both roles onto the inline playbooks (`refs/principal-engineer-playbook.md`, `refs/qa-engineer-playbook.md`, run inline by `/impl`, `/auto`, `/review`), so no consumer could ever dispatch either agent definition directly. The roles themselves are unaffected — they continue to run inline via their playbooks; this only removes the two dead agent-definition files a consumer could have referenced or attempted to dispatch directly.
+
 ## 0.45.1 (2026-07-21)
 
 ### 🚀 Features
