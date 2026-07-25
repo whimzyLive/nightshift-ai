@@ -185,8 +185,11 @@ Each agent prompt MUST include all of the following (agent starts cold — no co
    (the working directory named in item 1). Do NOT create a new branch. Do your work there and
    commit."
 8. "Do NOT create a PR — the Principal Engineer will open one after all phases and review are complete."
-9. "Commit your changes. Do NOT push — the Principal Engineer handles all pushes to origin."
-10. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
+9. "Commit your changes — first writing any admitted rule entries per the admission test in
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s rule-file flow (most dispatches admit
+   nothing, and that's expected) and staging them alongside your domain paths. Do NOT push — the
+   Principal Engineer handles all pushes to origin."
+10. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 
 Never send an agent just a task title — include enough context to work without asking questions.
 
@@ -226,6 +229,11 @@ what the dispatch prompt named in item 3 of its prompt contract, with its own ST
 consequence on failure — see `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` Step 5 for
 the full rule (source of truth; do not re-derive it here).
 
+**Verify the return carries `Rules applied:`.** Required on every return (4 lines complete, 5 lines
+blocked, per `domain-agent-handoff.md`), exactly like `Skills loaded:`. An absent line is a contract
+violation → re-dispatch, same consequence as a missing `Skills loaded:` line. `none` is a valid and
+expected value.
+
 ## Collecting results
 
 After each phase completes, extract from the agent's return message:
@@ -234,8 +242,9 @@ After each phase completes, extract from the agent's return message:
 - `Note:` field — only if blocked
 - `Summary:` field — one-line summary of what changed
 - `Skills loaded:` field — used by the set-coverage check above
+- `Rules applied:` field — required on every return, checked above
 
-**Do not carry forward large agent outputs into your context.** Extract the 4 fields above and discard the rest.
+**Do not carry forward large agent outputs into your context.** Extract the 5 fields above and discard the rest.
 
 If `Status: blocked` → STOP immediately. Report to user:
 
@@ -263,8 +272,8 @@ fix agents, so it runs at the top level — never as a subagent), passing:
 - The Jira story summary + acceptance criteria
 
 The QA Engineer runs: request review → triage → fix loop (dispatching domain agents) →
-re-review until clean → write learnings to memory → quality gate → AC + plan verification, then
-returns a verdict:
+re-review until clean → write a review round file + rule entries to memory → quality gate → AC +
+plan verification, then returns a verdict:
 
 - `Status: blocked` → **STOP**, surface the QA blocked reason to the user, do NOT create the PR.
 - `Status: clean` → proceed to create the PR. QA has already run the gate and verified every AC;

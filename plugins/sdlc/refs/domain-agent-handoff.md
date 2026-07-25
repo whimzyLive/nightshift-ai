@@ -16,8 +16,8 @@ git checkout <BRANCH_PREFIX>/<STORY-KEY> 2>/dev/null \
   || { echo "STOP: checkout failed — on $(git branch --show-current) instead of <BRANCH_PREFIX>/<STORY-KEY>"; exit 1; }
 ```
 
-If either check fails → return immediately (full 4-line blocked shape — see Return format below):
-`Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching` / `Summary: aborted before work — branch missing` / `Skills loaded: none` (an early abort loads no skills, so `none` is correct).
+If either check fails → return immediately (full 5-line blocked shape — see Return format below):
+`Status: blocked` / `Note: branch <BRANCH_PREFIX>/<STORY-KEY> not found — principal-engineer must push it before dispatching` / `Summary: aborted before work — branch missing` / `Skills loaded: none` / `Rules applied: none` (an early abort loads no skills and applies no rules, so `none` is correct for both).
 
 ## Branch and PR — do not create
 
@@ -25,29 +25,46 @@ The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` 
 
 ## Memory write (before committing)
 
-**ADR-index check first.** Before appending, consult your section(s) of `docs/adr/index.md` (your
-agent's section, plus `General`) if it exists. If a **`status: accepted`** ADR already captures
-the learning, **soft-skip the append and note it** in your return — the ADR is the canonical
-record, and re-appending would just duplicate it. A match against a `superseded`, `rejected`, or
-`proposed` ADR does **NOT** skip — the learning is still appended (a superseded/rejected decision
-is no longer, or never was, the operative convention, and a merely `proposed` one isn't binding
-yet). The index line carries status, so this check never needs to open the ADR itself. A missing
-index (repo has no ADRs yet) is a no-op — append as normal. This is an additive guard: it never
-changes the append format below, and the skip is always soft (append skipped, never failed) — a
-domain agent is never blocked from finishing its story by ADR bookkeeping.
+Memory is a set of small, self-describing rule files, not a diary. Collection at the start of your
+dispatch (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh <your-agent-name>`) already surfaced
+every rule and ADR that binds you — this section is about what you write back, not what you read.
 
-Append non-obvious learnings to your agent memory file at `.claude/memories/agents/<your-name>.md`:
+**Where a rule file lives.** A rule that binds only your own domain goes at
+`.claude/memories/agents/<your-name>/<rule-id>.md`. A rule that binds more than one agent (a
+cross-domain finding) goes at `.claude/memories/agents/shared/<rule-id>.md`, with every agent it
+binds listed in `agent`. `<rule-id>` is kebab-case and MUST equal the filename stem.
 
+**The 7-field schema** (YAML frontmatter, all fields required):
+
+```yaml
+---
+id: <kebab-case, equals the filename stem, unique across .claude/memories/agents/**>
+agent: [<agent-name>, ...] # exactly [<your-name>] under your own dir; length >= 2 under shared/
+trigger: [<phrase>, ...] # 1-6 lowercase keyword phrases naming the situation this fires in
+rule: When <condition>, <action>. # ONE line, <= 200 chars
+evidence: [<Jira key | PR#n | 7-40 char SHA>, ...] # length >= 1
+uses: 0 # incremented each dispatch that applied the rule
+status: active # active | deprecated | promoted — only active is collected at dispatch
+---
 ```
-## YYYY-MM-DD — Story <STORY-KEY> — one-line summary
-**Learnings:** <what worked or was discovered>
-**Pitfalls:** <what went wrong or nearly went wrong>
-**Patterns:** <reusable patterns confirmed>
-```
 
-If nothing non-obvious happened, skip the append — but still stage the file in case another agent earlier in the story updated it.
+Body is optional — a single `## Why` section, <= 10 lines. It is never read during collection; open
+it yourself only when the one-line `rule` isn't enough context.
 
-For cross-cutting findings (relevant to more than one domain), append to `.claude/memories/agents/shared.md` instead.
+**Admission test.** Write a candidate rule file only if ALL four hold:
+
+1. **Generalized** — a condition + action that constrains future work, not a narrative of one story.
+2. **Non-obvious** — not already derivable from the agent definition, the project override, or a repo `CLAUDE.md`.
+3. **Falsifiable trigger** — you can name the concrete situation it fires in (this populates `trigger`).
+4. **Not already an accepted ADR** — no `status: accepted` ADR covers the same decision (T2 wins; write nothing).
+
+Rejected by construction: story diaries, `Learnings`/`Pitfalls`/`Patterns` prose blocks, restatements
+of existing config, and any entry that only makes sense with the originating story in mind.
+**Skipping is normal, not a failure** — most dispatches write nothing new.
+
+**Counter-only updates.** For every rule you cited in `trigger` and actually applied this dispatch —
+your own, or a `shared/` one — increment its `uses` and append the current story key to its
+`evidence`. This is the only edit you make to a rule file you did not just create.
 
 ## Domain verification
 
@@ -55,15 +72,17 @@ Each domain has its own verification commands. Run **all** of them before consid
 
 ## Commit the memory file alongside your domain changes
 
-Stage your specific files and the memory file (do NOT use `git add .`):
+Stage your specific files and the rule files you touched (do NOT use `git add .`):
 
 ```bash
-git add <domain paths> .claude/memories/agents/<your-name>.md
+git add <domain paths> <rule files created or updated this dispatch>
 ```
 
 Then invoke the `conventional-commit` skill to construct and execute the commit message. Use the directory name as the scope — see `.claude/project/project-context.md` for valid scopes in this project.
 
 Do not split memory updates into a separate commit — they belong with the work that produced them.
+**If the dispatch produced no other change, skip the `uses` increment rather than raising an
+empty commit** — a counter-only diff is not worth a commit on its own.
 
 **Do NOT push.** The Principal Engineer pushes `<BRANCH_PREFIX>/<STORY-KEY>` to origin after verifying your commits landed locally. Your job ends at commit.
 
@@ -71,29 +90,37 @@ Do not split memory updates into a separate commit — they belong with the work
 
 Return only these lines to the Principal Engineer (no other prose). The line count depends on status:
 
-**Complete return — exactly 3 lines** (`Note:` omitted):
+**Complete return — exactly 4 lines** (`Note:` omitted):
 
 ```
 Status: complete
 Summary: <one line — what files changed, key entities/handlers/screens touched>
 Skills loaded: <comma-separated override skill names | none>
+Rules applied: <rule-id>, <rule-id> | none
 ```
 
-**Blocked return — exactly 4 lines** (`Note:` present):
+**Blocked return — exactly 5 lines** (`Note:` present):
 
 ```
 Status: blocked
 Note: <one line — why blocked>
 Summary: <one line — what was attempted>
 Skills loaded: <comma-separated override skill names | none>
+Rules applied: <rule-id>, <rule-id> | none
 ```
 
 - `Skills loaded:` is **required on every return** (complete, blocked, or early abort). An absent line is a contract violation.
 - Its value lists every **runtime override (project) skill** you invoked/applied this dispatch (e.g. `tailwind-design-system, react-components`) — including any skill the dispatch prompt named that happens to also be one of your agent's own required first-turn skills (loaded via the Skill tool per your agent's "Required skills (load FIRST)" section, not frontmatter — frontmatter `skills:` preloads are re-injected in full on every SendMessage resume, harness bug anthropics/claude-code#76337, which is why NA-25 moved every generic skill to a first-turn Skill-tool load instead). For those, "invoked" means you applied it to the task; listing it is what satisfies the orchestrator's set-coverage check. Only omit a first-turn generic skill the dispatch prompt did **not** name — never pad the line with those.
 - Emit the literal `none` only when no applicable override skill was loaded. Whether `none` is a pass or a failure is decided **mechanically against your dispatch prompt** by the orchestrator: `none` passes iff the dispatch prompt declared no applicable skills; if the prompt named skills, `none`/missing/empty/partial is a failure.
 - If your dispatch prompt neither names skills nor declares none applicable, select the applicable skills from your override yourself, invoke them, and list them — `none` then means none were applicable to the task.
+- `Rules applied:` is **required on every return**, same as `Skills loaded:`. Its value cites the rule
+  `id`s (yours or `shared/`) that collection surfaced and that you actually followed this dispatch —
+  the same set you incremented `uses` on. `none` is valid and expected whenever collection emitted
+  nothing applicable; it is not a sign anything went wrong. An agent that applied a rule but omitted
+  the line is a contract violation, handled exactly as a missing `Skills loaded:` line — the
+  orchestrator re-dispatches.
 
-Large outputs are dropped at the dispatch boundary — keep it to the 3 lines (complete) / 4 lines (blocked) above.
+Large outputs are dropped at the dispatch boundary — keep it to the 4 lines (complete) / 5 lines (blocked) above.
 
 ## Things you never do
 

@@ -124,22 +124,27 @@ transcript once and survive resumes.)
      `.claude/memories/**` deletions) and needs **no** `ai-enablement-engineer` ownership: do not
      STOP on its absence there. Resolve the write-scope from project-context and gate any such STOP
      on whether the resolved target is `plugins/**`, not on the agent roster unconditionally.
-2. Read your own memory archive if it exists: `.claude/memories/agents/knowledge-engineer.md`, and
-   `.claude/memories/agents/shared.md` if present.
+2. **Collect applicable memory** — run
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh knowledge-engineer`.
+   Pass 1 is mechanical: it emits one `RULE`/`ADR` index line per artifact whose `agent`/`agents`
+   list covers you and whose status is `active`/`accepted`. Pass 2 is yours: semantically match the
+   emitted `trigger` phrases against your dispatch task and open the full file (the rule body, or
+   `docs/adr/NNNN-*.md`) ONLY for the entries you will actually follow. A `LEGACY` banner in the
+   output means this repo has not migrated yet (NA-74) — read what it emitted and carry on.
 3. Read the specific task instructions provided (the founder-supplied pattern text for seed mode,
    or the distill trigger for distill mode).
 
 ## Role & scope
 
 You own ADR curation under `docs/adr/`: drafting, numbering, writing, and deterministically
-regenerating `docs/adr/index.md`. In distill mode, you also own the founder-gated deletion of
-promoted raw learning entries from `.claude/memories/**` during a distill PR — sanctioned as
+regenerating `docs/adr/index.md`. In distill mode you write the ADR only — **you do not delete or
+mark any rule file.** T1 promotion-and-deletion of superseded rule entries under
+`.claude/memories/**` is reassigned to the `ai-enablement-engineer` maintenance op (sanctioned as
 **Exception 2** in
-[`analyze-protocol.md`'s memory-ownership rules](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#memory-ownership-exceptions)
-(mirroring how `ai-enablement-engineer.md` points at the conflict-reset exception for its own
-cross-agent memory write). You explicitly do NOT own or edit any app/product source. When
-authoring plugin changes in the SDLC repo itself, you write only within the
-`ai-enablement-engineer`-owned surface.
+[`analyze-protocol.md`'s memory-ownership rules](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#memory-ownership-exceptions),
+now scoped to that op rather than to you — see `refs/adr-pipeline.md` §8). You explicitly do NOT
+own or edit any app/product source. When authoring plugin changes in the SDLC repo itself, you
+write only within the `ai-enablement-engineer`-owned surface.
 
 In a **docs-sync dispatch** (via `/sdlc:docs sync`), you additionally own the docs-sync pipeline:
 you regenerate frontmatter-driven reference docs + `llms.txt` deterministically and draft gated
@@ -182,7 +187,7 @@ and never `writing-docs`; the generic seed-dispatch skill rules (Phase 1 `writin
 
 - **ADR dispatch** (dispatched by `/sdlc:docs` for `seed adr` or `distill`) — the full procedure
   (the two-phase dispatch split, the distill evidence protocol, the promotion criteria, the
-  `shared.md` audience rule, and the index-regeneration algorithm) is defined once in
+  `agents/shared/` audience rule, and the index-regeneration algorithm) is defined once in
   `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` (single source of truth). Read it before running
   either phase.
 - **docs-sync dispatch** (via `/sdlc:docs sync`) — the full procedure (the two-phase dispatch
@@ -320,8 +325,10 @@ below, matching the required-skills and `Skills loaded:` split elsewhere in this
    command-layer-flow section (seed → `docs/adr-<slug>`, distill →
    `docs/adr-distill-<YYYY-MM-DD>`), off `<BASE-BRANCH>` from project-context — never assume `main`.
 2. Write the confirmed ADR(s), regenerate the index, and (distill) delete the confirmed learnings.
-3. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`.
-4. Stage your changed paths + the memory file, commit via the `conventional-commit` skill, push
+3. Write any admitted rule entries per the admission test in
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`.
+4. Stage your changed paths + any rule files you created or updated, commit via the
+   `conventional-commit` skill, push
    the branch yourself (there is no orchestrator to push for you outside a dispatch), then raise
    the PR via `gh` / `${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh` with the title convention from
    `refs/adr-pipeline.md`'s §3a section.
@@ -337,16 +344,18 @@ restatement: it names only the two things that are genuinely dispatch-specific h
 1. Write the deterministic regen content, the regenerated `llms.txt`, and the founder-confirmed
    narrative drafts under their manifest-resolved `target-path`s, on the branch §7 names (checked
    out / reset per §7's re-run rule).
-2. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`, then follow
-   §7's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
-   paths is non-empty (AC6); if it's empty, skip commit/push/PR entirely (clean no-op) and still
-   append any memory learning from this dispatch.
+2. Write any admitted rule entries per the admission test in
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`, then follow §7's commit/push/PR steps
+   exactly — but only if `git status --porcelain` on the written target paths is non-empty (AC6); if
+   it's empty, skip commit/push/PR entirely (clean no-op) and still write any admitted rule entry
+   from this dispatch.
 
 **Post-QA inline variant (§25) — override.** On this variant the §7 branch/reset/PR mechanics do
 **not** apply: you write in the handed `$WORKTREE` on `<BRANCH_PREFIX>/<STORY-KEY>` (no
 `docs/sync-<KEY>` branch, no checkout, no reset/force-with-lease), commit the deterministic regen +
 `llms.txt` + confirmed-less narrative drafts under their manifest-resolved `target-path`s via
-`conventional-commit`, append any learning to `.claude/memories/agents/knowledge-engineer.md`, and
+`conventional-commit`, write any admitted rule entries per
+`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`, and
 **return** — the orchestrator pushes and the impl PR (Step 7) carries the commit. **Never push,
 never raise or update a PR** on this variant. If the change-gate leaves nothing to commit, return
 cleanly with no commit. Your `Skills loaded:` return follows the docs-sync rule below.
@@ -364,10 +373,11 @@ owned once by `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--bran
    its own manifest row is present and enabled** (§14) — it is a `sync`-triggered row, not a member
    of `ENABLED_ROWS`, so its enabled state is never inferred from that set; if disabled or absent,
    do not write or touch `llms.txt` at all this dispatch.
-2. Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`, then follow
-   §13's commit/push/PR steps exactly — but only if `git status --porcelain` on the written target
-   paths is non-empty; if it's empty, skip commit/push/PR entirely (clean no-op) and still append any
-   memory learning from this dispatch.
+2. Write any admitted rule entries per the admission test in
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`, then follow §13's commit/push/PR steps
+   exactly — but only if `git status --porcelain` on the written target paths is non-empty; if it's
+   empty, skip commit/push/PR entirely (clean no-op) and still write any admitted rule entry from
+   this dispatch.
 
 ### seed dispatch — branch, memory, commit, return
 
@@ -387,9 +397,10 @@ Branch/PR/control flow is defined once in
   them as a TOCTOU backstop before writing. **On a STOP, preserve the confirmed content** — write it
   to the session temp dir (`scripts/tmp-dir.sh`) and surface the path — never discard it.
 - **Never reset, never force-push** the seed branch (a deliberate divergence from §7 — see §18).
-- Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md`.
+- Write any admitted rule entries per the admission test in
+  `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`.
 - Commit/push/PR **only if `git status --porcelain` on the written paths is non-empty** — and still
-  append the memory learning if it is empty.
+  write any admitted rule entry if it is empty.
 
 ### audit dispatch — branch, memory, commit, return
 
@@ -405,8 +416,9 @@ not restate it. Dispatch-specific:
   reset — see §24).
 - In `--dry-run`, write nothing and return the findings report to the command layer; no branch, no
   commit, no PR.
-- Append any non-obvious learning to `.claude/memories/agents/knowledge-engineer.md` — and still
-  append it even on a clean scan or a `--dry-run` run.
+- Write any admitted rule entries per the admission test in
+  `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — and still check for one even on a clean
+  scan or a `--dry-run` run.
 
 ## Completion checklist
 

@@ -43,6 +43,12 @@ reuses the domain agent that ran the phase across its fix-round dispatches inste
 `Agent(...)` each round; `disabled` is the documented off-switch, restoring a fresh dispatch every
 round.
 
+## Memory
+
+| Token                   | Value      |
+| ----------------------- | ---------- |
+| Review retention window | `6 months` |
+
 ## Triage
 
 | Token                                           | Value |

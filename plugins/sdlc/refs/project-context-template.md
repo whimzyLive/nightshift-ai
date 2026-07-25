@@ -42,6 +42,12 @@ generated file — every slot must be replaced with an actual value.
 | Typecheck | `<typecheck cmd>` |
 | Test | `<test cmd>` |
 
+## Memory
+
+| Token                   | Value                       |
+| ----------------------- | --------------------------- |
+| Review retention window | `<review-retention-window>` |
+
 ## Triage
 
 | Token                                           | Value         |
@@ -97,6 +103,11 @@ generated file — every slot must be replaced with an actual value.
   > project-context files. `/init` writes `claude-inline` **explicitly**, so new
   > repos get the in-session reviewer; pre-existing repos without the token keep
   > the historical Copilot behaviour.
+- **Review retention window** — default `6 months` when the founder does not request otherwise.
+  Accepted formats are **exactly** `<n> months` (wall-clock age) or `<n> stories` (activity-based —
+  preferred for low-activity repos, where wall-clock decay would expire still-relevant rules
+  between infrequent commits) — no other grammar. Consumed by
+  `${CLAUDE_PLUGIN_ROOT}/refs/memory-maintenance.md`'s decay/demotion and review-file GC ops.
 - **Review gate** — OPTIONAL. A comma-separated subset of `spec,plan,impl` listing
   which phases trigger the configured review (e.g. `Review gate | spec, impl`). A
   phase not listed has its review skipped (effective review-mode `none` for that

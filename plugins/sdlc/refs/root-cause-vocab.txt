@@ -1,0 +1,18 @@
+# one token per line; '#' comment lines and blank lines ignored
+# adding a token is an ai-enablement-engineer change; this file is the single canonical source
+# consumed by both refs/qa-engineer-playbook.md and scripts/check-frontmatter.sh
+contract-drift
+ordering-violation
+missing-guard
+hardcoded-assumption
+state-assumption
+stale-doc-claim
+scope-leak
+error-swallowed
+type-safety
+test-gap
+markdown-structure
+a11y-regression
+perf-regression
+security-gap
+dependency-drift

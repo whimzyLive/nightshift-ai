@@ -85,16 +85,19 @@ conventions or re-appending a learning an accepted ADR already covers.
 `plugins/sdlc/commands/docs.md` routes ADR curation to `knowledge-engineer` across two phases split
 by a founder-confirmation gate that lives at the command layer (a dispatched subagent cannot pause
 for interactive input): phase 1 drafts candidate ADR(s) and returns without writing; the command
-presents each draft, its proposed `agents:` tags, and (distill only) the exact memory entries
-slated for deletion, then waits for explicit founder confirmation; phase 2 writes only the
-confirmed items — assigns the next `NNNN`, writes `docs/adr/NNNN-slug.md`, regenerates
-`docs/adr/index.md` deterministically from ADR frontmatter, (distill only) deletes the confirmed
-learnings in the same PR, and self-raises the PR. `/sdlc:docs seed adr "<pattern>"` seeds inline
-with no corpus read; `/sdlc:docs distill ["<focus>"]` mines `.claude/memories/agents/*.md`,
-`.claude/memories/reviews/patterns.md`, PR review threads, commit history, and claude-mem
-observations, promoting a candidate only on recurrence, cross-agent relevance, or durable
-convention. Both are special routes on `/sdlc:docs` — `seed adr` branches before the generic seed
-machinery and `distill` is not a member of the four generic doc-generation modes (`sync`/
+presents each draft, its proposed `agents:` tags, and (distill only) the exact rule entries slated
+for promotion, then waits for explicit founder confirmation; phase 2 writes only the confirmed
+items — assigns the next `NNNN`, writes `docs/adr/NNNN-slug.md`, regenerates `docs/adr/index.md`
+deterministically from ADR frontmatter, and self-raises the PR. `knowledge-engineer` writes the
+ADR only — the confirmed rule entries' `status: promoted` flip and eventual deletion are reassigned
+to the `ai-enablement-engineer` maintenance op (`refs/memory-maintenance.md`), not done in the
+ADR-authoring PR. `/sdlc:docs seed adr "<pattern>"` seeds inline with no corpus read;
+`/sdlc:docs distill ["<focus>"]` consumes the maintenance op's mechanically-nominated rule
+candidate list plus per-round review files (`.claude/memories/reviews/*.md`), PR review threads,
+commit history, and claude-mem observations, promoting a candidate only on recurrence, cross-agent
+relevance, or durable convention. Both are special routes on `/sdlc:docs` — `seed adr` branches
+before the generic seed machinery and `distill` is not a member of the four generic doc-generation
+modes (`sync`/
 `release`/`seed`/`audit`), which this README does not otherwise document here. See
 `refs/adr-pipeline.md` for the full pipeline and `skills/writing-adrs/SKILL.md` for the ADR
 body/lifecycle/frontmatter contract it renders against.

@@ -57,11 +57,13 @@ transcript once and survive resumes.)
    the task counts as "invoked" for the orchestrator's set-coverage check; only omit a required
    skill the dispatch prompt did not name (per
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format).
-3. Read your memory archives if they exist: `.claude/memories/agents/ai-enablement-engineer.md`,
-   `.claude/memories/agents/shared.md`. Also read your section of `docs/adr/index.md` (the
-   `ai-enablement-engineer` section, plus `General`) if it exists — best-effort; a missing index
-   (repo has no ADRs yet) is a no-op, not an error. Open the full `docs/adr/NNNN-*.md` only on
-   demand, when a listing is relevant to the current task.
+3. **Collect applicable memory** — run
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh ai-enablement-engineer`.
+   Pass 1 is mechanical: it emits one `RULE`/`ADR` index line per artifact whose `agent`/`agents`
+   list covers you and whose status is `active`/`accepted`. Pass 2 is yours: semantically match the
+   emitted `trigger` phrases against your dispatch task and open the full file (the rule body, or
+   `docs/adr/NNNN-*.md`) ONLY for the entries you will actually follow. A `LEGACY` banner in the
+   output means this repo has not migrated yet (NA-74) — read what it emitted and carry on.
 4. Read the specific task instructions provided.
 
 ## Owned-surface resolution (AC-3, AC-5)
@@ -117,8 +119,9 @@ engineers.
 
 1. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate
    sections). Also run any domain-specific completion steps your override lists.
-2. Stage your changed paths + `.claude/memories/agents/ai-enablement-engineer.md`, then commit per
-   the handoff protocol. **Dispatched mode:** commit only — the Principal Engineer pushes (per
+2. Stage your changed paths + any rule files you created or updated under
+   `.claude/memories/agents/`, then commit per the handoff protocol. **Dispatched mode:** commit
+   only — the Principal Engineer pushes (per
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s "Do NOT push"). **Standalone
    `/sdlc:analyze` mode:** push the `chore/ai-config-<slug>` branch yourself before raising the PR
    (per [Apply flow](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#apply-flow) step 5) — there is

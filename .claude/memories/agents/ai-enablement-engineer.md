@@ -1,5 +1,100 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-25 — NA-73 review-fix round — inline-playbook drift, empty-value lint gaps, legacy exit-early bug (`plugins/sdlc/refs/principal-engineer-playbook.md`, `plugins/sdlc/scripts/{check-frontmatter,collect-memory}.sh`, `plugins/sdlc/agents/qa-engineer.md`, `plugins/sdlc/refs/code-comments-policy.md`, `plugins/sdlc/README.md`)
+
+- **`plugins/sdlc/agents/principal-engineer.md` and `plugins/sdlc/refs/principal-engineer-playbook.md`
+  carry the SAME dispatch-prompt-contract and return-verification content twice, independently, and
+  I only updated one copy in the Phase-1 pass.** The agent def's dispatch template and the playbook's
+  "Domain-agent prompt contract" (its own item 10/12 + Step-5 verification) are two hand-authored
+  copies of the identical instruction set, not one canonical file the other points at — unlike most
+  of this plugin's other single-canonical-statement relationships (ADR-0004). Nothing greps or lints
+  for the two staying in sync. **Lesson: when a change touches BOTH `plugins/sdlc/agents/<name>.md`
+  and a same-named `plugins/sdlc/refs/<name>-playbook.md`, grep the playbook for the identical
+  content class (dispatch-prompt items, return-format contract) before considering the change
+  done — these are a duplicated-not-pointed-at pair, the opposite of the file's own single-source
+  framing elsewhere.**
+- **A bash guard written as `[ -n "$val" ] && <only-check-when-present>` silently PASSES an empty
+  string, because the whole conditional short-circuits to false** — both `check-frontmatter.sh`'s
+  `id` and `rule` field checks had this shape (checked format/length only inside an `-n` guard,
+  never asserting non-emptiness itself), so `id:` or `rule:` with nothing after the colon produced
+  zero issues instead of a lint failure. Fixed by inverting to `if [ -z "$val" ]; then <fail>; else
+<format checks>; fi` for every required-non-empty field. **Lesson: a validator's `-n`-guarded
+  branch is a check for "if present, is it well-formed" — it is NOT a presence/non-emptiness check
+  on its own; a required field needs an explicit `-z` failure branch, not just format checks nested
+  under `-n`.**
+- **`grep -qx "$token"` treats a controlled-vocabulary token as an unanchored-content regex, not a
+  literal string** — `test.gap` (the `.` matching any char) silently matched the real vocabulary
+  entry `test-gap`, and a token starting with `-` would have been parsed as a grep option instead of
+  a pattern. Fixed with `grep -qxF -- "$token"` (`-F` = fixed-string, `--` = end-of-options guard).
+  **Lesson: any `grep -qx "$var"` matching a value against a fixed set from user/config input needs
+  `-F` (literal) and `--` (option-injection guard) — `-x` alone (exact-line match) does not make the
+  match literal, it only anchors it.**
+- **My own Phase-1 legacy-fallback design regressed a v1 capability without me noticing, because I
+  tested collect-memory.sh's legacy path in an isolated fixture with no `docs/adr/` present** —
+  `exit 0` right after the `LEGACY` banner meant a repo with BOTH a flat diary (unmigrated) AND real
+  ADRs under `docs/adr/` (this repo, exactly) would never reach the ADR scan, so an agent in legacy
+  mode lost ADR visibility v1 never had this gap for (v1 read `docs/adr/index.md` unconditionally).
+  My Task-1.14 verification ran `collect-memory.sh web-engineer` against THIS repo and only checked
+  for the `LEGACY` banner + exit code, never diffed the full output against what the ADR scan alone
+  would have produced — the fixture fixtures I wrote for Task 1.4 also never combined a legacy flat
+  diary WITH populated `docs/adr/`. Fixed by deleting the early `exit 0` so the legacy branch falls
+  through to the same rule-dir/shared-dir/adr-dir scan every non-legacy invocation runs (rule/shared
+  dirs are simply absent in pure-legacy mode, a no-op). **Lesson: when a fallback path is designed to
+  "keep working, degraded," verify it against a fixture that combines the OLD state with whatever
+  the feature ALREADY populates elsewhere (here: real ADRs already existing) — a fallback tested only
+  in isolation from the rest of the system's real state can silently drop a capability the old code
+  path had unconditionally.**
+
+## 2026-07-25 — NA-73 Phase 1 — Memory v2 protocol: collect-memory.sh, check-frontmatter.sh, 9 agent-def rewrites (`plugins/sdlc/scripts/{collect-memory,check-frontmatter}.sh`, `plugins/sdlc/refs/{domain-agent-handoff,qa-engineer-playbook,adr-pipeline,analyze-protocol,memory-maintenance,root-cause-vocab}*`, `plugins/sdlc/agents/*.md`, `plugins/sdlc/commands/init.md`)
+
+- **This repo's `bash` resolves to the macOS-shipped 3.2.57, not a Homebrew-installed 4/5** — no
+  associative arrays (`declare -A`), no `mapfile`, none of the bash-4+ conveniences. Both new
+  scripts (`collect-memory.sh`, `check-frontmatter.sh`) needed duplicate-key detection (rule `id`
+  uniqueness across `.claude/memories/agents/**`) without one; solved with a flat `id|filepath`
+  newline-accumulated string, `cut -d'|' -f1 | sort | uniq -d` to find the duplicated keys, then a
+  second `awk -F'|'` pass per duplicate to list its files — no dictionary needed. **Lesson: before
+  reaching for `declare -A` in any `plugins/sdlc/scripts/*.sh`, check `bash --version` in this
+  environment (3.2.57) — indexed arrays and `sort | uniq -d` cover the common "detect duplicates"
+  case without it.**
+- **`pnpm exec prettier --check <file>` is a repo-wrapped command that unconditionally prints
+  "Prettier: All files formatted correctly" regardless of the file's actual state** — it does NOT
+  reflect true Prettier output the way `./node_modules/.bin/prettier --check <file>` or
+  `pnpm nx format:check` do. Caught only because `pnpm nx format:check` flagged
+  `.claude/project/project-context.md` as unformatted (a hand-typed `## Memory` table with
+  misaligned column padding) immediately after `pnpm exec prettier --check` had reported it clean.
+  **Lesson: never trust `pnpm exec prettier --check` as this repo's format-check oracle — always
+  cross-verify with `./node_modules/.bin/prettier --check` or `pnpm nx format:check` before
+  declaring a hand-typed markdown table a Prettier fixed point.**
+- **A plan's stated "next free sub-step letter" can go stale between when the plan was written and
+  when it's executed, if an intervening story already claimed it** — NA-73's plan (written before
+  this session) said `commands/init.md` Step 4's next free sub-step letter was `4g` (reasoning: `4f`
+  is "Install each confirmed skill into project scope"), but by the time I read the live file, `4g`
+  was ALSO already taken (`.claude/project/docs-manifest.md` scaffolding, landed by a later story).
+  The true next free letter was `4h`. Followed the plan's underlying INTENT (find the actual next
+  free letter, place the new sub-step after the existing lettered steps) rather than its literal
+  letter, since blindly writing a second `**4g.**` heading would have silently shadowed the
+  existing one. **Lesson: when a plan names a specific sub-step letter/number as "next free," grep
+  the live file for that exact marker before writing — a plan's own numbering claims can be stale
+  the moment ANY other story lands between plan-authoring and execution, not just from concurrent
+  work in the same story.**
+- **A pipeline-reassignment ("T1 deletion moves from `knowledge-engineer` to the maintenance op")
+  touches more files than the plan's own per-task `Files:` list enumerates when the OLD owner's own
+  agent definition asserts the ownership it's losing in its own prose** — `adr-pipeline.md` §8 was
+  the plan's named file for the reassignment (Task 1.9), but `plugins/sdlc/agents/knowledge-engineer.md`'s
+  own "Role & scope" section independently claimed "you also own the founder-gated deletion of
+  promoted raw learning entries... sanctioned as Exception 2" — a second, independent assertion of
+  the same fact the reassignment now contradicts. Caught by grepping the whole repo for "Exception 2"
+  after finishing the named-file edits, not by the plan's Task 1.7/1.9 file lists (neither one names
+  `knowledge-engineer.md`'s Role & scope prose). **Lesson: after any ownership/responsibility
+  reassignment, grep for the specific exception/permission NAME (not just the mechanism it moved
+  out of) across the whole `plugins/sdlc/` tree — an agent's own self-description is exactly the
+  kind of second independent assertion a plan's file-scoped task list won't catch.**
+- Verified the new scripts against this repo's own real (unmigrated) tree per Task 1.14's exact
+  expected outputs — `check-frontmatter.sh` exits 0 with 5 legacy warnings (4 flat diaries +
+  `patterns.md`), `collect-memory.sh web-engineer` exits 0 with a `LEGACY` banner, `collect-memory.sh`
+  with no args exits 1 with a usage line — all matched on the first run, no iteration needed once the
+  awk frontmatter parser (single-pass, block-form + inline-flow YAML list support) was right.
+
 ## 2026-07-23 — NA-68 review-fix round — fragment-strip ordering, root-absolute targets, depth-wrong remediation example (`plugins/sdlc/refs/docs-pipeline.md`)
 
 - **A deterministic multi-step check spec with an implicit/narrative step order is exactly as fragile

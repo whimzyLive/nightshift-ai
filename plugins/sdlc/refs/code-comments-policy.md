@@ -3,24 +3,26 @@
 Single source of truth for the "no informative/explanatory code comments" rule. Every active
 domain agent's project override (`.claude/project/agents/<agent>.md`) and the QA review gate
 (`refs/qa-engineer-playbook.md`) reference this file rather than restating the rule — see
-`domain-agent-handoff.md`'s "Memory write" step for where the displaced content belongs.
+`domain-agent-handoff.md`'s "Memory write" step (the rule-entry flow and admission test) for where
+the displaced content belongs.
 
 ## Why
 
-This project's SDLC already captures evolving, non-obvious context at the agent-memory level
-(`.claude/memories/agents/<agent>.md`) — a record that is actively kept current across stories.
-A code comment that narrates or explains carries the same kind of information through a second,
-uncoordinated channel: it has no update discipline of its own, drifts out of sync with the code
-around it, and can end up silently disagreeing with what memory says. One durable, current record
-beats two that can diverge.
+This project's SDLC already captures evolving, non-obvious context as per-rule memory files
+(`.claude/memories/agents/<agent>/<rule-id>.md`, or `agents/shared/` for cross-domain rules) — a
+record that is actively kept current across stories. A code comment that narrates or explains
+carries the same kind of information through a second, uncoordinated channel: it has no update
+discipline of its own, drifts out of sync with the code around it, and can end up silently
+disagreeing with what memory says. One durable, current record beats two that can diverge.
 
 ## The rule
 
 Do not add informative or explanatory comments to code you write — a comment whose job is to
 narrate what the code does, explain why a decision was made, or restate something already
 knowable from reading the code and its names. If a decision, gotcha, workaround-rationale, or
-subtle invariant is genuinely worth preserving, it belongs in your agent memory file, not inline
-in the source (see "Where the content goes instead" below).
+subtle invariant is genuinely worth preserving AND passes the admission test in
+`domain-agent-handoff.md`, it belongs in a rule entry, not inline in the source (see "Where the
+content goes instead" below).
 
 **Forbidden — informative/explanatory:**
 
@@ -52,9 +54,11 @@ slightly less narrated, it's informative — don't add it; move any real content
 ## Where the content goes instead
 
 Anything a comment would have explained that's actually worth keeping — a non-obvious decision, a
-workaround and its reason, a gotcha future work would otherwise re-discover the hard way — goes in
-your agent memory file (`.claude/memories/agents/<agent>.md`), appended per
-`domain-agent-handoff.md`'s "Memory write" step, not left inline in the diff.
+workaround and its reason, a gotcha future work would otherwise re-discover the hard way — becomes
+a rule entry (`.claude/memories/agents/<agent>/<rule-id>.md`, or `agents/shared/` when it binds
+more than one agent) per `domain-agent-handoff.md`'s "Memory write" step and admission test, not
+left inline in the diff. Not every displaced comment clears the admission test — when it doesn't,
+the content is simply dropped, not force-fit into a rule entry.
 
 ## Enforcement
 
@@ -66,6 +70,6 @@ your agent memory file (`.claude/memories/agents/<agent>.md`), appended per
    exactly one place (this file) either layer can disagree with, not two.
 2. **Review gate.** The QA Engineer review loop (`refs/qa-engineer-playbook.md` Step 1 dispatch
    and Step 2 severity) flags any new informative/explanatory comment a PR diff introduces: the
-   finding requests the comment be removed and, if it captured real context, that the context be
-   moved to the introducing agent's memory file instead. This is an **Important** finding — the
+   finding requests the comment be removed and, if it captured real context that clears the
+   admission test, that a rule entry be written for it instead. This is an **Important** finding — the
    loop does not return `clean` (and no PR is created) while one is still open.
