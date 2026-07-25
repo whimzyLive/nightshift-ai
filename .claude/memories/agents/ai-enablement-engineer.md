@@ -1,5 +1,50 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-25 — NA-73 review-fix round — inline-playbook drift, empty-value lint gaps, legacy exit-early bug (`plugins/sdlc/refs/principal-engineer-playbook.md`, `plugins/sdlc/scripts/{check-frontmatter,collect-memory}.sh`, `plugins/sdlc/agents/qa-engineer.md`, `plugins/sdlc/refs/code-comments-policy.md`, `plugins/sdlc/README.md`)
+
+- **`plugins/sdlc/agents/principal-engineer.md` and `plugins/sdlc/refs/principal-engineer-playbook.md`
+  carry the SAME dispatch-prompt-contract and return-verification content twice, independently, and
+  I only updated one copy in the Phase-1 pass.** The agent def's dispatch template and the playbook's
+  "Domain-agent prompt contract" (its own item 10/12 + Step-5 verification) are two hand-authored
+  copies of the identical instruction set, not one canonical file the other points at — unlike most
+  of this plugin's other single-canonical-statement relationships (ADR-0004). Nothing greps or lints
+  for the two staying in sync. **Lesson: when a change touches BOTH `plugins/sdlc/agents/<name>.md`
+  and a same-named `plugins/sdlc/refs/<name>-playbook.md`, grep the playbook for the identical
+  content class (dispatch-prompt items, return-format contract) before considering the change
+  done — these are a duplicated-not-pointed-at pair, the opposite of the file's own single-source
+  framing elsewhere.**
+- **A bash guard written as `[ -n "$val" ] && <only-check-when-present>` silently PASSES an empty
+  string, because the whole conditional short-circuits to false** — both `check-frontmatter.sh`'s
+  `id` and `rule` field checks had this shape (checked format/length only inside an `-n` guard,
+  never asserting non-emptiness itself), so `id:` or `rule:` with nothing after the colon produced
+  zero issues instead of a lint failure. Fixed by inverting to `if [ -z "$val" ]; then <fail>; else
+<format checks>; fi` for every required-non-empty field. **Lesson: a validator's `-n`-guarded
+  branch is a check for "if present, is it well-formed" — it is NOT a presence/non-emptiness check
+  on its own; a required field needs an explicit `-z` failure branch, not just format checks nested
+  under `-n`.**
+- **`grep -qx "$token"` treats a controlled-vocabulary token as an unanchored-content regex, not a
+  literal string** — `test.gap` (the `.` matching any char) silently matched the real vocabulary
+  entry `test-gap`, and a token starting with `-` would have been parsed as a grep option instead of
+  a pattern. Fixed with `grep -qxF -- "$token"` (`-F` = fixed-string, `--` = end-of-options guard).
+  **Lesson: any `grep -qx "$var"` matching a value against a fixed set from user/config input needs
+  `-F` (literal) and `--` (option-injection guard) — `-x` alone (exact-line match) does not make the
+  match literal, it only anchors it.**
+- **My own Phase-1 legacy-fallback design regressed a v1 capability without me noticing, because I
+  tested collect-memory.sh's legacy path in an isolated fixture with no `docs/adr/` present** —
+  `exit 0` right after the `LEGACY` banner meant a repo with BOTH a flat diary (unmigrated) AND real
+  ADRs under `docs/adr/` (this repo, exactly) would never reach the ADR scan, so an agent in legacy
+  mode lost ADR visibility v1 never had this gap for (v1 read `docs/adr/index.md` unconditionally).
+  My Task-1.14 verification ran `collect-memory.sh web-engineer` against THIS repo and only checked
+  for the `LEGACY` banner + exit code, never diffed the full output against what the ADR scan alone
+  would have produced — the fixture fixtures I wrote for Task 1.4 also never combined a legacy flat
+  diary WITH populated `docs/adr/`. Fixed by deleting the early `exit 0` so the legacy branch falls
+  through to the same rule-dir/shared-dir/adr-dir scan every non-legacy invocation runs (rule/shared
+  dirs are simply absent in pure-legacy mode, a no-op). **Lesson: when a fallback path is designed to
+  "keep working, degraded," verify it against a fixture that combines the OLD state with whatever
+  the feature ALREADY populates elsewhere (here: real ADRs already existing) — a fallback tested only
+  in isolation from the rest of the system's real state can silently drop a capability the old code
+  path had unconditionally.**
+
 ## 2026-07-25 — NA-73 Phase 1 — Memory v2 protocol: collect-memory.sh, check-frontmatter.sh, 9 agent-def rewrites (`plugins/sdlc/scripts/{collect-memory,check-frontmatter}.sh`, `plugins/sdlc/refs/{domain-agent-handoff,qa-engineer-playbook,adr-pipeline,analyze-protocol,memory-maintenance,root-cause-vocab}*`, `plugins/sdlc/agents/*.md`, `plugins/sdlc/commands/init.md`)
 
 - **This repo's `bash` resolves to the macOS-shipped 3.2.57, not a Homebrew-installed 4/5** — no
