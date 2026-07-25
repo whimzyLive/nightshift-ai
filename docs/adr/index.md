@@ -37,3 +37,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0007. Worktree-scoped working directory for domain-agent dispatches](0007-worktree-scoped-dispatch-cwd.md) — accepted
 - [0009. Try/catch-to-defaults fallback for public-route CMS reads](0009-cms-read-try-catch-fallback.md) — accepted
 - [0010. force-dynamic rendering and production-migration requirement for CMS-backed routes](0010-cms-force-dynamic-and-migration.md) — accepted
+
+## General
+
+- [0011. Frontmatter-injection standard for agent-behaviour artifacts](0011-frontmatter-injection-standard.md) — accepted
