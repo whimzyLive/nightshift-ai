@@ -1,3 +1,21 @@
+## 0.45.2 (2026-07-25)
+
+### 🚀 Features
+
+- **sdlc:** remove dead principal-engineer/qa-engineer agent defs ([c163812](https://github.com/whimzyLive/nightshift-ai/commit/c163812))
+- **sdlc:** memory v2 collection contract, frontmatter lint, and protocol refs ([cdadf4e](https://github.com/whimzyLive/nightshift-ai/commit/cdadf4e))
+- **sdlc:** add dangling doc-link check to docs audit reference-integrity tier ([#163](https://github.com/whimzyLive/nightshift-ai/issues/163))
+
+### 🩹 Fixes
+
+- **sdlc:** NA-73 review fixes — inline playbook parity, lint gaps, legacy ADR visibility ([f123c73](https://github.com/whimzyLive/nightshift-ai/commit/f123c73))
+- **sdlc:** correct dangling-link check ordering, root-absolute targets, and example depth ([3c11e89](https://github.com/whimzyLive/nightshift-ai/commit/3c11e89))
+- **sdlc:** restore deleted docs-pipeline.md sanitization subsection ([8b4b1a1](https://github.com/whimzyLive/nightshift-ai/commit/8b4b1a1))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## Unreleased
 
 ### 🚨 Breaking Changes
