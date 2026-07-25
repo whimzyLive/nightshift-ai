@@ -112,3 +112,22 @@ link` line). Switched every generator to the `$(cat <<'EOF' ... EOF)` command-su
 
 **Learnings:** A generated ADR shipped with a stray `</content>` wrapper tag as its last line. Before committing any generated doc, check the final lines for generation/markup artifacts (`tail -3`), and run the prettier check on the exact file.
 **Pitfalls:** Artifact tags at end-of-file survive prettier and index regen unnoticed — neither validates content endings.
+
+## 2026-07-26 — Story NA-75 — ADR + docs-reference removal (dead agent defs)
+
+**Learnings:** Repeated the exact `</content>` stray-wrapper mistake NA-73's entry above already
+documented — a fresh `Write` of a new ADR still appended a trailing `</content>` line despite
+having the prior learning in context. `prettier --check` catches it (single-line diff at EOF) but
+only if you actually run `--check` on the exact new file — running it via a piped
+`prettier <file> > out; diff` masked the issue once because stderr got redirected into the same
+stream as stdout, making `diff` look clean; `prettier --check <file>` directly is the reliable
+form. Always `tail -3` a freshly-Written generated doc AND run `prettier --check` (not just
+`prettier` piped to a file) before treating a doc-generation task as done.
+**Doc-reference removal pattern (agent-reference row, on an agent-def deletion):** deleting
+`plugins/sdlc/agents/<name>.md` means its `docs/reference/agents/<name>.md` page is now
+sourceless — deterministic-regen has nothing to regenerate it _from_, so the correct action is to
+delete the page outright (not blank it, not stub it), then remove its single-line entry from
+`llms.txt`'s Reference section (grep `docs/reference/agents/<name>.md` to find the line). Verified
+correctness by counting: 14 files left in `docs/reference/agents/` after deleting the 2 sourceless
+pages, and exactly 14 `docs/reference/agents/*.md` line-entries left in `llms.txt` — set sizes must
+match after any agent-reference deletion.

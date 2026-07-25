@@ -41,3 +41,4 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 ## General
 
 - [0011. Frontmatter-injection standard for agent-behaviour artifacts](0011-frontmatter-injection-standard.md) — accepted
+- [0012. Orchestration roles are inline playbooks, never dispatchable agents](0012-agents-to-inline-playbook-pivot.md) — accepted
