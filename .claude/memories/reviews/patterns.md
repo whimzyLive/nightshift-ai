@@ -159,3 +159,10 @@ releases.
 **Root causes:** duplicated contract restatements drift when only one copy is edited; `[ -n ]`-guarded validations silently pass empty values; grep without -F treats tokens as regex; generated file not scanned for wrapper artifacts before commit
 **Preventions:** after any contract/ownership reassignment, grep the whole tree for every restatement of the old contract before committing; lint validations need explicit empty-value branches, not just format checks on non-empty; always `grep -qxF --` for literal token membership; scan generated docs for markup artifacts at the end of file
 **Domains affected:** ai-enablement-engineer, knowledge-engineer
+
+## 2026-07-26 — Story NA-75
+
+**Issues found:** 1 Critical + 1 Important — marketing charter links (home team-data.ts, /team roster-data.ts) pointed at the two deleted agent-def blobs; would 404 publicly on merge
+**Root causes:** deletion reference-sweep filtered to _.md/_.sh and never scanned TypeScript; first fix pass misjudged the sibling /team surface as unrelated without resolving its data source
+**Preventions:** sweep with no file-type filter on any artifact deletion/move; verify sibling surfaces by tracing their actual data source
+**Domains affected:** web-engineer, ai-enablement-engineer

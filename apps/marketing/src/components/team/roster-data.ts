@@ -29,6 +29,13 @@ export interface AgentProfile {
    * 'solutions-architect.md'. `null` for the human (no charter file).
    */
   file: string | null;
+  /**
+   * Optional full charter URL override, used when the canonical doc does
+   * not live at `plugins/sdlc/agents/<file>` (e.g. an agent whose def was
+   * deleted in favor of an inline playbook ref). When set, the card links
+   * here instead of building `${AGENT_URL}${file}`.
+   */
+  fileUrl?: string;
 }
 
 export interface Department {
@@ -130,6 +137,8 @@ export const DEPARTMENTS: Department[] = [
         artifact: 'branch + PR',
         fact: 'Never two agents at once. Chaos is a process failure, not a vibe.',
         file: 'principal-engineer.md',
+        fileUrl:
+          'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/principal-engineer-playbook.md',
       },
       {
         ini: 'DA',
@@ -204,6 +213,8 @@ export const DEPARTMENTS: Department[] = [
         artifact: 'review + learnings → PR',
         fact: 'Never writes feature code. Finds the owner and makes them fix it.',
         file: 'qa-engineer.md',
+        fileUrl:
+          'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/qa-engineer-playbook.md',
       },
     ],
   },

@@ -45,4 +45,22 @@ describe('AgentProfileCard', () => {
     expect(screen.queryByRole('link', { name: /charter/ })).toBeNull();
     expect(screen.getByText('HUMAN')).toBeTruthy();
   });
+
+  it('links charter ↗ to fileUrl when set, overriding the AGENT_URL+file build', () => {
+    render(
+      <AgentProfileCard
+        agent={{
+          ...sa,
+          name: 'principal-engineer',
+          file: 'principal-engineer.md',
+          fileUrl:
+            'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/principal-engineer-playbook.md',
+        }}
+      />,
+    );
+    const link = screen.getByRole('link', { name: /charter/ });
+    expect(link.getAttribute('href')).toBe(
+      'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/principal-engineer-playbook.md',
+    );
+  });
 });
