@@ -66,7 +66,7 @@ These instructions actively generate the patterns above:
   files using mktemp" → /tmp by default.
 - `.agents/skills/acli/SKILL.md:87,233,237,263` — same `mktemp /tmp/...` guidance,
   taught as the canonical pattern.
-- `${CLAUDE_PLUGIN_ROOT}/agents/principal-engineer.md` — heavy `$(...)` usage.
+- `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` — heavy `$(...)` usage.
 - `.agents/skills/gh-cli/SKILL.md`, `.agents/skills/acli/SKILL.md` — `$(...)` +
   produce `fix(scope):` parenthesised commit messages (churn source).
 - Inline ADF JSON to `acli` (already warned in CLAUDE.md, but still taught nearby).

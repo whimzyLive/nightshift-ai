@@ -32,6 +32,8 @@ const TIER_BADGE: Record<ModelTier, string> = {
 export function AgentProfileCard({ agent }: { agent: AgentProfile }) {
   const color = TIER_COLOR[agent.tier];
   const badge = agent.badgeOverride ?? TIER_BADGE[agent.tier];
+  const charterHref =
+    agent.fileUrl ?? (agent.file ? `${AGENT_URL}${agent.file}` : null);
 
   return (
     <div
@@ -115,9 +117,9 @@ export function AgentProfileCard({ agent }: { agent: AgentProfile }) {
           >
             → {agent.artifact}
           </span>
-          {agent.file && (
+          {charterHref && (
             <a
-              href={`${AGENT_URL}${agent.file}`}
+              href={charterHref}
               target="_blank"
               rel="noopener"
               className="font-mono whitespace-nowrap"

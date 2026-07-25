@@ -107,3 +107,27 @@ link` line). Switched every generator to the `$(cat <<'EOF' ... EOF)` command-su
 - **Found a dangling internal cross-reference inside `docs-pipeline.md` itself** (out of knowledge-engineer's write scope — `plugins/**` is `ai-enablement-engineer`'s): the NA-65 rewrite of §3 deleted the entire "### Description/title sanitization + frontmatter escaping" subsection (the em-dash/YAML-escaping/full-paragraph rules), but left **7 live references** to "the Description/title sanitization rule below" scattered across §3 steps 1/2/7/10 and §8's blockquote — the rule is invoked but never defined in the current file. This does **not** block or change audit's own output (audit doesn't audit the plugin's own ref files, and no currently-published page's frontmatter/`llms.txt` entry contains an em-dash that would expose the gap), but it's worth flagging to whoever next touches `docs-pipeline.md` §3 — the deletion looks like a rebase/merge artifact, not a deliberate removal (nothing in the diff explains dropping it, and §8 still depends on it existing).
 - **`llms.txt` frontmatter-consistency check, scripted.** Rather than eyeballing 61 entries against 61 pages, parsed every non-comment `llms.txt` line as `title — description — link` (split on `—`, last segment is the link), loaded each linked page's YAML frontmatter, and asserted exact `title`/`description` string equality — 0 mismatches, 0 orphaned pages (every `docs/**` file with frontmatter that should be public was accounted for; `docs/changelog/`, `docs/adr/`, `docs/design/`, `docs/features/`, `docs/gtm/`, `docs/superpowers/` correctly excluded — disabled row, `public:no` row, or simply not a doc-type-registry surface at all). Reusable pattern for any future audit's `llms.txt` verification pass — cheaper and more reliable than manual spot-checks.
 - **Reference-integrity tier (`tutorial`/`how-to`/`integration-guide`/`concept`; `migration-guide` had zero pages — release has never run) came back clean**: every `source:`-bearing how-to/integration-guide page's globbed source file(s) pre-date the page's own last commit (checked via `git log -1 --format=%cI -- <path>` on both sides); the one non-empty `related-adrs:` (`what-is-the-sdlc-plugin.md` → ADR 0001) pre-dates its page too; every backtick-quoted repo-relative path across all 8 narrative pages resolves at `origin/<BASE-BRANCH>` (checked via `git cat-file -e`) — including `plugins/sdlc/refs/triage.md`, the PR #153 dangling-ref fix, confirmed still correct. Zero corrections, zero flags → clean-scan exit per §24, no branch/commit/PR raised.
+
+## 2026-07-25 — Story NA-73 — review fix
+
+**Learnings:** A generated ADR shipped with a stray `</content>` wrapper tag as its last line. Before committing any generated doc, check the final lines for generation/markup artifacts (`tail -3`), and run the prettier check on the exact file.
+**Pitfalls:** Artifact tags at end-of-file survive prettier and index regen unnoticed — neither validates content endings.
+
+## 2026-07-26 — Story NA-75 — ADR + docs-reference removal (dead agent defs)
+
+**Learnings:** Repeated the exact `</content>` stray-wrapper mistake NA-73's entry above already
+documented — a fresh `Write` of a new ADR still appended a trailing `</content>` line despite
+having the prior learning in context. `prettier --check` catches it (single-line diff at EOF) but
+only if you actually run `--check` on the exact new file — running it via a piped
+`prettier <file> > out; diff` masked the issue once because stderr got redirected into the same
+stream as stdout, making `diff` look clean; `prettier --check <file>` directly is the reliable
+form. Always `tail -3` a freshly-Written generated doc AND run `prettier --check` (not just
+`prettier` piped to a file) before treating a doc-generation task as done.
+**Doc-reference removal pattern (agent-reference row, on an agent-def deletion):** deleting
+`plugins/sdlc/agents/<name>.md` means its `docs/reference/agents/<name>.md` page is now
+sourceless — deterministic-regen has nothing to regenerate it _from_, so the correct action is to
+delete the page outright (not blank it, not stub it), then remove its single-line entry from
+`llms.txt`'s Reference section (grep `docs/reference/agents/<name>.md` to find the line). Verified
+correctness by counting: 14 files left in `docs/reference/agents/` after deleting the 2 sourceless
+pages, and exactly 14 `docs/reference/agents/*.md` line-entries left in `llms.txt` — set sizes must
+match after any agent-reference deletion.

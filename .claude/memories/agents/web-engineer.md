@@ -1,3 +1,49 @@
+## 2026-07-26 — Story NA-75 — re-review found the /team roster surface had the same dead-link defect
+
+**Learnings:**
+
+- My earlier same-story call that `agent-profile-card.tsx`'s "charter ↗"
+  link was "structurally unrelated" to `home/team-data.ts`'s L5/L6 links was
+  wrong — it's a _second_ surface with the exact same defect, driven by
+  `team/roster-data.ts`'s `AgentProfile.file` feeding a shared
+  `AGENT_URL + file` template. Two files rendering visually-identical
+  "charter ↗" text from two independent data sources is not evidence
+  they're the same bug (or that fixing one covers the other) — always grep
+  the _literal dead path string_ itself (`principal-engineer.md`,
+  `qa-engineer.md`) across the whole app surface, not just the one file the
+  finding named, before declaring a second lookalike out of scope.
+- Chose the coordinator-suggested `fileUrl?: string` override field (card
+  prefers `agent.fileUrl ?? \`${AGENT_URL}${agent.file}\``) over changing
+`file`'s semantics to a full path — `roster-data.spec.ts`already asserted
+every member's`file`matches`/^[a-z-]+\.md$/`(bare filename, no
+slashes), so keeping`file` unchanged for all 12 members and adding an
+  optional override only on the 2 affected entries kept that existing test
+  meaningful and touched zero of the other 11 entries' data.
+
+## 2026-07-26 — Story NA-75 — fix dead L5/L6 charter links after agent-def deletion (review finding)
+
+**Learnings:**
+
+- `apps/marketing/src/components/home/team-data.ts`'s `ORG_LEVELS` entries
+  for L1–L4 and L6 point `ref`/`refLabel` at `plugins/sdlc/agents/<name>.md`
+  — this convention still holds for `product-manager`/`scrum-master`/
+  `solutions-architect`/`tech-lead`/`qa-engineer`'s siblings, but NA-75
+  deleted `principal-engineer.md` and `qa-engineer.md` specifically (dead
+  agent defs), leaving only their L5/L6 links 404ing. Repointed just those
+  two to the surviving `plugins/sdlc/refs/{principal-engineer,qa-engineer}-playbook.md`
+  and matched `refLabel` to the new path (`refs/<name>-playbook.md`,
+  consistent with the existing `agents/<name>.md` label convention elsewhere
+  in the same array) rather than editing the shared `${GITHUB_URL}/blob/main/plugins/sdlc/agents/${agent.name}.md`
+  template in `home/team-preview.tsx`'s `getSidePanel` (that template is
+  still correct for every _other_ agent card — only the two L5/L6 phase-row
+  entries in `team-data.ts` were wrong).
+- Grepped `apps/` and `packages/` for any other `plugins/sdlc/agents/principal-engineer|qa-engineer`
+  reference before touching anything — none existed outside these two lines;
+  `apps/marketing/src/components/team/agent-profile-card.tsx`'s own
+  "charter ↗" link is a visually identical but structurally unrelated
+  literal (driven by `agent.file` from the `/team` page's own data source,
+  not `home/team-data.ts`'s `ORG_LEVELS`) and was correctly out of scope.
+
 ## 2026-07-24 — Story NA-71 — render marketing site as static build output (force-dynamic removal + helper-catch narrowing)
 
 **Learnings:**

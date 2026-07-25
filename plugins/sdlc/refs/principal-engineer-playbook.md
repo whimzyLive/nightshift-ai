@@ -347,10 +347,11 @@ Agent({
      `<BRANCH_PREFIX>/<STORY-KEY>` branch (no new branch, no push). A sub-task with no work in your domain
      gets no commit in your phase — it is implemented in whichever phase owns its files, not
      dropped. When `subtaskCount === 0`, commit once for the phase as normal.
-10. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
-    your commit (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`)."
+10. "Write any admitted rule entries per the admission test in
+    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s rule-file flow and stage them with your
+    commit — most dispatches admit nothing, and that's expected."
 11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>"
+12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 
 Never send just a task title.
 
@@ -444,7 +445,16 @@ stray files.
   re-emitted `Skills loaded` line now passes. A persistent failure on the single redispatch →
   **STOP and report to the user** (same shape as the silent-failure STOP above).
 
-Extract only `Status` / `Note` / `Summary` / `Skills loaded` from each agent return; discard the rest.
+- **Verify the return carries `Rules applied:` — applies only to `Status: complete` returns.**
+  Required on every complete return, exactly like `Skills loaded:` (per
+  `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked). An
+  absent or empty line is a contract violation → **STOP-and-redispatch that phase once**, the same
+  RETURN-CONTRACT redispatch shape as the `Skills loaded` failure above (work already committed;
+  redispatch only to re-emit a compliant return). `none` is a valid and expected value whenever
+  collection surfaced nothing applicable — it is never itself a failure.
+
+Extract only `Status` / `Note` / `Summary` / `Skills loaded` / `Rules applied` from each agent
+return; discard the rest.
 
 ## Step 6 — Hand off to the QA Engineer (inline)
 

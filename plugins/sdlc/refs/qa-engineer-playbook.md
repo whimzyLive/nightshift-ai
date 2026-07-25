@@ -64,7 +64,7 @@ no Jira ticket, plan, or PR.
 | Review target                           | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>`                   | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
 | Requirements given to reviewer (Step 1) | plan + acceptance criteria                                                    | the change's own intent (commit subjects + changed-file summary) — there are no ACs                                                                                                                                                                  |
 | Fix commits (Step 3)                    | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user                                                                                                                       |
-| Learnings memory (Step 5)               | required                                                                      | **skip** — no story to key the entry to                                                                                                                                                                                                              |
+| Review file + rule entries (Step 5)     | required                                                                      | **skip** — no story to key the entry to                                                                                                                                                                                                              |
 | AC + plan verification (Step 7)         | required                                                                      | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green                                                                                                                                               |
 | Verdict (Step 8)                        | full block incl. AC + learnings lines                                         | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)`                                                                                                                                                         |
 
@@ -117,6 +117,12 @@ single-point `git diff <BASE_SHA>` the empty-diff guard uses, so guard and revie
 git --no-pager diff <BASE_SHA>            # tracked changes (committed-unmerged + staged + unstaged)
 git status --porcelain                    # surface any untracked new files to read in full
 ```
+
+**Pre-review consult.** Before dispatching the reviewer, scan the frontmatter of
+`.claude/memories/reviews/*.md` (excluding the legacy `patterns.md`, flagged separately by
+`check-frontmatter.sh`) for prior rounds whose `domains` or `root_causes` overlap this story's
+domains — open the full body only for the rounds that actually overlap, not every file. This
+replaces reading a single append-only audit log whole.
 
 Dispatch an `agent-skills:code-reviewer` subagent following the `requesting-code-review`
 skill pattern. The prompt MUST include:
@@ -209,9 +215,10 @@ PR. Accepted comments flow into the Step 3 fix loop; discarded ones go in the re
 - **Security** — treat as Critical unless demonstrably non-exploitable; say why if downgraded.
 - **Informative/explanatory comment** (per `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`) —
   treat as **Important**: the fix requests the comment be removed and, if it captured real
-  non-obvious context, that the context be moved to the introducing agent's memory file
-  (`.claude/memories/agents/<agent>.md`) instead. A comment required by language/lint convention
-  (per that same doc's exclusions) is not a finding.
+  non-obvious context, that the context be written as a rule entry under the introducing agent's
+  `.claude/memories/agents/<agent>/<rule-id>.md` instead (per the admission test in
+  `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). A comment required by language/lint
+  convention (per that same doc's exclusions) is not a finding.
 
 **Domain mapping (file path → owning agent — derive from project-context Workspace Structure):**
 
@@ -264,10 +271,10 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Fix ONLY these issues, and commit (use the
    `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
-7. "Append non-obvious learnings to `.claude/memories/agents/<your-name>.md` and stage it with
-   your commit."
+7. "Write any admitted rule entries under `.claude/memories/agents/<your-name>/` (per the admission
+   test in `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`) and stage them with your commit."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 3 lines complete, 4 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>"
+9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 
 **Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
 principal playbook Step 5) — a **snapshot to diff against later, not an assertion**; the primary
@@ -313,6 +320,9 @@ principal playbook's Step-5 guard) — do not attempt to fix or revert it yourse
   (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
   return `blocked` immediately, no redispatch. (Applies only to `Status: complete` returns, and
   extra skills the agent lists beyond the named set still pass, per Step 5.)
+- **Verify the return carries `Rules applied:`** (4 lines complete, 5 lines blocked, per
+  `domain-agent-handoff.md`) — an absent line is the same contract violation as a missing
+  `Skills loaded:` line: return `blocked` immediately, no redispatch. `none` is a valid value.
 
 ## Step 4 — Re-review
 
@@ -336,37 +346,55 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Audit log** — append to `$WORKTREE/.claude/memories/reviews/patterns.md`, **unconditionally,
-every round, regardless of any ADR-index match:**
+**1. Review round file** — write `$WORKTREE/.claude/memories/reviews/${DATE}-<STORY-KEY>.md`, one
+file per round, **unconditionally, every round**: a second or third round reviewed on the same date
+takes the `-r2`, `-r3`, … suffix (`${DATE}-<STORY-KEY>-r2.md`). Frontmatter is the 5-field review
+schema:
+
+```yaml
+---
+story: <STORY-KEY>
+date: <YYYY-MM-DD> # must match the filename
+domains: [<agent>, ...] # agents this round touched; [] only when issue_count is 0
+root_causes: [<token>, ...] # from ${CLAUDE_PLUGIN_ROOT}/refs/root-cause-vocab.txt; [] only when issue_count is 0
+issue_count: <N> # count of Critical + Important findings this round
+---
+```
+
+**A clean round (`issue_count: 0`) writes the frontmatter above and nothing else** — no body — the
+file exists purely as the "this story was reviewed" marker that the analyze finding and the
+maintenance-op GC key on.
+
+**A round with findings** adds a body:
 
 ```
-## ${DATE} — Story <STORY-KEY>
-**Issues found:** <Critical/Important + any AC/security gaps, or "none — clean review">
-**Root causes:** <why they occurred, or "n/a">
-**Preventions:** <what agents should check going forward>
-**Domains affected:** <agents>
+## Issues
+<one bullet per Critical/Important + any AC/security gap>
+
+## Preventions
+<what agents should check going forward>
+
+## Rules written
+<list of rule ids created from this round, or "none">
 ```
 
-The `patterns.md` audit log is never soft-skipped, even when the finding repeats something an
-`accepted` ADR already documents — a repeat violation of an accepted convention is itself
-recurrence evidence that `/sdlc:docs distill` needs to see (per `adr-pipeline.md` §6's
-Recurrence criterion), so suppressing this entry would starve distill of the exact signal that
-justifies revisiting or reinforcing the ADR. The ADR-index guard below applies only to the
-per-agent memory append (item 2), never to this audit log.
+This round file is never soft-skipped, even when a finding repeats something an `accepted` ADR
+already documents — a repeat violation of an accepted convention is itself recurrence evidence that
+`/sdlc:docs distill` needs to see (per `adr-pipeline.md` §6's Recurrence criterion).
 
-**ADR-index check (applies to item 2 only, below).** Before the per-agent memory append, consult
-`docs/adr/index.md` in `$WORKTREE` — the relevant agent's section(s) plus `General` — if it
-exists. If a **`status: accepted`** ADR already captures the learning, **soft-skip that append and
-note it** (the ADR is canonical). A match against a `superseded`, `rejected`, or `proposed` ADR
-does **NOT** skip — the learning is still appended, since the index line carries status and lets
-this check filter without opening the ADR. A missing index (repo has no ADRs yet) is a no-op —
-append as normal. Additive guard: never changes the append format below; the skip is always soft
-(skipped, never failed).
+**2. Rule entries** — for each agent that fixed something this round, write rule entries under
+`$WORKTREE/.claude/memories/agents/<fixing-agent>/<rule-id>.md` (cross-cutting → `agents/shared/`)
+for any candidate that passes the admission test in
+`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — do not restate the schema or the test here
+(ADR-0004). This is the one sanctioned case where `qa-engineer` creates files under another agent's
+rule directory; it is bounded to **creating new rule files from this round's findings**, never
+editing or deleting existing ones. List every id you created in the round file's `## Rules written`.
 
-**2. Agent memory** — for each agent that fixed something, append a
-`## ${DATE} — Story <STORY-KEY> — review fix` block to
-`$WORKTREE/.claude/memories/agents/<agent-name>.md` (cross-cutting → `shared.md`) with Learnings +
-Pitfalls. Then commit and push, both from the worktree:
+**3. Counter-only updates** — for any existing rule a finding proves was violated, increment its
+`uses` and append `<STORY-KEY>` to its `evidence`, whether the rule lives in your own scope or
+`agents/shared/` (permitted per the counter-only carve-out in `analyze-protocol.md`).
+
+Then commit and push, both from the worktree:
 
 ```bash
 git -C "$WORKTREE" add .claude/memories/
@@ -413,7 +441,8 @@ actual gate output — never claim a pass without it (`verification-before-compl
 > Treat the project-context quality-gate commands as a real gate: the test command may run
 > `.ts` via a transpiler and pass THROUGH type errors. Also confirm no compiled `.js` shadows
 > source — a green test suite does not prove
-> the deployed bundle is correct (consult the review-pattern memory at `.claude/memories/reviews/patterns.md` for prior findings).
+> the deployed bundle is correct (consult the Step 1 pre-review scan of `.claude/memories/reviews/*.md`
+> for prior findings on this domain).
 
 ## Step 7 — Verification before completion (AC + plan check)
 
@@ -483,7 +512,7 @@ Fixed (Critical/Important): <list, or "none">
 Minor noted (not fixed): <list, or "none">
 AC check: <met — all N ACs evidenced | UNMET: <which> >
 Quality gate: typecheck pass | tests pass   (paste evidence)
-Learnings: written to patterns.md + <agent memory files>
+Learnings: written to review file + <rule ids, or "none">
 Blocked reason: <one line — only if Status: blocked>
 ```
 

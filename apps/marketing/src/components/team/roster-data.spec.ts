@@ -41,6 +41,26 @@ describe('roster-data', () => {
     }
   });
 
+  it('principal-engineer and qa-engineer override fileUrl to the surviving playbook refs', () => {
+    const members = DEPARTMENTS.flatMap((d) => d.members);
+    const pe = members.find((m) => m.name === 'principal-engineer');
+    const qe = members.find((m) => m.name === 'qa-engineer');
+    expect(pe?.fileUrl).toBe(
+      'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/principal-engineer-playbook.md',
+    );
+    expect(qe?.fileUrl).toBe(
+      'https://github.com/whimzyLive/nightshift-ai/blob/main/plugins/sdlc/refs/qa-engineer-playbook.md',
+    );
+  });
+
+  it('every other member has no fileUrl override', () => {
+    const members = DEPARTMENTS.flatMap((d) => d.members);
+    for (const m of members) {
+      if (m.name === 'principal-engineer' || m.name === 'qa-engineer') continue;
+      expect(m.fileUrl).toBeUndefined();
+    }
+  });
+
   it('renders 4 philosophy cards and 6 handbook steps', () => {
     expect(PHILOSOPHY).toHaveLength(4);
     expect(HANDBOOK_STEPS).toHaveLength(6);
