@@ -109,4 +109,3 @@ to ADRs, and only to build a dev-facing index, not to drive dispatch-time collec
   `trigger` shape, or if the legacy-fallback two-format coexistence needs to support more than
   one prior format at once — either is the concrete trigger for the version-marker/migration-chain
   mechanism deferred above.
-  </content>
