@@ -12,6 +12,19 @@ const nextConfig = {
   turbopack: {
     root: path.join(dirname, '../..'),
   },
+  // sharp is a serverExternalPackage (via withPayload), so Next.js file tracing
+  // follows its JS entry but cannot follow the dlopen'd native chain:
+  // sharp-linux-x64/sharp.node loads libvips-cpp.so via ELF RPATH from the
+  // sibling @img/sharp-libvips-linux-x64 package — invisible to nft, so the .so
+  // never ships and every sharp call 500s on Vercel with ERR_DLOPEN_FAILED.
+  // Force-include every @img package from both the hoisted root node_modules
+  // (see root .npmrc public-hoist-pattern) and the pnpm virtual store.
+  outputFileTracingIncludes: {
+    '**/*': [
+      '../../node_modules/@img/**/*',
+      '../../node_modules/.pnpm/@img+*/node_modules/@img/**/*',
+    ],
+  },
   // See: https://nextjs.org/docs/app/api-reference/config/next-config-js
 };
 
