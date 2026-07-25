@@ -13,6 +13,20 @@ resolved from the consumer repo's `.claude/project/project-context.md`. In this 
 any write that touches `plugins/**` (plugin-authoring, not a plain ADR run) stays within the
 `ai-enablement-engineer` write-scope — see the Active-guard scope note in the agent's First steps.
 
+### Frontmatter — the `trigger` field
+
+Every ADR carries `trigger: string[]` — 1–6 lowercase keyword phrases naming the situation the
+decision is relevant to, same semantics as a rule entry's `trigger` (see
+`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). Its purpose is dispatch-time collection:
+`${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh` emits it verbatim in its `ADR NNNN [<trigger>,
+...] <title>` index line, and the collecting agent's second pass matches on it. `trigger` is
+**required on every ADR authored from now on** — write it in phase 1 alongside `status`, `agents`,
+and `source-stories`, which are otherwise unchanged. **Backfilling `trigger` onto ADRs authored
+before this field existed is NA-74, not this pipeline's job** — until backfilled, an ADR without
+`trigger` is collected with an empty trigger list (`[]`), never skipped and never a lint failure
+(`check-frontmatter.sh` does not validate ADR frontmatter — see Resolved Questions in
+`docs/superpowers/specs/NA-73.md`).
+
 ## 2. Two-phase dispatch (split across the confirmation boundary)
 
 A dispatched subagent runs to completion and returns — it cannot pause for interactive human
@@ -29,16 +43,17 @@ same split `/sdlc:analyze` uses for its scan-then-apply flow.
    status: proposed
    agents: [...]
    source-stories: [...]
+   trigger: [...] # 1-6 lowercase keyword phrases — see "Frontmatter — the trigger field" in §1
    ```
 
 2. Propose `agents:` routing tags for each candidate — the sdlc agent identifier(s) whose future
-   work the decision constrains. **Patterns.md tagging rule:** a candidate promoted from
-   `.claude/memories/reviews/patterns.md` MUST always include `qa-engineer` in its proposed
+   work the decision constrains. **Review-file tagging rule:** a candidate nominated from a
+   `.claude/memories/reviews/*.md` round file MUST always include `qa-engineer` in its proposed
    `agents:` list, in addition to whichever agent(s) the decision otherwise constrains — see
-   [§7 patterns.md tagging rule](#7-sharedmd-and-patternsmd-audience-preservation-rules).
-3. **(distill only)** Build the per-candidate deletion list: for each candidate, the exact memory
-   entries proposed for deletion (file path + entry heading/anchor + verbatim text), subject to
-   the [`shared.md` audience-preservation rule](#7-sharedmd-and-patternsmd-audience-preservation-rules).
+   [§7 review-file tagging rule](#7-agentsshared-and-review-file-audience-preservation-rules).
+3. **(distill only)** Build the per-candidate deletion list: for each candidate, the exact rule
+   files proposed for deletion (file path + `id` + verbatim `rule`), subject to
+   the [`agents/shared/` audience-preservation rule](#7-agentsshared-and-review-file-audience-preservation-rules).
 4. Return the drafted ADR(s), proposed tags, and (distill) the deletion list to the command layer.
    **Nothing is written to disk in phase 1.**
 
@@ -85,9 +100,10 @@ Phase 2 writes what the founder saw; it never re-drafts.
    never one ahead of the other.
 
 6. Regenerate `docs/adr/index.md` — see [§10 Index Regeneration algorithm](#10-index-regeneration-algorithm-docsadrindexmd).
-7. **(distill only)** Delete the founder-approved learnings from their source memory files in the
-   same PR (git history preserves the deleted text) — see [§8 Deletion-on-promotion](#8-deletion-on-promotion).
-   Seed mode skips this step entirely.
+7. **(distill only)** Write nothing else — T1 deletion moved to the `ai-enablement-engineer`
+   maintenance op, which promotes and deletes the confirmed rule files in its own PR once this ADR
+   is on `<BASE-BRANCH>` — see [§8 Deletion-on-promotion](#8-deletion-on-promotion). Seed mode skips
+   this step entirely (there is nothing to name).
 8. Commit via the `conventional-commit` skill, push the branch, self-raise the PR via `gh` /
    `raise-pr.sh`.
 
@@ -147,13 +163,20 @@ directly.
 
 Evidence sources (cluster across all of these):
 
-| Source                                 | Access                                                  |
-| -------------------------------------- | ------------------------------------------------------- |
-| `.claude/memories/agents/*.md`         | Read (per-agent learning archives)                      |
-| `.claude/memories/reviews/patterns.md` | Read (QA review-pattern audit log)                      |
-| PR review threads                      | `gh` (e.g. `gh pr list` / `gh api` for review comments) |
-| Commit history                         | `git log`                                               |
-| claude-mem observations                | `observation_search` / `get_observations` MCP tools     |
+| Source                                                                                     | Access                                                  |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| The `ai-enablement-engineer` maintenance-op nomination list (`refs/memory-maintenance.md`) | Read (mechanically-nominated rule candidates)           |
+| `.claude/memories/reviews/*.md`                                                            | Read (per-round review files, corroborating evidence)   |
+| PR review threads                                                                          | `gh` (e.g. `gh pr list` / `gh api` for review comments) |
+| Commit history                                                                             | `git log`                                               |
+| claude-mem observations                                                                    | `observation_search` / `get_observations` MCP tools     |
+
+Distill **consumes** the maintenance op's nomination list — it does not re-derive candidates by
+mining `.claude/memories/agents/**` itself. The nomination list already applied the promotion
+threshold (`uses >= 3` OR `agent` length >= 2 — see `refs/memory-maintenance.md`); distill's job is
+to cluster nominated rules with the other evidence sources above, draft the ADR, and (per §6) apply
+the Recurrence / Cross-agent / Durable-convention test to decide which nominated candidates
+actually get promoted this run.
 
 **Evidence contract.** Every distilled candidate MUST cite evidence — but the citation KIND
 depends on the occurrence's source, so an empty observation DB never blocks a well-evidenced
@@ -205,50 +228,62 @@ A clustered learning is promoted to an ADR candidate iff it meets at least one o
 Candidates failing all three are NOT promoted — report them as "below threshold" and leave them in
 memory untouched.
 
-## 7. `shared.md` and `patterns.md` audience-preservation rules
+## 7. `agents/shared/` and review-file audience-preservation rules
 
-`.claude/memories/agents/shared.md` is readable by every agent; a per-agent ADR index section is
-read only by the agent(s) named in its `agents:` tag. Deleting a learning from `shared.md` and
-replacing it with an ADR routed to only a subset of agents would narrow its visibility from
-all-agents down to tag-list-only. Therefore:
+`.claude/memories/agents/shared/*.md` rules are readable by every agent named in their `agent`
+list (length >= 2 by schema); a per-agent ADR index section is read only by the agent(s) named in
+its `agents:` tag. Deleting a shared rule and replacing it with an ADR routed to only a subset of
+its agents would narrow its visibility from that whole list down to tag-list-only. Therefore:
 
-- A learning promoted **from `shared.md`** may be deleted only when the replacing ADR preserves
-  the audience — i.e. the ADR is either tagged with **every** agent the shared learning was
-  relevant to, OR routed to the **`General`** section (which every agent reads via the read-path
+- A rule promoted **from `agents/shared/`** may be deleted only when the replacing ADR preserves
+  the audience — i.e. the ADR is either tagged with **every** agent the shared rule's `agent` list
+  named, OR routed to the **`General`** section (which every agent reads via the read-path
   integration).
-- Otherwise the `shared.md` entry STAYS — the ADR is still written as the canonical record, but
-  the raw shared learning is not deleted, so no audience is silently starved of a learning it
-  previously saw. The phase-1 deletion list must reflect this: a `shared.md` deletion is offered
-  only when the audience-preservation condition holds.
+- Otherwise the `agents/shared/` rule STAYS — the ADR is still written as the canonical record,
+  but the raw shared rule is not deleted, so no audience is silently starved of a rule it
+  previously saw. The phase-1 deletion list must reflect this: an `agents/shared/` deletion is
+  offered only when the audience-preservation condition holds.
 
-**`patterns.md` tagging rule (same audience-preservation concern, applied at tagging time rather
-than deletion time).** `.claude/memories/reviews/patterns.md` is `qa-engineer`'s working audit
-log — every QA round reads it (see `qa-engineer.md`'s read-path and
-`qa-engineer-playbook.md` Step 5). A candidate promoted from `patterns.md` whose proposed
-`agents:` tags name only the agent(s) whose _work_ the pattern constrains (e.g. `web-engineer`)
-and omit `qa-engineer` would silently drop the pattern out of QA's own read path — QA would no
-longer see, via its own index section, a review pattern it used to see directly in `patterns.md`.
-Therefore: **an ADR candidate promoted from `patterns.md` ALWAYS carries `qa-engineer` in its
-`agents:` list**, in addition to whichever other agent(s) the decision constrains — this is not
-optional and is not subject to founder override at the tag-editing step of the confirmation gate
-(the founder may add more agents; they may not remove `qa-engineer` from a `patterns.md`-sourced
-candidate). Unlike the `shared.md` rule above, this is enforced at **draft time** (phase 1, when
-tags are proposed), not at deletion time — there is no `General`-section escape hatch here because
-`patterns.md` promotion always needs the tag, never a broader/narrower substitute.
+**Review-file tagging rule (same audience-preservation concern, applied at tagging time rather
+than deletion time).** `.claude/memories/reviews/*.md` round files are `qa-engineer`'s working
+evidence — every QA round's Step 1 pre-review scan reads them (see `qa-engineer.md`'s collection
+read-path and `qa-engineer-playbook.md` Step 1/5). A candidate nominated from a rule that a review
+round file's `## Rules written` cited, whose proposed `agents:` tags name only the agent(s) whose
+_work_ the pattern constrains (e.g. `web-engineer`) and omit `qa-engineer`, would silently drop the
+pattern out of QA's own read path — QA would no longer see, via its own index section, a pattern it
+used to see directly in its review files. Therefore: **an ADR candidate nominated from a
+review-file-sourced rule ALWAYS carries `qa-engineer` in its `agents:` list**, in addition to
+whichever other agent(s) the decision constrains — this is not optional and is not subject to
+founder override at the tag-editing step of the confirmation gate (the founder may add more
+agents; they may not remove `qa-engineer` from a review-file-sourced candidate). Unlike the
+`agents/shared/` rule above, this is enforced at **draft time** (phase 1, when tags are proposed),
+not at deletion time — there is no `General`-section escape hatch here because a review-file-sourced
+promotion always needs the tag, never a broader/narrower substitute.
 
 ## 8. Deletion-on-promotion
 
-On write of a confirmed promoted candidate (phase 2, step 7), delete the founder-approved raw
-learning entries from their source memory files in the same PR — git history preserves the
-deleted text, so nothing is actually lost, only superseded by the canonical ADR. The deletion is
-subject to (a) the founder gate — it only happens for entries that appeared in the phase-1
-deletion list and were confirmed, and (b) the `shared.md` audience-preservation rule above. Seed
-mode never deletes anything (there is no corpus mining, so there is nothing to delete) — this step
-applies to distill only.
+On write of a confirmed promoted candidate (phase 2, step 7), `knowledge-engineer` writes the ADR
+and **marks nothing else — T1 deletion no longer happens in this pipeline at all.** The founder-
+approved deletion list from §2 step 3 still records which rule files a confirmed ADR supersedes
+(named in the ADR body, e.g. under Alternatives Considered / Consequences), but `knowledge-
+engineer`'s phase-2 write touches only `docs/adr/**`, never `.claude/memories/**`.
 
-This cross-agent memory write is sanctioned as **Exception 2** in
+**T1 deletion is reassigned to the `ai-enablement-engineer` maintenance op**
+(`refs/memory-maintenance.md`'s T1 deletion-on-promotion operation): on its next run, the
+maintenance op reads the confirmed ADR(s), sets `status: promoted` on each rule the ADR names as
+superseded, then deletes that rule in the same maintenance PR — git history preserves the deleted
+text, so nothing is actually lost, only superseded by the canonical ADR. Promotion is one-way and
+terminal: once marked `promoted`, a rule is deleted, never revived. This is subject to (a) the
+founder gate — only rules that appeared in the phase-1 deletion list and were confirmed are
+eligible, and (b) the `agents/shared/` audience-preservation rule above. Seed mode never triggers
+this (there is no corpus mining, so there is nothing to promote) — this step applies to distill
+only.
+
+This cross-agent memory write (marking and deleting another agent's rule) is sanctioned as
+**Exception 2** in
 [`analyze-protocol.md`'s memory-ownership rules](analyze-protocol.md#memory-ownership-exceptions)
-— see that anchor for the canonical statement of the exception.
+— see that anchor for the canonical statement of the exception, now scoped to the
+`ai-enablement-engineer` maintenance op rather than to `knowledge-engineer`'s distill run.
 
 ## 9. Seed-mode `source-stories` scoping
 
@@ -281,8 +316,8 @@ committed script, matching this plugin's "instructions not code" style.
 
 ## 11. Cross-reference
 
-The founder-gated distill deletion of promoted learnings from any agent's memory file (§8) is
-sanctioned by **Exception 2** in `analyze-protocol.md`'s memory-ownership rules — see
+The founder-gated promotion-and-deletion of promoted rule entries from any agent's rule directory
+(§8) is sanctioned by **Exception 2** in `analyze-protocol.md`'s memory-ownership rules — see
 [`analyze-protocol.md#memory-ownership-exceptions`](analyze-protocol.md#memory-ownership-exceptions).
-That is the canonical statement; this ref and `agents/knowledge-engineer.md` both point back to it
-rather than restating it.
+That is the canonical statement; this ref and `refs/memory-maintenance.md` both point back to it
+rather than restating it. (`agents/knowledge-engineer.md` no longer performs this write — see §8.)

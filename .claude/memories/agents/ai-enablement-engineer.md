@@ -1,5 +1,55 @@
 # ai-enablement-engineer — memory
 
+## 2026-07-25 — NA-73 Phase 1 — Memory v2 protocol: collect-memory.sh, check-frontmatter.sh, 9 agent-def rewrites (`plugins/sdlc/scripts/{collect-memory,check-frontmatter}.sh`, `plugins/sdlc/refs/{domain-agent-handoff,qa-engineer-playbook,adr-pipeline,analyze-protocol,memory-maintenance,root-cause-vocab}*`, `plugins/sdlc/agents/*.md`, `plugins/sdlc/commands/init.md`)
+
+- **This repo's `bash` resolves to the macOS-shipped 3.2.57, not a Homebrew-installed 4/5** — no
+  associative arrays (`declare -A`), no `mapfile`, none of the bash-4+ conveniences. Both new
+  scripts (`collect-memory.sh`, `check-frontmatter.sh`) needed duplicate-key detection (rule `id`
+  uniqueness across `.claude/memories/agents/**`) without one; solved with a flat `id|filepath`
+  newline-accumulated string, `cut -d'|' -f1 | sort | uniq -d` to find the duplicated keys, then a
+  second `awk -F'|'` pass per duplicate to list its files — no dictionary needed. **Lesson: before
+  reaching for `declare -A` in any `plugins/sdlc/scripts/*.sh`, check `bash --version` in this
+  environment (3.2.57) — indexed arrays and `sort | uniq -d` cover the common "detect duplicates"
+  case without it.**
+- **`pnpm exec prettier --check <file>` is a repo-wrapped command that unconditionally prints
+  "Prettier: All files formatted correctly" regardless of the file's actual state** — it does NOT
+  reflect true Prettier output the way `./node_modules/.bin/prettier --check <file>` or
+  `pnpm nx format:check` do. Caught only because `pnpm nx format:check` flagged
+  `.claude/project/project-context.md` as unformatted (a hand-typed `## Memory` table with
+  misaligned column padding) immediately after `pnpm exec prettier --check` had reported it clean.
+  **Lesson: never trust `pnpm exec prettier --check` as this repo's format-check oracle — always
+  cross-verify with `./node_modules/.bin/prettier --check` or `pnpm nx format:check` before
+  declaring a hand-typed markdown table a Prettier fixed point.**
+- **A plan's stated "next free sub-step letter" can go stale between when the plan was written and
+  when it's executed, if an intervening story already claimed it** — NA-73's plan (written before
+  this session) said `commands/init.md` Step 4's next free sub-step letter was `4g` (reasoning: `4f`
+  is "Install each confirmed skill into project scope"), but by the time I read the live file, `4g`
+  was ALSO already taken (`.claude/project/docs-manifest.md` scaffolding, landed by a later story).
+  The true next free letter was `4h`. Followed the plan's underlying INTENT (find the actual next
+  free letter, place the new sub-step after the existing lettered steps) rather than its literal
+  letter, since blindly writing a second `**4g.**` heading would have silently shadowed the
+  existing one. **Lesson: when a plan names a specific sub-step letter/number as "next free," grep
+  the live file for that exact marker before writing — a plan's own numbering claims can be stale
+  the moment ANY other story lands between plan-authoring and execution, not just from concurrent
+  work in the same story.**
+- **A pipeline-reassignment ("T1 deletion moves from `knowledge-engineer` to the maintenance op")
+  touches more files than the plan's own per-task `Files:` list enumerates when the OLD owner's own
+  agent definition asserts the ownership it's losing in its own prose** — `adr-pipeline.md` §8 was
+  the plan's named file for the reassignment (Task 1.9), but `plugins/sdlc/agents/knowledge-engineer.md`'s
+  own "Role & scope" section independently claimed "you also own the founder-gated deletion of
+  promoted raw learning entries... sanctioned as Exception 2" — a second, independent assertion of
+  the same fact the reassignment now contradicts. Caught by grepping the whole repo for "Exception 2"
+  after finishing the named-file edits, not by the plan's Task 1.7/1.9 file lists (neither one names
+  `knowledge-engineer.md`'s Role & scope prose). **Lesson: after any ownership/responsibility
+  reassignment, grep for the specific exception/permission NAME (not just the mechanism it moved
+  out of) across the whole `plugins/sdlc/` tree — an agent's own self-description is exactly the
+  kind of second independent assertion a plan's file-scoped task list won't catch.**
+- Verified the new scripts against this repo's own real (unmigrated) tree per Task 1.14's exact
+  expected outputs — `check-frontmatter.sh` exits 0 with 5 legacy warnings (4 flat diaries +
+  `patterns.md`), `collect-memory.sh web-engineer` exits 0 with a `LEGACY` banner, `collect-memory.sh`
+  with no args exits 1 with a usage line — all matched on the first run, no iteration needed once the
+  awk frontmatter parser (single-pass, block-form + inline-flow YAML list support) was right.
+
 ## 2026-07-23 — NA-68 review-fix round — fragment-strip ordering, root-absolute targets, depth-wrong remediation example (`plugins/sdlc/refs/docs-pipeline.md`)
 
 - **A deterministic multi-step check spec with an implicit/narrative step order is exactly as fragile

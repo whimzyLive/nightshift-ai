@@ -187,20 +187,21 @@ Prompt the user for each value **individually** — one question at a time, neve
 of prompts. Each field is **either** a picker **or** free text; the mechanics are mandatory, not a
 suggestion (see _Prompt mechanics_ below). Collect:
 
-| Value                 | Notes                                                                                                                                                                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Project name          | repo/display name, e.g. `acme-api`                                                                                                                                                                                                          |
-| Jira project key      | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`)                                                                                                                                                                       |
-| Jira site             | the authenticated host from Step 2 (offer it as the default)                                                                                                                                                                                |
-| Base branch           | the integration branch PRs target, e.g. `main` or `develop`                                                                                                                                                                                 |
-| Package manager       | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`**                                                                                                                                                                      |
-| Typecheck command     | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none)                                                                                                                                                                 |
-| Test command          | the project's test runner — **default: `DETECTED_TEST`** (blank if none)                                                                                                                                                                    |
-| Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3`                                                                                                                                                                            |
-| Active agents         | the **domain** agents whose code lives in this repo (see below)                                                                                                                                                                             |
-| Review agent          | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers`                                                                                                                              |
-| Review trigger        | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none`                                                                                                                                                      |
-| Review gate           | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
+| Value                   | Notes                                                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project name            | repo/display name, e.g. `acme-api`                                                                                                                                                                                                          |
+| Jira project key        | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`)                                                                                                                                                                       |
+| Jira site               | the authenticated host from Step 2 (offer it as the default)                                                                                                                                                                                |
+| Base branch             | the integration branch PRs target, e.g. `main` or `develop`                                                                                                                                                                                 |
+| Package manager         | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`**                                                                                                                                                                      |
+| Typecheck command       | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none)                                                                                                                                                                 |
+| Test command            | the project's test runner — **default: `DETECTED_TEST`** (blank if none)                                                                                                                                                                    |
+| Lightweight threshold   | story points at/under which `/auto` skips spec+plan; default `3`                                                                                                                                                                            |
+| Active agents           | the **domain** agents whose code lives in this repo (see below)                                                                                                                                                                             |
+| Review agent            | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers`                                                                                                                              |
+| Review trigger          | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none`                                                                                                                                                      |
+| Review gate             | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
+| Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one.                                                   |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
 
@@ -521,6 +522,7 @@ are documented in that template file. Token slots to substitute:
 | `<threshold>`                    | lightweight threshold (Step 3)                                                                                                                                                                        |
 | `<review-agent>`                 | Review agent picker (Step 3) — `claude-inline` default                                                                                                                                                |
 | `<review-mode>`                  | Review trigger picker (Step 3) — `on-update` default                                                                                                                                                  |
+| `<review-retention-window>`      | Review retention window (Step 3) — `6 months` default unless the founder requests otherwise; accepted formats are exactly `<n> months` or `<n> stories`                                               |
 | workspace→agent rows             | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
 
 > **On the Merge-new-findings path** (Step 0): do **not** regenerate the file from scratch — preserve
@@ -785,6 +787,19 @@ Error / no-op branches:
 | Manifest present, new non-declined matching rows exist                     | Offer to append them per-row (merge/confirm); keep existing rows verbatim; record any decline in the `<!-- declined: … -->` comment. Never overwrite. |
 | Manifest present, no new (non-declined) rows                               | No-op on the manifest; print it as unchanged.                                                                                                         |
 | `refs/doc-types.md` unreadable or malformed at scaffold time               | Surface the failure and **skip** the manifest write — never write a half-filled manifest.                                                             |
+
+**4h. Scaffold the memory v2 layout.** Create, if not already present:
+
+- `.claude/memories/agents/shared/.gitkeep`
+- `.claude/memories/agents/<agent>/.gitkeep` for each agent active in this repo (per the active-agent
+  set established in Step 3 / written an override in 4c — a `SdlcAgentName` other than
+  `principal-engineer`, which gets no rule directory)
+- `.claude/memories/reviews/.gitkeep`
+
+This step is additive and idempotent: on the merge/re-init path, backfill any of the three that are
+missing **without touching any existing memory content** (an existing rule file, review file, or
+non-empty directory is left exactly as it is — this step only ever creates an absent `.gitkeep` in
+an absent or genuinely-empty directory).
 
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 

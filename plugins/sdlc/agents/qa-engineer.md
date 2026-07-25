@@ -65,15 +65,19 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 - Quality gate commands — the quality-gate commands from `.claude/project/project-context.md`
 - Workspace Structure — the file-path → owning-agent mapping
 
-Also read your `docs/adr/index.md` section (the `qa-engineer` section, plus `General`) if it
-exists — best-effort; a missing index (repo has no ADRs yet) is a no-op, not an error. Open the
-full `docs/adr/NNNN-*.md` only on demand. This matters because `/sdlc:docs distill` can promote —
-and delete — entries from `.claude/memories/reviews/patterns.md`, which Step 5 of the playbook
-consults; without this read-path, a promoted-and-deleted review pattern would vanish from QA's
-view instead of surfacing via its canonical ADR. This is guaranteed to work: the pipeline's
-`patterns.md` tagging rule (`refs/adr-pipeline.md` §7) requires every ADR promoted from
-`patterns.md` to always carry `qa-engineer` in its `agents:` list, so it always lands in your own
-`docs/adr/index.md` section — it can never be tagged away from your read path.
+**Collect applicable memory** — run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh
+qa-engineer`. Pass 1 is mechanical: it emits one `RULE`/`ADR` index line per artifact whose
+`agent`/`agents` list covers you and whose status is `active`/`accepted`. Pass 2 is yours:
+semantically match the emitted `trigger` phrases against your dispatch task and open the full file
+(the rule body, or `docs/adr/NNNN-*.md`) ONLY for the entries you will actually follow. A `LEGACY`
+banner in the output means this repo has not migrated yet (NA-74) — read what it emitted and carry
+on. This matters because `/sdlc:docs distill` can promote — and delete — rule entries nominated
+from review round files under `.claude/memories/reviews/`, which the playbook's Step 1 pre-review
+scan consults; without this collection, a promoted-and-deleted rule would vanish from QA's view
+instead of surfacing via its canonical ADR. This is guaranteed to work: the pipeline's
+review-file tagging rule (`refs/adr-pipeline.md` §7) requires every ADR promoted from a
+review-file-sourced candidate to always carry `qa-engineer` in its `agents:` list, so it always
+surfaces in your own collection pass — it can never be tagged away from your read path.
 
 ## Role & Scope
 
@@ -120,8 +124,8 @@ dispatch the owning domain agent to fix what review finds.
    fresh when the instance is unavailable. A machine-checked primary-checkout guard runs after every
    fix dispatch — an agent that wrote outside `$WORKTREE` fails the round.
 4. **Re-review** — repeat until no Critical/Important findings and no open AC gaps.
-5. **Learn** — write the audit log to `.claude/memories/reviews/patterns.md` and per-agent
-   learnings to `.claude/memories/agents/<agent>.md`; commit + push.
+5. **Learn** — write one review round file to `.claude/memories/reviews/` and rule entries under
+   `.claude/memories/agents/<fixing-agent>/` for admitted candidates; commit + push.
 6. **Quality gate** — assert `$WORKTREE` is porcelain-clean first (STOP with the stray-file list if
    not — never silently clean), then run the quality-gate commands from
    `.claude/project/project-context.md`; dispatch fixes on failure; repeat until clean. Paste real

@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+set -uo pipefail
+shopt -s nullglob
+
+here="$(cd "$(dirname "$0")" && pwd)"
+vocab_file="$here/../refs/root-cause-vocab.txt"
+
+repo_root="${1:-}"
+if [ -z "$repo_root" ]; then
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+  [ -z "$repo_root" ] && repo_root="$(pwd)"
+fi
+
+mem_root="$repo_root/.claude/memories"
+
+vocab_list=""
+if [ -f "$vocab_file" ]; then
+  vocab_list="$(grep -v '^[[:space:]]*#' "$vocab_file" | grep -v '^[[:space:]]*$')"
+fi
+vocab_display="$(printf '%s' "$vocab_list" | paste -sd, - | sed 's/,/, /g')"
+
+vocab_contains() {
+  printf '%s\n' "$vocab_list" | grep -qx "$1"
+}
+
+extract_fm() {
+  awk '
+    NR==1 && /^---[[:space:]]*$/ { open=1; next }
+    NR==1 { exit }
+    open && /^---[[:space:]]*$/ { exit }
+    open { print }
+  ' "$1"
+}
+
+parse_frontmatter() {
+  awk '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    function unquote(s,    n) {
+      s = trim(s)
+      n = length(s)
+      if (n >= 2 && substr(s, 1, 1) == "\"" && substr(s, n, 1) == "\"") {
+        s = substr(s, 2, n - 2)
+      }
+      return s
+    }
+    BEGIN { key=""; in_list=0; listval="" }
+    {
+      line = $0
+      if (match(line, /^[A-Za-z_][A-Za-z0-9_-]*:/)) {
+        if (key != "" && in_list) { print "FIELD:" key "=" listval }
+        colonpos = index(line, ":")
+        key = substr(line, 1, colonpos - 1)
+        rest = trim(substr(line, colonpos + 1))
+        in_list = 0
+        listval = ""
+        if (rest == "") {
+          in_list = 1
+        } else if (substr(rest, 1, 1) == "[") {
+          inner = rest
+          gsub(/^\[|\][ \t]*$/, "", inner)
+          inner = trim(inner)
+          out = ""
+          if (inner != "") {
+            n = split(inner, arr, ",")
+            for (i = 1; i <= n; i++) {
+              v = unquote(trim(arr[i]))
+              if (v != "") out = (out == "" ? v : out "," v)
+            }
+          }
+          print "FIELD:" key "=" out
+          key = ""
+        } else {
+          print "FIELD:" key "=" unquote(rest)
+          key = ""
+        }
+      } else if (in_list && match(line, /^[ \t]*-[ \t]?/)) {
+        item = line
+        sub(/^[ \t]*-[ \t]?/, "", item)
+        item = unquote(trim(item))
+        if (item != "") listval = (listval == "" ? item : listval "," item)
+      }
+    }
+    END {
+      if (key != "" && in_list) print "FIELD:" key "=" listval
+    }
+  '
+}
+
+has_field() {
+  printf '%s\n' "$1" | grep -q "^FIELD:${2}="
+}
+
+field_value() {
+  printf '%s\n' "$1" | sed -n "s/^FIELD:${2}=//p" | head -1
+}
+
+list_len() {
+  if [ -z "$1" ]; then
+    echo 0
+  else
+    printf '%s' "$1" | awk -F',' '{print NF}'
+  fi
+}
+
+valid_evidence_item() {
+  [[ "$1" =~ ^[A-Z][A-Z0-9]+-[0-9]+$ ]] && return 0
+  [[ "$1" =~ ^PR#[0-9]+$ ]] && return 0
+  [[ "$1" =~ ^[0-9a-f]{7,40}$ ]] && return 0
+  return 1
+}
+
+offenders=""
+warnings=""
+id_records=""
+
+add_offender() { offenders+="$1"$'\n'; }
+add_warning() { warnings+="$1"$'\n'; }
+
+if [ ! -d "$mem_root" ]; then
+  echo "check-frontmatter: OK — $mem_root not present"
+  exit 0
+fi
+
+for f in "$mem_root"/agents/*.md; do
+  add_warning "$f is a v1 flat diary; migrate to .claude/memories/agents/<agent>/<rule-id>.md (NA-74)"
+done
+
+validate_rule_file() {
+  local file="$1" dirname="$2"
+  local base stem fm parsed
+  base="$(basename "$file")"
+  stem="${base%.md}"
+
+  fm="$(extract_fm "$file")"
+  if [ -z "$fm" ]; then
+    add_offender "$file: missing or unparseable frontmatter"
+    return
+  fi
+  parsed="$(printf '%s\n' "$fm" | parse_frontmatter)"
+
+  local issues=""
+  local field
+  for field in id agent trigger rule evidence uses status; do
+    has_field "$parsed" "$field" || issues+="missing field '$field'; "
+  done
+
+  local id agent_list trig rule_val evidence_val uses_val status_val
+  id="$(field_value "$parsed" id)"
+  agent_list="$(field_value "$parsed" agent)"
+  trig="$(field_value "$parsed" trigger)"
+  rule_val="$(field_value "$parsed" rule)"
+  evidence_val="$(field_value "$parsed" evidence)"
+  uses_val="$(field_value "$parsed" uses)"
+  status_val="$(field_value "$parsed" status)"
+
+  if [ -n "$id" ]; then
+    id_records+="$id|$file"$'\n'
+    [ "$id" != "$stem" ] && issues+="id '$id' does not equal filename stem '$stem'; "
+  fi
+
+  if [ -z "$agent_list" ]; then
+    issues+="agent list is empty; "
+  elif [ "$dirname" = "shared" ]; then
+    local shared_len
+    shared_len="$(list_len "$agent_list")"
+    [ "$shared_len" -lt 2 ] && issues+="agents/shared/ rule must have agent length >= 2, got [$agent_list]; "
+  else
+    if [ "$agent_list" != "$dirname" ]; then
+      issues+="under agents/$dirname/ agent must be exactly [$dirname], got [$agent_list]; "
+    fi
+  fi
+
+  local trig_len
+  trig_len="$(list_len "$trig")"
+  if [ "$trig_len" -lt 1 ] || [ "$trig_len" -gt 6 ]; then
+    issues+="trigger must have 1-6 items, got $trig_len; "
+  fi
+
+  if [ -n "$rule_val" ] && [ "${#rule_val}" -gt 200 ]; then
+    issues+="rule exceeds 200 chars (${#rule_val}); "
+  fi
+
+  local evidence_len
+  evidence_len="$(list_len "$evidence_val")"
+  if [ "$evidence_len" -lt 1 ]; then
+    issues+="evidence is empty; "
+  else
+    local IFS_OLD="$IFS" item
+    IFS=','
+    for item in $evidence_val; do
+      valid_evidence_item "$item" || issues+="evidence item '$item' is not a Jira key, PR#n, or 7-40 char SHA; "
+    done
+    IFS="$IFS_OLD"
+  fi
+
+  if ! [[ "$uses_val" =~ ^[0-9]+$ ]]; then
+    issues+="uses '$uses_val' is not a non-negative integer; "
+  fi
+
+  case "$status_val" in
+    active | deprecated | promoted) ;;
+    *) issues+="status '$status_val' is not one of active|deprecated|promoted; " ;;
+  esac
+
+  [ -n "$issues" ] && add_offender "$file: $issues"
+}
+
+for dir in "$mem_root"/agents/*/; do
+  agentdir="$(basename "$dir")"
+  for f in "$dir"*.md; do
+    validate_rule_file "$f" "$agentdir"
+  done
+done
+
+if [ -n "$id_records" ]; then
+  dupe_ids="$(printf '%s' "$id_records" | cut -d'|' -f1 | sort | uniq -d)"
+  if [ -n "$dupe_ids" ]; then
+    while IFS= read -r dup; do
+      [ -z "$dup" ] && continue
+      files_for_dup="$(printf '%s' "$id_records" | awk -F'|' -v id="$dup" '$1==id {print $2}' | paste -sd, -)"
+      add_offender "duplicate id '$dup' across: $files_for_dup"
+    done <<< "$dupe_ids"
+  fi
+fi
+
+validate_review_file() {
+  local file="$1"
+  local base stem fm parsed
+  base="$(basename "$file")"
+  stem="${base%.md}"
+
+  if ! [[ "$stem" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})-([A-Z][A-Z0-9]*-[0-9]+)(-r[0-9]+)?$ ]]; then
+    add_offender "$file: filename does not match YYYY-MM-DD-<KEY>[-rN].md"
+    return
+  fi
+  local fname_date="${BASH_REMATCH[1]}" fname_key="${BASH_REMATCH[2]}"
+
+  fm="$(extract_fm "$file")"
+  if [ -z "$fm" ]; then
+    add_offender "$file: missing or unparseable frontmatter"
+    return
+  fi
+  parsed="$(printf '%s\n' "$fm" | parse_frontmatter)"
+
+  local issues=""
+  local field
+  for field in story date domains root_causes issue_count; do
+    has_field "$parsed" "$field" || issues+="missing field '$field'; "
+  done
+
+  local story_val date_val domains_val root_causes_val issue_count_val
+  story_val="$(field_value "$parsed" story)"
+  date_val="$(field_value "$parsed" date)"
+  domains_val="$(field_value "$parsed" domains)"
+  root_causes_val="$(field_value "$parsed" root_causes)"
+  issue_count_val="$(field_value "$parsed" issue_count)"
+
+  [ "$story_val" != "$fname_key" ] && issues+="story '$story_val' disagrees with filename key '$fname_key'; "
+  [ "$date_val" != "$fname_date" ] && issues+="date '$date_val' disagrees with filename date '$fname_date'; "
+
+  if ! [[ "$issue_count_val" =~ ^[0-9]+$ ]]; then
+    issues+="issue_count '$issue_count_val' is not a non-negative integer; "
+  fi
+
+  local domains_len root_causes_len
+  domains_len="$(list_len "$domains_val")"
+  root_causes_len="$(list_len "$root_causes_val")"
+
+  if [ "$domains_len" -eq 0 ] && [ "$issue_count_val" != "0" ]; then
+    issues+="domains is empty but issue_count is not 0; "
+  fi
+  if [ "$root_causes_len" -eq 0 ] && [ "$issue_count_val" != "0" ]; then
+    issues+="root_causes is empty but issue_count is not 0; "
+  fi
+
+  if [ -n "$root_causes_val" ]; then
+    local IFS_OLD="$IFS" token
+    IFS=','
+    for token in $root_causes_val; do
+      vocab_contains "$token" || issues+="root_causes token '$token' is not in the vocabulary; accepted: $vocab_display; "
+    done
+    IFS="$IFS_OLD"
+  fi
+
+  [ -n "$issues" ] && add_offender "$file: $issues"
+}
+
+for f in "$mem_root"/reviews/*.md; do
+  base="$(basename "$f")"
+  if [ "$base" = "patterns.md" ]; then
+    add_warning "$f is the legacy patterns.md audit log; migrate to per-round review files (NA-74)"
+    continue
+  fi
+  validate_review_file "$f"
+done
+
+if [ -n "$warnings" ]; then
+  echo "check-frontmatter: WARNING — legacy memory artifacts present (migration is NA-74):" >&2
+  printf '%s' "$warnings" | sed 's/^/  - /' >&2
+fi
+
+if [ -n "$offenders" ]; then
+  echo "check-frontmatter: FAILED"
+  echo
+  printf '%s' "$offenders" | sed 's/^/  - /'
+  exit 1
+fi
+
+echo "check-frontmatter: OK"
+exit 0
