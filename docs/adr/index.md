@@ -11,15 +11,22 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0004. Single canonical statement with pointers for shared cross-file contracts](0004-single-canonical-statement-with-pointers.md) — accepted
 - [0007. Worktree-scoped working directory for domain-agent dispatches](0007-worktree-scoped-dispatch-cwd.md) — accepted
 - [0008. Dispatch-prompt push override of the commit-only handoff default](0008-dispatch-prompt-push-override.md) — accepted
+- [0013. Whole-tree literal grep as the closing step after any shared-contract change](0013-whole-tree-literal-grep-after-shared-contract-change.md) — accepted
+- [0014. Clean Nx "no tasks were run" result is accepted as a pass for plugins-only changes](0014-clean-nx-no-tasks-pass-for-plugins-only-change.md) — accepted
+- [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — accepted
 
 ## knowledge-engineer
 
 - [0001. Two-phase dispatch for founder-confirmation gates](0001-two-phase-dispatch-founder-confirmation-gate.md) — accepted
+- [0013. Whole-tree literal grep as the closing step after any shared-contract change](0013-whole-tree-literal-grep-after-shared-contract-change.md) — accepted
 
 ## platform-engineer
 
 - [0007. Worktree-scoped working directory for domain-agent dispatches](0007-worktree-scoped-dispatch-cwd.md) — accepted
 - [0008. Dispatch-prompt push override of the commit-only handoff default](0008-dispatch-prompt-push-override.md) — accepted
+- [0013. Whole-tree literal grep as the closing step after any shared-contract change](0013-whole-tree-literal-grep-after-shared-contract-change.md) — accepted
+- [0014. Clean Nx "no tasks were run" result is accepted as a pass for plugins-only changes](0014-clean-nx-no-tasks-pass-for-plugins-only-change.md) — accepted
+- [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — accepted
 
 ## qa-engineer
 
@@ -29,6 +36,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0006. Post-mount effect resolution of matchMedia reads](0006-post-mount-matchmedia-read.md) — accepted
 - [0009. Try/catch-to-defaults fallback for public-route CMS reads](0009-cms-read-try-catch-fallback.md) — accepted
 - [0010. force-dynamic rendering and production-migration requirement for CMS-backed routes](0010-cms-force-dynamic-and-migration.md) — accepted
+- [0013. Whole-tree literal grep as the closing step after any shared-contract change](0013-whole-tree-literal-grep-after-shared-contract-change.md) — accepted
 
 ## web-engineer
 
