@@ -31,7 +31,13 @@
 #   actual invocation syntax (`--project <value>`), never on a documentation mention of the flag.
 #
 # Case 2 (STOP-instruction) is a text-presence assertion against a prompt document, not executable
-# code — see the "how strong" caveat in the script's own final PASS/FAIL message below.
+# code, and it is scoped to co-location (`STOP`, "project key", and the literal
+# `.claude/project/project-context.md` path all inside the SAME markdown paragraph block — an awk
+# `RS=""` paragraph split, blank line = boundary) rather than "all three anywhere in the file",
+# since two unconnected mentions elsewhere would not actually prove the STOP clause is attached to
+# the right instruction. Still — see the "how strong" caveat in the script's own final PASS/FAIL
+# message below: presence-and-proximity in a prompt document proves the instruction is WRITTEN and
+# well-placed, never that a dispatched agent obeys it at runtime.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/no-hardcoded-project-key.test.sh
@@ -59,14 +65,18 @@ fi
 
 # Case 2: unresolvable-key STOP — refine-feature.md must instruct a STOP with an actionable
 # message when the project key cannot be resolved from project-context, rather than defaulting to
-# any literal key. This is a text-presence assertion against a prompt document (refine-feature.md
-# has no executable branch to actually exercise), so it can only prove the instruction is WRITTEN
-# down, not that a dispatched agent will faithfully follow it at runtime — see the Summary note on
-# how strong this assertion is judged to be.
-if grep -qi 'STOP' "$refine_feature" && grep -qi 'project.key' "$refine_feature"; then
-  echo "PASS: STOP instruction — refine-feature.md mentions STOP in connection with the project key"
+# any literal key. Required co-located in the SAME paragraph block (awk RS="" paragraph split):
+# "stop" + "project key" (case-insensitive) + the literal `.claude/project/project-context.md`
+# path — proximity, not just presence-anywhere-in-file, so a stray STOP elsewhere in the doc can't
+# satisfy this. This is still a text-presence/proximity assertion against a prompt document
+# (refine-feature.md has no executable branch to actually exercise), so it can only prove the
+# instruction is WRITTEN and well-placed, not that a dispatched agent will faithfully follow it at
+# runtime — see the Summary note on how strong this assertion is judged to be.
+stop_para_hit="$(awk -v RS="" 'tolower($0) ~ /stop/ && tolower($0) ~ /project key/ && $0 ~ /project-context\.md/ {print "MATCH"; found=1} END{if(!found) exit 1}' "$refine_feature" 2>/dev/null)"
+if [ "$stop_para_hit" = "MATCH" ]; then
+  echo "PASS: STOP instruction — refine-feature.md has a STOP co-located with the project-key resolution in one paragraph"
 else
-  echo "FAIL: STOP instruction — refine-feature.md has no STOP-on-unresolvable-project-key instruction"
+  echo "FAIL: STOP instruction — refine-feature.md has no STOP co-located with a project-key/project-context.md mention"
   failures=$((failures + 1))
 fi
 
