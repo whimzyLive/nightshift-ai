@@ -10,8 +10,10 @@ status: active
 
 ## Why
 
-Widening `no-hardcoded-project-key.test.sh`'s Case 2 `literal_default_re` to also catch
-`fall back to `ET``added the literal phrase "fall back to" as a trigger — which is a substring of
-the paragraph's own legitimate, required text ("do not **fall back to** any literal project key").
-Under`grep -qiE`(case-insensitive, matching the sibling`no_fallback_re`check),`[A-Z]{2,10}`stopped meaning "uppercase" and matched the following lowercase word "any" too, so the guard's own
-required paragraph tripped its own forbidden-fallback detector. Fix: match`literal_default_re`with plain`grep -qE`(case-sensitive) — the`[A-Z]`class only means what it says without`-i`.
+Widening `no-hardcoded-project-key.test.sh`'s Case 2 `literal_default_re` to also catch the phrase
+"fall back to ET" added the literal words "fall back to" as a trigger — which is a substring of
+the paragraph's own legitimate, required text ("do not fall back to any literal project key"). Under
+`grep -qiE` (case-insensitive, matching the sibling `no_fallback_re` check), the class `[A-Z]{2,10}`
+stopped meaning "uppercase" and matched the following lowercase word "any" too, so the guard's own
+required paragraph tripped its own forbidden-fallback detector. Fix: match `literal_default_re` with
+plain `grep -qE` (case-sensitive) — `[A-Z]` only means what it says without `-i`.
