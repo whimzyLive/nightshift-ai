@@ -1,7 +1,12 @@
 {
   "name": "nightshift",
   "owner": { "name": "nightshift" },
-  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official", "postiz-agent", "marketingskills"],
+  "allowCrossMarketplaceDependenciesOn": [
+    "claude-plugins-official",
+    "thedotmack",
+    "postiz-agent",
+    "marketingskills"
+  ],
   "plugins": [
     {
       "name": "sdlc",
