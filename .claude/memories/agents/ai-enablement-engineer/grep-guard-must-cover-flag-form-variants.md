@@ -15,3 +15,9 @@ status: active
 flag, `skills/acli/SKILL.md:76`) — all real syntaxes the same CLI accepts, verified by QA
 mutation-testing. A guard that only covers the one syntax it happened to see in the original bug
 report gives a false sense of coverage.
+
+Widening to the short alias then over-corrects: a bare `-p` is a common flag on unrelated commands
+(`mkdir -p DIRNAME`, `mktemp -p TMPDIR`, `gh pr create -p PROJECT`), so matching `-p` alone
+false-positives on any of them with an uppercase operand. Fix: require the `-p` branch to co-occur
+with the parent command name (here, `acli`) on the same line; the long-flag branch needs no such
+qualifier since `--project` isn't ambiguous with other tools.

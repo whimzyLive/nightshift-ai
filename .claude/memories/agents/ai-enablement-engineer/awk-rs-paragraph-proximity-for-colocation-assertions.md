@@ -2,7 +2,7 @@
 id: awk-rs-paragraph-proximity-for-colocation-assertions
 agent: [ai-enablement-engineer]
 trigger: [tightening a text-presence test into a proximity test, prompt-document regression test, STOP instruction co-located with a token]
-rule: When a regression test must prove two phrases co-locate in a prose document, split on blank lines via `awk -v RS=""` and require both match in one paragraph, not just anywhere in the file.
+rule: When a regression test must prove three phrases co-locate in a prose document, split on blank lines via `awk -v RS=""` and require all three match in one paragraph, not just anywhere.
 evidence: [NA-78]
 uses: 0
 status: active

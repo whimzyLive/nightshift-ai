@@ -29,8 +29,11 @@ if [ ! -d "$commands_dir" ] || [ ! -d "$agents_dir" ]; then
 fi
 
 # Case 1
-project_flag_re='(--project|(^|[[:space:]])-p)([[:space:]]+|=)["'"'"']?[A-Z][A-Z0-9]{1,9}'
-hardcoded_hits="$(grep -rnE -- "$project_flag_re" "$commands_dir" "$agents_dir" 2>/dev/null || true)"
+long_form_re='--project([[:space:]]+|=)["'"'"']?[A-Z][A-Z0-9]{1,9}'
+short_form_re='(^|[[:space:]])-p([[:space:]]+|=)["'"'"']?[A-Z][A-Z0-9]{1,9}'
+long_hits="$(grep -rnE -- "$long_form_re" "$commands_dir" "$agents_dir" 2>/dev/null || true)"
+short_hits="$(grep -rnE -- "$short_form_re" "$commands_dir" "$agents_dir" 2>/dev/null | grep -i 'acli' || true)"
+hardcoded_hits="$(printf '%s\n%s\n' "$long_hits" "$short_hits" | sed '/^$/d')"
 if [ -z "$hardcoded_hits" ]; then
   echo "PASS: grep-clean — no hardcoded --project/-p literal under plugins/sdlc/commands/ or plugins/sdlc/agents/"
 else
@@ -42,7 +45,7 @@ fi
 # Case 2
 stop_para="$(awk -v RS="" 'tolower($0) ~ /stop/ && tolower($0) ~ /project key/ && $0 ~ /project-context\.md/ {print; exit}' "$refine_feature" 2>/dev/null)"
 no_fallback_re='not fall back|never fall back|do not default|never default|not default'
-literal_default_re='(default(ing)?[[:space:]]+to|fallback[[:space:]]+(to|is))[[:space:]]+["'"'"']?[A-Z]{2,10}'
+literal_default_re='(default(ing)?[[:space:]]+to|fallback[[:space:]]+(to|is))[[:space:]]+["'"'"'`]?[A-Z]{2,10}'
 if [ -n "$stop_para" ] \
   && printf '%s' "$stop_para" | grep -qiE -- "$no_fallback_re" \
   && ! printf '%s' "$stop_para" | grep -qiE -- "$literal_default_re"; then
