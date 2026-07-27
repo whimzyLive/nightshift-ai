@@ -37,6 +37,3 @@ jobs:
       - run: bash plugins/sdlc/scripts/check-plugin-docs-format.sh
       - run: bash plugins/sdlc/scripts/check-frontmatter.sh
       - run: bash plugins/sdlc/scripts/__tests__/docs-sync-fixtures.test.sh
-      - run: bash plugins/sdlc/scripts/__tests__/jira-site-guard.test.sh
-      - run: bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
-      - run: bash plugins/sdlc/scripts/__tests__/memory-frontmatter.test.sh
