@@ -52,11 +52,11 @@ single empty probe must **never** be trusted as `missing`: retry a few times wit
 and treat an `acli` **error** (non-zero exit) as _inconclusive_, not as `missing`.
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 FOUND_FIELD=""; LAST_ERR=0
 for attempt in 1 2 3; do
   LAST_ERR=0
   for FIELD in "Story point estimate" "Story Points"; do
+    bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
     out=$(acli jira workitem search --jql "key = <KEY> AND \"$FIELD\" is not EMPTY" --json 2>&1) || LAST_ERR=1
     printf '%s' "$out" | grep -qE '"key":[[:space:]]*"<KEY>"' && { FOUND_FIELD="$FIELD"; break; }
   done
@@ -84,6 +84,7 @@ Decide from the loop result — **only a clean, repeatable empty means `missing`
 
 ```bash
 for V in 1 2 3 5 8 13 20 21 40; do
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
   acli jira workitem search --jql "key = <KEY> AND \"<FIELD>\" = $V" --json 2>/dev/null | grep -q '"key": "<KEY>"' && { echo "POINTS=$V"; break; }
 done
 ```

@@ -32,7 +32,7 @@ epic="${1:?usage: epic-queue.sh <EPIC-KEY>}"
 
 fail() { echo "REASON=$1"; echo "GATE=STOP"; exit 1; }
 
-bash "$here/jira-site-guard.sh" 2>/dev/null || fail "acli active site does not match project-context's Jira site — run: bash $here/jira-site-guard.sh (directly, for the actionable error)"
+guard_err="$(bash "$here/jira-site-guard.sh" 2>&1)" || fail "jira-site-guard: ${guard_err:-unknown failure (re-run: bash $here/jira-site-guard.sh)}"
 
 echo "EPIC=$epic"
 

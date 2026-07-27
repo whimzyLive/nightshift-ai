@@ -29,6 +29,8 @@
 #      test instead of a mock that always agrees with itself.
 #   8. A cosmetically different but same site (case, scheme prefix, trailing slash) -> normalizes to
 #      a match, exit 0, no switch issued.
+#   9. acli itself is not on PATH -> exit non-zero with a message naming the missing binary, not the
+#      no-account-stored wording (a different remedy: install acli, not `acli jira auth login`).
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/jira-site-guard.test.sh
@@ -268,6 +270,20 @@ else
   failures=$((failures + 1))
 fi
 rm -rf "$statedir"
+
+# Case 8: acli is not on PATH at all (a fixed, acli-free PATH — /usr/bin:/bin still carries
+# awk/sed/tr/grep so the guard's own parsing runs normally) -> exit non-zero with a message
+# identifying the missing BINARY specifically, not the "no account stored" wording (which would
+# misdiagnose "acli was never installed" as "an acli account for this site was never logged in").
+ctx8="$mockdir/ctx-match-8.md"
+write_fixture "$ctx8" "$EXPECTED_SITE"
+out8="$(PATH="/usr/bin:/bin" bash "$script" "$ctx8" 2>&1)"; status8=$?
+if [ "$status8" -ne 0 ] && is_guard_error "$out8" && printf '%s' "$out8" | grep -q 'acli not found on PATH'; then
+  echo "PASS: acli missing from PATH -> exit non-zero with the acli-not-found wording"
+else
+  echo "FAIL: acli missing from PATH -> status=$status8 output=${out8:-<empty>}"
+  failures=$((failures + 1))
+fi
 
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all jira-site-guard.sh regression cases passed"
