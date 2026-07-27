@@ -24,7 +24,8 @@ Commit on branch `spec/<STORY-KEY>`. Raise PR titled `docs(spec): <STORY-KEY> <s
 After the PR is merged, comment on the story as a human-readable breadcrumb:
 
 ```bash
-acli jira workitem comment add <STORY-KEY> \
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+acli jira workitem comment create --key <STORY-KEY> \
   --body "Spec: docs/superpowers/specs/<STORY-KEY>.md | PR: <PR_URL>"
 ```
 

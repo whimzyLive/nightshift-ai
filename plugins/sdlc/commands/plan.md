@@ -8,6 +8,7 @@ Before dispatching anything, probe the issue type — **defects have no plan pha
 one-liner (same as `/auto` Step 0):
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 ITYPE="$(acli jira workitem view <STORY-KEY> --fields issuetype --json 2>/dev/null \
            | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
 ```

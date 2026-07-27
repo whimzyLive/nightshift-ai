@@ -64,6 +64,7 @@ acli jira workitem search \
 ### Create a single work item
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem create \
   --project "CER" \
   --type "Story" \
@@ -95,6 +96,7 @@ bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX")
 trap 'rm -f "$bulk_file"' EXIT
 
 # ... write JSON to $bulk_file, then:
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
 ```
 
@@ -166,6 +168,7 @@ acli jira workitem view CER-456 --json 2>&1
 ### Edit a work item
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem edit CER-456 \
   --summary "Updated title" \
   --description "Updated description" 2>&1
@@ -189,6 +192,7 @@ Use the `link create` form with `--out`/`--in` — NOT the positional `link A B`
 
 ```bash
 # A blocks B   →   --out <B, blocked/downstream>   --in <A, blocker/prerequisite>
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem link create --out CER-102 --in CER-101 --type Blocks --yes 2>&1
 ```
 
@@ -201,6 +205,7 @@ acli jira workitem link create --out CER-102 --in CER-101 --type Blocks --yes 2>
 
 ```bash
 # Delete a link by its id (from link list)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem link delete --id <LINK-ID> --yes 2>&1
 ```
 
@@ -222,7 +227,8 @@ acli jira workitem search \
 ### Add comment
 
 ```bash
-acli jira workitem comment add CER-456 --body "Spec ready: docs/superpowers/specs/..." 2>&1
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+acli jira workitem comment create --key CER-456 --body "Spec ready: docs/superpowers/specs/..." 2>&1
 ```
 
 ## Workflow pattern for story creation
@@ -270,6 +276,7 @@ So that I can track certification status without opening each record
 - Editing penetrations from this view
 EOF
 
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem create \
   --project "CER" \
   --type "Story" \
@@ -284,6 +291,7 @@ acli jira workitem create \
 ## Capturing created issue keys
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 result=$(acli jira workitem create --project CER --type Story --summary "Title" --json 2>&1)
 key=$(echo "$result" | jq -r '.key')
 echo "Created: $key"

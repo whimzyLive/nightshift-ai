@@ -15,6 +15,7 @@ scrape `acli workitem view` rendered text (that format is not stable across acli
 Read the structured `issuetype.name` field and compare case-insensitively:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null \
            | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
 ```

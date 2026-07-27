@@ -108,18 +108,16 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 
 > ⚠️ **Do NOT use `acli ... create-bulk` for Epic-linked stories.** Its `--from-json` schema accepts only `summary`, `projectKey`, `issueType`, `label`, `assignee` — it has **no parent field**. A `parentKey`/`parent` entry in the bulk JSON is **silently dropped**, so every story is created **orphaned** (not under the Epic). Only `acli jira workitem create` links a child to its parent, via the `--parent` flag — `create-bulk`/`edit` cannot set the parent (and `edit` rejects a `parent` field outright). Use the per-story `create` loop below.
 
-For each story, in the dependency order from step 8. Run the site guard once before the loop
-(acli's active site is global across every authenticated account — NA-77):
-
-```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
-```
+For each story, in the dependency order from step 8. Run the site guard for EVERY story, not once
+for the batch — acli's active site is global across every authenticated account and has been
+observed reverting mid-session, including between two consecutive acli calls seconds apart (NA-77):
 
 ```bash
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
 desc=$(mktemp "$dir/acli-desc.XXXXXX")                 # ADF JSON or text per ${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md
 trap 'rm -f "$desc"' EXIT
 # write the story description to "$desc" first
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 key=$(acli jira workitem create \
   --project "<PROJECT-KEY>" \
   --type "Story" \
@@ -255,10 +253,10 @@ Refine an unpolished story in-place OR create new stories from raw text.
 8. **Annotate each sub-task (only when `subtaskCount > 0`).** For each sub-task, write a **minimal** ADF description (purpose sentence + `Part of <STORY-KEY>` reference; the shape is in `${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md` → "Minimal sub-task description"). The sub-task MUST NOT receive the full story template. Use the **session-scoped** temp dir, one file per sub-task. Do **NOT** register a per-iteration `trap '... EXIT'` inside the loop — an EXIT trap set in a loop overwrites the prior handler and fires only once at exit, so it would clean up just the last file; instead `rm -f "$file"` at the end of each iteration (or rely on the single session-dir teardown):
    ```bash
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
    for st in "${subtask_keys[@]}"; do           # zsh: keys MUST be an array, not a space string
      sub=$(mktemp "$dir/acli-subtask.XXXXXX")
      # ... write the minimal ADF for "$st" into "$sub" ...
+     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || { echo "STOP: site guard failed for $st"; rm -f "$sub"; exit 1; }
      acli jira workitem edit "$st" --description-file "$sub" || { echo "STOP: sub-task edit failed for $st"; rm -f "$sub"; exit 1; }
      rm -f "$sub"                               # deterministic per-iteration cleanup (no in-loop EXIT trap)
    done

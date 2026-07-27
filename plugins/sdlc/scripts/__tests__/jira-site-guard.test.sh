@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
 # jira-site-guard.test.sh — regression test pinning the acli global-active-site defect (NA-77).
 #
-# acli holds a SINGLE global active site shared across every authenticated Atlassian account. A
-# Jira call made while the wrong site is active fails with a PERMISSION-shaped error ("Issue does
-# not exist or you do not have permission to see it."), not a site-mismatch-shaped one — and the
-# active site has been observed reverting mid-session between two consecutive acli calls. Nothing
-# in plugins/sdlc/ re-verifies acli's active site against project-context before a Jira call.
-#
-# This test pins the CONTRACT for the not-yet-written `jira-site-guard.sh`:
+# This test pins the CONTRACT for `jira-site-guard.sh`:
 #
 #   jira-site-guard.sh [context-file]      (defaults to .claude/project/project-context.md,
 #                                            matching the read-review-config.sh convention)
@@ -25,13 +19,16 @@
 #                                                           `acli jira auth login --site <site>`
 #                                                           remedy. Never a silent fallback.
 #   6. Context file missing/unreadable, or missing the
-#      `Jira site` row                                  -> exit non-zero with a DISTINCT,
-#                                                           actionable message per case. Never
-#                                                           assume a site.
+#      `Jira site` row                                  -> exit non-zero, each with its OWN
+#                                                           actionable wording (asserted verbatim,
+#                                                           not just "differs from the other case").
+#                                                           Never assume a site.
 #   7. Switch reports success (exit 0) but the re-verify status call still shows the wrong site
 #      (the observed mid-session reversion) -> exit non-zero. A switch's own exit code is NEVER
 #      trusted as proof the site actually changed — this is what makes case 4 a real regression
 #      test instead of a mock that always agrees with itself.
+#   8. A cosmetically different but same site (case, scheme prefix, trailing slash) -> normalizes to
+#      a match, exit 0, no switch issued.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/jira-site-guard.test.sh
@@ -77,13 +74,10 @@ write_fixture() { # $1=path  $2=jira-site-row ("" = omit the row entirely)
 #                                                <site> is in $MOCK_ACLI_STORED_SITES; otherwise
 #                                                fails with a login-remedy message on stderr,
 #                                                exactly like a real unstored-account switch would.
-#   - MOCK_ACLI_SWITCH_NOOP=1                -> switch still exits 0 (reports success) but does NOT
-#                                                actually update the mocked active site, reproducing
-#                                                the observed mid-session active-site reversion.
-# Every call is counted into $MOCK_ACLI_STATE_DIR/status-calls and .../switch-calls so the test can
-# assert the guard actually re-verifies after a switch, rather than trusting the switch's own exit
-# code (the mock-cli-must-validate-downstream-consumption concern: the re-verify step must consume
-# and check the mocked site, not just the prior call's exit status).
+#   - MOCK_ACLI_SWITCH_NOOP=1                -> switch still exits 0 but does NOT update the mocked
+#                                                active site (case 6).
+# Every call is counted into $MOCK_ACLI_STATE_DIR/status-calls and .../switch-calls (asserted by
+# case 2 and case 6 below).
 cat >"$mockdir/acli" <<'MOCK_ACLI'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -206,29 +200,35 @@ else
 fi
 rm -rf "$statedir"
 
-# Case 4: context file missing entirely -> exit non-zero, actionable + distinct message.
+# Case 4: context file missing entirely -> exit non-zero, actionable message naming the path AND
+# carrying the specific "cannot read" wording — NOT just "any non-empty message" (a mutation that
+# swapped in case 5's wording would still be "non-zero + non-empty" but would send the user chasing
+# the wrong fix).
 ctx4="$mockdir/does-not-exist.md"
 new_state "$EXPECTED_SITE"
 out4="$(run_guard "$ctx4" 2>&1)"; status4=$?
-if [ "$status4" -ne 0 ] && is_guard_error "$out4" && printf '%s' "$out4" | grep -qF "$ctx4"; then
-  echo "PASS: missing context file -> exit non-zero with a guard-authored message naming the path"
+if [ "$status4" -ne 0 ] && is_guard_error "$out4" && printf '%s' "$out4" | grep -qF "$ctx4" \
+   && printf '%s' "$out4" | grep -q 'cannot read project-context file'; then
+  echo "PASS: missing context file -> exit non-zero with the cannot-read wording naming the path"
 else
   echo "FAIL: missing context file -> status=$status4 output=${out4:-<empty>}"
   failures=$((failures + 1))
 fi
 rm -rf "$statedir"
 
-# Case 5: context file exists but has no `Jira site` row -> exit non-zero, and the message must be
-# DISTINCT from case 4's (missing-file vs missing-row are different failure modes; conflating them
-# would leave a user chasing the wrong fix).
+# Case 5: context file exists but has no `Jira site` row -> exit non-zero, carrying the specific
+# "no 'Jira site' row" wording — asserting only that this differs textually from case 4's output is
+# vacuous (case 4 and 5 interpolate different $ctx paths, so they'd differ regardless of wording;
+# rewriting this branch to emit case 4's exact wording, or deleting the case-4 unreadable-file check
+# entirely, both still pass a bare `!=` comparison). Assert the wording itself.
 ctx5="$mockdir/ctx-no-site-row.md"
 write_fixture "$ctx5" ""
 new_state "$EXPECTED_SITE"
 out5="$(run_guard "$ctx5" 2>&1)"; status5=$?
-if [ "$status5" -ne 0 ] && is_guard_error "$out5" && [ "$out5" != "$out4" ]; then
-  echo "PASS: missing 'Jira site' row -> exit non-zero, message distinct from missing-file case"
+if [ "$status5" -ne 0 ] && is_guard_error "$out5" && printf '%s' "$out5" | grep -q "no 'Jira site' row"; then
+  echo "PASS: missing 'Jira site' row -> exit non-zero with the no-Jira-site-row wording"
 else
-  echo "FAIL: missing 'Jira site' row -> status=$status5 output=${out5:-<empty>} (vs missing-file output=${out4:-<empty>})"
+  echo "FAIL: missing 'Jira site' row -> status=$status5 output=${out5:-<empty>}"
   failures=$((failures + 1))
 fi
 rm -rf "$statedir"
@@ -245,6 +245,26 @@ if [ "$status6" -ne 0 ] && is_guard_error "$out6" && [ "${switches6:-0}" = "1" ]
 else
   echo "FAIL: switch succeeds but re-verify still shows wrong site -> status=$status6 switches=${switches6:-<none>}"
   echo "--- guard output ---"; printf '%s\n' "$out6"
+  failures=$((failures + 1))
+fi
+rm -rf "$statedir"
+
+# Case 7: project-context's Jira site row is cosmetically different from acli's reported bare
+# lowercase host (mixed case, a scheme prefix, a trailing slash) but the same site once normalized
+# -> exit 0, no switch issued. Hostnames are case-insensitive and acli reports the bare lowercase
+# host, so a naive case-sensitive/scheme-sensitive compare would hard-fail on every call forever,
+# telling the user to run a login command that cannot fix a formatting mismatch.
+ctx7="$mockdir/ctx-cosmetic-mismatch.md"
+EXPECTED_SITE_UPPER="$(printf '%s' "$EXPECTED_SITE" | tr '[:lower:]' '[:upper:]')"
+write_fixture "$ctx7" "HTTPS://${EXPECTED_SITE_UPPER}/"
+new_state "$EXPECTED_SITE"
+out7="$(run_guard "$ctx7" 2>&1)"; status7=$?
+switches7="$(call_count "$statedir" switch-calls)"
+if [ "$status7" -eq 0 ] && [ "${switches7:-0}" = "0" ]; then
+  echo "PASS: cosmetic case/scheme/trailing-slash mismatch normalizes to a match -> exit 0, no switch"
+else
+  echo "FAIL: cosmetic mismatch -> status=$status7 switches=${switches7:-<none>}"
+  echo "--- guard output ---"; printf '%s\n' "$out7"
   failures=$((failures + 1))
 fi
 rm -rf "$statedir"

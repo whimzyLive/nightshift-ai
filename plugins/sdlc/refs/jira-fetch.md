@@ -52,6 +52,7 @@ single empty probe must **never** be trusted as `missing`: retry a few times wit
 and treat an `acli` **error** (non-zero exit) as _inconclusive_, not as `missing`.
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 FOUND_FIELD=""; LAST_ERR=0
 for attempt in 1 2 3; do
   LAST_ERR=0
@@ -100,6 +101,7 @@ For a Story, the Epic key is in the `parent` field of the view JSON.
 The story `view --json` response does **not** include a story's child sub-tasks. Enumerate them with a dedicated JQL probe on the parent key — this is the source of truth for sub-tasks:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem search --jql "parent = <KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC" --fields "key,summary" --json
 ```
 

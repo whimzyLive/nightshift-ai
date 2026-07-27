@@ -2,16 +2,14 @@
 set -uo pipefail
 # jira-site-guard.sh [context-file]
 #
-# acli holds a single global active Jira site shared across every authenticated account (NA-77):
-# a stale/reverted active site makes a Jira call fail with a permission-shaped acli error instead
-# of a site-mismatch one. Run this before any acli Jira call so the mismatch fails loud instead.
 # Contract pinned by plugins/sdlc/scripts/__tests__/jira-site-guard.test.sh:
 #
 #   Exit 0  — active site already matched the expected one, or matched after an in-place switch.
 #             Silent (no measurable per-call context cost) — this runs ahead of every Jira call.
-#   Exit 1  — no acli account stored for the expected site (names the site + the login remedy),
-#             the context file/row is missing or unreadable, or a switch reported success but a
-#             re-verify still shows the wrong site active. Never assumes or defaults a site.
+#   Exit 1  — acli is missing, no acli account stored for the expected site (names the site + the
+#             login remedy), the context file/row is missing or unreadable, or a switch reported
+#             success but a re-verify still shows the wrong site active. Never assumes or defaults
+#             a site.
 #
 # [context-file] defaults to .claude/project/project-context.md; callers/tests may override it.
 
@@ -31,8 +29,21 @@ if [ -z "$expected" ]; then
   exit 1
 fi
 
+normalize_site() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's#^https?://##; s#/+$##'
+}
+
+expected="$(normalize_site "$expected")"
+
+if ! command -v acli >/dev/null 2>&1; then
+  echo "ERROR: jira-site-guard: acli not found on PATH — install it before running any Jira command" >&2
+  exit 1
+fi
+
 active_site() {
-  acli jira auth status 2>/dev/null | awk '/^[[:space:]]*Site:/ { print $2; exit }'
+  local raw
+  raw="$(acli jira auth status 2>/dev/null | awk '/^[[:space:]]*Site:/ { print $2; exit }')"
+  normalize_site "$raw"
 }
 
 active="$(active_site)"

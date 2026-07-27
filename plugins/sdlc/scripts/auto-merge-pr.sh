@@ -102,7 +102,7 @@ echo "merged: PR $PR" >&2
 # script under `set -euo pipefail` — the merge above already succeeded, and that must stand
 # regardless of transition outcome.
 if [ -n "$STORY_KEY" ] && [ -n "$DONE_STATUS" ]; then
-  if ! bash "$here/jira-site-guard.sh" 2>&1; then
+  if ! bash "$here/jira-site-guard.sh"; then
     echo "WARNING: jira-site-guard failed for $STORY_KEY — skipping the Jira transition; a human must move it to $DONE_STATUS manually" >&2
   else
     CURRENT_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
