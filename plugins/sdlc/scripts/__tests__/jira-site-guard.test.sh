@@ -146,6 +146,14 @@ run_guard() { # $1=context-file
     bash "$script" "$1"
 }
 
+# A genuine guard-authored failure always carries this marker. A bare `bash: .../jira-site-guard.sh:
+# No such file or directory` (exit 127, script missing/not-yet-written) does NOT — so asserting this
+# marker on every non-zero-exit case is what stops a nonexistent script from trivially passing an
+# "exit non-zero + non-empty output" check.
+is_guard_error() { # $1=captured stdout+stderr
+  printf '%s' "$1" | grep -q '^ERROR: jira-site-guard:'
+}
+
 # Case 1: active site already matches expected -> exit 0, no switch issued, minimal output.
 ctx1="$mockdir/ctx-match.md"
 write_fixture "$ctx1" "$EXPECTED_SITE"
@@ -188,7 +196,7 @@ ctx3="$mockdir/ctx-differ-unstored.md"
 write_fixture "$ctx3" "$UNSTORED_SITE"
 new_state "$OTHER_ACTIVE_SITE"
 out3="$(MOCK_ACLI_STORED_SITES="$EXPECTED_SITE" run_guard "$ctx3" 2>&1)"; status3=$?
-if [ "$status3" -ne 0 ] && printf '%s' "$out3" | grep -qF "$UNSTORED_SITE" \
+if [ "$status3" -ne 0 ] && is_guard_error "$out3" && printf '%s' "$out3" | grep -qF "$UNSTORED_SITE" \
    && printf '%s' "$out3" | grep -q 'acli jira auth login'; then
   echo "PASS: site differs + no stored account -> exit non-zero, names site + login remedy"
 else
@@ -202,8 +210,8 @@ rm -rf "$statedir"
 ctx4="$mockdir/does-not-exist.md"
 new_state "$EXPECTED_SITE"
 out4="$(run_guard "$ctx4" 2>&1)"; status4=$?
-if [ "$status4" -ne 0 ] && [ -n "$out4" ]; then
-  echo "PASS: missing context file -> exit non-zero with a message"
+if [ "$status4" -ne 0 ] && is_guard_error "$out4" && printf '%s' "$out4" | grep -qF "$ctx4"; then
+  echo "PASS: missing context file -> exit non-zero with a guard-authored message naming the path"
 else
   echo "FAIL: missing context file -> status=$status4 output=${out4:-<empty>}"
   failures=$((failures + 1))
@@ -217,7 +225,7 @@ ctx5="$mockdir/ctx-no-site-row.md"
 write_fixture "$ctx5" ""
 new_state "$EXPECTED_SITE"
 out5="$(run_guard "$ctx5" 2>&1)"; status5=$?
-if [ "$status5" -ne 0 ] && [ -n "$out5" ] && [ "$out5" != "$out4" ]; then
+if [ "$status5" -ne 0 ] && is_guard_error "$out5" && [ "$out5" != "$out4" ]; then
   echo "PASS: missing 'Jira site' row -> exit non-zero, message distinct from missing-file case"
 else
   echo "FAIL: missing 'Jira site' row -> status=$status5 output=${out5:-<empty>} (vs missing-file output=${out4:-<empty>})"
@@ -231,10 +239,11 @@ ctx6="$mockdir/ctx-reverify-fails.md"
 write_fixture "$ctx6" "$EXPECTED_SITE"
 new_state "$OTHER_ACTIVE_SITE"
 out6="$(MOCK_ACLI_STORED_SITES="$EXPECTED_SITE" MOCK_ACLI_SWITCH_NOOP=1 run_guard "$ctx6" 2>&1)"; status6=$?
-if [ "$status6" -ne 0 ]; then
+switches6="$(call_count "$statedir" switch-calls)"
+if [ "$status6" -ne 0 ] && is_guard_error "$out6" && [ "${switches6:-0}" = "1" ]; then
   echo "PASS: switch succeeds but re-verify still shows wrong site -> exit non-zero (no false pass)"
 else
-  echo "FAIL: switch succeeds but re-verify still shows wrong site -> guard exited 0 (false pass)"
+  echo "FAIL: switch succeeds but re-verify still shows wrong site -> status=$status6 switches=${switches6:-<none>}"
   echo "--- guard output ---"; printf '%s\n' "$out6"
   failures=$((failures + 1))
 fi

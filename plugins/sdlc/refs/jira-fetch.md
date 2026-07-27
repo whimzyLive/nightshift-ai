@@ -8,9 +8,12 @@ Standard "fetch everything we know about a Jira issue" block. Reference this fro
 
 ## Calls (always parallel)
 
-Run all four in parallel — they are independent:
+Run the site guard first (acli's active site is global across every authenticated account — NA-77),
+then all four fetch calls in parallel — they are independent:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+
 acli jira workitem view <KEY> --json                                # summary + description + status + parent + fields
 acli jira workitem comment list --key <KEY> --json --paginate       # all comments, newest first
 acli jira workitem link list --key <KEY> --json                     # linked Jira tickets (blocks, is blocked by, child of, etc.)

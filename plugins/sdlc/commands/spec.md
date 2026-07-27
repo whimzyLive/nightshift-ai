@@ -58,6 +58,7 @@ The agent should:
    ```
 8. Comment the story with the spec reference. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
    ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
    acli jira workitem comment create --key <STORY-KEY> \
      --body "Spec ready.
    File: docs/superpowers/specs/<STORY-KEY>.md

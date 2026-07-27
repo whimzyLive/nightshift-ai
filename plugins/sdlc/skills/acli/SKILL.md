@@ -35,6 +35,10 @@ acli jira auth status 2>/dev/null || \
     --site "$ATLASSIAN_SITE" \
     --email "$ATLASSIAN_EMAIL" \
     --token
+
+# 3. acli's active site is GLOBAL across every authenticated account (NA-77) — re-verify it
+#    matches this repo's project-context before any call, not just that some account is logged in
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh" || exit 1
 ```
 
 `ATLASSIAN_API_TOKEN` and `ATLASSIAN_EMAIL` are injected as environment variables by the Copilot agent runtime from repository Copilot secrets. If both are empty and auth fails, abort: "ATLASSIAN_API_TOKEN/ATLASSIAN_EMAIL not set — configure in GitHub → Settings → Secrets → Copilot."

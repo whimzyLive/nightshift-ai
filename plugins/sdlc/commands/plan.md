@@ -62,6 +62,7 @@ The agent should:
     ```
 11. Comment the story. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
     ```bash
+    bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
     acli jira workitem comment create --key <STORY-KEY> \
       --body "Plan ready.
     File: docs/superpowers/plans/<STORY-KEY>.md
