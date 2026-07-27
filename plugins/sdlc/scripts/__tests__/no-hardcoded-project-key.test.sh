@@ -31,8 +31,26 @@ fi
 # Case 1
 long_form_re='--project([[:space:]]+|=)["'"'"']?[A-Z][A-Z0-9]{1,9}'
 short_form_re='(^|[[:space:]])-p([[:space:]]+|=)["'"'"']?[A-Z][A-Z0-9]{1,9}'
+other_cmd_re='(^|[[:space:]]|\(|\||;)(mkdir|mktemp|install|mkfifo|ssh|scp|rsync|tar|gh|curl)([[:space:]]+([a-zA-Z][a-zA-Z0-9_-]*|-[a-zA-Z]+))*[[:space:]]+-p([[:space:]]|=|$)'
+
 long_hits="$(grep -rnE -- "$long_form_re" "$commands_dir" "$agents_dir" 2>/dev/null || true)"
-short_hits="$(grep -rnE -- "$short_form_re" "$commands_dir" "$agents_dir" 2>/dev/null | grep -i 'acli' || true)"
+
+short_candidates="$(grep -rnE -- "$short_form_re" "$commands_dir" "$agents_dir" 2>/dev/null || true)"
+short_hits=""
+if [ -n "$short_candidates" ]; then
+  while IFS= read -r hit; do
+    [ -z "$hit" ] && continue
+    content="${hit#*:}"
+    content="${content#*:}"
+    if ! printf '%s' "$content" | grep -qE -- "$other_cmd_re"; then
+      short_hits="$short_hits
+$hit"
+    fi
+  done <<SHORT_CANDIDATES
+$short_candidates
+SHORT_CANDIDATES
+fi
+
 hardcoded_hits="$(printf '%s\n%s\n' "$long_hits" "$short_hits" | sed '/^$/d')"
 if [ -z "$hardcoded_hits" ]; then
   echo "PASS: grep-clean — no hardcoded --project/-p literal under plugins/sdlc/commands/ or plugins/sdlc/agents/"
@@ -45,10 +63,10 @@ fi
 # Case 2
 stop_para="$(awk -v RS="" 'tolower($0) ~ /stop/ && tolower($0) ~ /project key/ && $0 ~ /project-context\.md/ {print; exit}' "$refine_feature" 2>/dev/null)"
 no_fallback_re='not fall back|never fall back|do not default|never default|not default'
-literal_default_re='(default(ing)?[[:space:]]+to|fallback[[:space:]]+(to|is))[[:space:]]+["'"'"'`]?[A-Z]{2,10}'
+literal_default_re='(default(ing)?[[:space:]]+to|fallback[[:space:]]+(to|is)|fall[[:space:]]+back[[:space:]]+to|use)[[:space:]]+["'"'"'`]?[A-Z]{2,10}'
 if [ -n "$stop_para" ] \
   && printf '%s' "$stop_para" | grep -qiE -- "$no_fallback_re" \
-  && ! printf '%s' "$stop_para" | grep -qiE -- "$literal_default_re"; then
+  && ! printf '%s' "$stop_para" | grep -qE -- "$literal_default_re"; then
   echo "PASS: STOP instruction — refine-feature.md has a co-located, no-fallback STOP paragraph"
 else
   echo "FAIL: STOP instruction — refine-feature.md has no co-located, no-fallback STOP paragraph"
