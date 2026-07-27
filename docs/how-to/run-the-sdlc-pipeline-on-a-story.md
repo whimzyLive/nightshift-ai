@@ -16,7 +16,7 @@ Drive one Jira story from a raw ticket to a merged PR. Two routes get you there:
 
 ## Prerequisites
 
-- `acli` authenticated against the Jira instance, and `gh` authenticated against the repo (both set up by `/sdlc:init`).
+- `acli` authenticated against the Jira instance, and `gh` authenticated against the repo (both set up by `/sdlc:init`). Every pipeline command re-verifies acli's active site against this repo's configured `Jira site` (in `project-context.md`) before each Jira call and switches automatically if they differ, so it is safe to keep more than one acli account signed in — but an account must exist for this repo's site. If none does, a command stops with `run: acli jira auth login --site <site>`.
 - A Jira story key (e.g. `NA-123`). A Bug key also works and routes to the defect path automatically.
 - Story points set on the story. Routing depends on them: `<= 3` points (inclusive, per-repo threshold) triages **lightweight**, above triages **full**. A Bug needs no points (it forces lightweight).
 - For `/sdlc:auto` to auto-merge unattended, the story's **AI Workflow** field set to `Full Auto`. Any other value (or unset) drives the PR to review-clean and leaves it open for a human merge.
