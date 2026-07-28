@@ -56,11 +56,12 @@ pnpm nx build marketing && pnpm nx start marketing
 
 ## Deployment (Vercel)
 
-No `vercel.json` — Vercel auto-detects Next.js.
+Vercel auto-detects Next.js; `vercel.json` only restricts which branches deploy
+(see [Branch filtering](#branch-filtering) below).
 
 1. **Import the repo** into Vercel. For this monorepo, set the project **Root
-   Directory** to `apps/marketing`, or keep the repo root and set the build
-   command to `pnpm nx build marketing`.
+   Directory** to `apps/marketing` — `vercel.json` is read from the Root
+   Directory, so it must move with it if that setting ever changes.
 2. **Environment variables** (all environments):
    - `DATABASE_URL` → Neon **prod** branch, **pooled** connection string
      (serverless-safe).
@@ -74,6 +75,37 @@ No `vercel.json` — Vercel auto-detects Next.js.
    (or run the migrate target via a Vercel deploy hook / one-off job).
 4. **Seed prod once** — run `pnpm nx seed marketing` against the prod
    `DATABASE_URL` a single time (idempotent, so re-deploys are safe).
+
+### Branch filtering
+
+`apps/marketing/vercel.json` limits automatic deployments to `main` and
+`develop`:
+
+```json
+{
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "*": false,
+      "main": true,
+      "develop": true
+    }
+  }
+}
+```
+
+Branch keys are [minimatch](https://github.com/isaacs/minimatch) patterns, and a
+branch matching **any** `true` rule deploys. `*` does not cross `/`, so both `*`
+(e.g. `main`-style names) and `**` (e.g. `feat/NA-1`) are needed to catch
+everything before the two allow rules re-enable them.
+
+Two consequences worth knowing:
+
+- Vercel reads `vercel.json` **from the commit being deployed**, so a branch
+  only stops deploying once it contains this file. Branches cut before it landed
+  keep deploying until rebased onto `develop`.
+- This blocks _automatic_ Git deployments only. `vercel deploy` and deploy hooks
+  still work from any branch.
 
 ## Notes
 

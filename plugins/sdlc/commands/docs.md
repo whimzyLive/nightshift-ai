@@ -138,11 +138,11 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
    ```
 
    `SEED_TYPES` is resolved **at read time** from `refs/doc-types.md`'s `trigger` cells, minus `adr`
-   — see `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §15. The enumerated list in this message is
+   — see `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-seed.md` §15. The enumerated list in this message is
    **rendered from the resolved `SEED_TYPES`**, never typed as a literal — otherwise it becomes the
    hardcoded copy the derivation rule exists to avoid. **This file is `command-reference`
    source-of-truth** (`refs/doc-types.md`'s `command-reference` row) — the generated reference page
-   now derives only from this file's frontmatter plus a link back here (`refs/docs-pipeline.md` §3
+   now derives only from this file's frontmatter plus a link back here (`refs/docs-pipeline-core.md` §3
    steps 1–2, never a body copy), so a stale literal here would no longer leak into that published
    page, but it would still mislead every reader who follows the Source link to see this file's real
    runtime behavior, and it would still be logic that silently drifts from the registry. The
@@ -152,7 +152,7 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
 
 9. **`seed` `<topic>`, when supplied, is validated and normalised here — at the ladder, before any
    gate.** The slugify rule and its **three** reachable STOPs (empty / >80 chars / reserved page id)
-   are defined once in `refs/docs-pipeline.md` §15 and are **not** restated here. This placement is
+   are defined once in `refs/docs-pipeline-seed.md` §15 and are **not** restated here. This placement is
    the direct lesson from NA-53, where a version token that forms a branch name reached the gate
    unvalidated. **`<topic>` omitted is NOT an error** (the signature is `[topic]`) — the command
    prompts for it, but **after** the manifest and type-activation gates, so a repo with nothing to
@@ -177,13 +177,13 @@ Parse `$ARGUMENTS` into `<mode>` (the first token) and the mode's remaining args
 
 The procedure — the two-phase dispatch split, the deterministic regen algorithm, the voice/format
 resolution chain, the `source:` refresh convention, and the no-op/change-gate semantics — is
-defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md`; this command owns only the flow
+defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md`; this command owns only the flow
 around the founder-confirmation gate (a dispatched subagent cannot itself pause for it), the
 argument validation above, and the gates below that decide whether `knowledge-engineer` is
 dispatched at all.
 
 1. **Manifest gate (AC5).** Shared with `release` — defined **once** in
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit` (the
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#manifest-gate-shared-by-sync-release-seed-and-audit` (the
    base-ref resolution pre-check that runs **before** the manifest read — an unresolvable
    `origin/<BASE-BRANCH>` is a STOP, never mistaken for "manifest absent" — then the
    checkout-independent `git show`, then the silent no-op on genuine absence). This command does not
@@ -203,14 +203,14 @@ dispatched at all.
 
    - **Neither `origin/feat/<STORY-KEY>` nor `origin/fix/<STORY-KEY>` exists** → select the
      **merged-commit** diff source per
-     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#26-dual-diff-source--selection-rule`: locate the
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-postqa.md#26-dual-diff-source--selection-rule`: locate the
      commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>` (the `PROJECT_KEYS`-scoped regex from
-     §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
+     `docs-pipeline-release.md` §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
      (`<sha>^..<sha>`, or the union across matches). **Zero commits carry the key** → STOP with
      `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`
      (never a silent no-op). `git fetch` failure / unresolvable `origin/<BASE-BRANCH>` → STOP.
      `STORY_BRANCH` stays empty; set `REGEN_TREE_REF=origin/<BASE-BRANCH>`
-     (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#2-two-phase-dispatch-split-across-the-confirmation-boundary`
+     (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#2-two-phase-dispatch-split-across-the-confirmation-boundary`
      step 2 — base HEAD already contains the landed commit(s), so it is the tree the regen reads
      from and the tree Phase 2 checks out from).
 
@@ -218,13 +218,13 @@ dispatched at all.
    - **`STORY_BRANCH` resolved** (the common case) → pass `STORY_BRANCH`, `origin/<BASE-BRANCH>`
      (the **remote-tracking** base ref from project-context, not the bare local branch name — a
      stale local checkout must never skew the diff), and the story key. Per
-     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2 step 3, phase 1 **computes**
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md` §2 step 3, phase 1 **computes**
      `CHANGED_FILES`/`CHANGED_DIFF` from `origin/<BASE-BRANCH>...$STORY_BRANCH` itself;
      `REGEN_TREE_REF=$STORY_BRANCH` (§2 step 2).
    - **`STORY_BRANCH` empty — merged-commit path selected** (previous step) → pass the
      **precomputed** `CHANGED_FILES`/`CHANGED_DIFF` (already derived from the merged range above)
      and `REGEN_TREE_REF=origin/<BASE-BRANCH>` instead. Per
-     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2 step 3, phase 1 uses these **verbatim** — it
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md` §2 step 3, phase 1 uses these **verbatim** — it
      does **not** recompute from `$STORY_BRANCH` (there is none to diff against). This is the fix
      that makes the merged-commit path actually regenerate — a bare `STORY_BRANCH`-only dispatch
      here would diff against nothing and silently no-op.
@@ -260,14 +260,14 @@ dispatched at all.
 ## `release <version>` — shared pipeline split across the dispatch boundary
 
 The release run mirrors `sync`'s two-phase dispatch and command-layer founder-confirm gate. The
-shared skeleton lives in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2, and the release-specific
+shared skeleton lives in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md` §2, and the release-specific
 procedure — enumeration, aggregation, upsert, ADR-link resolution, branch/PR control flow, no-op
-semantics — is defined once in that ref's **§§10–14**. This command owns only the gates below, the
+semantics — is defined once in `refs/docs-pipeline-release.md`'s **§§10–14**. This command owns only the gates below, the
 argument validation above, and the founder-confirm gate between the two dispatches.
 
 1. **Manifest gate (AC6).** Shared with `sync` — same pointer, same mechanics: see step 1 of the
    `sync` procedure above,
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`. The
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#manifest-gate-shared-by-sync-release-seed-and-audit`. The
    base-ref resolution pre-check runs first (an unresolvable `origin/<BASE-BRANCH>` STOPs — it is
    never mistaken for "manifest absent"), then the checkout-independent `git show`, then the silent
    no-op on genuine absence. Do not dispatch `knowledge-engineer` on either exit path.
@@ -292,7 +292,7 @@ argument validation above, and the founder-confirm gate between the two dispatch
      `migration-guide` must never have those pages drafted, shown, or created. `ENABLED_ROWS =
 {changelog}` produces exactly one artifact, one gate item, one written page.
 
-3. **Resolve the last tag and the merged-story set.** Per `refs/docs-pipeline.md` §10 — the base-ref
+3. **Resolve the last tag and the merged-story set.** Per `refs/docs-pipeline-release.md` §10 — the base-ref
    pre-check, the **positive shallow-clone pre-check**, the `No names found`-only fallthrough, the
    **single-ended** no-tags range, the RS/US delimited `git log` format and its parse rules, and the
    story-key regex scoped to the `PROJECT_KEYS` set (primary key + manifest-configured additional
@@ -302,7 +302,7 @@ argument validation above, and the founder-confirm gate between the two dispatch
    **Compute the out-of-scope key warning (AC3) — only when `PROJECT_KEYS ≠ ∅`.** Over the same
    `(subject, body)` records §10 enumerated (no second scan), compute `OUT_OF_SCOPE` and its
    `LIKELY_KEYS` / `STANDARDS_MATCHES` partition per
-   `refs/docs-pipeline.md` §10's `### Out-of-scope key warning`. When `PROJECT_KEYS = ∅` (State A),
+   `refs/docs-pipeline-release.md` §10's `### Out-of-scope key warning`. When `PROJECT_KEYS = ∅` (State A),
    **skip this entirely** — nothing is out-of-scope; never route `∅` into a suppressing no-op. **The
    warning fires iff `LIKELY_KEYS ≠ ∅` — never merely `OUT_OF_SCOPE ≠ ∅`.** `OUT_OF_SCOPE` also
    contains `STANDARDS_MATCHES`, and a range whose only out-of-scope tokens are standards-prefixed
@@ -397,10 +397,10 @@ To include them, <section-aware remediation>, then re-run `release <version>`.
 ## `seed <type> [topic]` — shared pipeline split across the dispatch boundary
 
 The seed run mirrors `sync`/`release`'s two-phase dispatch and command-layer founder-confirm gate.
-The shared skeleton lives in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §2, and the seed-specific
+The shared skeleton lives in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md` §2, and the seed-specific
 procedure — type resolution, the topic/slug ladder, `PAGE` construction, the gate ladder, page
-artifacts, branch/PR control flow, no-op and re-run semantics — is defined once in that ref's
-**§§15–19**. This command owns only the gates below, the argument validation above, and the
+artifacts, branch/PR control flow, no-op and re-run semantics — is defined once in
+`refs/docs-pipeline-seed.md`'s **§§15–19**. This command owns only the gates below, the argument validation above, and the
 founder-confirm gate between the two dispatches.
 
 **The ordering below is load-bearing.** Everything through step 5 runs **before the founder authors
@@ -411,13 +411,13 @@ already available is hoisted ahead of the gate.
 1. **Argument validation** — the ladder above, including a supplied `<topic>`.
 
 2. **Manifest gate (AC5).** Shared with `sync` and `release` — defined once at
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#manifest-gate-shared-by-sync-release-seed-and-audit`
    (base-ref resolution pre-check → checkout-independent `git show` → silent no-op on genuine
    absence). **Not re-derived here**; `seed` is its third consumer. If **absent** → **silent no-op**:
    no prompt, no branch, no dispatch, no PR, no error, **no stdout**, exit 0. Do not dispatch
    `knowledge-engineer`.
 
-3. **Type-activation gate (AC2)** — per `refs/docs-pipeline.md` §16 step 3. Resolve `SEED_ROW` from
+3. **Type-activation gate (AC2)** — per `refs/docs-pipeline-seed.md` §16 step 3. Resolve `SEED_ROW` from
    the manifest; the type is activated iff its row is **present** **and** `enabled = true`.
    **Absent is never activated — never infer a missing row as enabled.** Not activated → print
    `doc type "<type>" is not activated in .claude/project/docs-manifest.md — nothing seeded`
@@ -429,7 +429,7 @@ already available is hoisted ahead of the gate.
    input — and run the **identical** §15 ladder on the answer. Placed **after** gates 2–3 so a repo
    with no manifest is never prompted before its silent no-op.
 
-5. **Page-exists + branch-state gate — all of it pre-gate** (`refs/docs-pipeline.md` §16 step 5).
+5. **Page-exists + branch-state gate — all of it pre-gate** (`refs/docs-pipeline-seed.md` §16 step 5).
    Construct `PAGE` by **normalising the trailing slash before joining** — every registry
    `target-path` ends in `/`, so a naive join makes this gate **fail open** and phase 2 overwrite a
    published page (§16 carries the verified rationale). Check it checkout-independently at
@@ -449,7 +449,7 @@ already available is hoisted ahead of the gate.
    `sync`/`release`, where the gate mostly confirms machine-derived content, here the gate **is the
    authoring surface**, and heavy editing is the expected path.
    - **Validate the confirmed content HERE, at the gate, while it still exists** — specifically the
-     required `title` + `description` frontmatter (`refs/docs-pipeline.md` §17). **Not deferred to
+     required `title` + `description` frontmatter (`refs/docs-pipeline-seed.md` §17). **Not deferred to
      phase 2**: phase 2 is a fresh dispatch holding an opaque payload, so a check there can only STOP
      — it cannot ask the founder to fix the missing line — converting a one-line correction into the
      loss of a whole authored page.
@@ -475,7 +475,7 @@ already available is hoisted ahead of the gate.
 Unlike `sync`/`release`/`seed`, `audit` has **no founder-confirm gate** and therefore **no two-phase
 dispatch split** — its `auto`-row corrections are un-gated and its narrative findings are flags, not
 writes. It collapses to a **single** `knowledge-engineer` dispatch. The full procedure is defined
-once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§20–24**; this command owns only the
+once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-audit.md` **§§20–24**; this command owns only the
 manifest gate, the flag ladder above, the single dispatch, and the report/PR surfacing.
 
 ```text
@@ -487,7 +487,7 @@ manifest gate, the flag ladder above, the single dispatch, and the report/PR sur
 1. **Argument validation** — the flag ladder above.
 
 2. **Manifest gate (AC5).** Shared — defined once at
-   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#manifest-gate-shared-by-sync-release-seed-and-audit`
+   `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#manifest-gate-shared-by-sync-release-seed-and-audit`
    (base-ref pre-check → checkout-independent resolution → silent no-op on genuine absence). `audit`
    is its **fourth** consumer; not re-derived here. If **absent** → **silent no-op**: no scan, no
    dispatch, no PR, no error, **no stdout**, exit 0 — for **both** `audit` and `audit --dry-run`.
@@ -536,12 +536,12 @@ restated here.
 Full contract (cut point, commit string + trailer, PR base, local-branch precondition, both re-run
 guards — including the prohibition on `reset --hard` / force-push, a deliberate divergence from §7
 — and the control-flow tail) is defined once in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow` — this
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-release.md#13-release-mode--branch--pr--control-flow` — this
 command does not re-derive it.
 
 ## Seed branch/PR naming
 
-Defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §18. In summary: branch
+Defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-seed.md` §18. In summary: branch
 `docs/seed-<type>-<SLUG>` (the **normalised** slug) cut from `origin/<BASE-BRANCH>` head — **not** a
 story branch; commit and PR title `docs(docs): seed <type> <SLUG>`, carrying the trailer
 `Seed-Generated: <type>/<SLUG>` that both re-run guards key on; PR base `<BASE-BRANCH>` from
@@ -565,7 +565,7 @@ command owns it, exactly as it owns the gate for the `seed adr` and `distill` ro
 
 Full contract (cut-point detail, commit string, PR base, re-run open-or-update behaviour, diff
 source) is defined once in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` — this command does
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#7-branch--pr-naming--control-flow` — this command does
 not re-derive it.
 
 ## `llms.txt` format (v1 decision)
@@ -573,7 +573,7 @@ not re-derive it.
 Index-only, grouped by Diátaxis quadrant, content matching the `llms-txt` row's `source-of-truth`
 cell in `refs/doc-types.md` — see that cell rather than this restating it. Regenerated every run
 (AC4), committed only if changed (AC6). Full format decision:
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#8-llmstxt-format-v1-decision`.
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#8-llmstxt-format-v1-decision`.
 
 ## Command control flow
 
@@ -589,9 +589,9 @@ If the harness cannot nest `/loop` from inside a command, fall back to `Schedule
 let its final pass release. If the command hit a terminal STOP, WARNING, or no-op before a PR was
 raised, release the session directly via `${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` — for
 exactly which pre-PR exit paths this covers, see the invoked mode's own control-flow tail:
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` for `sync`,
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow` for
-`release`, or `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#18-seed-mode--branch--pr--control-flow`
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#7-branch--pr-naming--control-flow` for `sync`,
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-release.md#13-release-mode--branch--pr--control-flow` for
+`release`, or `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-seed.md#18-seed-mode--branch--pr--control-flow`
 for `seed` — each lists a different pre-PR exit set (`sync`'s WARNING/no-op pair is not `release`'s
 or `seed`'s no-op/STOP set).
 

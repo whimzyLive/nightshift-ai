@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """docs_sync_fixture_gen.py — minimal, deterministic stand-in for the /sdlc:docs sync
-resolver (refs/docs-pipeline.md §3), used only by docs-sync-fixtures.test.sh to prove the
-activation-gated, family-resolved shape described in refs/doc-types.md and refs/docs-pipeline.md
+resolver (refs/docs-pipeline-core.md §3), used only by docs-sync-fixtures.test.sh to prove the
+activation-gated, family-resolved shape described in refs/doc-types.md and refs/docs-pipeline-core.md
 against the three fixture repos (NA-65). This is a TEST HELPER, not the production algorithm —
-the real algorithm is prose executed inline by the knowledge-engineer agent (see docs-pipeline.md's
+the real algorithm is prose executed inline by the knowledge-engineer agent (see docs-pipeline-core.md's
 "instructions not code" standing style). It implements just enough of the resolver ladder
 (contract -> source -> scan -> skip) to be exercised mechanically and diffed against a committed
 snapshot.
