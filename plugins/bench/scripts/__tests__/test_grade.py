@@ -785,3 +785,110 @@ class TestArchiveBlindInputs(unittest.TestCase):
         grade.archive_blind_inputs({"artifacts": str(artifacts)}, blind)
         target = grade.archive_blind_inputs({"artifacts": str(artifacts)}, blind)
         self.assertTrue((target / "diff.patch").exists())
+
+
+class TestPlanRegexWordBoundary(unittest.TestCase):
+    """CHANGE 4: the *plan*.md strip regex false-positives on real filenames.
+
+    `explanation.md` is a real Diataxis filename in this repo, so stripping it
+    silently deletes deliverable content from the graded diff.
+    """
+
+    def _diff(self, path):
+        return (
+            "diff --git a/{0} b/{0}\n"
+            "index 111..222 100644\n"
+            "--- a/{0}\n"
+            "+++ b/{0}\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        ).format(path)
+
+    def _stripped(self, path):
+        return path not in grade.filter_diff(self._diff(path))
+
+    def test_explanation_md_is_not_stripped(self):
+        self.assertFalse(self._stripped("docs/concepts/explanation.md"))
+
+    def test_planner_md_is_not_stripped(self):
+        self.assertFalse(self._stripped("src/planner.md"))
+
+    def test_planet_md_is_not_stripped(self):
+        self.assertFalse(self._stripped("docs/planet.md"))
+
+    def test_bare_plan_md_is_still_stripped(self):
+        self.assertTrue(self._stripped("plan.md"))
+
+    def test_hyphenated_plan_doc_is_still_stripped(self):
+        self.assertTrue(self._stripped("docs/2026-01-01-thing-plan.md"))
+
+    def test_underscored_plan_doc_is_still_stripped(self):
+        self.assertTrue(self._stripped("notes/my_plan.md"))
+
+    def test_suffixed_plan_doc_is_still_stripped(self):
+        self.assertTrue(self._stripped("plan-2.md"))
+
+    def test_plans_plural_is_still_stripped(self):
+        self.assertTrue(self._stripped("plans.md"))
+
+
+class TestFilteredDiffStatus(unittest.TestCase):
+    """CHANGE 4: a non-empty raw diff that filters down to nothing must fail
+    loudly, not be graded as an empty patch.
+
+    measure.py computes empty_diff from the RAW numstat, so a cell whose
+    deliverable lives entirely under a stripped path yields
+    `empty_diff: false` and an empty `diff.patch`. The three graders then
+    honestly report 0 findings and unmet ACs, and the report prints `OK`.
+    """
+
+    RAW = (
+        "diff --git a/.claude/settings.json b/.claude/settings.json\n"
+        "--- a/.claude/settings.json\n"
+        "+++ b/.claude/settings.json\n"
+        "@@ -1 +1 @@\n"
+        "-old\n"
+        "+new\n"
+    )
+
+    def test_raw_non_empty_but_filtered_empty_is_not_ok(self):
+        status = grade.filtered_diff_status(self.RAW)
+        self.assertFalse(status["ok"])
+        self.assertTrue(status["filtered_diff_empty"])
+        self.assertFalse(status["raw_diff_empty"])
+
+    def test_note_names_the_stripped_paths(self):
+        status = grade.filtered_diff_status(self.RAW)
+        self.assertIn(".claude/settings.json", status["note"])
+
+    def test_a_real_code_change_is_ok(self):
+        raw = (
+            "diff --git a/src/app.ts b/src/app.ts\n"
+            "--- a/src/app.ts\n"
+            "+++ b/src/app.ts\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+        status = grade.filtered_diff_status(raw)
+        self.assertTrue(status["ok"])
+        self.assertFalse(status["filtered_diff_empty"])
+
+    def test_empty_raw_diff_is_measures_problem_not_ours(self):
+        """An empty RAW diff is already caught by measure.py as empty_diff.
+        This check is only for the case measure cannot see."""
+        status = grade.filtered_diff_status("")
+        self.assertTrue(status["raw_diff_empty"])
+        self.assertTrue(status["ok"])
+
+    def test_whitespace_only_filtered_output_counts_as_empty(self):
+        raw = (
+            "diff --git a/docs/adr/0001-x.md b/docs/adr/0001-x.md\n"
+            "--- a/docs/adr/0001-x.md\n"
+            "+++ b/docs/adr/0001-x.md\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+        self.assertFalse(grade.filtered_diff_status(raw)["ok"])

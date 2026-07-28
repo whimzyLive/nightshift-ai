@@ -73,8 +73,19 @@ STRIP_PATTERNS = [
 # Path patterns that a plain substring cannot express. Plan documents are
 # the clearest example: they live under many different roots and carry many
 # different names, and every one of them is a process tell.
+#
+# The plan-document pattern is anchored on WORD boundaries rather than bare
+# substring containment. `[^/]*plan[^/]*\.md$` matched `explanation.md`,
+# `planner.md` and `planet.md` -- and `explanation.md` is a real Diataxis
+# filename in this repository, so the old pattern silently deleted
+# deliverable content from the graded diff and then let three graders
+# honestly report that the criteria it satisfied were unmet.
+#
+# A plan document's name has `plan`/`plans` as a whole word: `plan.md`,
+# `implementation-plan.md`, `my_plan.md`, `plan-2.md`, `plans.md`. Separators
+# are `-`, `_` or `.`, which is what the boundary groups below express.
 STRIP_REGEXES = [
-    re.compile(r"(^|/)[^/]*plan[^/]*\.md$", re.IGNORECASE),
+    re.compile(r"(^|/)([^/]*[-_.])?plans?([-_.][^/]*)?\.md$", re.IGNORECASE),
     re.compile(r"(^|/)plans?/", re.IGNORECASE),
 ]
 
@@ -160,6 +171,13 @@ def _redact_approach_tokens(line: str) -> str:
     return line
 
 
+def _is_stripped_path(path: str) -> bool:
+    """Whether this file's diff section is a process artifact to be dropped."""
+    return any(pattern in path for pattern in STRIP_PATTERNS) or any(
+        pattern.search(path) for pattern in STRIP_REGEXES
+    )
+
+
 def filter_diff(diff_text: str) -> str:
     """Drop process-artifact file sections, identifying trailers, and
     approach-identifying content tokens from surviving lines."""
@@ -168,16 +186,72 @@ def filter_diff(diff_text: str) -> str:
     for line in diff_text.splitlines():
         path = _diff_header_path(line)
         if path is not None:
-            keeping = not (
-                any(pattern in path for pattern in STRIP_PATTERNS)
-                or any(pattern.search(path) for pattern in STRIP_REGEXES)
-            )
+            keeping = not _is_stripped_path(path)
         if not keeping:
             continue
         if _TRAILER.match(line):
             continue
         out.append(_redact_approach_tokens(line))
     return "\n".join(out)
+
+
+def stripped_paths(diff_text: str) -> List[str]:
+    """The file paths whose diff sections filter_diff drops, in diff order."""
+    return [
+        path
+        for path in (_diff_header_path(line) for line in diff_text.splitlines())
+        if path is not None and _is_stripped_path(path)
+    ]
+
+
+def filtered_diff_status(raw_diff: str) -> Dict[str, object]:
+    """Detect a cell whose whole deliverable was stripped before grading.
+
+    measure.py computes `empty_diff` from the RAW numstat, so it cannot see
+    this case: a cell whose changes live entirely under a stripped path
+    (`.claude/`, `.superpowers/`, `docs/adr/`, a plan document, ...) reports
+    `empty_diff: false` and still writes an EMPTY `diff.patch`. The three
+    graders then honestly report 0 findings and unmet ACs against nothing,
+    and the report prints a clean `OK` row. Grading an empty patch produces a
+    number that looks like a measurement and is not one, so it must fail
+    loudly instead.
+
+    An empty RAW diff is explicitly NOT this failure -- measure.py already
+    catches that as `empty_diff` and says so more precisely.
+    """
+    raw_empty = not raw_diff.strip()
+    filtered_empty = not filter_diff(raw_diff).strip()
+    dropped = stripped_paths(raw_diff)
+
+    ok = raw_empty or not filtered_empty
+    note = ""
+    if not ok:
+        note = (
+            "nothing gradable: the cell's diff is non-empty but every changed path "
+            "was stripped as a process artifact before grading, leaving an empty "
+            "patch. Stripped paths: {0}. Grading this would produce 0 findings and "
+            "unmet ACs against nothing, which reads as a clean result and is not "
+            "one. The cell's real output, if any, is in its worktree and "
+            "artifacts.".format(", ".join(dropped) if dropped else "(none recorded)")
+        )
+
+    return {
+        "ok": ok,
+        "raw_diff_empty": raw_empty,
+        "filtered_diff_empty": filtered_empty,
+        "stripped_paths": dropped,
+        "note": note,
+    }
+
+
+def raw_cell_diff(cell: dict) -> str:
+    """`git diff base_sha HEAD` in the cell's worktree, unfiltered."""
+    return subprocess.run(
+        ["git", "-C", cell["worktree"], "diff", cell["base_sha"], "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
 
 
 def cell_hash(cell: dict) -> str:
@@ -375,12 +449,7 @@ def build_blind_dir(cell: dict, story: dict, base: Path) -> Path:
     target = base / cell_hash(cell)
     target.mkdir(parents=True, exist_ok=True)
 
-    diff = subprocess.run(
-        ["git", "-C", cell["worktree"], "diff", cell["base_sha"], "HEAD"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    diff = raw_cell_diff(cell)
     numbered_acs, _ = number_acceptance_criteria(story["acs"])
     (target / "diff.patch").write_text(filter_diff(diff))
     (target / "acs.md").write_text(numbered_acs)
@@ -557,6 +626,31 @@ def main(argv: Optional[list] = None) -> int:
 
     numbered_acs, ac_ids = number_acceptance_criteria(story["acs"])
 
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    # Checked BEFORE any grader runs. A patch that filtered down to nothing
+    # cannot be graded into a meaningful number, and three grader
+    # invocations spent discovering that is three wasted.
+    diff_status = filtered_diff_status(raw_cell_diff(cell))
+    if not diff_status["ok"]:
+        out.write_text(
+            json.dumps(
+                {
+                    "graded": False,
+                    "filtered_diff_empty": True,
+                    "filtered_diff_note": diff_status["note"],
+                    "stripped_paths": diff_status["stripped_paths"],
+                    "acs": {},
+                    "ac_ids": ac_ids,
+                    "grader_count": 0,
+                },
+                indent=2,
+            )
+        )
+        print("FAILED CELL: " + str(diff_status["note"]))
+        return 1
+
     # Built in an isolated temp root outside every repository, then archived
     # under the cell's artifacts. The grader only ever sees the temp copy.
     blind_dir = build_blind_dir(cell, story, blind_base_dir(cell))
@@ -573,8 +667,8 @@ def main(argv: Optional[list] = None) -> int:
     reduced["grader_failures"] = result["failures"]
     reduced["grader_failure_count"] = len(result["failures"])
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    reduced["graded"] = True
+    reduced["filtered_diff_empty"] = False
     out.write_text(json.dumps(reduced, indent=2))
     met = sum(1 for ac in reduced["acs"].values() if ac["met"])
     print(f"graded {blind_dir.name}: {met}/{len(reduced['acs'])} ACs met, "

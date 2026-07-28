@@ -459,3 +459,36 @@ class TestCutOffRendering(unittest.TestCase):
     def test_no_auto_resume_is_stated(self):
         out = report.render_markdown("NA-80", [self._cut_off_run()])
         self.assertIn("re-run", out.lower())
+
+
+class TestNoPatchRendering(unittest.TestCase):
+    """CHANGE 4: a cell whose filtered diff was empty must surface distinctly
+    and must never render as a clean OK row with 0 findings."""
+
+    def _no_patch_run(self):
+        run = copy.deepcopy(RUN)
+        run["grades"] = {
+            "filtered_diff_empty": True,
+            "filtered_diff_note": "every changed path was stripped: .claude/settings.json",
+            "acs": {},
+            "findings_count": 0,
+        }
+        return run
+
+    def test_status_is_distinct(self):
+        out = report.render_markdown("NA-80", [self._no_patch_run()])
+        self.assertIn("| NO PATCH", out)
+
+    def test_acs_and_findings_are_not_rendered_as_clean_zeroes(self):
+        out = report.render_markdown("NA-80", [self._no_patch_run()])
+        row = [l for l in out.split("\n") if l.startswith("| NO PATCH")][0]
+        self.assertNotIn("0/0", row)
+
+    def test_footnote_explains_and_names_the_paths(self):
+        out = report.render_markdown("NA-80", [self._no_patch_run()])
+        self.assertIn("Nothing gradable", out)
+        self.assertIn(".claude/settings.json", out)
+
+    def test_ordinary_run_is_unaffected(self):
+        out = report.render_markdown("NA-80", [RUN])
+        self.assertNotIn("NO PATCH", out)

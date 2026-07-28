@@ -124,7 +124,9 @@ For each approach, in the order given:
      --out docs/benchmarks/<TICKET>/<APPROACH>/grades.json
    ```
 
-   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage spends money (grader invocations). Never auto-retry without explicit founder confirmation.
+   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage spends grader invocations. Never auto-retry without explicit founder confirmation.
+
+   **A non-zero exit with `FAILED CELL: nothing gradable`** means the cell's diff was non-empty but every changed path was stripped as a process artifact, leaving the graders an empty patch. No graders were invoked. `grades.json` records `filtered_diff_empty: true` and the stripped paths; the report renders the row as `NO PATCH` with its quality columns as `—` and its cost columns intact. Surface it to the founder — it usually means the ticket's deliverable lives entirely under a stripped path and is not a suitable benchmark subject.
 
 Then render the report once, across every approach that ran:
 

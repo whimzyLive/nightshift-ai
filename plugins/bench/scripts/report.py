@@ -99,6 +99,11 @@ def phase_rows(runs: List[dict]) -> List[dict]:
                 "termination_observed": term.get("observed") or {},
                 "termination_violations": term.get("violations") or [],
                 "rate_limit_entries": term.get("rate_limit_entries") or [],
+                # grade.py refused to grade: the raw diff was non-empty but
+                # every changed path was stripped as a process artifact.
+                "filtered_diff_empty": bool(grades.get("filtered_diff_empty")),
+                "filtered_diff_note": grades.get("filtered_diff_note", ""),
+                "stripped_paths": grades.get("stripped_paths") or [],
             }
         )
     return rows
@@ -188,14 +193,15 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         "Cost is split by phase. `impl-only` is the comparable figure across approaches;",
         "`review + fix` and `ceremony` are what the process-heavy approaches additionally buy.",
         "",
-        "| Status  | Approach            | impl-only API-eq $ | review + fix API-eq $ | ceremony API-eq $ | total API-eq $ | Regressions | ACs met   | findings | wall clock |",
-        "| ------- | ------------------- | -----------------: | --------------------: | ----------------: | -------------: | ----------- | --------- | -------- | ---------- |",
+        "| Status   | Approach            | impl-only API-eq $ | review + fix API-eq $ | ceremony API-eq $ | total API-eq $ | Regressions | ACs met   | findings | wall clock |",
+        "| -------- | ------------------- | -----------------: | --------------------: | ----------------: | -------------: | ----------- | --------- | -------- | ---------- |",
     ]
 
     failed_notes = []
     unattributed_notes = []
     empty_diff_notes = []
     cut_off_notes = []
+    no_patch_notes = []
     for i, row in enumerate(rows):
         # Four independent reasons a row's numbers cannot be shown as-is.
         # Order matters only for the status label; the em dashes are the
@@ -210,6 +216,8 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             status = "CUT OFF"
         elif row["empty_diff"]:
             status = "NO DIFF"
+        elif row["filtered_diff_empty"]:
+            status = "NO PATCH"
         elif not row["reconciled"]:
             status = "FAILED"
         elif not row["attribution_available"]:
@@ -234,7 +242,10 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         total_str = "—" if not row["termination_clean"] else "{:.2f}".format(row["total"])
 
         regressions_str = "yes" if row["regressions"] else "no"
-        if row["empty_diff"] or not row["termination_clean"]:
+        # The COST columns stay valid for a NO PATCH row -- the session ran
+        # and its spend was measured; what is missing is anything gradable.
+        # Only the quality columns are meaningless.
+        if row["empty_diff"] or not row["termination_clean"] or row["filtered_diff_empty"]:
             # 0 findings against an empty or partial diff is not a clean
             # result; it is a grader with nothing to grade. Never render it
             # as 0.
@@ -247,7 +258,7 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             findings_str = str(row["findings"])
 
         lines.append(
-            "| {0:<7} | {1:<19} | {2:>18} | {3:>21} | {4:>17} | {5:>14} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
+            "| {0:<8} | {1:<19} | {2:>18} | {3:>21} | {4:>17} | {5:>14} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
                 status,
                 row["approach"],
                 impl_str,
@@ -263,6 +274,8 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
 
         if not row["termination_clean"]:
             cut_off_notes.append(row)
+        if row["filtered_diff_empty"]:
+            no_patch_notes.append(row)
         if not row["reconciled"]:
             failed_notes.append((row["approach"], row["reconciliation_note"]))
         if not row["attribution_available"]:
@@ -345,6 +358,30 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
                 )
             if not row["termination_violations"] and row["termination_note"]:
                 lines.append("  - {0}".format(row["termination_note"]))
+
+    # Footnotes for cells with nothing gradable left after filtering
+    if no_patch_notes:
+        lines += [
+            "",
+            "## Nothing gradable — the filtered patch was empty",
+            "",
+            "These cells produced a **non-empty** diff, but every changed path was stripped",
+            "as a process artifact (`.claude/`, `.superpowers/`, `docs/adr/`, plan documents,",
+            "...) before grading, leaving the graders an empty patch. Grading that yields 0",
+            "findings and unmet ACs against nothing, which reads as a clean result and is",
+            "not one — so these cells were **not graded** and their quality columns show `—`.",
+            "",
+            "Their **cost columns remain valid**: the session ran and its spend was measured.",
+            "What is missing is any code change to judge. The usual cause is a cell whose",
+            "whole deliverable legitimately lives under a stripped path — in which case this",
+            "ticket is not a suitable benchmark subject for the blinding rules in force.",
+            "",
+        ]
+        for row in no_patch_notes:
+            note = row["filtered_diff_note"] or (
+                "the raw diff was non-empty but filtered down to nothing."
+            )
+            lines.append("- **{0}**: {1}".format(row["approach"], note))
 
     # Footnotes for failed reconciliation
     if failed_notes:
