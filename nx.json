@@ -84,7 +84,7 @@
     },
     "groups": {
       "plugins": {
-        "projects": ["sdlc", "gtm"],
+        "projects": ["sdlc", "gtm", "bench"],
         "projectsRelationship": "independent",
         "version": {
           "specifierSource": "conventional-commits",

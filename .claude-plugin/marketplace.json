@@ -17,6 +17,11 @@
       "name": "gtm",
       "source": "./plugins/gtm",
       "description": "GTM marketing plugin — Postiz-backed channel publishing and marketingskills-driven positioning, brief authoring, and marketing foundation bootstrap for Claude Code"
+    },
+    {
+      "name": "bench",
+      "source": "./plugins/bench",
+      "description": "Benchmark harness — measures cost and delivered quality for implementing the same ticket through multiple approaches"
     }
   ]
 }

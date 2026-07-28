@@ -1,0 +1,6 @@
+{
+  "name": "bench",
+  "version": "0.0.0",
+  "description": "Benchmark harness — measures cost and delivered quality for implementing the same ticket through multiple approaches. Reads per-repo config from .claude/project/project-context.md.",
+  "author": { "name": "nightshift" }
+}
