@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugins/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute versions and changelogs without committing, tagging, or publishing'
+        type: boolean
+        default: false
+      project:
+        description: 'Restrict the release to one project (default: every affected project in the plugins group)'
+        type: choice
+        default: all
+        options:
+          - all
+          - sdlc
+          - gtm
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Guard — release only from main
+        run: |
+          if [ "$GITHUB_REF_NAME" != "main" ]; then
+            echo "::error::Release must run from main, got '$GITHUB_REF_NAME'. nx resolves each project's current version from its git tag, so releasing off a branch that does not contain the release history re-resolves to the previous version and overwrites its GitHub release with an empty changelog."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Release affected projects
+        id: release
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          PROJECT: ${{ inputs.project }}
+        run: |
+          set -euo pipefail
+          args=(--yes)
+          [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
+          [ -n "${PROJECT:-}" ] && [ "${PROJECT}" != "all" ] && args+=(-p "${PROJECT}")
+          echo "running: pnpm nx release ${args[*]}"
+          pnpm nx release "${args[@]}"
+
+      - name: Summarise released tags
+        if: always()
+        run: |
+          {
+            echo "### Release"
+            echo
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "Dry run — nothing was committed, tagged, or published."
+              echo
+            fi
+            echo "Tags on this commit:"
+            echo
+            git tag --points-at HEAD | sed 's/^/- /' || true
+            echo
+            echo "Latest tag per project:"
+            echo
+            for p in sdlc gtm; do
+              latest=$(git tag --list "${p}@*" --sort=-v:refname | head -1)
+              echo "- ${p}: ${latest:-none}"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
