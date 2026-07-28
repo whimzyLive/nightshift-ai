@@ -41,7 +41,7 @@ def issue_summary(fields: dict) -> str:
     return fields.get("summary") or ""
 
 
-def _flatten_adf(node: Any, out: List[str]) -> None:
+def _flatten_adf(node: Any, out: List[str], depth: int = 0) -> None:
     if isinstance(node, dict):
         node_type = node.get("type")
 
@@ -53,17 +53,21 @@ def _flatten_adf(node: Any, out: List[str]) -> None:
         elif node_type == "hardBreak":
             out.append("\n")
 
-        # List item: special case with marker
+        # List item: special case with marker and depth-based indentation
         elif node_type == "listItem":
-            out.append("- ")
+            indent = "  " * depth
+            out.append(indent + "- ")
             for child in node.get("content", []) or []:
-                _flatten_adf(child, out)
+                _flatten_adf(child, out, depth)
             out.append("\n")
 
         # All other container nodes
         else:
+            # Lists should increment depth for their children
+            child_depth = depth + 1 if node_type in ("bulletList", "orderedList") else depth
+
             for child in node.get("content", []) or []:
-                _flatten_adf(child, out)
+                _flatten_adf(child, out, child_depth)
 
             # Block elements get double newline separator
             if node_type in ("paragraph", "heading", "codeBlock", "bulletList", "orderedList"):
@@ -71,7 +75,7 @@ def _flatten_adf(node: Any, out: List[str]) -> None:
 
     elif isinstance(node, list):
         for child in node:
-            _flatten_adf(child, out)
+            _flatten_adf(child, out, depth)
 
 
 def issue_description(fields: dict) -> str:

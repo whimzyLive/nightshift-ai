@@ -120,6 +120,57 @@ class TestFieldExtraction(unittest.TestCase):
         self.assertIn("- Item 1", result)
         self.assertIn("- Item 2", result)
 
+    def test_description_nested_bullet_list(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 1"}],
+                                },
+                                {
+                                    "type": "bulletList",
+                                    "content": [
+                                        {
+                                            "type": "listItem",
+                                            "content": [
+                                                {
+                                                    "type": "paragraph",
+                                                    "content": [
+                                                        {"type": "text", "text": "Nested"}
+                                                    ],
+                                                }
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 2"}],
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        # Nested item should be indented differently from siblings
+        self.assertIn("- Item 1", result)
+        self.assertIn("  - Nested", result)
+        self.assertIn("- Item 2", result)
+
 
 if __name__ == "__main__":
     unittest.main()
