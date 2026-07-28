@@ -9,57 +9,26 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchlib import acli, config  # noqa: E402
+
+
+class MissingAcceptanceCriteriaError(RuntimeError):
+    """No acceptance-criteria section could be extracted from the ticket.
+
+    Acceptance criteria are the benchmark's entire quality axis: they become
+    the prompt's AC block, acs.md, and the ACs met/total column on every
+    report row. Continuing with an empty block produces a run that looks
+    successful and scores 0/0 everywhere -- so this is fatal, not a warning.
+    """
+
 
 _AC_HEADING = re.compile(r"^\s*acceptance criteria\s*:?\s*$", re.IGNORECASE)
 _NEXT_HEADING = re.compile(
     r"^\s*(non-?goals?|notes?|prerequisites?|out of scope|objective|rollout|dependencies)\s*:?\s*$", re.IGNORECASE
 )
-
-
-def _flatten_adf_nodes(nodes: List[Any]) -> str:
-    """Flatten ADF nodes to plain text (minimal formatting)."""
-    parts = []
-    for node in nodes:
-        if isinstance(node, dict):
-            node_type = node.get("type")
-            if node_type == "text":
-                parts.append(node.get("text", ""))
-            elif node_type == "hardBreak":
-                parts.append("\n")
-            elif node_type == "paragraph":
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-                parts.append("\n")
-            elif node_type == "heading":
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-                parts.append("\n")
-            elif node_type in ("bulletList", "orderedList", "taskList"):
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-            elif node_type == "listItem":
-                parts.append("- ")
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-                parts.append("\n")
-            elif node_type == "taskItem":
-                parts.append("- ")
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-                parts.append("\n")
-            elif node_type == "codeBlock":
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-                parts.append("\n")
-            else:
-                # Generic container: just process children
-                for child in node.get("content", []) or []:
-                    parts.append(_flatten_adf_nodes([child]))
-    return "".join(parts)
 
 
 def _extract_heading_text(node: Any) -> str:
@@ -111,9 +80,11 @@ def extract_acs_structural(adf: Any) -> str:
                     break
         collected.append(node)
 
-    # Flatten collected nodes
-    result = _flatten_adf_nodes(collected).strip()
-    return result
+    # Flatten collected nodes with the ONE shared flattener. A second
+    # implementation here previously lifted nested sub-criteria to top level,
+    # turning one criterion with sub-points into several independent
+    # acceptance criteria and changing the AC denominator on every report row.
+    return acli.flatten_adf(collected).strip()
 
 
 def extract_acs(description: str) -> str:
@@ -166,6 +137,14 @@ def main(argv: Optional[list] = None) -> int:
     cfg = config.load_config(Path(args.repo), {})
     fields = acli.fetch_issue(args.key)
     story = build_story(fields, args.key, cfg.story_points_field)
+
+    if not (story["acs"] or "").strip():
+        raise MissingAcceptanceCriteriaError(
+            "{0}: no acceptance criteria found in the ticket description. "
+            "Add an 'Acceptance Criteria' heading to {0} before benchmarking it -- "
+            "without one every approach scores 0/0 and the report's quality "
+            "column is meaningless.".format(args.key)
+        )
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

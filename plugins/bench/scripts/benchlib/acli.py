@@ -92,6 +92,21 @@ def _flatten_adf(node: Any, out: List[str], depth: int = 0) -> None:
             _flatten_adf(child, out, depth)
 
 
+def flatten_adf(node: Any) -> str:
+    """Flatten an ADF node (or list of nodes) to plain text.
+
+    The single public entry point for ADF -> text in this plugin. It exists
+    because there was briefly a second, subtly different flattener in
+    resolve.py that dropped list nesting -- flattening a nested
+    sub-criterion up to top level, which silently inflated the acceptance
+    criteria count and therefore every report's ACs denominator. One
+    implementation, one nesting behaviour.
+    """
+    parts: List[str] = []
+    _flatten_adf(node, parts)
+    return "".join(parts)
+
+
 def issue_description(fields: dict) -> str:
     desc = fields.get("description")
     if desc is None:

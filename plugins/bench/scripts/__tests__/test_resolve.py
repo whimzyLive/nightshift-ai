@@ -1,9 +1,151 @@
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import resolve  # noqa: E402
+from benchlib import acli  # noqa: E402
+
+
+def _nested_criteria_adf():
+    """AC section whose second criterion carries an indented sub-criterion.
+
+    Structurally: `Top A` (with nested `Sub A1`) and `Top B` -- TWO
+    acceptance criteria, not three.
+    """
+    return {
+        "type": "doc",
+        "content": [
+            {
+                "type": "heading",
+                "attrs": {"level": 2},
+                "content": [{"type": "text", "text": "Acceptance Criteria"}],
+            },
+            {
+                "type": "bulletList",
+                "content": [
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": "Top A"}],
+                            },
+                            {
+                                "type": "bulletList",
+                                "content": [
+                                    {
+                                        "type": "listItem",
+                                        "content": [
+                                            {
+                                                "type": "paragraph",
+                                                "content": [
+                                                    {"type": "text", "text": "Sub A1"}
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            },
+                        ],
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": "Top B"}],
+                            }
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+
+
+class TestSharedAdfFlattener(unittest.TestCase):
+    """resolve must not carry its own lossy ADF flattener (MUST-FIX)."""
+
+    def test_nested_sub_criterion_stays_nested(self):
+        acs = resolve.extract_acs_structural(_nested_criteria_adf())
+        lines = [line for line in acs.splitlines() if line.strip()]
+        self.assertEqual(lines[0], "- Top A")
+        # Indented -- a SUB-criterion of "Top A", not a third top-level AC.
+        self.assertEqual(lines[1], "  - Sub A1")
+        self.assertEqual(lines[2], "- Top B")
+
+    def test_top_level_criterion_count_is_two_not_three(self):
+        acs = resolve.extract_acs_structural(_nested_criteria_adf())
+        top_level = [
+            line for line in acs.splitlines() if line.startswith("- ")
+        ]
+        self.assertEqual(len(top_level), 2, acs)
+
+    def test_matches_the_shared_acli_flattener_exactly(self):
+        adf = _nested_criteria_adf()
+        collected = adf["content"][1:]
+        self.assertEqual(
+            resolve.extract_acs_structural(adf),
+            acli.flatten_adf(collected).strip(),
+        )
+
+    def test_resolve_no_longer_defines_a_second_flattener(self):
+        self.assertFalse(hasattr(resolve, "_flatten_adf_nodes"))
+
+
+class TestMissingAcceptanceCriteriaIsFatal(unittest.TestCase):
+    """resolve must not emit a story with an empty acs block (finding I6)."""
+
+    def _run_main(self, description):
+        tmp = Path(tempfile.mkdtemp())
+        out = tmp / "story.json"
+        fields = {"summary": "Do a thing", "description": description}
+        with patch.object(acli, "fetch_issue", return_value=fields):
+            code = resolve.main(
+                ["--key", "NA-999", "--repo", str(tmp), "--out", str(out)]
+            )
+        return code, out
+
+    def test_plain_text_without_ac_heading_exits_non_zero(self):
+        with self.assertRaises(resolve.MissingAcceptanceCriteriaError) as ctx:
+            self._run_main("Objective\nJust some prose, no criteria heading.")
+        self.assertIn("NA-999", str(ctx.exception))
+
+    def test_adf_without_ac_heading_exits_non_zero(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "heading",
+                    "attrs": {"level": 2},
+                    "content": [{"type": "text", "text": "Objective"}],
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "No criteria here"}],
+                },
+            ],
+        }
+        with self.assertRaises(resolve.MissingAcceptanceCriteriaError):
+            self._run_main(adf)
+
+    def test_no_story_json_is_written_when_acs_are_missing(self):
+        try:
+            _, out = self._run_main("no criteria at all")
+        except resolve.MissingAcceptanceCriteriaError:
+            pass
+        # An empty-acs story.json must never reach the rest of the pipeline.
+        tmp = Path(tempfile.mkdtemp())
+        self.assertFalse((tmp / "story.json").exists())
+
+    def test_story_with_criteria_still_succeeds(self):
+        code, out = self._run_main("Acceptance criteria\n- one\n- two")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out.read_text())["acs"], "- one\n- two")
 
 
 class TestExtractAcs(unittest.TestCase):
