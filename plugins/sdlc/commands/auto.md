@@ -15,6 +15,7 @@ scrape `acli workitem view` rendered text (that format is not stable across acli
 Read the structured `issuetype.name` field and compare case-insensitively:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null \
            | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
 ```
@@ -276,7 +277,12 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 **If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then run the
 **Loop-after-raise** procedure (above) for the spec PR as the session **tail** (`<PR_URL>`=`SPEC_PR_URL`,
-`<PHASE>`=`spec`). The comment is posted **before** the loop (the loop is the last act):
+`<PHASE>`=`spec`). The comment is posted **before** the loop (the loop is the last act). Run the site
+guard once before either branch below:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+```
 
 - **`MODE`=`Full Auto`** → post an intent note, then run the tail loop **with** the auto-merge hook
   (it auto-merges the spec PR on clean exit; that merge webhook then resumes Phase 2 automatically):
@@ -338,7 +344,12 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 ### A3 — Complete (comment posted BEFORE the tail loop)
 
 Post the mode-aware comment now — before the loop, since the loop is the session's last act (intent
-tense; any merge happens inside the loop's clean exit):
+tense; any merge happens inside the loop's clean exit). Run the site guard once before either branch
+below:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+```
 
 - **`Full Auto`:**
 
@@ -406,7 +417,12 @@ loop owns the release.
 ### B2 — Complete (comment posted BEFORE the tail loop)
 
 Post the mode-aware comment now — before entering the loop, since the loop is the session's last act
-(intent tense; any merge happens inside the loop's clean exit):
+(intent tense; any merge happens inside the loop's clean exit). Run the site guard once before either
+branch below:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+```
 
 - **`Full Auto`:**
 
@@ -489,6 +505,7 @@ on the **Epic** explaining that an AI Workflow mode must be set before automatio
 **without spawning any session**:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem comment create --key EPIC_KEY --body "Cannot start epic automation: no AI Workflow mode is set on this Epic.
 
 Set the Epic's AI Workflow field to one of Full Auto / Auto / Assisted — or, on a project without the custom field, add an AI-Workflow:full-auto / AI-Workflow:auto / AI-Workflow:assisted label. It becomes the default mode for every child story that does not set its own. Then re-run /auto EPIC_KEY."

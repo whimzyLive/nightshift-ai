@@ -3,8 +3,8 @@ id: mock-cli-must-validate-downstream-consumption
 agent: [ai-enablement-engineer]
 trigger: [mocked CLI regression test, auto-merge-pr.sh test hardening, resolve-then-act mock chain]
 rule: When a mock stands in for a multi-step CLI contract (resolve → act), every downstream mock step that consumes the resolved value must also validate it.
-evidence: [NA-45]
-uses: 0
+evidence: [NA-45, NA-77]
+uses: 1
 status: active
 ---
 

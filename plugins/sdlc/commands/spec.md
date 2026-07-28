@@ -8,6 +8,7 @@ Before dispatching anything, probe the issue type — **defects have no spec pha
 one-liner (same as `/auto` Step 0):
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 ITYPE="$(acli jira workitem view <STORY-KEY> --fields issuetype --json 2>/dev/null \
            | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
 ```
@@ -58,6 +59,7 @@ The agent should:
    ```
 8. Comment the story with the spec reference. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
    ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
    acli jira workitem comment create --key <STORY-KEY> \
      --body "Spec ready.
    File: docs/superpowers/specs/<STORY-KEY>.md

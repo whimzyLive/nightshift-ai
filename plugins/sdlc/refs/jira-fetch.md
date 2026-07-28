@@ -8,9 +8,12 @@ Standard "fetch everything we know about a Jira issue" block. Reference this fro
 
 ## Calls (always parallel)
 
-Run all four in parallel — they are independent:
+Run the site guard first (acli's active site is global across every authenticated account — NA-77),
+then all four fetch calls in parallel — they are independent:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+
 acli jira workitem view <KEY> --json                                # summary + description + status + parent + fields
 acli jira workitem comment list --key <KEY> --json --paginate       # all comments, newest first
 acli jira workitem link list --key <KEY> --json                     # linked Jira tickets (blocks, is blocked by, child of, etc.)
@@ -53,6 +56,7 @@ FOUND_FIELD=""; LAST_ERR=0
 for attempt in 1 2 3; do
   LAST_ERR=0
   for FIELD in "Story point estimate" "Story Points"; do
+    bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
     out=$(acli jira workitem search --jql "key = <KEY> AND \"$FIELD\" is not EMPTY" --json 2>&1) || LAST_ERR=1
     printf '%s' "$out" | grep -qE '"key":[[:space:]]*"<KEY>"' && { FOUND_FIELD="$FIELD"; break; }
   done
@@ -80,6 +84,7 @@ Decide from the loop result — **only a clean, repeatable empty means `missing`
 
 ```bash
 for V in 1 2 3 5 8 13 20 21 40; do
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
   acli jira workitem search --jql "key = <KEY> AND \"<FIELD>\" = $V" --json 2>/dev/null | grep -q '"key": "<KEY>"' && { echo "POINTS=$V"; break; }
 done
 ```
@@ -97,6 +102,7 @@ For a Story, the Epic key is in the `parent` field of the view JSON.
 The story `view --json` response does **not** include a story's child sub-tasks. Enumerate them with a dedicated JQL probe on the parent key — this is the source of truth for sub-tasks:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem search --jql "parent = <KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC" --fields "key,summary" --json
 ```
 

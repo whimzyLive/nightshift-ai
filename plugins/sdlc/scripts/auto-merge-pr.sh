@@ -52,6 +52,8 @@ set -euo pipefail
 #   - On failure: non-zero exit, reason on stderr, nothing on stdout. (The transition block never
 #     causes a non-zero exit — see Best-effort above.)
 
+here="$(cd "$(dirname "$0")" && pwd)"
+
 PR="${1:?PR number or URL required}"
 STORY_KEY="${2:-}"
 DONE_STATUS="${3:-}"
@@ -100,26 +102,30 @@ echo "merged: PR $PR" >&2
 # script under `set -euo pipefail` — the merge above already succeeded, and that must stand
 # regardless of transition outcome.
 if [ -n "$STORY_KEY" ] && [ -n "$DONE_STATUS" ]; then
-  CURRENT_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
-                      | jq -r '.fields.status.name // empty' 2>/dev/null || true)
-  if [ "$CURRENT_STATUS" = "$DONE_STATUS" ]; then
-    echo "transition: $STORY_KEY already $DONE_STATUS — no-op" >&2
-  elif acli jira workitem transition --key "$STORY_KEY" --status "$DONE_STATUS" --yes >/dev/null 2>&1; then
-    echo "transition: $STORY_KEY -> $DONE_STATUS" >&2
+  if ! bash "$here/jira-site-guard.sh"; then
+    echo "WARNING: jira-site-guard failed for $STORY_KEY — skipping the Jira transition; a human must move it to $DONE_STATUS manually" >&2
   else
-    # Transition call failed — before warning, re-read status: a flaky first read or a
-    # concurrent transition may mean the story is ALREADY done, in which case this is an
-    # idempotent no-op, not a failure (never post a contradictory "move it manually" comment
-    # on a story that's actually already Done).
-    RECHECK_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
+    CURRENT_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
                         | jq -r '.fields.status.name // empty' 2>/dev/null || true)
-    if [ "$RECHECK_STATUS" = "$DONE_STATUS" ]; then
-      echo "transition: $STORY_KEY already $DONE_STATUS (confirmed on re-read) — no-op" >&2
+    if [ "$CURRENT_STATUS" = "$DONE_STATUS" ]; then
+      echo "transition: $STORY_KEY already $DONE_STATUS — no-op" >&2
+    elif acli jira workitem transition --key "$STORY_KEY" --status "$DONE_STATUS" --yes >/dev/null 2>&1; then
+      echo "transition: $STORY_KEY -> $DONE_STATUS" >&2
     else
-      echo "WARNING: auto-transition of $STORY_KEY to $DONE_STATUS failed after merge (permission / workflow-scheme mismatch / status name unavailable) — a human must move it manually" >&2
-      acli jira workitem comment create --key "$STORY_KEY" \
-        --body "Auto-transition to $DONE_STATUS failed after the PR merged. Please move this story to $DONE_STATUS manually." \
-        >/dev/null 2>&1 || echo "WARNING: could not post the auto-transition-failed comment on $STORY_KEY either" >&2
+      # Transition call failed — before warning, re-read status: a flaky first read or a
+      # concurrent transition may mean the story is ALREADY done, in which case this is an
+      # idempotent no-op, not a failure (never post a contradictory "move it manually" comment
+      # on a story that's actually already Done).
+      RECHECK_STATUS=$(acli jira workitem view "$STORY_KEY" --fields status --json 2>/dev/null \
+                          | jq -r '.fields.status.name // empty' 2>/dev/null || true)
+      if [ "$RECHECK_STATUS" = "$DONE_STATUS" ]; then
+        echo "transition: $STORY_KEY already $DONE_STATUS (confirmed on re-read) — no-op" >&2
+      else
+        echo "WARNING: auto-transition of $STORY_KEY to $DONE_STATUS failed after merge (permission / workflow-scheme mismatch / status name unavailable) — a human must move it manually" >&2
+        acli jira workitem comment create --key "$STORY_KEY" \
+          --body "Auto-transition to $DONE_STATUS failed after the PR merged. Please move this story to $DONE_STATUS manually." \
+          >/dev/null 2>&1 || echo "WARNING: could not post the auto-transition-failed comment on $STORY_KEY either" >&2
+      fi
     fi
   fi
 elif [ -n "$STORY_KEY" ]; then

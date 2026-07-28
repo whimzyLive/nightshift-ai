@@ -4,19 +4,24 @@ description: Refine a raw idea (or an existing Jira ticket) and create or update
 
 Dispatch the `product-manager` agent to refine the input and create or update a Jira Epic.
 
+Jira project key: read the `Jira project key` row from `.claude/project/project-context.md` before
+anything else — use the resolved value as `<PROJECT-KEY>` for every step below. If the row is
+missing or empty, **STOP** — do not fall back to any literal project key. Return: "Cannot proceed —
+`.claude/project/project-context.md` has no `Jira project key` row. Add the row and retry."
+
 The agent should first detect the input type from `$ARGUMENTS`:
 
 **Step 1 — Detect mode**
 
-Scan `$ARGUMENTS` for a `ET-\d+` pattern:
+Scan `$ARGUMENTS` for a `<PROJECT-KEY>-\d+` pattern:
 
-- **If an `ET-XXX` key is present** → this is an existing Epic to update. Extract the key. Set `MODE=update`, `EPIC_KEY=<extracted key>`.
-- **If no `ET-XXX` key, but another Jira URL or key is present** (e.g. `https://...atlassian.net/browse/...`) → use it as source material. Set `MODE=create`.
+- **If a `<PROJECT-KEY>-XXX` key is present** → this is an existing Epic to update. Extract the key. Set `MODE=update`, `EPIC_KEY=<extracted key>`.
+- **If no `<PROJECT-KEY>-XXX` key, but another Jira URL or key is present** (e.g. `https://...atlassian.net/browse/...`) → use it as source material. Set `MODE=create`.
 - **If only raw idea text** → Set `MODE=create`.
 
 **Step 2 — Gather source material**
 
-For any non-ET Jira key or URL found in `$ARGUMENTS`:
+For any non-`<PROJECT-KEY>` Jira key or URL found in `$ARGUMENTS`:
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol to fetch that ticket
 2. Extract summary, description, all comments, linked tickets — use as raw idea source
@@ -59,6 +64,12 @@ cat > "$epic_desc" << 'EOF'
 EOF
 ```
 
+Both branches below write to Jira — run the site guard once first:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+```
+
 **If `MODE=update`:**
 
 ```bash
@@ -75,7 +86,7 @@ echo "Updated Epic: $EPIC_KEY"
 
 ```bash
 result=$(acli jira workitem create \
-  --project ET \
+  --project "<PROJECT-KEY>" \
   --type "Epic" \
   --summary "<concise concept title — max 8 words>" \
   --description-file "$epic_desc" \

@@ -21,6 +21,7 @@ The protocol classifies the issue as a **defect** (Bug) or a **feature** (everyt
 - **No input** (standalone `/impl`, `/triage`) → fetch with the **exact** canonical one-liner
   `commands/auto.md` Step 0 uses — reproduce it verbatim, do **not** write a divergent variant:
   ```bash
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
   acli jira workitem view <KEY> --fields issuetype --json | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]'
   ```
   The `// empty` and `tr '[:upper:]' '[:lower:]'` are load-bearing: without `// empty` an unreadable

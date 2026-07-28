@@ -61,6 +61,7 @@ Requires a merged spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `pla
 Caller passes `LIGHTWEIGHT=true`. No spec file required. Derive tasks from the Jira story description directly. Commit the plan file to `<BASE-BRANCH>` in-place — **no plan branch, no PR**. Comment on Jira only with the plan file path:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem comment create --key <STORY-KEY> --body "Plan (lightweight): docs/superpowers/plans/<STORY-KEY>.md"
 ```
 
@@ -113,6 +114,7 @@ Save to: `docs/superpowers/plans/<STORY-KEY>.md`
 After committing, comment on the Jira story:
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem comment create --key <STORY-KEY> \
   --body "Plan: docs/superpowers/plans/<STORY-KEY>.md | PR: <PR_URL>"
 ```
