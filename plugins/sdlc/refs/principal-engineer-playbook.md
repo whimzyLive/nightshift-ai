@@ -614,16 +614,17 @@ before dispatching its next fix agent.
 ## Step 8 — Final report (to the caller / user)
 
 Carry the QA verdict fields (Step 6) into the report — do not re-derive them. The `Docs sync:` line
-reports Step 6.5's outcome: `no changes` / `committed` on the two no-op-or-success paths, the
-`WARN … recover with /sdlc:docs sync <STORY-KEY>` wording on a docs-content failure, and
-`skipped (no docs manifest)` when the manifest was absent.
+reports Step 6.5's outcome: `no changes` / `committed` / `no manifest-tracked files touched —
+skipped` on the three no-op-or-success paths, the `WARN … recover with /sdlc:docs sync
+<STORY-KEY>` wording on a docs-content failure, and `skipped (no docs manifest)` when the manifest
+was absent.
 
 ```
 ## <Feature|Fix>: <name>  (Branch: <BRANCH_PREFIX>/<STORY-KEY>)   # "Fix" on the defect path, "Feature" otherwise
 ### Phases: <agents that ran + one-line summaries>
 ### QA: rounds <N>; fixed <Critical/Important list>; minor noted <list>; ACs <met — all N evidenced>
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
-### Docs sync: <no changes | committed on the branch | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
+### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
 ### Status: all phases complete, QA verdict clean, gate passed, PR ready.
 ```
