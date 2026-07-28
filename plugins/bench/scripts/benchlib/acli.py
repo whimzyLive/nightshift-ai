@@ -65,6 +65,18 @@ def _flatten_adf(node: Any, out: List[str], depth: int = 0) -> None:
                     _flatten_adf(child, out, depth)
             out.append("\n")
 
+        # Task item: similar to list item with marker and depth-based indentation
+        elif node_type == "taskItem":
+            indent = "  " * depth
+            out.append(indent + "- ")
+            for child in node.get("content", []) or []:
+                # Nested lists increment depth
+                if isinstance(child, dict) and child.get("type") in ("bulletList", "orderedList", "taskList"):
+                    _flatten_adf(child, out, depth + 1)
+                else:
+                    _flatten_adf(child, out, depth)
+            out.append("\n")
+
         # All other container nodes
         else:
             # Pass current depth to children (no increment)
@@ -72,7 +84,7 @@ def _flatten_adf(node: Any, out: List[str], depth: int = 0) -> None:
                 _flatten_adf(child, out, depth)
 
             # Block elements get double newline separator
-            if node_type in ("paragraph", "heading", "codeBlock", "bulletList", "orderedList"):
+            if node_type in ("paragraph", "heading", "codeBlock", "bulletList", "orderedList", "taskList"):
                 out.append("\n\n")
 
     elif isinstance(node, list):

@@ -262,6 +262,42 @@ class TestFieldExtraction(unittest.TestCase):
         expected = "- Item 1\n\n  - Nested\n\n\n\n\n\n- Item 2"
         self.assertEqual(result, expected)
 
+    def test_description_task_list_items_separated(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "taskList",
+                    "content": [
+                        {
+                            "type": "taskItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Task 1"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "taskItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Task 2"}],
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        # Should not concatenate: "Task 1Task 2"
+        self.assertNotIn("Task 1Task 2", result)
+        # Should have markers
+        self.assertIn("- Task 1", result)
+        self.assertIn("- Task 2", result)
+
 
 if __name__ == "__main__":
     unittest.main()
