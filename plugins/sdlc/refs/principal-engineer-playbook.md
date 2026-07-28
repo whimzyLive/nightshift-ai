@@ -495,13 +495,30 @@ the run at Step 6 — Step 6.5 never runs; AC5). The story branch `<BRANCH_PREFI
 pushed and **unmerged**, and its `$WORKTREE` is still provisioned (teardown is Step 7), so the docs
 commit lands on the branch **before** the PR opens — folding into the same impl PR (AC2). This wires
 the existing `sync` in via its **inline post-QA dispatch variant**
-(`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §25); the diff source is **story-branch-vs-base**
+(`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-postqa.md` §25); the diff source is **story-branch-vs-base**
 (§26), passed explicitly.
 
 **Manifest gate (AC4).** Resolve `.claude/project/docs-manifest.md` checkout-independently
 (`git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md`). If **absent** → **clean no-op**:
 do not dispatch, no warning, no report line — the repo opted out of docs. Proceed to Step 7
 unchanged. This is a no-op, **not** a failure.
+
+**Change-size gate (second no-op, after the manifest gate passes).** A manifest can exist while this
+particular story touches nothing it tracks — dispatching `knowledge-engineer` in that case is pure
+overhead for a run that was always going to no-op. After the manifest gate passes, resolve the
+story-branch-vs-base changed-file set
+(`git diff --name-only "origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>"`, after
+`git fetch origin --quiet`) and compare it against the activated manifest rows' tracked source
+scopes (each enabled row's `reference-roots`/`source:`/`contract:` path, or a `how-to` row's
+`source:` glob list — the same scopes the docs-sync dispatch itself would resolve). If **no** changed
+file falls inside any activated row's scope → clean no-op: do **not** dispatch the
+`knowledge-engineer` at all, no warning, Step 8's report still notes `Docs sync: no manifest-tracked
+files touched — skipped`, and proceed to Step 7 unchanged. **Fail safe, not silent-skip:** if either
+the changed-file set or the activated rows' scopes cannot be resolved (a `git fetch`/diff failure, an
+unreadable manifest row, an unresolvable registry lookup), **dispatch anyway** — this is today's
+behaviour, unchanged. A gate that silently skipped docs regeneration on an unreadable probe would be
+a worse defect than the context-overhead this gate exists to close; when in doubt, this gate always
+resolves toward dispatching, never toward skipping.
 
 **Primary-checkout guard — reuse Step 5's machine check verbatim.** Before dispatching, snapshot the
 primary checkout (`PRIMARY_HEAD` + `PRIMARY_CLEAN_BEFORE`, exactly as Step 5). Dispatch the
@@ -510,14 +527,15 @@ primary checkout (`PRIMARY_HEAD` + `PRIMARY_CLEAN_BEFORE`, exactly as Step 5). D
 story-branch-vs-base diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>`). The agent
 **commits only** (no push, no PR); **you** push from `$WORKTREE` and re-run Step 5's assertions.
 
-Classify the outcome into **exactly four** buckets (do not collapse them):
+Classify the outcome into **exactly five** buckets (do not collapse them):
 
-| Outcome at Step 6.5                                                                                                                                                                                                              | Class                         | Behaviour                                                                                                                                                                                                                                           |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/project/docs-manifest.md` **absent**                                                                                                                                                                                    | **no-op (AC4)**               | No dispatch. Proceed to Step 7 unchanged. No warning, no report line.                                                                                                                                                                               |
-| Manifest present; regen byte-identical **and** no `how-to` affected (change-gate, §6)                                                                                                                                            | **no-op**                     | Agent makes no commit (`git status --porcelain` empty on written paths). Proceed to Step 7. Step 8 report notes `Docs sync: no changes`. Not a failure.                                                                                             |
-| Manifest present; **docs-content failure** — regen error, docs-commit push failure, or the agent returns `Status: blocked`                                                                                                       | **failure (loud, non-block)** | **WARN, do not block.** Emit a distinct `WARNING: post-QA docs sync failed …`. **Still proceed to Step 7 and open the impl PR** (without the docs commit). The Step 8 report carries a `Docs sync:` line naming the failure + the recovery pointer. |
-| **Workspace-integrity failure** — the dispatch moved the **primary checkout's HEAD**, or its `git status --porcelain` no longer matches the pre-dispatch snapshot, or `$WORKTREE` is left with stray uncommitted/untracked files | **failure (hard STOP)**       | **STOP the run**, same shape as Step 5's guard. Do **not** open the impl PR while the primary checkout is corrupted, or while `$WORKTREE` carries an unattributable stray. Surface the exact violation.                                             |
+| Outcome at Step 6.5                                                                                                                                                                                                                                                          | Class                         | Behaviour                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/project/docs-manifest.md` **absent**                                                                                                                                                                                                                                | **no-op (AC4)**               | No dispatch. Proceed to Step 7 unchanged. No warning, no report line.                                                                                                                                                                               |
+| Manifest present; the story's changed-file set **touches no manifest-tracked path** (change-size gate — resolvable case; an **unresolvable** changed-file set or row scopes falls through to an ordinary dispatch instead, fail safe, and lands in one of the buckets below) | **no-op (AC4)**               | No dispatch — the `knowledge-engineer` never runs this pass. Proceed to Step 7. Step 8 report notes `Docs sync: no manifest-tracked files touched — skipped`. Not a failure.                                                                        |
+| Manifest present; regen byte-identical **and** no `how-to` affected (change-gate, §6)                                                                                                                                                                                        | **no-op**                     | Agent makes no commit (`git status --porcelain` empty on written paths). Proceed to Step 7. Step 8 report notes `Docs sync: no changes`. Not a failure.                                                                                             |
+| Manifest present; **docs-content failure** — regen error, docs-commit push failure, or the agent returns `Status: blocked`                                                                                                                                                   | **failure (loud, non-block)** | **WARN, do not block.** Emit a distinct `WARNING: post-QA docs sync failed …`. **Still proceed to Step 7 and open the impl PR** (without the docs commit). The Step 8 report carries a `Docs sync:` line naming the failure + the recovery pointer. |
+| **Workspace-integrity failure** — the dispatch moved the **primary checkout's HEAD**, or its `git status --porcelain` no longer matches the pre-dispatch snapshot, or `$WORKTREE` is left with stray uncommitted/untracked files                                             | **failure (hard STOP)**       | **STOP the run**, same shape as Step 5's guard. Do **not** open the impl PR while the primary checkout is corrupted, or while `$WORKTREE` carries an unattributable stray. Surface the exact violation.                                             |
 
 **Why the split (state it inline so a later edit does not blanket-downgrade or blanket-STOP):**
 

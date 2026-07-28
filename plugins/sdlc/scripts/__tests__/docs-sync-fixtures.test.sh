@@ -2,7 +2,7 @@
 # docs-sync-fixtures.test.sh — dispatch-and-snapshot regression test for the activation-gated,
 # family-resolved /sdlc:docs reference-doc pipeline (NA-65).
 #
-# The real /sdlc:docs sync algorithm (refs/docs-pipeline.md §3) is prose executed inline by the
+# The real /sdlc:docs sync algorithm (refs/docs-pipeline-core.md §3) is prose executed inline by the
 # knowledge-engineer agent — there is no committed generator script to unit-test. This harness
 # instead runs docs_sync_fixture_gen.py (a minimal, deterministic stand-in for the same resolver
 # ladder: contract -> source -> scan -> skip) against each of the three fixture repos under
