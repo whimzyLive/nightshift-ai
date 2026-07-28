@@ -251,8 +251,10 @@ class TestFilterDiffApproachRedaction(unittest.TestCase):
         self.assertNotIn("bench/NA-1/sdlc/r1", out)
         self.assertIn("[REDACTED]", out)
 
-    def test_redacts_all_four_approach_ids(self):
-        for approach in ("opus", "sdlc", "superpowers", "speckit"):
+    def test_redacts_bare_id_for_redacted_approaches(self):
+        # opus is NOT in this list — it is a deliberate, documented
+        # exception (see round-2 tests below).
+        for approach in ("sdlc", "superpowers", "speckit"):
             with self.subTest(approach=approach):
                 diff = "diff --git a/src/app.ts b/src/app.ts\n+// {0} did this\n".format(approach)
                 out = grade.filter_diff(diff)
@@ -262,6 +264,14 @@ class TestFilterDiffApproachRedaction(unittest.TestCase):
         diff = "diff --git a/src/app.ts b/src/app.ts\n+// corpus of tests\n"
         out = grade.filter_diff(diff)
         self.assertIn("corpus", out)
+        self.assertNotIn("[REDACTED]", out)
+
+    def test_does_not_redact_superpowered(self):
+        # "superpowered" must survive even though it shares a long prefix
+        # with the redacted approach id "superpowers".
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// a superpowered widget\n"
+        out = grade.filter_diff(diff)
+        self.assertIn("superpowered", out)
         self.assertNotIn("[REDACTED]", out)
 
     def test_preserves_line_count_of_kept_section(self):
@@ -278,6 +288,60 @@ class TestFilterDiffApproachRedaction(unittest.TestCase):
         out_lines = grade.filter_diff(diff).splitlines()
         in_lines = diff.splitlines()
         self.assertEqual(len(out_lines), len(in_lines))
+
+
+class TestFilterDiffSpeckitAliases(unittest.TestCase):
+    """Fix round 2 (Important): the bare id `speckit` isn't the form a model
+    actually writes. `spec-kit` is the approach's real product name (it
+    appears in this repo's own adapter label, "GitHub spec-kit"), and
+    `specify-cli` is the CLI the adapter installs — both uniquely identify
+    the approach and must be redacted too, alongside `spec kit`."""
+
+    def test_redacts_hyphenated_spec_kit(self):
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// built with GitHub spec-kit\n"
+        out = grade.filter_diff(diff)
+        self.assertNotIn("spec-kit", out)
+        self.assertIn("[REDACTED]", out)
+
+    def test_redacts_spaced_spec_kit(self):
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// used the spec kit workflow\n"
+        out = grade.filter_diff(diff)
+        self.assertNotIn("spec kit", out)
+        self.assertIn("[REDACTED]", out)
+
+    def test_redacts_specify_cli(self):
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// ran specify-cli init\n"
+        out = grade.filter_diff(diff)
+        self.assertNotIn("specify-cli", out)
+        self.assertIn("[REDACTED]", out)
+
+    def test_redacts_bare_speckit_still(self):
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// speckit did this\n"
+        out = grade.filter_diff(diff)
+        self.assertNotIn("speckit", out)
+        self.assertIn("[REDACTED]", out)
+
+    def test_case_insensitive(self):
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// Built with Spec-Kit\n"
+        out = grade.filter_diff(diff)
+        self.assertNotIn("Spec-Kit", out)
+        self.assertIn("[REDACTED]", out)
+
+
+class TestFilterDiffOpusExceptionDocumented(unittest.TestCase):
+    """Fix round 2: `opus` is a deliberate, documented exception to content
+    redaction — the bare model name is left alone because model ids show up
+    in code/config for reasons unrelated to which approach ran, and
+    redacting it would mangle legitimate content."""
+
+    def test_bare_opus_survives_content_redaction(self):
+        diff = "diff --git a/src/app.ts b/src/app.ts\n+// uses claude-opus-4 under the hood\n"
+        out = grade.filter_diff(diff)
+        self.assertIn("opus", out)
+        self.assertNotIn("[REDACTED]", out)
+
+    def test_opus_not_in_alias_table(self):
+        self.assertNotIn("opus", grade.APPROACH_REDACTION_ALIASES)
 
 
 class TestFilterDiffQuotedPaths(unittest.TestCase):

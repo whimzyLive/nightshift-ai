@@ -16,10 +16,13 @@ airtight:
      `..`-traversal is even required to leak it if the path itself named the
      approach, which is why this matters as much as the traversal risk.
   2. Content: filter_diff drops process-artifact file sections by path AND
-     redacts approach-identifying tokens (the known approach ids, and
-     bench/<ticket>/<approach>/<run-id> branch references) from what
-     survives, because a diff's content is free text an approach can name
-     itself in (a comment, a commit message fragment).
+     redacts approach-identifying content (alias phrases per approach —
+     see APPROACH_REDACTION_ALIASES — and bench/<ticket>/<approach>/<run-id>
+     branch references) from what survives, because a diff's content is
+     free text an approach can name itself in (a comment, a commit message
+     fragment) using whatever phrasing a model actually writes, not just
+     its internal id string. `opus` is a deliberate, documented exception —
+     see APPROACH_REDACTION_ALIASES.
   3. Inputs: grader_prompt inlines the diff and test output as strings.
      cell_hash is NOT a secret and provides directory de-identification, not
      preimage resistance — (ticket, approach, run_id) is a small enough
@@ -50,10 +53,31 @@ STRIP_PATTERNS = [
     "CHANGELOG.md",
 ]
 
-# Known approach ids, redacted as whole words wherever they surface in
-# surviving diff content (not just in file paths). Keep in sync with the
-# approaches this bench harness actually runs.
+# Known approach ids. Used for path-safety purposes (e.g. blind_base_dir
+# must never surface any of these in a path). NOT all of these are redacted
+# from diff content — see APPROACH_REDACTION_ALIASES below for that.
 APPROACH_IDS = ["opus", "sdlc", "superpowers", "speckit"]
+
+# Alias phrases a model might actually write in diff content to name the
+# approach that produced it, keyed by approach id. Redaction has to cover
+# the forms a model would actually write, not just the internal id string —
+# e.g. speckit's real product name is the hyphenated "spec-kit" (as it
+# appears in this repo's own adapter label, "GitHub spec-kit"), which a
+# model is far more likely to write in prose/comments than the bare
+# "speckit" id, and "specify-cli" (the CLI the adapter installs) uniquely
+# identifies this approach too.
+#
+# `opus` is deliberately NOT a key here: redacting the bare model name would
+# mangle legitimate content, since model names show up in code and config
+# for reasons unrelated to which approach produced a diff (this repo's own
+# source references Claude model ids). This is an accepted, documented
+# blinding gap for that one case — grader_prompt's instruction not to
+# speculate about provenance is what has to carry it.
+APPROACH_REDACTION_ALIASES: Dict[str, List[str]] = {
+    "sdlc": ["sdlc"],
+    "superpowers": ["superpowers"],
+    "speckit": ["speckit", "spec-kit", "spec kit", "specify-cli"],
+}
 
 _REDACTED = "[REDACTED]"
 
@@ -68,8 +92,17 @@ _FILE_HEADER_PLAIN = re.compile(r"^diff --git a/(\S+) b/\S+\s*$")
 _FILE_HEADER_QUOTED = re.compile(r'^diff --git "a/(.+)" "b/.+"\s*$')
 
 _BRANCH_REF = re.compile(r"bench/[^\s/]+/[^\s/]+/[^\s/]+")
-_APPROACH_WORD = re.compile(
-    r"\b(" + "|".join(re.escape(a) for a in APPROACH_IDS) + r")\b", re.IGNORECASE
+
+# Longest-alias-first: keeps ordering correct if future aliases overlap
+# (none of the current ones do, but a shorter alias that happens to be a
+# prefix of a longer one should never shadow it).
+_ALIAS_TERMS = sorted(
+    {alias for aliases in APPROACH_REDACTION_ALIASES.values() for alias in aliases},
+    key=len,
+    reverse=True,
+)
+_APPROACH_ALIAS = re.compile(
+    r"\b(" + "|".join(re.escape(term) for term in _ALIAS_TERMS) + r")\b", re.IGNORECASE
 )
 
 GRADER_COUNT = 3
@@ -89,13 +122,16 @@ def _diff_header_path(line: str) -> Optional[str]:
 def _redact_approach_tokens(line: str) -> str:
     """Redact approach-identifying content from a single diff line.
 
-    Branch references are redacted whole (before word-level redaction would
+    Branch references are redacted whole (before alias-level redaction would
     otherwise mangle them into a still-identifiable fragment), then any
-    remaining whole-word approach id is redacted individually. Replacement
-    (not deletion) keeps line count and diff structure intact.
+    remaining approach alias phrase (see APPROACH_REDACTION_ALIASES — whole
+    word/phrase, case-insensitive) is redacted individually. Replacement
+    (not deletion) keeps line count and diff structure intact. `opus` is
+    deliberately excluded from alias redaction — see
+    APPROACH_REDACTION_ALIASES for why.
     """
     line = _BRANCH_REF.sub(_REDACTED, line)
-    line = _APPROACH_WORD.sub(_REDACTED, line)
+    line = _APPROACH_ALIAS.sub(_REDACTED, line)
     return line
 
 
