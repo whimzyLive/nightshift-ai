@@ -38,14 +38,21 @@ def build_variables(
     }
 
 
-def claude_argv(flags: List[str]) -> List[str]:
+def claude_argv(flags: List[str], model: str) -> List[str]:
     """The prompt is fed on stdin, never as an argv element — a long ticket
-    description would otherwise risk the command-line length limit."""
+    description would otherwise risk the command-line length limit.
+
+    `--model` is always passed, from the adapter's required `run.model`.
+    Leaving it off means the row measures the operator's default model
+    rather than the one its label names.
+    """
     return [
         "claude",
         "--print",
         "--output-format",
         "json",
+        "--model",
+        model,
     ] + list(flags)
 
 
@@ -110,7 +117,7 @@ def main(argv: Optional[list] = None) -> int:
 
     started_at = datetime.now(timezone.utc).isoformat()
     proc = subprocess.run(
-        claude_argv(adapter.flags),
+        claude_argv(adapter.flags, adapter.model),
         cwd=str(worktree),
         input=prompt,
         capture_output=True,
@@ -153,8 +160,11 @@ def main(argv: Optional[list] = None) -> int:
         teardown_error = e
 
     print(
-        "executed {0}: session={1} cost=${2:.4f}".format(
-            adapter.id, payload.get("session_id"), payload.get("total_cost_usd", 0.0)
+        "executed {0} (model={1}): session={2} cost=${3:.4f}".format(
+            adapter.id,
+            adapter.model,
+            payload.get("session_id"),
+            payload.get("total_cost_usd", 0.0),
         )
     )
 

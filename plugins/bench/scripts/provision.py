@@ -97,6 +97,105 @@ def assert_bench_branch(name: str) -> None:
         )
 
 
+# Permissions a benchmark run needs to be able to happen at all.
+#
+# The worktree is a fresh checkout: it carries the repo's committed
+# .claude/settings.json (empty allow list) and NOT .claude/settings.local.json,
+# which is gitignored. The adapters pass --permission-mode acceptEdits, which
+# auto-approves EDITS ONLY -- not Bash. So a session told to "commit your
+# changes" and "run the test suite" could do neither: no commit means
+# `git diff base_sha..HEAD` is empty, work_done is all zeros, and the graders
+# grade nothing.
+#
+# Every entry below is harness friction, not part of the approach being
+# measured. An approach is not being judged on whether it can get past a
+# permission prompt in a non-interactive session; it is being judged on the
+# code it produces. Granting these makes the measurement possible; it does
+# not advantage any approach over another, because every approach gets the
+# same grant.
+#
+# Deliberately NOT granted: anything that could push, merge, or touch a ref
+# outside the worktree. The bench branch-prefix guarantee is a hard boundary
+# and no convenience justifies weakening it.
+BENCH_PERMISSIONS = [
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git show:*)",
+    "Bash(git rev-parse:*)",
+    "Bash(git checkout:*)",
+    "Bash(git restore:*)",
+    "Bash(git stash:*)",
+    "Bash(npm:*)",
+    "Bash(npx:*)",
+    "Bash(pnpm:*)",
+    "Bash(yarn:*)",
+    "Bash(node:*)",
+    "Bash(python3:*)",
+    "Bash(pytest:*)",
+    "Bash(make:*)",
+    "Bash(cargo:*)",
+    "Bash(go:*)",
+    "Bash(mkdir:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(rg:*)",
+    "Bash(grep:*)",
+    "Bash(find:*)",
+]
+
+BENCH_DENIED_PERMISSIONS = [
+    "Bash(git push:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(gh pr merge:*)",
+]
+
+SETTINGS_RATIONALE = (
+    "Written by plugins/bench/scripts/provision.py for a benchmark cell. "
+    "The worktree is a fresh checkout that carries the committed "
+    ".claude/settings.json (empty allow list) but NOT the gitignored "
+    ".claude/settings.local.json, and the adapters run with "
+    "--permission-mode acceptEdits, which auto-approves edits but NOT Bash. "
+    "Without this file a session told to commit its work and run the tests "
+    "can do neither, the graded diff is empty, and the cell reports a clean "
+    "0 findings against no code. These grants remove harness friction that "
+    "is not part of the approach being measured -- every approach gets the "
+    "same grant. Push, merge, rebase and PR-merge stay denied: the bench/ "
+    "branch boundary is not negotiable."
+)
+
+
+def write_bench_settings(worktree: Path) -> Path:
+    """Write .claude/settings.local.json into a benchmark worktree.
+
+    Provisioning owns this, not execute.py: the file is a property of the
+    WORKTREE, created in the same step that creates the worktree, so the
+    worktree is never in a state where it exists but cannot be worked in.
+    It also keeps the measured window clean -- execute.py's timer starts at
+    the session, and writing permissions is setup, not measured work.
+    """
+    settings_dir = worktree / ".claude"
+    settings_dir.mkdir(parents=True, exist_ok=True)
+    target = settings_dir / "settings.local.json"
+    target.write_text(
+        json.dumps(
+            {
+                "_comment": SETTINGS_RATIONALE,
+                "permissions": {
+                    "allow": BENCH_PERMISSIONS,
+                    "deny": BENCH_DENIED_PERMISSIONS,
+                },
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    return target
+
+
 def git(repo: Path, *args: str) -> str:
     proc = subprocess.run(
         ["git", "-C", str(repo)] + list(args), capture_output=True, text=True
@@ -130,6 +229,7 @@ def main(argv: Optional[list] = None) -> int:
     artifacts.mkdir(parents=True, exist_ok=True)
 
     git(repo, "worktree", "add", "-b", branch, str(worktree), base_sha)
+    settings_path = write_bench_settings(worktree)
 
     cell = {
         "ticket": ticket,
@@ -140,11 +240,13 @@ def main(argv: Optional[list] = None) -> int:
         "artifacts": str(artifacts),
         "base_sha": base_sha,
         "repo": str(repo),
+        "settings_local": str(settings_path),
     }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(cell, indent=2))
     print(f"provisioned {branch} at {worktree}")
+    print(f"  wrote {settings_path} (harness permissions: git commit + test runner)")
     return 0
 
 

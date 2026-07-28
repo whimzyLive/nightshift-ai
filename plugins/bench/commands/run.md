@@ -90,7 +90,9 @@ For each approach, in the order given:
 
    The destination is the cell's artifacts directory, which provision.py has already created at an absolute path outside the worktree — so test evidence survives worktree removal. The `|| true` ensures this step does not fail the cell even if tests fail — a failing test suite is exactly the evidence the grader needs. Continue regardless.
 
-5. Measure. A non-zero exit means reconciliation failed — report it, do not hide it. Reconciliation failure does NOT stop the cell; continue to grading.
+5. Measure. A non-zero exit means **either** reconciliation failed **or** the cell produced no code change — report whichever it is, do not hide it. Neither stops the cell; continue to grading, and let the report render the row as failed.
+
+   Read `run.json` after this step and surface three things to the founder if present: `reconciliation.unpriceable_models` (a model id with no rate card, so the computed cost is an undercount), `phase_attribution.available: false` (the per-phase split is an artefact and the report will show `—`), and `work_done.empty_diff: true` (**a failed cell** — the session committed nothing, so the graders will be grading an empty patch).
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/measure.py" \

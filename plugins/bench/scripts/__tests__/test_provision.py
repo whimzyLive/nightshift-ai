@@ -1,4 +1,6 @@
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -167,3 +169,55 @@ class TestAssertBenchBranch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBenchSettingsLocal(unittest.TestCase):
+    """The measured session must be able to commit and run tests (finding C4)."""
+
+    def _worktree(self):
+        return Path(tempfile.mkdtemp())
+
+    def test_writes_settings_local_json_into_the_worktree(self):
+        wt = self._worktree()
+        path = provision.write_bench_settings(wt)
+        self.assertTrue(path.exists())
+        self.assertEqual(path, wt / ".claude" / "settings.local.json")
+
+    def test_grants_bash_for_git_commit(self):
+        wt = self._worktree()
+        data = json.loads(provision.write_bench_settings(wt).read_text())
+        allow = data["permissions"]["allow"]
+        self.assertIn("Bash(git commit:*)", allow)
+        self.assertIn("Bash(git add:*)", allow)
+
+    def test_grants_bash_for_the_test_runner(self):
+        wt = self._worktree()
+        data = json.loads(provision.write_bench_settings(wt).read_text())
+        allow = data["permissions"]["allow"]
+        self.assertIn("Bash(pnpm:*)", allow)
+        self.assertIn("Bash(npm:*)", allow)
+
+    def test_never_grants_push_or_merge(self):
+        wt = self._worktree()
+        data = json.loads(provision.write_bench_settings(wt).read_text())
+        allow = data["permissions"]["allow"]
+        deny = data["permissions"]["deny"]
+        for forbidden in ("push", "merge", "rebase"):
+            self.assertFalse(
+                any(forbidden in entry for entry in allow),
+                "allow list must never permit {0}: {1}".format(forbidden, allow),
+            )
+        self.assertIn("Bash(git push:*)", deny)
+        self.assertIn("Bash(git merge:*)", deny)
+        self.assertIn("Bash(gh pr merge:*)", deny)
+
+    def test_carries_a_comment_explaining_why_it_exists(self):
+        wt = self._worktree()
+        data = json.loads(provision.write_bench_settings(wt).read_text())
+        comment = data["_comment"]
+        self.assertIn("acceptEdits", comment)
+        self.assertIn("harness friction", comment)
+
+    def test_is_valid_json(self):
+        wt = self._worktree()
+        json.loads(provision.write_bench_settings(wt).read_text())

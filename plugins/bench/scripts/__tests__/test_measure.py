@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -567,3 +568,73 @@ class TestPhaseMarkerFires(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _throwaway_repo(tmp):
+    """A disposable git repo. Never run git fixtures against the real repo."""
+    repo = Path(tmp) / "repo"
+    repo.mkdir()
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    def run(*args):
+        subprocess.run(["git", "-C", str(repo)] + list(args), check=True,
+                       capture_output=True, env={**os.environ, **env})
+    run("init", "-q", "-b", "main")
+    (repo / "a.txt").write_text("base\n")
+    run("add", "-A")
+    run("commit", "-qm", "base")
+    base = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+    return repo, base, run
+
+
+class TestEmptyDiffGuard(unittest.TestCase):
+    """A cell that produced no code change is a failed cell (finding C4)."""
+
+    def _transcript(self, tmp, edits=0):
+        path = Path(tmp) / "t.jsonl"
+        lines = []
+        for _ in range(edits):
+            lines.append(json.dumps({
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Edit"}]},
+            }))
+        path.write_text("\n".join(lines) + ("\n" if lines else ""))
+        return path
+
+    def test_empty_diff_is_flagged(self):
+        with TemporaryDirectory() as tmp:
+            repo, base, _ = _throwaway_repo(tmp)
+            transcript = self._transcript(tmp, edits=3)
+            work = measure.compute_work_done(
+                {"worktree": str(repo), "base_sha": base}, transcript
+            )
+        self.assertTrue(work["empty_diff"])
+        self.assertEqual(work["files_touched"], 0)
+        self.assertIn("no code change", work["empty_diff_note"])
+
+    def test_note_names_the_edit_calls_so_the_cause_is_diagnosable(self):
+        with TemporaryDirectory() as tmp:
+            repo, base, _ = _throwaway_repo(tmp)
+            transcript = self._transcript(tmp, edits=7)
+            work = measure.compute_work_done(
+                {"worktree": str(repo), "base_sha": base}, transcript
+            )
+        # 7 edits but an empty diff => work was done but never committed.
+        self.assertEqual(work["edit_calls"], 7)
+        self.assertIn("7 Edit", work["empty_diff_note"])
+        self.assertIn("settings.local.json", work["empty_diff_note"])
+
+    def test_a_real_commit_is_not_flagged(self):
+        with TemporaryDirectory() as tmp:
+            repo, base, run = _throwaway_repo(tmp)
+            (repo / "a.txt").write_text("base\nchanged\n")
+            run("add", "-A")
+            run("commit", "-qm", "work")
+            transcript = self._transcript(tmp, edits=1)
+            work = measure.compute_work_done(
+                {"worktree": str(repo), "base_sha": base}, transcript
+            )
+        self.assertFalse(work["empty_diff"])
+        self.assertEqual(work["empty_diff_note"], "")
+        self.assertEqual(work["files_touched"], 1)

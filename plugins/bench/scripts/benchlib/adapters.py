@@ -36,6 +36,7 @@ class Adapter:
     id: str
     label: str
     prompt: str
+    model: str = ""
     setup: List[str] = field(default_factory=list)
     flags: List[str] = field(default_factory=list)
     phases: List[Phase] = field(default_factory=list)
@@ -53,6 +54,20 @@ def load_adapter(path: Path) -> Adapter:
     if not prompt:
         raise ValueError(f"adapter {path} has no run.prompt")
 
+    # `run.model` is REQUIRED and part of the adapter contract. Without it
+    # execute.py passes no --model and the session runs on whatever the
+    # operator's default happens to be -- so a row labelled "Direct Opus"
+    # measures an unknown model, and the label is a claim the data does not
+    # support. An approach that deliberately does not pin a model must say
+    # so explicitly rather than by omission.
+    model = run.get("model")
+    if not model:
+        raise ValueError(
+            f"adapter {path} has no run.model. Every adapter must name the model it "
+            f"runs, so the report row is labelled honestly rather than measuring the "
+            f"operator's default."
+        )
+
     phases_data = data.get("phases") or []
     phases = []
     for i, p in enumerate(phases_data):
@@ -67,6 +82,7 @@ def load_adapter(path: Path) -> Adapter:
         id=data.get("id") or Path(path).stem,
         label=data.get("label") or data.get("id") or Path(path).stem,
         prompt=prompt,
+        model=model,
         setup=list(data.get("setup") or []),
         flags=list(run.get("flags") or []),
         phases=phases,

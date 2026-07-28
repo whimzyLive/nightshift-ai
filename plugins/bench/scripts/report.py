@@ -64,6 +64,13 @@ def phase_rows(runs: List[dict]) -> List[dict]:
         grades = run.get("grades") or {}
         acs = grades.get("acs") or {}
         reconciliation = run.get("reconciliation") or {}
+        attribution = run.get("phase_attribution") or {}
+        work_done = run.get("work_done") or {}
+
+        # A run.json written before phase_attribution existed has no opinion;
+        # treat that as available rather than retroactively invalidating it.
+        attribution_available = attribution.get("available", True)
+
         rows.append(
             {
                 "approach": run["approach"],
@@ -79,6 +86,10 @@ def phase_rows(runs: List[dict]) -> List[dict]:
                 "grader_failure_count": grades.get("grader_failure_count", 0),
                 "reconciled": bool(reconciliation.get("ok")),
                 "reconciliation_note": reconciliation.get("note", ""),
+                "attribution_available": attribution_available,
+                "attribution_note": attribution.get("note", ""),
+                "empty_diff": bool(work_done.get("empty_diff")),
+                "empty_diff_note": work_done.get("empty_diff_note", ""),
             }
         )
     return rows
@@ -91,6 +102,12 @@ def artifact_inventory(runs: List[dict]) -> List[dict]:
         if "approach" not in run:
             continue
         if not (run.get("reconciliation") or {}).get("ok"):
+            continue
+        # A row whose markers never fired has no real ceremony bucket -- its
+        # spend was dumped into the first declared phase. Listing that as
+        # "what the ceremony spend bought" would launder the same fabricated
+        # number the main table refuses to print.
+        if not (run.get("phase_attribution") or {}).get("available", True):
             continue
 
         phases = run.get("by_phase") or {}
@@ -115,24 +132,50 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         "Cost is split by phase. `impl-only` is the comparable figure across approaches;",
         "`review + fix` and `ceremony` are what the process-heavy approaches additionally buy.",
         "",
-        "| Status | Approach            | impl-only $ | review + fix $ | ceremony $ | total $  | Regressions | ACs met   | findings | wall clock |",
-        "| ------ | ------------------- | ----------: | -------------: | ----------: | -------: | ----------- | --------- | -------- | ---------- |",
+        "| Status  | Approach            | impl-only $ | review + fix $ | ceremony $ | total $  | Regressions | ACs met   | findings | wall clock |",
+        "| ------- | ------------------- | ----------: | -------------: | ----------: | -------: | ----------- | --------- | -------- | ---------- |",
     ]
 
     failed_notes = []
+    unattributed_notes = []
+    empty_diff_notes = []
     for i, row in enumerate(rows):
-        status = "OK" if row["reconciled"] else "FAILED"
-        impl_str = "{:.2f}".format(row["impl"]) if row["reconciled"] else "—"
-        review_str = "{:.2f}".format(row["review_fix"]) if row["reconciled"] else "—"
-        ceremony_str = "{:.2f}".format(row["ceremony"]) if row["reconciled"] else "—"
+        # Three independent reasons a row's numbers cannot be shown as-is.
+        # Order matters only for the status label; the em dashes are the
+        # same either way, because in every one of these cases the split is
+        # not a measurement.
+        if row["empty_diff"]:
+            status = "NO DIFF"
+        elif not row["reconciled"]:
+            status = "FAILED"
+        elif not row["attribution_available"]:
+            status = "NO SPLIT"
+        else:
+            status = "OK"
+
+        show_split = (
+            row["reconciled"]
+            and row["attribution_available"]
+            and not row["empty_diff"]
+        )
+        impl_str = "{:.2f}".format(row["impl"]) if show_split else "—"
+        review_str = "{:.2f}".format(row["review_fix"]) if show_split else "—"
+        ceremony_str = "{:.2f}".format(row["ceremony"]) if show_split else "—"
 
         regressions_str = "yes" if row["regressions"] else "no"
-        acs_str = "{0}/{1}".format(row["acs_met"], row["acs_total"])
-        if row["grader_failure_count"] > 0:
-            acs_str += " ({0} fail)".format(row["grader_failure_count"])
+        if row["empty_diff"]:
+            # 0 findings against an empty diff is not a clean result; it is
+            # a grader with nothing to grade. Never render it as 0.
+            acs_str = "—"
+            findings_str = "—"
+        else:
+            acs_str = "{0}/{1}".format(row["acs_met"], row["acs_total"])
+            if row["grader_failure_count"] > 0:
+                acs_str += " ({0} fail)".format(row["grader_failure_count"])
+            findings_str = str(row["findings"])
 
         lines.append(
-            "| {0:<6} | {1:<19} | {2:>10} | {3:>14} | {4:>10} | {5:>7} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
+            "| {0:<7} | {1:<19} | {2:>10} | {3:>14} | {4:>10} | {5:>7} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
                 status,
                 row["approach"],
                 impl_str,
@@ -141,13 +184,17 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
                 "{:.2f}".format(row["total"]),
                 regressions_str,
                 acs_str,
-                row["findings"],
+                findings_str,
                 "{:.1f}s".format(row["duration_ms"] / 1000.0),
             )
         )
 
         if not row["reconciled"]:
             failed_notes.append((row["approach"], row["reconciliation_note"]))
+        if not row["attribution_available"]:
+            unattributed_notes.append((row["approach"], row["attribution_note"]))
+        if row["empty_diff"]:
+            empty_diff_notes.append((row["approach"], row["empty_diff_note"]))
 
     # Skipped files section
     skipped_files = None
@@ -182,6 +229,49 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
                 lines.append("- **{0}**: {1}".format(approach, note))
             else:
                 lines.append("- **{0}**: per-phase reconstruction drifted past tolerance.".format(approach))
+
+    # Footnotes for unavailable phase attribution
+    if unattributed_notes:
+        lines += [
+            "",
+            "## Phase attribution unavailable",
+            "",
+            "These rows declared more than one phase, but **no phase marker matched anywhere in",
+            "the transcript** — so every entry defaulted into whichever phase was declared first",
+            "and the whole run's spend landed in one bucket. That is an artefact of the",
+            "attribution rule, not a measurement, so the impl-only / review + fix / ceremony",
+            "split is shown as `—`. **The total $ column is still valid** — only the split is not.",
+            "",
+            "This is what happens when an approach's phases run inline inside one session rather",
+            "than being triggered by literal slash commands the marker regex can see.",
+            "",
+        ]
+        for approach, note in unattributed_notes:
+            if note:
+                lines.append("- **{0}**: {1}".format(approach, note))
+            else:
+                lines.append(
+                    "- **{0}**: multiple phases declared, no marker ever fired.".format(approach)
+                )
+
+    # Footnotes for cells that produced no code change
+    if empty_diff_notes:
+        lines += [
+            "",
+            "## Failed cells — no code change",
+            "",
+            "These cells ran a measured session and produced an **empty diff** against their base",
+            "commit. There is nothing to grade, so ACs and findings are shown as `—` rather than",
+            "as a clean `0/0` with 0 findings. **These are failed cells, not good results.**",
+            "The usual cause is the session being unable to commit (missing Bash permission), or",
+            "the model finishing without writing anything.",
+            "",
+        ]
+        for approach, note in empty_diff_notes:
+            if note:
+                lines.append("- **{0}**: {1}".format(approach, note))
+            else:
+                lines.append("- **{0}**: `git diff base_sha..HEAD` was empty.".format(approach))
 
     # Artifact inventory
     inventory = artifact_inventory(runs)

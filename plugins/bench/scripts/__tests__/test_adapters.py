@@ -12,6 +12,7 @@ label: Demo Approach
 setup:
   - echo setting up
 run:
+  model: claude-opus-5
   prompt: |
     Implement {{ticket_key}}: {{ticket_summary}}
   flags: ["--permission-mode", "acceptEdits"]
@@ -45,7 +46,9 @@ class TestLoadAdapter(unittest.TestCase):
         self.assertEqual(adapter.phases[0].marker, "/implement")
 
     def test_missing_phases_defaults_to_single_impl_phase(self):
-        adapter = adapters.load_adapter(_write("id: bare\nlabel: Bare\nrun:\n  prompt: hi\n"))
+        adapter = adapters.load_adapter(
+            _write("id: bare\nlabel: Bare\nrun:\n  model: claude-opus-5\n  prompt: hi\n")
+        )
         self.assertEqual([p.id for p in adapter.phases], ["impl"])
         self.assertEqual(adapter.phases[0].marker, "")
 
@@ -61,7 +64,12 @@ class TestLoadAdapter(unittest.TestCase):
     def test_phase_entry_missing_id_is_an_error(self):
         # Finding 2: phase without id raises descriptive ValueError, not KeyError
         with self.assertRaisesRegex(ValueError, "phase 0 missing required key 'id'"):
-            adapters.load_adapter(_write("id: bad\nrun:\n  prompt: hi\nphases:\n  - {marker: x}\n"))
+            adapters.load_adapter(
+                _write(
+                    "id: bad\nrun:\n  model: claude-opus-5\n  prompt: hi\n"
+                    "phases:\n  - {marker: x}\n"
+                )
+            )
 
 
 class TestRender(unittest.TestCase):
@@ -99,3 +107,30 @@ class TestShippedAdapters(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAdapterModelContract(unittest.TestCase):
+    """Every adapter must name its model, so a row is labelled honestly (C4)."""
+
+    def _adapter(self, tmp, body):
+        path = Path(tmp) / "a.yaml"
+        path.write_text(body)
+        return path
+
+    def test_model_is_loaded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._adapter(tmp, "id: x\nrun:\n  model: claude-opus-5\n  prompt: hi\n")
+            self.assertEqual(adapters.load_adapter(path).model, "claude-opus-5")
+
+    def test_missing_model_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._adapter(tmp, "id: x\nrun:\n  prompt: hi\n")
+            with self.assertRaises(ValueError) as ctx:
+                adapters.load_adapter(path)
+            self.assertIn("run.model", str(ctx.exception))
+
+    def test_shipped_opus_adapter_declares_its_model(self):
+        path = (
+            Path(__file__).resolve().parents[2] / "approaches" / "opus.yaml"
+        )
+        self.assertEqual(adapters.load_adapter(path).model, "claude-opus-5")

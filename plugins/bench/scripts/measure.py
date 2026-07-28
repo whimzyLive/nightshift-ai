@@ -390,12 +390,38 @@ def compute_work_done(cell: dict, transcript: Path) -> Dict[str, int]:
     """
     stats = git_numstat(cell["worktree"], cell["base_sha"])
     tool_counts = count_tool_uses(transcript, ["Edit", "Write"])
+
+    # An empty diff is a FAILED CELL, not a zero result. Everything
+    # downstream reads as success: the graders receive an empty patch and
+    # honestly report 0 findings and no regressions, and the report renders
+    # a clean row. Nothing else in the pipeline can tell the difference
+    # between "produced no defects" and "produced no code", so it has to be
+    # detected here and said loudly.
+    empty_diff = stats["files_touched"] == 0
+    note = ""
+    if empty_diff:
+        note = (
+            "no code change: `git diff {0}..HEAD` in {1} is empty. The measured "
+            "session ran but committed nothing, so there is nothing to grade. "
+            "The session made {2} Edit and {3} Write tool call(s) -- if those are "
+            "non-zero the work was done but never committed (check that the "
+            "worktree's .claude/settings.local.json grants Bash(git commit:*)); "
+            "if they are zero the session produced no work at all.".format(
+                cell["base_sha"],
+                cell["worktree"],
+                tool_counts["Edit"],
+                tool_counts["Write"],
+            )
+        )
+
     return {
         "files_touched": stats["files_touched"],
         "lines_added": stats["lines_added"],
         "lines_removed": stats["lines_removed"],
         "edit_calls": tool_counts["Edit"],
         "write_calls": tool_counts["Write"],
+        "empty_diff": empty_diff,
+        "empty_diff_note": note,
     }
 
 
@@ -568,6 +594,9 @@ def main(argv: Optional[list] = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(run, indent=2))
 
+    if work_done["empty_diff"]:
+        print("FAILED CELL: " + work_done["empty_diff_note"])
+
     status = "ok" if ok else "RECONCILIATION FAILED"
     print(
         "measured {0}: reported=${1:.4f} computed=${2:.4f} "
@@ -584,7 +613,7 @@ def main(argv: Optional[list] = None) -> int:
         print("WARNING: " + attribution["note"])
     for note in notes:
         print("WARNING: " + note)
-    return 0 if ok else 1
+    return 0 if (ok and not work_done["empty_diff"]) else 1
 
 
 if __name__ == "__main__":

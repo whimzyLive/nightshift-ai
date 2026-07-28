@@ -209,3 +209,129 @@ class TestPhaseRowsExtended(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPhaseAttributionRendering(unittest.TestCase):
+    """A row whose markers never fired must not print a split (finding C3)."""
+
+    def _run(self, **attribution):
+        run = copy.deepcopy(RUN)
+        run["phase_attribution"] = attribution
+        return run
+
+    def test_multi_phase_no_marker_fired_renders_em_dashes(self):
+        run = self._run(
+            declared_phases=["spec", "impl", "review-fix"],
+            marker_fires={"spec": 0, "impl": 0, "review-fix": 0},
+            any_marker_fired=False,
+            available=False,
+            note="phase attribution unavailable: 3 phases declared",
+        )
+        md = report.render_markdown("NA-80", [run])
+        # The fabricated impl-only figure must not appear.
+        self.assertNotIn("30.00", md)
+        self.assertIn("NO SPLIT", md)
+        self.assertIn("—", md)
+        # The total is still a real measurement and must survive.
+        self.assertIn("46.67", md)
+
+    def test_multi_phase_no_marker_fired_adds_a_footnote(self):
+        run = self._run(
+            declared_phases=["spec", "impl"],
+            marker_fires={"spec": 0, "impl": 0},
+            any_marker_fired=False,
+            available=False,
+            note="no phase marker matched anywhere in the transcript",
+        )
+        md = report.render_markdown("NA-80", [run])
+        self.assertIn("## Phase attribution unavailable", md)
+        self.assertIn("no phase marker matched", md)
+
+    def test_single_declared_phase_with_empty_marker_still_renders(self):
+        # opus.yaml's shape: one phase, no marker needed. NOT the broken case.
+        run = {
+            "approach": "opus",
+            "total": {"reported_cost_usd": 9.71, "duration_ms": 1000},
+            "by_phase": {"impl": {"cost_usd": 9.71}},
+            "reconciliation": {"ok": True},
+            "phase_attribution": {
+                "declared_phases": ["impl"],
+                "marker_fires": {"impl": 0},
+                "any_marker_fired": False,
+                "available": True,
+                "note": "",
+            },
+            "grades": {"acs": {"AC1": {"met": True}}, "findings_count": 0},
+        }
+        md = report.render_markdown("NA-80", [run])
+        self.assertIn("9.71", md)
+        self.assertNotIn("NO SPLIT", md)
+        self.assertNotIn("## Phase attribution unavailable", md)
+
+    def test_marker_that_fired_renders_normally(self):
+        run = self._run(
+            declared_phases=["spec", "impl"],
+            marker_fires={"spec": 1, "impl": 4},
+            any_marker_fired=True,
+            available=True,
+            note="",
+        )
+        md = report.render_markdown("NA-80", [run])
+        self.assertIn("30.00", md)
+        self.assertNotIn("NO SPLIT", md)
+
+    def test_unattributed_row_is_excluded_from_the_artifact_inventory(self):
+        run = self._run(
+            declared_phases=["spec", "impl"],
+            marker_fires={"spec": 0, "impl": 0},
+            any_marker_fired=False,
+            available=False,
+            note="",
+        )
+        self.assertEqual(report.artifact_inventory([run]), [])
+
+    def test_run_json_without_phase_attribution_is_treated_as_available(self):
+        md = report.render_markdown("NA-80", [copy.deepcopy(RUN)])
+        self.assertIn("30.00", md)
+        self.assertNotIn("NO SPLIT", md)
+
+
+class TestEmptyDiffRendering(unittest.TestCase):
+    """A cell with no code change is a failed cell (finding C4)."""
+
+    def _empty_diff_run(self):
+        run = copy.deepcopy(RUN)
+        run["work_done"] = {
+            "files_touched": 0,
+            "lines_added": 0,
+            "lines_removed": 0,
+            "edit_calls": 7,
+            "write_calls": 1,
+            "empty_diff": True,
+            "empty_diff_note": "no code change: git diff base..HEAD is empty",
+        }
+        run["grades"] = {"acs": {}, "findings_count": 0, "regressions": False}
+        return run
+
+    def test_status_says_no_diff(self):
+        md = report.render_markdown("NA-80", [self._empty_diff_run()])
+        self.assertIn("NO DIFF", md)
+
+    def test_zero_findings_is_not_rendered_as_a_clean_result(self):
+        md = report.render_markdown("NA-80", [self._empty_diff_run()])
+        table = [ln for ln in md.splitlines() if ln.startswith("| NO DIFF")][0]
+        # ACs and findings must be em dashes, never "0/0" and "0".
+        self.assertNotIn("0/0", table)
+        self.assertIn("—", table)
+
+    def test_adds_a_failed_cell_footnote(self):
+        md = report.render_markdown("NA-80", [self._empty_diff_run()])
+        self.assertIn("## Failed cells — no code change", md)
+        self.assertIn("no code change", md)
+
+    def test_a_cell_with_a_diff_renders_normally(self):
+        run = copy.deepcopy(RUN)
+        run["work_done"] = {"files_touched": 4, "empty_diff": False, "empty_diff_note": ""}
+        md = report.render_markdown("NA-80", [run])
+        self.assertNotIn("NO DIFF", md)
+        self.assertNotIn("## Failed cells", md)

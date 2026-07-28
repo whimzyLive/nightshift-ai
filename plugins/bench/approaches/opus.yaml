@@ -3,6 +3,10 @@ label: Direct Opus, no framework
 # No setup: this approach deliberately brings no tooling, no skills, no process.
 setup: []
 run:
+  # Required. Passed to `claude --model`, so the row is labelled honestly:
+  # without it the session runs on whatever the operator's default happens
+  # to be and "Direct Opus" is a claim the measurement cannot support.
+  model: claude-opus-5
   prompt: |
     Implement the following ticket in this repository.
 

@@ -23,22 +23,22 @@ class TestBuildVariables(unittest.TestCase):
 
 class TestClaudeArgv(unittest.TestCase):
     def test_always_prints_json(self):
-        argv = execute.claude_argv([])
+        argv = execute.claude_argv([], "claude-opus-5")
         self.assertIn("--print", argv)
         self.assertIn("--output-format", argv)
         self.assertIn("json", argv)
 
     def test_appends_adapter_flags(self):
-        argv = execute.claude_argv(["--permission-mode", "acceptEdits"])
+        argv = execute.claude_argv(["--permission-mode", "acceptEdits"], "claude-opus-5")
         self.assertIn("--permission-mode", argv)
         self.assertIn("acceptEdits", argv)
 
     def test_prompt_is_not_passed_as_an_argument(self):
-        argv = execute.claude_argv([])
+        argv = execute.claude_argv([], "claude-opus-5")
         self.assertNotIn("-p", argv)
 
     def test_never_bypasses_permissions(self):
-        argv = execute.claude_argv([])
+        argv = execute.claude_argv([], "claude-opus-5")
         self.assertNotIn("--dangerously-skip-permissions", argv)
 
 
@@ -168,3 +168,17 @@ class TestRenderHook(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestClaudeArgvModel(unittest.TestCase):
+    """execute must pass --model, or the row measures the operator's default (C4)."""
+
+    def test_model_is_passed(self):
+        argv = execute.claude_argv([], "claude-opus-5")
+        self.assertIn("--model", argv)
+        self.assertEqual(argv[argv.index("--model") + 1], "claude-opus-5")
+
+    def test_adapter_flags_still_follow(self):
+        argv = execute.claude_argv(["--permission-mode", "acceptEdits"], "claude-opus-5")
+        self.assertEqual(argv[-2:], ["--permission-mode", "acceptEdits"])
+        self.assertIn("--model", argv)
