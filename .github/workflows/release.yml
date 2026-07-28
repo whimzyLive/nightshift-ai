@@ -68,7 +68,12 @@ jobs:
           PROJECT: ${{ inputs.project }}
         run: |
           set -euo pipefail
-          args=(--yes)
+          # --skip-publish, NOT --yes: these are Claude plugins, released as git tags and
+          # GitHub releases only, with no registry to publish to. Both flags answer the same
+          # publish prompt and are mutually exclusive; --yes answers "yes", which then errors
+          # with `no "nx-release-publish" target` and exits 1 AFTER the tag, push and release
+          # have already succeeded, marking a good release as a failed run.
+          args=(--skip-publish)
           [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
           [ -n "${PROJECT:-}" ] && [ "${PROJECT}" != "all" ] && args+=(-p "${PROJECT}")
           echo "running: pnpm nx release ${args[*]}"
