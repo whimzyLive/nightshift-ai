@@ -95,17 +95,17 @@ class TestGraderPrompt(unittest.TestCase):
     grader to go read (and potentially escape) on disk."""
 
     def test_inlines_acs_diff_and_tests(self):
-        prompt = grade.grader_prompt("AC1: does the thing", "diff --git a/x b/x", "3 passed")
+        prompt = grade.grader_prompt("AC1: does the thing", "diff --git a/x b/x", "3 passed", ["AC1"])
         self.assertIn("AC1: does the thing", prompt)
         self.assertIn("diff --git a/x b/x", prompt)
         self.assertIn("3 passed", prompt)
 
     def test_instructs_grader_not_to_speculate_on_provenance(self):
-        prompt = grade.grader_prompt("acs", "diff", "tests")
+        prompt = grade.grader_prompt("acs", "diff", "tests", ["AC1"])
         self.assertIn("do not know how it was produced", prompt.lower())
 
     def test_requests_json_only_reply(self):
-        prompt = grade.grader_prompt("acs", "diff", "tests")
+        prompt = grade.grader_prompt("acs", "diff", "tests", ["AC1"])
         self.assertIn("JSON object", prompt)
         self.assertIn('"acs"', prompt)
 
@@ -177,7 +177,9 @@ class TestBuildBlindDir(unittest.TestCase):
 
     def test_acs_and_tests_are_written(self):
         target = grade.build_blind_dir(self.cell, self.story, self.blind_base)
-        self.assertEqual((target / "acs.md").read_text(), "AC1: app.ts is updated")
+        # acs.md carries the harness-numbered criteria (finding I3), with the
+        # author's hand-written "AC1:" prefix replaced by our own id.
+        self.assertEqual((target / "acs.md").read_text(), "AC1. app.ts is updated")
         self.assertEqual((target / "tests.txt").read_text(), "2 passed\n")
 
     def test_missing_tests_file_falls_back_to_not_run(self):
@@ -212,12 +214,25 @@ class TestBlindBaseDir(unittest.TestCase):
                 cell = {"ticket": "NA-1", "approach": approach, "run_id": "r1", "repo": "/repo"}
                 self.assertNotIn(approach, str(grade.blind_base_dir(cell)))
 
-    def test_path_is_keyed_by_repo_and_ticket_only(self):
+    def test_path_is_outside_every_repository(self):
+        """Finding I1: the blind dir must not sit inside the repo under
+        grading -- a grader rooted there can `ls ..` the sibling cell
+        directories AND loads the repo's CLAUDE.md / .claude/ config."""
         cell = {"ticket": "NA-42", "approach": "opus", "run_id": "r1", "repo": "/repo"}
-        self.assertEqual(
-            grade.blind_base_dir(cell),
-            Path("/repo") / "docs" / "benchmarks" / "NA-42" / "blind",
-        )
+        base = grade.blind_base_dir(cell)
+        self.assertNotIn("/repo", str(base))
+        self.assertNotIn("docs/benchmarks", str(base))
+        self.assertTrue(base.is_absolute())
+        self.assertTrue(base.exists())
+
+    def test_each_call_yields_a_fresh_isolated_directory(self):
+        cell = {"ticket": "NA-42", "approach": "opus", "run_id": "r1", "repo": "/repo"}
+        self.assertNotEqual(grade.blind_base_dir(cell), grade.blind_base_dir(cell))
+
+    def test_isolated_dir_has_no_sibling_cell_directories(self):
+        cell = {"ticket": "NA-42", "approach": "opus", "run_id": "r1", "repo": "/repo"}
+        base = grade.blind_base_dir(cell)
+        self.assertEqual(list(base.iterdir()), [])
 
 
 class TestFilterDiffApproachRedaction(unittest.TestCase):
@@ -484,7 +499,7 @@ class TestCollectVerdicts(unittest.TestCase):
     def _stub(outcomes):
         it = iter(outcomes)
 
-        def grader_fn(blind_dir, acs):
+        def grader_fn(blind_dir, acs, ac_ids=None):
             outcome = next(it)
             if isinstance(outcome, Exception):
                 raise outcome
@@ -531,3 +546,242 @@ class TestCollectVerdicts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Final whole-branch review findings: I1, I2, I3
+# ---------------------------------------------------------------------------
+
+
+class TestProcessArtifactStripping(unittest.TestCase):
+    """Presence of a process file is a perfect tell (finding I2)."""
+
+    def _diff_for(self, path):
+        return (
+            "diff --git a/{0} b/{0}\n"
+            "--- a/{0}\n"
+            "+++ b/{0}\n"
+            "@@ -0,0 +1 @@\n"
+            "+some content\n"
+        ).format(path)
+
+    def test_strips_superpowers_progress_files(self):
+        out = grade.filter_diff(self._diff_for(".superpowers/sdd/2026-01-01-x/progress.md"))
+        self.assertNotIn("some content", out)
+        self.assertNotIn(".superpowers", out)
+
+    def test_strips_plan_documents_anywhere(self):
+        for path in (
+            "docs/plans/my-plan.md",
+            "PLAN.md",
+            "notes/implementation-plan.md",
+            "docs/plan/step1.md",
+        ):
+            with self.subTest(path=path):
+                out = grade.filter_diff(self._diff_for(path))
+                self.assertNotIn("some content", out, path)
+
+    def test_strips_adr_directory(self):
+        out = grade.filter_diff(self._diff_for("docs/adr/0001-use-x.md"))
+        self.assertNotIn("some content", out)
+
+    def test_strips_claude_config_directory(self):
+        out = grade.filter_diff(self._diff_for(".claude/settings.json"))
+        self.assertNotIn("some content", out)
+
+    def test_strips_agents_directory(self):
+        out = grade.filter_diff(self._diff_for(".agents/product-marketing.md"))
+        self.assertNotIn("some content", out)
+
+    def test_still_keeps_ordinary_source_files(self):
+        out = grade.filter_diff(self._diff_for("src/planner.ts"))
+        self.assertIn("some content", out)
+
+    def test_keeps_a_source_file_that_merely_mentions_plan(self):
+        # `plan` inside a .ts filename is not a process artifact.
+        out = grade.filter_diff(self._diff_for("src/lib/plan-utils.ts"))
+        self.assertIn("some content", out)
+
+
+class TestNumberAcceptanceCriteria(unittest.TestCase):
+    """AC ids come from the harness, not the grader (finding I3)."""
+
+    def test_numbers_top_level_bullets_sequentially(self):
+        text, ids = grade.number_acceptance_criteria("- one\n- two\n- three")
+        self.assertEqual(ids, ["AC1", "AC2", "AC3"])
+        self.assertEqual(text, "AC1. one\nAC2. two\nAC3. three")
+
+    def test_nested_sub_bullets_are_not_separate_criteria(self):
+        text, ids = grade.number_acceptance_criteria("- Top A\n  - Sub A1\n- Top B")
+        self.assertEqual(ids, ["AC1", "AC2"])
+        self.assertIn("  - Sub A1", text)
+
+    def test_prose_lines_are_numbered_when_there_are_no_bullets(self):
+        text, ids = grade.number_acceptance_criteria("does the thing\ndoes the other thing")
+        self.assertEqual(ids, ["AC1", "AC2"])
+        self.assertTrue(text.startswith("AC1. does the thing"))
+
+    def test_existing_hand_written_ids_are_replaced_not_doubled(self):
+        text, ids = grade.number_acceptance_criteria("- AC1: alpha\n- AC7: beta")
+        self.assertEqual(ids, ["AC1", "AC2"])
+        self.assertEqual(text, "AC1. alpha\nAC2. beta")
+
+    def test_ids_are_stable_across_calls(self):
+        acs = "- a\n- b"
+        self.assertEqual(
+            grade.number_acceptance_criteria(acs)[1],
+            grade.number_acceptance_criteria(acs)[1],
+        )
+
+    def test_prompt_names_the_allowed_ids_and_forbids_others(self):
+        prompt = grade.grader_prompt("AC1. a\nAC2. b", "diff", "tests", ["AC1", "AC2"])
+        self.assertIn("AC1, AC2", prompt)
+        self.assertIn("invent ids", prompt)
+
+
+class TestValidateVerdict(unittest.TestCase):
+    """One malformed grader must not discard the others (finding I3)."""
+
+    ALLOWED = ["AC1", "AC2"]
+
+    def test_accepts_a_well_formed_verdict(self):
+        v = grade.validate_verdict(
+            {"acs": [{"id": "AC1", "met": True, "evidence": "x"}], "findings": [],
+             "regressions": False, "first_fix_round_items": 0},
+            self.ALLOWED,
+        )
+        self.assertEqual(v["acs"][0]["id"], "AC1")
+
+    def test_rejects_an_entry_with_no_id(self):
+        # Pre-fix this KeyError'd out of reduce_verdicts and discarded all
+        # three paid grader calls.
+        with self.assertRaises(ValueError):
+            grade.validate_verdict({"acs": [{"met": True}]}, self.ALLOWED)
+
+    def test_rejects_acs_that_is_a_string(self):
+        with self.assertRaises(ValueError) as ctx:
+            grade.validate_verdict({"acs": "none"}, self.ALLOWED)
+        self.assertIn("not a list", str(ctx.exception))
+
+    def test_rejects_an_unknown_ac_id(self):
+        with self.assertRaises(ValueError) as ctx:
+            grade.validate_verdict({"acs": [{"id": "AC9", "met": True}]}, self.ALLOWED)
+        self.assertIn("AC9", str(ctx.exception))
+
+    def test_rejects_duplicate_ids(self):
+        with self.assertRaises(ValueError):
+            grade.validate_verdict(
+                {"acs": [{"id": "AC1", "met": True}, {"id": "AC1", "met": False}]},
+                self.ALLOWED,
+            )
+
+    def test_rejects_a_non_object_payload(self):
+        with self.assertRaises(ValueError):
+            grade.validate_verdict(["not", "an", "object"], self.ALLOWED)
+
+    def test_rejects_non_numeric_first_fix_round_items(self):
+        with self.assertRaises(ValueError):
+            grade.validate_verdict(
+                {"acs": [], "first_fix_round_items": "lots"}, self.ALLOWED
+            )
+
+    def test_missing_optional_fields_default_safely(self):
+        v = grade.validate_verdict({"acs": []}, self.ALLOWED)
+        self.assertEqual(v["findings"], [])
+        self.assertFalse(v["regressions"])
+        self.assertEqual(v["first_fix_round_items"], 0)
+
+
+class TestOneBadGraderDoesNotDiscardTheOthers(unittest.TestCase):
+    @staticmethod
+    def _stub(outcomes):
+        it = iter(outcomes)
+
+        def grader_fn(blind_dir, acs, ac_ids=None):
+            outcome = next(it)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        return grader_fn
+
+    def test_malformed_verdict_is_retried_then_only_it_is_discarded(self):
+        good = {"acs": [{"id": "AC1", "met": True}]}
+        outcomes = [
+            {"acs": "none"}, {"acs": "none"},  # grader 1: malformed twice
+            good,                              # grader 2
+            good,                              # grader 3
+        ]
+        result = grade.collect_verdicts(
+            Path("/x"), "acs", 3, grader_fn=self._stub(outcomes), ac_ids=["AC1"]
+        )
+        self.assertEqual(len(result["verdicts"]), 2)
+        self.assertEqual(len(result["failures"]), 1)
+        self.assertIn("not a list", result["failures"][0])
+
+    def test_unknown_id_verdict_is_rerequested(self):
+        good = {"acs": [{"id": "AC1", "met": True}]}
+        outcomes = [
+            {"acs": [{"id": "CRITERION-A", "met": True}]}, good,  # grader 1 recovers
+            good,
+            good,
+        ]
+        result = grade.collect_verdicts(
+            Path("/x"), "acs", 3, grader_fn=self._stub(outcomes), ac_ids=["AC1"]
+        )
+        self.assertEqual(len(result["verdicts"]), 3)
+        self.assertEqual(result["failures"], [])
+
+
+class TestComparableAcDenominator(unittest.TestCase):
+    def test_every_harness_id_appears_even_if_no_grader_mentioned_it(self):
+        verdicts = [{"acs": [{"id": "AC1", "met": True}]}]
+        reduced = grade.reduce_verdicts(verdicts, ac_ids=["AC1", "AC2", "AC3"])
+        self.assertEqual(sorted(reduced["acs"]), ["AC1", "AC2", "AC3"])
+        # An unmentioned criterion is not-met, never silently dropped.
+        self.assertFalse(reduced["acs"]["AC2"]["met"])
+        self.assertEqual(reduced["acs"]["AC2"]["votes"], [])
+
+    def test_denominator_is_identical_for_two_approaches(self):
+        ids = ["AC1", "AC2", "AC3"]
+        a = grade.reduce_verdicts([{"acs": [{"id": "AC1", "met": True}]}], ac_ids=ids)
+        b = grade.reduce_verdicts(
+            [{"acs": [{"id": i, "met": True} for i in ids]}], ac_ids=ids
+        )
+        self.assertEqual(len(a["acs"]), len(b["acs"]))
+
+    def test_reduce_survives_a_malformed_verdict_that_slipped_through(self):
+        verdicts = [{"acs": "none"}, {"acs": [{"id": "AC1", "met": True}]}, {"acs": [{}]}]
+        reduced = grade.reduce_verdicts(verdicts, ac_ids=["AC1"])
+        self.assertTrue(reduced["acs"]["AC1"]["met"])
+
+
+class TestArchiveBlindInputs(unittest.TestCase):
+    """The grader runs from temp; the record lives with the cell (finding I1)."""
+
+    def test_copies_the_blinded_inputs_under_the_cells_artifacts(self):
+        tmp = Path(tempfile.mkdtemp())
+        blind = tmp / "src" / "cell-abcd1234"
+        blind.mkdir(parents=True)
+        (blind / "diff.patch").write_text("patch")
+        (blind / "acs.md").write_text("AC1. a")
+        (blind / "tests.txt").write_text("ok")
+        artifacts = tmp / "artifacts"
+        artifacts.mkdir()
+
+        target = grade.archive_blind_inputs({"artifacts": str(artifacts)}, blind)
+        self.assertTrue((target / "diff.patch").exists())
+        self.assertEqual((target / "acs.md").read_text(), "AC1. a")
+        # The archive is NOT where the grader ran.
+        self.assertNotEqual(target, blind)
+
+    def test_is_idempotent(self):
+        tmp = Path(tempfile.mkdtemp())
+        blind = tmp / "src" / "cell-abcd1234"
+        blind.mkdir(parents=True)
+        (blind / "diff.patch").write_text("patch")
+        artifacts = tmp / "artifacts"
+        artifacts.mkdir()
+        grade.archive_blind_inputs({"artifacts": str(artifacts)}, blind)
+        target = grade.archive_blind_inputs({"artifacts": str(artifacts)}, blind)
+        self.assertTrue((target / "diff.patch").exists())

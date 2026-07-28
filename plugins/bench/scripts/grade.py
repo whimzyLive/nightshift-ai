@@ -10,11 +10,15 @@ evidence of code correctness.
 Blinding rests on three independent properties, not on any single one being
 airtight:
 
-  1. Path: blind_dir (see blind_base_dir) is keyed by repo + ticket only.
-     The approach never appears in any path segment, so a `pwd`, an `ls ..`,
-     or a stray error message that echoes a path cannot reveal it — no
-     `..`-traversal is even required to leak it if the path itself named the
-     approach, which is why this matters as much as the traversal risk.
+  1. Isolation: blind_dir (see blind_base_dir) is a fresh temp directory
+     OUTSIDE every repository, containing only the blinded inputs. The
+     approach never appears in any path segment, there are no sibling cell
+     directories for an `ls ..` to enumerate, and — just as important — a
+     `claude` process rooted there loads no repository CLAUDE.md, no
+     `.claude/` configuration and no installed plugins, so the grader is
+     neutral and its context is reproducible. A copy of the same blinded
+     inputs is archived under the cell's artifacts for the record; the
+     grader never runs from that copy.
   2. Content: filter_diff drops process-artifact file sections by path AND
      redacts approach-identifying content (alias phrases per approach —
      see APPROACH_REDACTION_ALIASES — and bench/<ticket>/<approach>/<run-id>
@@ -40,17 +44,38 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import statistics
 import subprocess
+import tempfile
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
+# File-path substrings whose diff sections are dropped before grading.
+#
+# The point is not redaction -- it is PRESENCE. A redacted
+# `.superpowers/sdd/*/progress.md` hunk still tells the grader it is looking
+# at a heavyweight process approach, because the direct-Opus cell can never
+# produce one. Any path that only one class of approach can create is a
+# perfect tell no matter how thoroughly its contents are scrubbed.
 STRIP_PATTERNS = [
     "docs/superpowers/",
     "docs/features/",
     "docs/benchmarks/",
+    ".superpowers/",
     ".specify/",
+    ".claude/",
+    ".agents/",
+    "docs/adr/",
     "CHANGELOG.md",
+]
+
+# Path patterns that a plain substring cannot express. Plan documents are
+# the clearest example: they live under many different roots and carry many
+# different names, and every one of them is a process tell.
+STRIP_REGEXES = [
+    re.compile(r"(^|/)[^/]*plan[^/]*\.md$", re.IGNORECASE),
+    re.compile(r"(^|/)plans?/", re.IGNORECASE),
 ]
 
 # Known approach ids. Used for path-safety purposes (e.g. blind_base_dir
@@ -143,7 +168,10 @@ def filter_diff(diff_text: str) -> str:
     for line in diff_text.splitlines():
         path = _diff_header_path(line)
         if path is not None:
-            keeping = not any(pattern in path for pattern in STRIP_PATTERNS)
+            keeping = not (
+                any(pattern in path for pattern in STRIP_PATTERNS)
+                or any(pattern.search(path) for pattern in STRIP_REGEXES)
+            )
         if not keeping:
             continue
         if _TRAILER.match(line):
@@ -167,38 +195,180 @@ def cell_hash(cell: dict) -> str:
     return "cell-" + hashlib.sha256(seed.encode()).hexdigest()[:8]
 
 
-def grader_prompt(acs: str, diff_text: str, tests_text: str) -> str:
+_AC_BULLET = re.compile(r"^(?:[-*+]|\d+[.)])\s+(.*)$")
+# An AC id the ticket author already wrote by hand. Stripped and replaced
+# with the harness's own sequential id, so "AC1: does X" never becomes
+# "AC1. AC1: does X" and a ticket that numbers its criteria oddly (AC3, AC7)
+# still produces a dense, comparable AC1..ACn sequence.
+_EXISTING_AC_ID = re.compile(r"^AC\s*\d+\s*[.:)\-]\s*", re.IGNORECASE)
+
+
+def number_acceptance_criteria(acs_text: str) -> Tuple[str, List[str]]:
+    """Assign deterministic AC1..ACn ids to the criteria, harness-side.
+
+    Returns (numbered_text, ids).
+
+    Letting the grader invent its own ids is what makes the ACs column
+    incomparable across rows: three independent graders enumerate the same
+    criteria differently, so acs_met/acs_total denominators differ between
+    approaches -- and comparing approaches is the entire point of the
+    report. Numbering here fixes the denominator before any grader sees it.
+
+    Only TOP-LEVEL bullets are numbered. An indented sub-bullet is part of
+    its parent criterion, not a criterion of its own (the same nesting
+    distinction resolve.py's flattener preserves).
+    """
+    lines = (acs_text or "").splitlines()
+    out: List[str] = []
+    ids: List[str] = []
+    for line in lines:
+        match = _AC_BULLET.match(line) if line[:1] not in (" ", "\t") else None
+        if match:
+            ac_id = "AC{0}".format(len(ids) + 1)
+            ids.append(ac_id)
+            out.append("{0}. {1}".format(ac_id, _EXISTING_AC_ID.sub("", match.group(1))))
+        else:
+            out.append(line)
+
+    if not ids:
+        # No bullet list at all -- number each non-empty line instead, so a
+        # prose-style AC block still yields stable ids.
+        out = []
+        for line in lines:
+            if line.strip():
+                ac_id = "AC{0}".format(len(ids) + 1)
+                ids.append(ac_id)
+                out.append(
+                    "{0}. {1}".format(ac_id, _EXISTING_AC_ID.sub("", line.strip()))
+                )
+            else:
+                out.append(line)
+
+    return "\n".join(out), ids
+
+
+def grader_prompt(acs: str, diff_text: str, tests_text: str, ac_ids: List[str]) -> str:
     """Everything the grader may see is inlined here.
 
     The alternative — pointing the grader at a directory and letting it read files —
     gives it a working directory it can escape. One `..` reaches the real repository,
     where branch names and plan documents identify the approach immediately.
+
+    `ac_ids` are assigned by the harness, not the grader. The prompt names
+    them explicitly and forbids inventing others, so every row's ACs
+    denominator is the same number and the column is comparable.
     """
+    id_list = ", ".join(ac_ids) if ac_ids else "(none)"
     return (
         "You are reviewing a code change. You do not know how it was produced, you have no way "
         "to find out, and you must not speculate about it.\n\n"
-        "Acceptance criteria:\n{0}\n\n"
+        "Acceptance criteria (each is prefixed with its id):\n{0}\n\n"
         "Test output:\n```\n{1}\n```\n\n"
         "Diff under review:\n```diff\n{2}\n```\n\n"
+        "You MUST return exactly one entry per acceptance criterion, using exactly "
+        "these ids and no others: {3}. Do not merge, split, renumber, skip, or "
+        "invent ids -- a response using any other id is discarded and re-requested.\n\n"
         "Reply with ONLY a JSON object, no prose, in this exact shape:\n"
         '{{"acs": [{{"id": "AC1", "met": true, "evidence": "quote from the diff"}}], '
         '"findings": [{{"severity": "high|medium|low", "summary": "one sentence"}}], '
         '"regressions": false, "first_fix_round_items": 0}}\n'
-    ).format(acs, tests_text, diff_text)
+    ).format(acs, tests_text, diff_text, id_list)
+
+
+def validate_verdict(payload: object, allowed_ids: List[str]) -> dict:
+    """Return a normalised verdict, or raise ValueError explaining the defect.
+
+    Grader output is untrusted model output, not a data structure. Before
+    this existed, reduce_verdicts KeyError'd on a verdict missing `id` and
+    TypeError'd on `"acs": "none"` -- and because both escaped the collect
+    loop, ONE malformed field discarded all three paid grader calls. Every
+    defect found here is raised as a plain ValueError so the caller can
+    retry that single grader and keep the others.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("grader returned {0}, not a JSON object".format(type(payload).__name__))
+
+    raw_acs = payload.get("acs")
+    if raw_acs is None:
+        raw_acs = []
+    if not isinstance(raw_acs, list):
+        raise ValueError('grader returned "acs" as {0}, not a list'.format(type(raw_acs).__name__))
+
+    allowed = set(allowed_ids)
+    seen = set()
+    acs: List[dict] = []
+    for item in raw_acs:
+        if not isinstance(item, dict):
+            raise ValueError("grader returned a non-object entry in \"acs\": {0!r}".format(item))
+        ac_id = item.get("id")
+        if not isinstance(ac_id, str):
+            raise ValueError('grader returned an "acs" entry with no usable id: {0!r}'.format(item))
+        if allowed and ac_id not in allowed:
+            raise ValueError(
+                "grader used unknown acceptance-criterion id {0!r}; allowed ids are {1}".format(
+                    ac_id, ", ".join(sorted(allowed))
+                )
+            )
+        if ac_id in seen:
+            raise ValueError("grader returned duplicate acceptance-criterion id {0!r}".format(ac_id))
+        seen.add(ac_id)
+        evidence = item.get("evidence")
+        acs.append(
+            {
+                "id": ac_id,
+                "met": bool(item.get("met")),
+                "evidence": evidence if isinstance(evidence, str) else "",
+            }
+        )
+
+    findings = payload.get("findings")
+    if findings is None:
+        findings = []
+    if not isinstance(findings, list):
+        raise ValueError(
+            'grader returned "findings" as {0}, not a list'.format(type(findings).__name__)
+        )
+
+    try:
+        fix_items = int(payload.get("first_fix_round_items") or 0)
+    except (TypeError, ValueError):
+        raise ValueError(
+            'grader returned a non-numeric "first_fix_round_items": {0!r}'.format(
+                payload.get("first_fix_round_items")
+            )
+        )
+
+    return {
+        "acs": acs,
+        "findings": findings,
+        "regressions": bool(payload.get("regressions")),
+        "first_fix_round_items": fix_items,
+    }
 
 
 def blind_base_dir(cell: dict) -> Path:
-    """Root directory for this ticket's blind grading directories.
+    """A fresh temp root for blind grading, OUTSIDE any repository.
 
-    Deliberately keyed by repo + ticket only, never by approach: a blind_dir
-    path that names the approach anywhere lets the grader recover it via a
-    bare `pwd`, an `ls ..`, or any tool error that echoes a path — no
-    `..`-traversal required. cell["artifacts"] (written by provision.py) is
-    NOT a safe base for this reason — it is
-    `<repo>/docs/benchmarks/<ticket>/<approach>/artifacts`, two segments
-    away from the approach name.
+    The blind dir was previously
+    `<repo>/docs/benchmarks/<ticket>/blind/<hash>` -- inside the repo, and
+    the grader's cwd. Two things follow from that, both bad:
+
+      1. `ls ../..` from there lists `opus/`, `sdlc/`, ... each holding a
+         cell.json naming its approach, run id and bench branch, plus its
+         prompt.txt. The hash-named directory de-identifies itself and then
+         sits next to a directory listing that identifies everything.
+      2. A `claude` process whose cwd is inside this repository loads the
+         repo's CLAUDE.md, its .claude/ configuration and its installed
+         plugins into the grader's own context. The grader is then neither
+         neutral (it has read this repo's opinions about how work should be
+         done) nor reproducible (its context depends on the repo it happens
+         to be graded in).
+
+    A fresh mkdtemp has no siblings, no repo above it, and no project
+    configuration to discover. The blinded inputs are still archived under
+    the cell's artifacts for the record -- see archive_blind_inputs.
     """
-    return Path(cell["repo"]) / "docs" / "benchmarks" / cell["ticket"] / "blind"
+    return Path(tempfile.mkdtemp(prefix="bench-blind-"))
 
 
 def build_blind_dir(cell: dict, story: dict, base: Path) -> Path:
@@ -211,20 +381,37 @@ def build_blind_dir(cell: dict, story: dict, base: Path) -> Path:
         text=True,
         check=True,
     ).stdout
+    numbered_acs, _ = number_acceptance_criteria(story["acs"])
     (target / "diff.patch").write_text(filter_diff(diff))
-    (target / "acs.md").write_text(story["acs"])
+    (target / "acs.md").write_text(numbered_acs)
     tests = Path(cell["artifacts"]) / "tests.txt"
     (target / "tests.txt").write_text(tests.read_text() if tests.exists() else "not run")
     return target
 
 
-def run_grader(blind_dir: Path, acs: str) -> dict:
+def archive_blind_inputs(cell: dict, blind_dir: Path) -> Path:
+    """Copy the blinded inputs under the cell's artifacts, for the record.
+
+    The grader runs from the isolated temp dir; this copy exists so the
+    exact inputs a paid grader call saw remain auditable after the temp dir
+    is gone. It is written AFTER the grader directory is built and is never
+    the grader's cwd.
+    """
+    target = Path(cell["artifacts"]) / "blind" / blind_dir.name
+    if target.exists():
+        shutil.rmtree(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(str(blind_dir), str(target))
+    return target
+
+
+def run_grader(blind_dir: Path, acs: str, ac_ids: Optional[List[str]] = None) -> dict:
     diff_text = (blind_dir / "diff.patch").read_text()
     tests_text = (blind_dir / "tests.txt").read_text()
     proc = subprocess.run(
         ["claude", "--print", "--output-format", "json"],
         cwd=str(blind_dir),
-        input=grader_prompt(acs, diff_text, tests_text),
+        input=grader_prompt(acs, diff_text, tests_text, ac_ids or []),
         capture_output=True,
         text=True,
     )
@@ -242,17 +429,22 @@ def collect_verdicts(
     blind_dir: Path,
     acs: str,
     count: int,
-    grader_fn: Callable[[Path, str], dict] = run_grader,
+    grader_fn: Callable = run_grader,
+    ac_ids: Optional[List[str]] = None,
 ) -> dict:
     """Run `count` graders, retrying a failing grader once before giving up
     on it. Each grader call costs real money, so one flaky call must not
     throw away the others: this proceeds once a majority of graders produced
     a verdict, and raises only if fewer than a majority succeeded.
 
-    Returns {"verdicts": [...succeeded, in order...], "failures": ["error
-    text", ...]} — `failures` records one entry per grader slot that never
-    produced a verdict even after its retry.
+    A verdict is validated here, inside the retry loop, against the
+    harness-assigned `ac_ids`. Malformed shape and unknown ids are both
+    treated as retryable grader failures -- so the offending grader is
+    re-requested once and, if it fails again, only IT is discarded. That is
+    the whole point: one grader returning `"acs": "none"` used to throw a
+    TypeError out of the reduce step and discard all three paid calls.
     """
+    ac_ids = ac_ids or []
     verdicts: List[dict] = []
     failures: List[str] = []
     for _ in range(count):
@@ -260,10 +452,11 @@ def collect_verdicts(
         last_error = None
         for _attempt in range(2):  # initial try + one retry
             try:
-                verdict = grader_fn(blind_dir, acs)
+                verdict = validate_verdict(grader_fn(blind_dir, acs, ac_ids), ac_ids)
                 break
             except Exception as exc:  # noqa: BLE001 - any grader failure is retryable
                 last_error = str(exc)
+                verdict = None
         if verdict is not None:
             verdicts.append(verdict)
         else:
@@ -279,23 +472,43 @@ def collect_verdicts(
     return {"verdicts": verdicts, "failures": failures}
 
 
-def reduce_verdicts(verdicts: List[dict]) -> dict:
+def reduce_verdicts(verdicts: List[dict], ac_ids: Optional[List[str]] = None) -> dict:
     """Reduce independent grader verdicts to one verdict per AC.
 
     Majority is relative to the votes actually cast for that AC, not to
-    len(verdicts): graders are independent LLM calls and may enumerate
-    different AC ids, so an AC only one grader mentions must not be punished
-    for the other graders having said nothing about it. An exact tie
-    resolves to not-met — the burden of proof for "this AC is satisfied"
-    sits with the evidence, not the vote count.
+    len(verdicts): a grader that failed validation contributes nothing, and
+    an AC it would have voted on must not be punished for its absence. An
+    exact tie resolves to not-met — the burden of proof for "this AC is
+    satisfied" sits with the evidence, not the vote count.
+
+    When `ac_ids` is supplied, EVERY id appears in the result whether or not
+    any grader mentioned it — an unmentioned criterion is not-met with zero
+    votes. That is what makes acs_met/acs_total comparable across rows: the
+    denominator is the ticket's criterion count, fixed by the harness,
+    identical for every approach.
+
+    Entries are read defensively (`.get`, not `[]`) even though
+    validate_verdict has already normalised them, because this function is
+    also reachable with hand-built or historical verdict data.
     """
     acs: Dict[str, dict] = {}
+    for ac_id in ac_ids or []:
+        acs[ac_id] = {"votes": [], "evidence": []}
+
     for verdict in verdicts:
-        for item in verdict.get("acs") or []:
-            acs.setdefault(item["id"], {"votes": [], "evidence": []})
-            acs[item["id"]]["votes"].append(bool(item.get("met")))
+        items = verdict.get("acs")
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            ac_id = item.get("id")
+            if not isinstance(ac_id, str):
+                continue
+            acs.setdefault(ac_id, {"votes": [], "evidence": []})
+            acs[ac_id]["votes"].append(bool(item.get("met")))
             if item.get("evidence"):
-                acs[item["id"]]["evidence"].append(item["evidence"])
+                acs[ac_id]["evidence"].append(item["evidence"])
 
     reduced_acs = {}
     for ac_id, data in acs.items():
@@ -309,8 +522,16 @@ def reduce_verdicts(verdicts: List[dict]) -> dict:
             "evidence": data["evidence"][:1],
         }
 
-    counts = [len(v.get("findings") or []) for v in verdicts]
-    fix_items = [int(v.get("first_fix_round_items") or 0) for v in verdicts]
+    counts = [
+        len(v.get("findings")) if isinstance(v.get("findings"), list) else 0
+        for v in verdicts
+    ]
+    fix_items = []
+    for v in verdicts:
+        try:
+            fix_items.append(int(v.get("first_fix_round_items") or 0))
+        except (TypeError, ValueError):
+            fix_items.append(0)
     regressions = [bool(v.get("regressions")) for v in verdicts]
     regressions_yes = sum(1 for r in regressions if r)
 
@@ -334,11 +555,20 @@ def main(argv: Optional[list] = None) -> int:
     cell = json.loads(Path(args.cell).read_text())
     story = json.loads(Path(args.story).read_text())
 
-    blind_dir = build_blind_dir(cell, story, blind_base_dir(cell))
+    numbered_acs, ac_ids = number_acceptance_criteria(story["acs"])
 
-    result = collect_verdicts(blind_dir, story["acs"], args.graders)
-    reduced = reduce_verdicts(result["verdicts"])
+    # Built in an isolated temp root outside every repository, then archived
+    # under the cell's artifacts. The grader only ever sees the temp copy.
+    blind_dir = build_blind_dir(cell, story, blind_base_dir(cell))
+    archived = archive_blind_inputs(cell, blind_dir)
+
+    result = collect_verdicts(
+        blind_dir, numbered_acs, args.graders, ac_ids=ac_ids
+    )
+    reduced = reduce_verdicts(result["verdicts"], ac_ids=ac_ids)
     reduced["blind_dir"] = str(blind_dir)
+    reduced["blind_inputs_archived_to"] = str(archived)
+    reduced["ac_ids"] = ac_ids
     reduced["raw_verdicts"] = result["verdicts"]
     reduced["grader_failures"] = result["failures"]
     reduced["grader_failure_count"] = len(result["failures"])
