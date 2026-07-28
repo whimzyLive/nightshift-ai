@@ -11,6 +11,7 @@ Usage:
 """
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -21,6 +22,99 @@ from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchlib import adapters, config  # noqa: E402
+
+# Environment variables that put `claude` on a pay-per-token API key rather
+# than the operator's subscription. Checked for PRESENCE only -- the value is
+# a credential and is never read into any recorded structure.
+API_KEY_ENV_VARS = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
+
+
+def settings_candidates(repo: Path) -> List[Path]:
+    """Settings files whose contents can put a run on an API key.
+
+    Order is the order Claude Code itself resolves them, most general first.
+    """
+    return [
+        Path.home() / ".claude" / "settings.json",
+        Path(repo) / ".claude" / "settings.json",
+        Path(repo) / ".claude" / "settings.local.json",
+    ]
+
+
+def detect_billing_mode(
+    env: Dict[str, str], settings_paths: List[Path]
+) -> Dict[str, object]:
+    """Decide whether this run is billed to an API key or to a subscription.
+
+    Why this is recorded PER RUN and not stated once in a doc: a sweep can be
+    run on a different machine, or on this one after someone exports a key.
+    `total_cost_usd` means two genuinely different things in those two cases
+    -- real spend against an account, versus an API-list-price equivalent for
+    tokens that incurred no per-run charge. A reader months later has no way
+    to reconstruct which basis a row sat on unless the row says so itself.
+
+    Only PRESENCE and the variable NAME are recorded. The credential value is
+    never read into the returned structure, and therefore never reaches
+    result.json or run.json.
+    """
+    api_key_env_var = None
+    for name in API_KEY_ENV_VARS:
+        # An exported-but-empty variable is not a key. Treating it as one
+        # would mislabel a subscription run as API-billed.
+        if (env.get(name) or "").strip():
+            api_key_env_var = name
+            break
+
+    settings_evidence: List[str] = []
+    settings_checked: List[str] = []
+    for path in settings_paths:
+        settings_checked.append(str(path))
+        try:
+            data = json.loads(Path(path).read_text())
+        except (IOError, OSError, ValueError):
+            # A missing or malformed settings file is not evidence of a key.
+            # It must never abort a run that has yet to spend anything.
+            continue
+        if not isinstance(data, dict):
+            continue
+        if (data.get("apiKeyHelper") or "") != "":
+            settings_evidence.append("{0}: apiKeyHelper is set".format(path))
+        env_block = data.get("env")
+        if isinstance(env_block, dict):
+            for name in API_KEY_ENV_VARS:
+                if (env_block.get(name) or "") != "":
+                    settings_evidence.append(
+                        "{0}: env.{1} is set".format(path, name)
+                    )
+
+    is_api = api_key_env_var is not None or bool(settings_evidence)
+    if is_api:
+        reasons = []
+        if api_key_env_var:
+            reasons.append("{0} is set in the environment".format(api_key_env_var))
+        reasons.extend(settings_evidence)
+        evidence = (
+            "API key in play ({0}) -- cost figures are real spend against that "
+            "key.".format("; ".join(reasons))
+        )
+    else:
+        evidence = (
+            "no API key present (checked {0} and {1} settings file(s)) -- "
+            "`claude` authenticates via the operator's Claude subscription, so "
+            "reported cost figures are API-list-price equivalents for the tokens "
+            "consumed, not per-run spend.".format(
+                ", ".join(API_KEY_ENV_VARS), len(settings_checked)
+            )
+        )
+
+    return {
+        "mode": "api" if is_api else "subscription",
+        "api_key_env_var": api_key_env_var,
+        "settings_evidence": settings_evidence,
+        "env_vars_checked": list(API_KEY_ENV_VARS),
+        "settings_files_checked": settings_checked,
+        "evidence": evidence,
+    }
 
 
 def build_variables(
@@ -145,6 +239,11 @@ def main(argv: Optional[list] = None) -> int:
     payload["started_at"] = started_at
     payload["ended_at"] = ended_at
     payload["setup_seconds"] = round(setup_seconds, 3)
+    # Which basis this cell's dollar figures sit on. Recorded per run, never
+    # inferred later -- see detect_billing_mode.
+    payload["billing_mode"] = detect_billing_mode(
+        dict(os.environ), settings_candidates(Path(cell["repo"]))
+    )
 
     # Write result.json BEFORE running teardown. If teardown fails, the
     # already-paid-for result is still captured on disk.

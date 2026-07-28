@@ -1,7 +1,9 @@
+import json
 import shlex
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import execute  # noqa: E402
@@ -182,3 +184,91 @@ class TestClaudeArgvModel(unittest.TestCase):
         argv = execute.claude_argv(["--permission-mode", "acceptEdits"], "claude-opus-5")
         self.assertEqual(argv[-2:], ["--permission-mode", "acceptEdits"])
         self.assertIn("--model", argv)
+
+
+class TestDetectBillingMode(unittest.TestCase):
+    """CHANGE 1: the run must record WHICH basis its cost figures sit on.
+
+    On a subscription there is no per-run charge, so `total_cost_usd` is an
+    API-list-price equivalent, not spend. A sweep can be run on another
+    machine, or after someone exports a key, so this has to be recorded per
+    run rather than asserted once in a doc.
+    """
+
+    def _settings(self, tmp, name, payload):
+        path = Path(tmp) / name
+        path.write_text(json.dumps(payload))
+        return path
+
+    def test_no_key_anywhere_is_subscription(self):
+        with TemporaryDirectory() as tmp:
+            settings = self._settings(tmp, "s.json", {"env": {}})
+            mode = execute.detect_billing_mode({}, [settings])
+        self.assertEqual(mode["mode"], "subscription")
+        self.assertIsNone(mode["api_key_env_var"])
+        self.assertEqual(mode["settings_evidence"], [])
+
+    def test_anthropic_api_key_env_var_is_api(self):
+        with TemporaryDirectory() as tmp:
+            settings = self._settings(tmp, "s.json", {})
+            mode = execute.detect_billing_mode(
+                {"ANTHROPIC_API_KEY": "sk-ant-SUPERSECRET"}, [settings]
+            )
+        self.assertEqual(mode["mode"], "api")
+        self.assertEqual(mode["api_key_env_var"], "ANTHROPIC_API_KEY")
+
+    def test_anthropic_auth_token_env_var_is_api(self):
+        mode = execute.detect_billing_mode({"ANTHROPIC_AUTH_TOKEN": "tok-SECRET"}, [])
+        self.assertEqual(mode["mode"], "api")
+        self.assertEqual(mode["api_key_env_var"], "ANTHROPIC_AUTH_TOKEN")
+
+    def test_empty_env_var_is_not_treated_as_a_key(self):
+        mode = execute.detect_billing_mode({"ANTHROPIC_API_KEY": ""}, [])
+        self.assertEqual(mode["mode"], "subscription")
+
+    def test_api_key_helper_in_settings_is_api(self):
+        with TemporaryDirectory() as tmp:
+            settings = self._settings(tmp, "s.json", {"apiKeyHelper": "/bin/get-key"})
+            mode = execute.detect_billing_mode({}, [settings])
+        self.assertEqual(mode["mode"], "api")
+        self.assertTrue(any("apiKeyHelper" in e for e in mode["settings_evidence"]))
+
+    def test_env_anthropic_api_key_in_settings_is_api(self):
+        with TemporaryDirectory() as tmp:
+            settings = self._settings(
+                tmp, "s.json", {"env": {"ANTHROPIC_API_KEY": "sk-ant-SECRET"}}
+            )
+            mode = execute.detect_billing_mode({}, [settings])
+        self.assertEqual(mode["mode"], "api")
+        self.assertTrue(
+            any("env.ANTHROPIC_API_KEY" in e for e in mode["settings_evidence"])
+        )
+
+    def test_missing_or_malformed_settings_file_does_not_crash(self):
+        with TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "bad.json"
+            bad.write_text("{not json")
+            missing = Path(tmp) / "nope.json"
+            mode = execute.detect_billing_mode({}, [bad, missing])
+        self.assertEqual(mode["mode"], "subscription")
+
+    def test_never_records_the_secret_value(self):
+        """The whole point: presence and variable NAME only, never the value."""
+        secret = "sk-ant-DO-NOT-LEAK-THIS"
+        with TemporaryDirectory() as tmp:
+            settings = self._settings(
+                tmp, "s.json", {"env": {"ANTHROPIC_API_KEY": secret}}
+            )
+            mode = execute.detect_billing_mode(
+                {"ANTHROPIC_API_KEY": secret, "ANTHROPIC_AUTH_TOKEN": secret},
+                [settings],
+            )
+        serialised = json.dumps(mode)
+        self.assertNotIn(secret, serialised)
+        self.assertNotIn("sk-ant", serialised)
+
+    def test_evidence_is_a_human_readable_sentence(self):
+        mode = execute.detect_billing_mode({"ANTHROPIC_API_KEY": "x"}, [])
+        self.assertIn("ANTHROPIC_API_KEY", mode["evidence"])
+        subscription = execute.detect_billing_mode({}, [])
+        self.assertIn("subscription", subscription["evidence"].lower())

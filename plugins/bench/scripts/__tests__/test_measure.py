@@ -638,3 +638,32 @@ class TestEmptyDiffGuard(unittest.TestCase):
         self.assertFalse(work["empty_diff"])
         self.assertEqual(work["empty_diff_note"], "")
         self.assertEqual(work["files_touched"], 1)
+
+
+class TestBillingModeCarryThrough(unittest.TestCase):
+    """CHANGE 1: the billing mode recorded at execute time must reach run.json.
+
+    report.py reads it from there. A reader months later must be able to tell
+    which basis a row's dollar figures were measured on without re-deriving
+    it from the machine they happen to be standing at.
+    """
+
+    def test_billing_mode_is_carried_from_result(self):
+        result = {
+            "billing_mode": {
+                "mode": "subscription",
+                "api_key_env_var": None,
+                "settings_evidence": [],
+                "evidence": "no API key present; billed against the operator's subscription",
+            }
+        }
+        carried = measure.billing_mode_from_result(result)
+        self.assertEqual(carried["mode"], "subscription")
+        self.assertIn("subscription", carried["evidence"])
+
+    def test_result_without_billing_mode_is_unknown_not_assumed(self):
+        """A result.json written before this field existed must not be
+        silently relabelled as a subscription run."""
+        carried = measure.billing_mode_from_result({})
+        self.assertEqual(carried["mode"], "unknown")
+        self.assertTrue(carried["evidence"])

@@ -312,6 +312,29 @@ def phase_attribution(phases: List[dict], marker_fires: Dict[str, int]) -> dict:
     }
 
 
+def billing_mode_from_result(result: dict) -> dict:
+    """Carry execute.py's billing-mode record through into run.json.
+
+    A result.json written before that field existed is reported as "unknown",
+    never defaulted to either basis: silently labelling an old row
+    "subscription" would be exactly the kind of confidently-wrong claim this
+    harness exists to avoid.
+    """
+    recorded = result.get("billing_mode")
+    if isinstance(recorded, dict) and recorded.get("mode"):
+        return recorded
+    return {
+        "mode": "unknown",
+        "api_key_env_var": None,
+        "settings_evidence": [],
+        "evidence": (
+            "this result.json carries no billing_mode record (written before the "
+            "field existed), so whether its cost figures are real API spend or "
+            "subscription API-equivalents cannot be determined from the record."
+        ),
+    }
+
+
 def instruction_floor(residents: List[int]) -> int:
     return min(residents) if residents else 0
 
@@ -573,6 +596,7 @@ def main(argv: Optional[list] = None) -> int:
             "setup_seconds": result.get("setup_seconds"),
             "num_turns": result.get("num_turns"),
         },
+        "billing_mode": billing_mode_from_result(result),
         "by_phase": summary["by_phase"],
         "context": summary["context"],
         "subagents": summary["subagents"],
