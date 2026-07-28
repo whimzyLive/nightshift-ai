@@ -15,22 +15,27 @@ This command receives `${CLAUDE_PLUGIN_ROOT}` natively from the harness — use 
 
 ## Safety
 
-Runs execute against the real repository and cost real money. Before dispatching, confirm with the founder:
+Runs execute against the real repository and consume real capacity. Before dispatching, confirm with the founder:
 
 - the ticket key and the approaches to run
 - that branches will be created under `bench/` and never merged
-- the estimated spend
+- the expected consumption (below)
 
-### Estimating spend
+### Confirming expected consumption
 
-For each approach, state:
+**What the scarce resource actually is depends on how `claude` authenticates on this machine.** `execute.py` records that per run as `billing_mode` and the report states it:
+
+- **`subscription`** — no API key is in play. **No per-run charge is incurred; no money leaves an account.** The scarce resource is **rate-limit budget**, not dollars. A large sweep can exhaust the operator's window and cut a session off mid-run, which the harness marks as a `CUT OFF` cell.
+- **`api`** — an API key is in play, so token consumption is real spend against that key.
+
+State plainly, for each approach:
 
 - the number of measured sessions this approach will run (one session per cell in the pipeline)
 - that three independent graders evaluate the result per cell
-- that a prior measured direct-Opus session on this machine cost approximately $0.16 for a trivial prompt
-- that real story-sized prompts are significantly larger and spending is genuinely unpredictable
+- the resulting total number of `claude` invocations, since that is what consumes rate-limit budget
+- that a prior measured direct-Opus session on this machine reported approximately $0.16 API-equivalent for a trivial prompt, and that real story-sized prompts are significantly larger and consumption is genuinely unpredictable
 
-Present a cost range with its basis, and say plainly that the figure is an estimate, not a guarantee. If the founder wants a firmer number, the pilot cell exists precisely to produce one.
+**Any dollar figure you quote is an API-list-price equivalent for the tokens consumed — not a bill.** Say so explicitly. On a subscription it is a proxy for how much of the rate-limit window the run will use, nothing more. Present it as a range with its basis, and say plainly it is an estimate, not a guarantee. If the founder wants a firmer number, the pilot cell exists precisely to produce one.
 
 Do not proceed without that confirmation.
 

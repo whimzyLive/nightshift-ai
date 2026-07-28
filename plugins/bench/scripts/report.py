@@ -124,6 +124,48 @@ def artifact_inventory(runs: List[dict]) -> List[dict]:
     return inventory
 
 
+def billing_modes(runs: List[dict]) -> List[tuple]:
+    """The (mode, evidence) pairs observed across these runs, deduplicated.
+
+    Read from each run's record rather than assumed. A sweep's rows can
+    legitimately disagree — one cell measured before a key was exported and
+    one after — and a report that picked either as "the" mode would be
+    asserting something it does not know.
+    """
+    seen: List[tuple] = []
+    for run in runs:
+        if "approach" not in run:
+            continue
+        recorded = run.get("billing_mode") or {}
+        mode = recorded.get("mode") or "unknown"
+        evidence = recorded.get("evidence") or ""
+        if not evidence:
+            evidence = (
+                "no billing mode was recorded for this run, so whether its figures "
+                "are real API spend or subscription API-equivalents cannot be "
+                "determined from the record."
+            )
+        pair = (mode, evidence)
+        if pair not in seen:
+            seen.append(pair)
+    return seen
+
+
+# Why the money columns are labelled API-eq rather than plainly "$":
+# `total_cost_usd` is what the tokens WOULD cost at API list price. When
+# `claude` authenticates against an operator's subscription rather than an
+# API key, no per-run charge is incurred, so a column headed "total $" is
+# read as money that left an account when none did. The cross-approach
+# comparison is unaffected either way — every approach is priced identically
+# — so only the labelling was wrong.
+COST_BASIS_NOTE = [
+    "Dollar columns are **API-equivalents**: what the tokens consumed would cost at",
+    "API list price. They are not a bill. On a subscription run **no per-run charge is",
+    "incurred** — no money leaves an account. The comparison across approaches still",
+    "holds regardless, because every approach is priced against the same rate card.",
+]
+
+
 def render_markdown(ticket: str, runs: List[dict]) -> str:
     rows = phase_rows(runs)
     lines = [
@@ -132,8 +174,8 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         "Cost is split by phase. `impl-only` is the comparable figure across approaches;",
         "`review + fix` and `ceremony` are what the process-heavy approaches additionally buy.",
         "",
-        "| Status  | Approach            | impl-only $ | review + fix $ | ceremony $ | total $  | Regressions | ACs met   | findings | wall clock |",
-        "| ------- | ------------------- | ----------: | -------------: | ----------: | -------: | ----------- | --------- | -------- | ---------- |",
+        "| Status  | Approach            | impl-only API-eq $ | review + fix API-eq $ | ceremony API-eq $ | total API-eq $ | Regressions | ACs met   | findings | wall clock |",
+        "| ------- | ------------------- | -----------------: | --------------------: | ----------------: | -------------: | ----------- | --------- | -------- | ---------- |",
     ]
 
     failed_notes = []
@@ -175,7 +217,7 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             findings_str = str(row["findings"])
 
         lines.append(
-            "| {0:<7} | {1:<19} | {2:>10} | {3:>14} | {4:>10} | {5:>7} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
+            "| {0:<7} | {1:<19} | {2:>18} | {3:>21} | {4:>17} | {5:>14} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
                 status,
                 row["approach"],
                 impl_str,
@@ -195,6 +237,23 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             unattributed_notes.append((row["approach"], row["attribution_note"]))
         if row["empty_diff"]:
             empty_diff_notes.append((row["approach"], row["empty_diff_note"]))
+
+    # Cost basis, stated directly under the table. Read from what each run
+    # recorded at execute time -- never hardcoded to either mode.
+    modes = billing_modes(runs)
+    lines.append("")
+    if len(modes) == 1:
+        lines.append("Billing mode: **{0}**. {1}".format(modes[0][0], modes[0][1]))
+    elif len(modes) > 1:
+        lines.append(
+            "Billing mode: **{0}** (rows in this sweep were not all measured on the "
+            "same basis).".format(", ".join(mode for mode, _ in modes))
+        )
+        lines.append("")
+        for mode, evidence in modes:
+            lines.append("- **{0}**: {1}".format(mode, evidence))
+    lines.append("")
+    lines += COST_BASIS_NOTE
 
     # Skipped files section
     skipped_files = None
@@ -280,9 +339,9 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             "",
             "## Artifact inventory",
             "",
-            "What the ceremony spend bought (failed rows excluded).",
+            "What the ceremony spend bought, in API-equivalent dollars (failed rows excluded).",
             "",
-            "| Approach | Phase | Cost $ |",
+            "| Approach | Phase | Cost (API-eq $) |",
             "| --- | --- | ---: |",
         ]
         for item in inventory:

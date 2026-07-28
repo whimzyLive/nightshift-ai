@@ -335,3 +335,63 @@ class TestEmptyDiffRendering(unittest.TestCase):
         md = report.render_markdown("NA-80", [run])
         self.assertNotIn("NO DIFF", md)
         self.assertNotIn("## Failed cells", md)
+
+
+class TestApiEquivalentLabelling(unittest.TestCase):
+    """CHANGE 2: money columns must read as API-equivalent, not as spend.
+
+    On a subscription run no per-run charge is incurred, so a column headed
+    plainly "total $" is read as money that left an account. The comparison
+    across approaches is unaffected (every approach is priced identically),
+    so only the labelling needed fixing.
+    """
+
+    def _run_with_mode(self, mode):
+        run = copy.deepcopy(RUN)
+        run["billing_mode"] = {
+            "mode": mode,
+            "evidence": "evidence sentence for {0}".format(mode),
+        }
+        return run
+
+    def test_columns_are_labelled_api_equivalent(self):
+        out = report.render_markdown("NA-80", [RUN])
+        header = [l for l in out.split("\n") if l.startswith("| Status")][0]
+        self.assertIn("API-eq", header)
+
+    def test_note_explains_figures_are_api_list_price_equivalents(self):
+        out = report.render_markdown("NA-80", [RUN])
+        lowered = out.lower()
+        self.assertIn("api list price", lowered)
+        self.assertIn("no per-run charge", lowered)
+
+    def test_subscription_mode_is_stated_from_the_run_record(self):
+        out = report.render_markdown("NA-80", [self._run_with_mode("subscription")])
+        self.assertIn("subscription", out.lower())
+        self.assertIn("evidence sentence for subscription", out)
+
+    def test_api_mode_is_stated_and_not_hardcoded_to_subscription(self):
+        """The mode must be READ from the record, never assumed."""
+        out = report.render_markdown("NA-80", [self._run_with_mode("api")])
+        self.assertIn("Billing mode", out)
+        self.assertIn("evidence sentence for api", out)
+        billing_line = [
+            l for l in out.split("\n") if l.startswith("Billing mode")
+        ][0]
+        self.assertIn("api", billing_line)
+        self.assertNotIn("subscription", billing_line)
+
+    def test_unknown_mode_is_reported_as_unknown(self):
+        out = report.render_markdown("NA-80", [RUN])
+        self.assertIn("Billing mode", out)
+        self.assertIn("unknown", out.lower())
+
+    def test_mixed_modes_across_rows_are_all_named(self):
+        runs = [self._run_with_mode("subscription")]
+        api_run = self._run_with_mode("api")
+        api_run["approach"] = "opus"
+        runs.append(api_run)
+        out = report.render_markdown("NA-80", runs)
+        billing_line = [l for l in out.split("\n") if l.startswith("Billing mode")][0]
+        self.assertIn("subscription", billing_line)
+        self.assertIn("api", billing_line)
