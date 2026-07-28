@@ -1,21 +1,26 @@
 {
-  "_calibration_note": "claude-opus-5 cache_write corrected 6.25 -> 10.0 after calibration against a real claude -p result (see task-8-report.md). The observed costUSD exactly matches the 1-hour cache TTL write rate (2x input) rather than the 5-minute TTL rate (1.25x input) originally assumed. This harness has no field distinguishing 5m vs 1h cache_creation_input_tokens, so this rate is a best single-value approximation, not a universal truth -- a 5-minute-TTL run would be overpriced by this table. sonnet-5 and haiku cache_write rates are unverified (no calibration data).",
-  "claude-opus-5": {
-    "input": 5.0,
-    "output": 25.0,
-    "cache_write": 10.0,
-    "cache_read": 0.5
-  },
-  "claude-sonnet-5": {
-    "input": 3.0,
-    "output": 15.0,
-    "cache_write": 3.75,
-    "cache_read": 0.3
-  },
-  "claude-haiku-4-5-20251001": {
-    "input": 1.0,
-    "output": 5.0,
-    "cache_write": 1.25,
-    "cache_read": 0.1
+  "_calibration_note": "claude-opus-5 cache_write split into cache_write_1h and cache_write_5m after fix-round-1 review (Finding 1). Original single cache_write=6.25 assumed 5-minute TTL and overpriced 1-hour-TTL cache writes by 1.6x. Calibrated against a real claude -p usage payload: usage.cache_creation = {ephemeral_1h_input_tokens: 14888, ephemeral_5m_input_tokens: 0}, reported costUSD 0.1565825. price_entry now reads usage['cache_creation']['ephemeral_1h_input_tokens'] / ['ephemeral_5m_input_tokens'] when that sub-object is present, and only falls back to pricing the flat 'cache_creation_input_tokens' bucket at the 1h rate when it is absent. cache_write_1h = 2x input (standard 1-hour TTL multiplier); cache_write_5m = 1.25x input (standard 5-minute TTL multiplier), applied uniformly across models per documented Anthropic caching economics. Real calibration data exists only for claude-opus-5; sonnet-5 and haiku rates are the standard multipliers, unverified against observed cost. This note is nested outside the 'models' object (not a sibling key needing convention-based filtering) so it can never be mistaken for a model's rate card by a pricing[canonical] lookup.",
+  "models": {
+    "claude-opus-5": {
+      "input": 5.0,
+      "output": 25.0,
+      "cache_write_1h": 10.0,
+      "cache_write_5m": 6.25,
+      "cache_read": 0.5
+    },
+    "claude-sonnet-5": {
+      "input": 3.0,
+      "output": 15.0,
+      "cache_write_1h": 6.0,
+      "cache_write_5m": 3.75,
+      "cache_read": 0.3
+    },
+    "claude-haiku-4-5-20251001": {
+      "input": 1.0,
+      "output": 5.0,
+      "cache_write_1h": 2.0,
+      "cache_write_5m": 1.25,
+      "cache_read": 0.1
+    }
   }
 }
