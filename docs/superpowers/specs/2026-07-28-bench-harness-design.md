@@ -80,6 +80,21 @@ Order: CLI flags, then `.claude/project/project-context.md`, then defaults.
 | Test command | `Typecheck / Test` |
 | Package manager | `Package manager` |
 
+One value has no project-context source and no discovery route, so it lives in bench config:
+
+| Setting | Default | Why it cannot be discovered |
+| --- | --- | --- |
+| `story_points_field` | `customfield_10016` | `acli jira field` exposes create / delete / update / restore but **no list**, and `workitem view --json` returns no `names` map, so there is no acli path from a field name to its ID on an arbitrary site. |
+
+Two further acli constraints the harness must code around, both verified on
+`whimzylive.atlassian.net`:
+
+- `workitem search --fields customfield_10016` is rejected with
+  `field 'customfield_10016' is not allowed`. Custom fields are only readable through
+  `workitem view --fields '*all' --json`, one issue per call. Band labelling therefore fans out
+  per-issue rather than using a single search.
+- `--json` output is not always pure JSON. Parsers must seek to the first `{` before decoding.
+
 Any repository already initialised by `/sdlc:init` runs with zero additional setup. Repositories
 without that file supply the same values as flags.
 
@@ -217,20 +232,45 @@ deliverables it purchased.
 
 ## Isolation and side effects
 
+Runs execute against the real Jira project and the real repository, so each approach performs its
+full genuine behaviour — Jira comments, pull requests, review loops — and measured cost is honest
+rather than a suppressed-writes approximation. Fidelity is bought with pollution risk, which the
+guardrails below contain rather than eliminate.
+
 Per cell:
 
-1. Fresh `git worktree` created at the base SHA.
-2. Remote rewritten to a scratch remote.
-3. Source ticket cloned into a scratch Jira project; the clone's key is substituted into the prompt.
-4. Adapter `setup`, then the measured `run`, then `teardown`.
-5. Repository bundled into `artifacts/`, worktree removed.
+1. Fresh `git worktree` created at the base SHA, on branch `bench/<TICKET>/<approach>/<run-id>`.
+2. Source ticket cloned into a **scratch issue in the real project**, labelled `bench-run` and
+   linked to the source ticket. The scratch key is substituted into the prompt; the source ticket is
+   never written to.
+3. Adapter `setup`, then the measured `run`, then `teardown`.
+4. Repository bundled into `artifacts/`, worktree removed.
 
-Real projects and real repositories are never written to. Runs execute their approach's full genuine
-behaviour — including Jira comments, pull requests, and review loops for SDLC — so measured cost is
-honest rather than a suppressed-writes approximation.
+### Guardrails
 
-Run order is counterbalanced from a seed the runner records in the aggregate report, so cache
-warming cannot systematically favour whichever approach happens to run last.
+Because runs touch the real repository, the following are hard requirements, not conventions:
+
+- Every branch a run creates is prefixed `bench/`. A run that attempts to push to any ref outside
+  that prefix is aborted.
+- Pull requests are opened as **drafts**, so branch protection and auto-merge cannot land one.
+- A `PreToolUse` deny hook blocks merge verbs for the duration of a run: `gh pr merge`, pushes to
+  `develop` or `main`, and force-pushes to non-`bench/` refs.
+- The runner itself never invokes a merge command in any code path.
+
+### Cleanup
+
+`/bench:cleanup <TICKET>` is a first-class command, not a manual chore. It closes every draft PR for
+the run set, deletes `bench/*` branches local and remote, and deletes the scratch Jira issues found
+by JQL on the `bench-run` label plus the source-ticket link. Scratch issues are discoverable by query
+rather than by memory precisely so that cleanup cannot silently miss one.
+
+Issue deletion is irreversible. Cleanup lists what it will delete and requires confirmation before
+acting.
+
+### Counterbalancing
+
+Run order is counterbalanced from a seed the runner records in the aggregate report, so cache warming
+cannot systematically favour whichever approach happens to run last.
 
 ## Story source
 
@@ -258,9 +298,25 @@ that:
 
 The remaining eleven cells are a separate go / no-go decision once that pilot lands.
 
-## Open questions
+## Resolved during design
 
-- Scratch Jira project key and scratch GitHub remote are not yet provisioned. Both are prerequisites
-  for the first SDLC cell, though not for the direct-Opus pilot.
-- Story point values are not exposed through `acli`'s named fields. The custom field ID must be
-  resolved before the report can label bands by points; the pilot does not depend on it.
+- **Story points field.** `customfield_10016` on `whimzylive.atlassian.net`, verified against NA-71
+  (5 points). Not auto-discoverable — see the configuration section. The full Done-story band map at
+  time of writing: 2pt ×1, 3pt ×11, 5pt ×16, 8pt ×14, 13pt ×1, unpointed ×4, so all three bands
+  NA-80 requires have candidates.
+- **Jira scratch target.** Scratch issues inside the real NA project, labelled `bench-run`, deleted
+  by `/bench:cleanup`. Chosen over a cloned BENCH project because workflow, statuses and custom
+  fields are then guaranteed to match production exactly, which is what SDLC's transitions depend on.
+- **Git scratch target.** The real repository, `bench/*` branches, draft PRs, never merged. Chosen
+  for faithful CI behaviour. The guardrails in the isolation section exist to contain the merge risk
+  this choice introduces.
+
+## Accepted risks
+
+Both scratch-target decisions trade containment for fidelity. Recorded here so the eventual writeup
+does not have to rediscover them:
+
+- Benchmark issues appear on the real NA board while runs are in flight.
+- Up to twelve draft PRs and their branches exist on the real repository until cleanup runs.
+- Cleanup deletes real Jira issues. It is confirm-gated, but a mis-scoped JQL is the one failure mode
+  that could reach beyond the benchmark set.
