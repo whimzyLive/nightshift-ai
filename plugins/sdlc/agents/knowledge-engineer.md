@@ -60,8 +60,8 @@ loads doc-authoring skills and a docs dispatch never loads ADR-authoring skills:
   unconditionally, in the same first-turn pass as the three always-on skills above.
 - **docs-sync dispatch** (via `/sdlc:docs sync`): also load `writing-docs`, but only
   **conditionally** — in Phase 1, and only once you've resolved that at least one `how-to` row is
-  affected this run (docs-pipeline.md §2 step 4 / §3's table). Phase 2 never re-drafts (it writes
-  only what the founder already confirmed, per docs-pipeline.md §2), so it never needs
+  affected this run (docs-pipeline-core.md §2 step 4 / §3's table). Phase 2 never re-drafts (it writes
+  only what the founder already confirmed, per docs-pipeline-core.md §2), so it never needs
   `writing-docs`; a Phase 1 run that resolves zero affected `how-to` rows doesn't either — loading
   it unconditionally on every docs-sync dispatch would burn context on a skill most dispatches
   never use. (This condition is identical on the post-QA inline variant — `writing-docs` loads only
@@ -193,20 +193,23 @@ and never `writing-docs`; the generic seed-dispatch skill rules (Phase 1 `writin
 - **docs-sync dispatch** (via `/sdlc:docs sync`) — the full procedure (the two-phase dispatch
   split, the deterministic regen algorithm, the voice/format resolution chain, the `source:`
   refresh convention, and the no-op/change-gate semantics) is defined once in
-  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` (single source of truth). Read it before running
-  either phase.
+  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md` **§§1–9** (single source of truth). Read it
+  before running either phase.
 - **release dispatch** (via `/sdlc:docs release`) — the full procedure (merged-story enumeration,
   changelog aggregation + upsert, ADR-link resolution, the release artifact set, branch/PR control
   flow, and the no-op/idempotence contract) is defined once in
-  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§10–14** (single source of truth). Read it before
-  running either phase. **Do not re-inline it.**
+  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-release.md` **§§10–14** (single source of truth). Read
+  it before running either phase, together with `refs/docs-pipeline-core.md`. **Do not re-inline
+  it.**
 - **seed dispatch** (via `/sdlc:docs seed`) — the full procedure (type resolution, the topic/slug
   ladder, `PAGE` construction, the gate ladder, page artifacts, branch/PR control flow, and the
-  no-op/re-run semantics) is defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§15–19**
-  (single source of truth). Read it before running either phase. **Do not re-inline it.**
+  no-op/re-run semantics) is defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-seed.md`
+  **§§15–19** (single source of truth). Read it before running either phase, together with
+  `refs/docs-pipeline-core.md`. **Do not re-inline it.**
 - **audit dispatch** (via `/sdlc:docs audit`) — the full procedure (scan scope, the two-tier drift
   model, deterministic correction, reference-integrity flagging, branch/PR control flow) lives in
-  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` **§§20–24**; not re-inlined.
+  `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-audit.md` **§§20–24**, together with
+  `refs/docs-pipeline-core.md`; not re-inlined.
 
 ### ADR dispatch — in summary
 
@@ -231,7 +234,7 @@ You run in one of two dispatch phases per invocation:
 - **Phase 1 (compute & draft, writes nothing)** — the command layer hands you either the story
   branch (the common case — you compute `CHANGED_FILES`/`CHANGED_DIFF` yourself) **or**, on the
   merged-commit path (story branch absent), a precomputed `CHANGED_FILES`/`CHANGED_DIFF` pair plus
-  `REGEN_TREE_REF` — use whichever you're handed **verbatim** (`refs/docs-pipeline.md` §2 steps 2–3;
+  `REGEN_TREE_REF` — use whichever you're handed **verbatim** (`refs/docs-pipeline-core.md` §2 steps 2–3;
   never re-derive one from the other). Resolve the manifest, resolve affected rows, produce
   deterministic regen content for the `auto` rows + `llms.txt` (reading source content from
   `REGEN_TREE_REF`), draft narrative how-to refreshes via `writing-docs`, and return the regen
@@ -240,11 +243,11 @@ You run in one of two dispatch phases per invocation:
   gate: the command hands you the deterministic content and the founder-confirmed narrative drafts
   **verbatim** (inline or via `${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh` temp files by path). Check
   out the branch cut from `REGEN_TREE_REF` (the story branch head when present, or
-  `origin/<BASE-BRANCH>` on the merged-commit path — `refs/docs-pipeline.md` §2 step 8), write
+  `origin/<BASE-BRANCH>` on the merged-commit path — `refs/docs-pipeline-core.md` §2 step 8), write
   everything, then commit/push/open-or-update the PR — but only if content changed (AC6).
 - **Post-QA inline variant (dispatched by the Principal Engineer playbook Step 6.5, via `/impl` /
   `/auto`)** — a **single** dispatch, no phase-1/phase-2 split and **no** founder-confirm gate
-  (`refs/docs-pipeline.md` §25). The orchestrator hands you the live `$WORKTREE` (already checked out
+  (`refs/docs-pipeline-postqa.md` §25). The orchestrator hands you the live `$WORKTREE` (already checked out
   at `<BRANCH_PREFIX>/<STORY-KEY>`), `$NX_CACHE_DIRECTORY`, the story key, and the
   **story-branch-vs-base** diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>`, §26).
   You do **not** check out or cut any branch. In one pass you compute **and** write the deterministic
@@ -276,7 +279,8 @@ You run in one of two dispatch phases per invocation:
 ### seed dispatch — in summary
 
 You run in one of two dispatch phases per invocation. The full procedure lives in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §§15–19 — this is a pointer, not a restatement:
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-seed.md` §§15–19 (together with
+`refs/docs-pipeline-core.md`) — this is a pointer, not a restatement:
 
 - **Phase 1 (scaffold & draft, writes nothing)** — scaffold exactly one page of the requested
   activated type from its registry-quadrant `writing-docs` template, filling only what the topic and
@@ -293,7 +297,8 @@ You run in one of two dispatch phases per invocation. The full procedure lives i
 Unlike the other four pipelines, `audit` runs as a **single** dispatch — **no phase-1/phase-2
 split, no confirm gate.** Its `auto`-row corrections are un-gated and its narrative findings are
 flags, not writes, so there is nothing for a founder to confirm. The full procedure lives in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §§20–24 — this is a pointer, not a restatement:
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-audit.md` §§20–24 (together with
+`refs/docs-pipeline-core.md`) — this is a pointer, not a restatement:
 
 - Scan every activated row → correct the `auto` tier deterministically (§21) + flag the
   reference-integrity tier (§22).
@@ -337,7 +342,7 @@ below, matching the required-skills and `Skills loaded:` split elsewhere in this
 
 Branch/commit/PR mechanics (branch name + cut point, re-run reset/force-with-lease behaviour,
 commit string, PR title/base) are owned once by
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#7-branch--pr-naming--control-flow` — you already read
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md#7-branch--pr-naming--control-flow` — you already read
 that ref before running either phase (see "Pipeline" above). This section is a pointer, not a
 restatement: it names only the two things that are genuinely dispatch-specific here.
 
@@ -350,7 +355,7 @@ restatement: it names only the two things that are genuinely dispatch-specific h
    it's empty, skip commit/push/PR entirely (clean no-op) and still write any admitted rule entry
    from this dispatch.
 
-**Post-QA inline variant (§25) — override.** On this variant the §7 branch/reset/PR mechanics do
+**Post-QA inline variant (`docs-pipeline-postqa.md` §25) — override.** On this variant the §7 branch/reset/PR mechanics do
 **not** apply: you write in the handed `$WORKTREE` on `<BRANCH_PREFIX>/<STORY-KEY>` (no
 `docs/sync-<KEY>` branch, no checkout, no reset/force-with-lease), commit the deterministic regen +
 `llms.txt` + confirmed-less narrative drafts under their manifest-resolved `target-path`s via
@@ -364,7 +369,7 @@ cleanly with no commit. Your `Skills loaded:` return follows the docs-sync rule 
 
 Branch/commit/PR mechanics (branch name + cut point from `origin/<BASE-BRANCH>`, the
 `Release-Generated:` trailer, the local-branch precondition, both re-run guards, PR title/base) are
-owned once by `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--branch--pr--control-flow`
+owned once by `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-release.md#13-release-mode--branch--pr--control-flow`
 — you already read it before running either phase. This section is a pointer, not a restatement.
 
 1. Write the founder-confirmed drafts for `ENABLED_ROWS` **only**, plus the regenerated doc index,
@@ -382,7 +387,7 @@ owned once by `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md#13-release-mode--bran
 ### seed dispatch — branch, memory, commit, return
 
 Branch/PR/control flow is defined once in
-`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §18 — do not restate it. Dispatch-specific:
+`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-seed.md` §18 — do not restate it. Dispatch-specific:
 
 - Write the founder-confirmed content **verbatim** to the **normalised** `PAGE` under `SEED_ROW`'s
   `target-path` — never re-drafted, re-enriched, or re-derived at write time. Exactly one page, for
@@ -404,7 +409,7 @@ Branch/PR/control flow is defined once in
 
 ### audit dispatch — branch, memory, commit, return
 
-Branch/PR/control flow is defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §24 — do
+Branch/PR/control flow is defined once in `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-audit.md` §24 — do
 not restate it. Dispatch-specific:
 
 - Write the regenerated `auto`-row corrections under their manifest-resolved `target-path`s, plus
@@ -436,7 +441,7 @@ Branched by dispatch type — the idempotence gate each checks is different:
   1. Run the consumer repo's quality-gate commands from `.claude/project/project-context.md` if
      your write touched a gated path (plugin-authoring under `plugins/**`). The idempotence gate
      itself is the deterministic-regen consistency check (per
-     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline.md` §3/§6) — confirm re-running the deterministic
+     `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-core.md` §3/§6) — confirm re-running the deterministic
      regen algorithm with no source change yields byte-identical reference docs **and**
      byte-identical `llms.txt` content to what you just wrote.
   2. Confirm every affected `how-to` page you wrote was a founder-confirmed draft (never an
@@ -445,7 +450,7 @@ Branched by dispatch type — the idempotence gate each checks is different:
 - **release dispatch:**
   1. Run the consumer repo's quality-gate commands from `.claude/project/project-context.md` if your
      write touched a gated path (plugin-authoring under `plugins/**`). The idempotence gate is
-     `refs/docs-pipeline.md` §14's contract — confirm that re-running the aggregation over the same
+     `refs/docs-pipeline-release.md` §14's contract — confirm that re-running the aggregation over the same
      range with the same confirmed content yields byte-identical content for every enabled row.
   2. Confirm every page you wrote belongs to a row in `ENABLED_ROWS` (never a disabled row), that
      every written page landed at its manifest-resolved `target-path` and carries `title` +

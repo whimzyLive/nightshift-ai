@@ -319,7 +319,7 @@ they follow from the quadrant model itself rather than from any one repo's taste
 - **No TBDs in published docs** — an unfinished doc is worse than no doc; if a fact is genuinely
   unknown, say what's known and flag the gap explicitly rather than leaving a placeholder.
 - **No em-dash inside `title:` or `description:` frontmatter** — `/sdlc:docs`'s `llms.txt` regen
-  (`docs-pipeline.md` §8) parses each generated entry positionally as
+  (`docs-pipeline-core.md` §8) parses each generated entry positionally as
   `title — one-line description — relative link`, splitting on a space, an em-dash, and a space. An
   em-dash inside either field's own value collides with that delimiter and breaks the split. Use a
   comma, colon, or plain hyphen instead when the title/description itself needs a pause.

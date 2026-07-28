@@ -32,13 +32,13 @@ project name already stored in `.claude/project/project-context.md` instead):
 The manifest row table carries the 3 **required** columns below, plus 2 **optional** trailing
 columns (blank when unused, so an existing 3-column manifest stays valid unchanged):
 
-| Column        | Meaning                                                                                                                                               |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`        | The registry key — must match a `type` value in `refs/doc-types.md`                                                                                   |
-| `enabled`     | `true` (default) or `false`; set `false` to deactivate this doc type without deleting the row                                                         |
-| `target-path` | Editable output path; `/init` writes the registry's default `target-path` token, the founder retargets it to their real docs tree                     |
-| `source`      | **Optional.** A path, glob/scan directive, or `command:`-prefixed command feeding the source resolver's rung-2 (`refs/docs-pipeline.md` §3)           |
-| `contract`    | **Optional.** An explicit contract-file path overriding the resolver's rung-1 conventional lookup (`refs/docs-pipeline.md` §3's Contract conventions) |
+| Column        | Meaning                                                                                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`        | The registry key — must match a `type` value in `refs/doc-types.md`                                                                                        |
+| `enabled`     | `true` (default) or `false`; set `false` to deactivate this doc type without deleting the row                                                              |
+| `target-path` | Editable output path; `/init` writes the registry's default `target-path` token, the founder retargets it to their real docs tree                          |
+| `source`      | **Optional.** A path, glob/scan directive, or `command:`-prefixed command feeding the source resolver's rung-2 (`refs/docs-pipeline-core.md` §3)           |
+| `contract`    | **Optional.** An explicit contract-file path overriding the resolver's rung-1 conventional lookup (`refs/docs-pipeline-core.md` §3's Contract conventions) |
 
 ```markdown
 | type   | enabled | target-path   | source     | contract   |
@@ -110,7 +110,7 @@ the founder authors by hand, below the table (and below "Voice & format" if both
 ```
 
 Consumed only by `/sdlc:docs release`'s merged-story enumeration
-(`refs/docs-pipeline.md` §10's "Story-key extraction") to widen the set of recognised story-key
+(`refs/docs-pipeline-release.md` §10's "Story-key extraction") to widen the set of recognised story-key
 prefixes beyond the single primary key in `.claude/project/project-context.md` — for a repo whose
 history carries commits under more than one Jira project key (most commonly after a Jira project
 rename or a repo merge), so those commits' stories are not silently dropped from the changelog. Not
