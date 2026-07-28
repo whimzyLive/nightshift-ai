@@ -4,7 +4,7 @@ agent: [ai-enablement-engineer]
 trigger: [dangling-reference regression test, grep -rlF for an old filename, renaming or splitting a file whose old name is referenced descriptively in prose]
 rule: A dangling-ref test grepping content for a literal old filename also flags prose mentions of it — never write that literal string outside the file meant to keep the path; describe it generically.
 evidence: [NA-79]
-uses: 0
+uses: 1
 status: active
 ---
 

@@ -510,7 +510,8 @@ story-branch-vs-base changed-file set
 (`git diff --name-only "origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>"`, after
 `git fetch origin --quiet`) and compare it against the activated manifest rows' tracked source
 scopes (each enabled row's `reference-roots`/`source:`/`contract:` path, or a `how-to` row's
-`source:` glob list — the same scopes the docs-sync dispatch itself would resolve). If **no** changed
+`source:` glob list — the same scopes the docs-sync dispatch itself would resolve, per
+`docs-pipeline-core.md` §3's source resolver). If **no** changed
 file falls inside any activated row's scope → clean no-op: do **not** dispatch the
 `knowledge-engineer` at all, no warning, Step 8's report still notes `Docs sync: no manifest-tracked
 files touched — skipped`, and proceed to Step 7 unchanged. **Fail safe, not silent-skip:** if either

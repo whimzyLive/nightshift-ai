@@ -372,7 +372,7 @@ than discard it.
 
 ### `source:` frontmatter — `how-to` and `integration-guide` only
 
-Both map onto the how-to quadrant, whose template emits a `source:` glob list. §5 is normative and
+Both map onto the how-to quadrant, whose template emits a `source:` glob list. `docs-pipeline-core.md` §5 is normative and
 unchanged: a how-to page **with** `source:` is auto-refresh-drafted by `sync` when `CHANGED_FILES`
 intersects its globs; a page **without** it is **never** auto-refreshed — the deliberate opt-in
 boundary. `seed` **is** that founder action, and the natural moment to make the choice:
@@ -381,10 +381,10 @@ boundary. `seed` **is** that founder action, and the natural moment to make the 
   the founder supplies globs or removes the key.
 - **Founder supplies globs** → the page is written with `source:`; future `sync` runs draft refreshes
   of it. This is the seed → sync handoff that makes `how-to`'s `seed,sync` trigger coherent.
-- **Founder omits it** → the key is **omitted entirely** (never written empty). Per §5 the page is
+- **Founder omits it** → the key is **omitted entirely** (never written empty). Per `docs-pipeline-core.md` §5 the page is
   simply never auto-refreshed. Not an error, and **not something `seed` may infer a value for** —
   inferring globs would opt the founder into automated refreshes of a page they hand-authored.
-- `concept` and `tutorial` pages **never** carry `source:` — it is a how-to-quadrant key and §5's
+- `concept` and `tutorial` pages **never** carry `source:` — it is a how-to-quadrant key and `docs-pipeline-core.md` §5's
   match semantics apply only to how-to rows. Do not emit it for them.
 
 ## 18. Seed mode — branch / PR / control flow

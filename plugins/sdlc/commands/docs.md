@@ -205,7 +205,7 @@ dispatched at all.
      **merged-commit** diff source per
      `${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-postqa.md#26-dual-diff-source--selection-rule`: locate the
      commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>` (the `PROJECT_KEYS`-scoped regex from
-     §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
+     `docs-pipeline-release.md` §10 — never the loose matcher) and set `CHANGED_FILES` / `CHANGED_DIFF` from the merged range
      (`<sha>^..<sha>`, or the union across matches). **Zero commits carry the key** → STOP with
      `cannot locate a merged commit for <STORY-KEY> on origin/<BASE-BRANCH> — nothing to diff`
      (never a silent no-op). `git fetch` failure / unresolvable `origin/<BASE-BRANCH>` → STOP.
