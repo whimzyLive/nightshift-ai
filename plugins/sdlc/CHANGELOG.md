@@ -1,3 +1,16 @@
+## 0.45.4 (2026-07-28)
+
+### 🩹 Fixes
+
+- **sdlc:** add Step 6.5 change-size gate's fifth bucket to Step 8's report template ([#193](https://github.com/whimzyLive/nightshift-ai/issues/193))
+- **sdlc:** qualify remaining bare cross-slice §N refs, add slice-consistency guard ([09d06eb](https://github.com/whimzyLive/nightshift-ai/commit/09d06eb))
+- **sdlc:** split docs-pipeline.md monolith into mode-scoped slices ([3ff79ef](https://github.com/whimzyLive/nightshift-ai/commit/3ff79ef))
+- **sdlc:** add failing regression test pinning the docs-pipeline.md split (NA-79) ([ad3dafc](https://github.com/whimzyLive/nightshift-ai/commit/ad3dafc))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.3 (2026-07-28)
 
 ### 🩹 Fixes
