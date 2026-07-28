@@ -1,3 +1,21 @@
+## 0.45.3 (2026-07-28)
+
+### 🩹 Fixes
+
+- **sdlc:** replace -p allowlist with denylist, close case-2 gaps (NA-78) ([cbba73f](https://github.com/whimzyLive/nightshift-ai/commit/cbba73f))
+- **sdlc:** close QA round-2 minors on NA-78 project-key guard ([6f17288](https://github.com/whimzyLive/nightshift-ai/commit/6f17288))
+- **sdlc:** close QA round-1 findings on NA-78 project-key guard ([58c2f56](https://github.com/whimzyLive/nightshift-ai/commit/58c2f56))
+- **sdlc:** resolve Jira project key from project-context in refine-feature (NA-78) ([72b74f5](https://github.com/whimzyLive/nightshift-ai/commit/72b74f5))
+- **sdlc:** pin failing regression test for hardcoded --project ET literal (NA-78) ([7ed4582](https://github.com/whimzyLive/nightshift-ai/commit/7ed4582))
+- **scripts:** fix remaining site-guard consistency gaps from round-1 re-review ([bf34d46](https://github.com/whimzyLive/nightshift-ai/commit/bf34d46))
+- **scripts:** close review gaps in the acli site-guard coverage ([9ef6a72](https://github.com/whimzyLive/nightshift-ai/commit/9ef6a72))
+- **scripts:** guard acli calls against the global active-site defect ([ce4e2ea](https://github.com/whimzyLive/nightshift-ai/commit/ce4e2ea))
+- **scripts:** add failing regression test for acli global-active-site guard ([6f5f672](https://github.com/whimzyLive/nightshift-ai/commit/6f5f672))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.2 (2026-07-25)
 
 ### 🚀 Features
