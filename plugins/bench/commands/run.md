@@ -70,13 +70,13 @@ For each approach, in the order given:
 
 4. Run tests inside the cell's worktree to capture test evidence for graders.
 
-   Load the test command from the project's `.claude/project/project-context.md` file (key: "Typecheck / Test"), or use an empty command if not configured. Run this command inside the cell's worktree with combined stdout and stderr redirected to `artifacts/tests.txt`:
+   Load the test command from the project's `.claude/project/project-context.md` file (key: "Typecheck / Test"), or use an empty command if not configured. Run this command with the worktree as the working directory, and redirect combined stdout and stderr to the cell's artifacts directory (read the `artifacts` path from the cell's cell.json):
 
    ```bash
-   cd <WORKTREE> && <TEST_COMMAND> >artifacts/tests.txt 2>&1 || true
+   cd <WORKTREE> && <TEST_COMMAND> > "<CELL_ARTIFACTS>/tests.txt" 2>&1 || true
    ```
 
-   The `|| true` ensures this step does not fail the cell even if tests fail — a failing test suite is exactly the evidence the grader needs. Continue regardless.
+   The destination is the cell's artifacts directory, which provision.py has already created at an absolute path outside the worktree — so test evidence survives worktree removal. The `|| true` ensures this step does not fail the cell even if tests fail — a failing test suite is exactly the evidence the grader needs. Continue regardless.
 
 5. Measure. A non-zero exit means reconciliation failed — report it, do not hide it. Reconciliation failure does NOT stop the cell; continue to grading.
 
