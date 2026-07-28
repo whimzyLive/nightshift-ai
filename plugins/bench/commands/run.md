@@ -21,6 +21,17 @@ Runs execute against the real repository and cost real money. Before dispatching
 - that branches will be created under `bench/` and never merged
 - the estimated spend
 
+### Estimating spend
+
+For each approach, state:
+
+- the number of measured sessions this approach will run (one session per cell in the pipeline)
+- that three independent graders evaluate the result per cell
+- that a prior measured direct-Opus session on this machine cost approximately $0.16 for a trivial prompt
+- that real story-sized prompts are significantly larger and spending is genuinely unpredictable
+
+Present a cost range with its basis, and say plainly that the figure is an estimate, not a guarantee. If the founder wants a firmer number, the pilot cell exists precisely to produce one.
+
 Do not proceed without that confirmation.
 
 ## Steps
@@ -43,6 +54,8 @@ For each approach, in the order given:
      --out docs/benchmarks/<TICKET>/<APPROACH>/cell.json
    ```
 
+   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry or skip to measure — the worktree is the evidence of what happened.
+
 3. Execute.
 
    ```bash
@@ -53,7 +66,19 @@ For each approach, in the order given:
      --out docs/benchmarks/<TICKET>/<APPROACH>/result.json
    ```
 
-4. Measure. A non-zero exit means reconciliation failed — report it, do not hide it.
+   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage spends money. Never auto-retry without explicit founder confirmation.
+
+4. Run tests inside the cell's worktree to capture test evidence for graders.
+
+   Load the test command from the project's `.claude/project/project-context.md` file (key: "Typecheck / Test"), or use an empty command if not configured. Run this command inside the cell's worktree with combined stdout and stderr redirected to `artifacts/tests.txt`:
+
+   ```bash
+   cd <WORKTREE> && <TEST_COMMAND> >artifacts/tests.txt 2>&1 || true
+   ```
+
+   The `|| true` ensures this step does not fail the cell even if tests fail — a failing test suite is exactly the evidence the grader needs. Continue regardless.
+
+5. Measure. A non-zero exit means reconciliation failed — report it, do not hide it. Reconciliation failure does NOT stop the cell; continue to grading.
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/measure.py" \
@@ -63,7 +88,7 @@ For each approach, in the order given:
      --out docs/benchmarks/<TICKET>/<APPROACH>/run.json
    ```
 
-5. Grade.
+6. Grade.
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/grade.py" \
@@ -71,6 +96,8 @@ For each approach, in the order given:
      --story docs/benchmarks/<TICKET>/story.json \
      --out docs/benchmarks/<TICKET>/<APPROACH>/grades.json
    ```
+
+   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage spends money (grader invocations). Never auto-retry without explicit founder confirmation.
 
 Then render the report once, across every approach that ran:
 
