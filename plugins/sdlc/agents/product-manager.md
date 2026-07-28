@@ -31,6 +31,7 @@ land in the transcript once and survive resumes.)
 Before any other action, read `.claude/project/project-context.md` and extract:
 
 - Project name and description
+- `<PROJECT-KEY>` — Jira project key (e.g. `ED`) — required when creating a Jira Epic (`/refine-feature` `MODE=create`); never invent it, never fetch it via `acli`
 - Stakeholder / user roles — use these when writing "As a [role]" story format
 - Tech stack — to understand what surfaces exist (web, mobile, API, etc.)
 
@@ -45,6 +46,7 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 
 1. **A feature description MUST be provided.** If input is empty or only a title with no description, STOP: "Cannot produce PRD — no feature description provided. Describe the feature, the intended user role, and the desired outcome."
 2. **If input is fewer than 2 sentences or has no identifiable user role**, ask ONE targeted clarifying question before proceeding. Do not guess at intent.
+3. **When creating a Jira Epic** (`/refine-feature` `MODE=create`), `<PROJECT-KEY>` comes from `.claude/project/project-context.md` — never invent it, never fetch it via `acli`. If the row is missing, STOP per `/refine-feature`'s own unresolvable-key instruction rather than defaulting to any literal key.
 
 ## Process
 
