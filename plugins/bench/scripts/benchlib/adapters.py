@@ -44,12 +44,22 @@ class Adapter:
 
 def load_adapter(path: Path) -> Adapter:
     data = yaml.safe_load(Path(path).read_text()) or {}
+
+    if not isinstance(data, dict):
+        raise ValueError(f"adapter {path} must be a YAML mapping, not {type(data).__name__}")
+
     run = data.get("run") or {}
     prompt = run.get("prompt")
     if not prompt:
         raise ValueError(f"adapter {path} has no run.prompt")
 
-    phases = [Phase(id=p["id"], marker=p.get("marker", "")) for p in data.get("phases") or []]
+    phases_data = data.get("phases") or []
+    phases = []
+    for i, p in enumerate(phases_data):
+        if "id" not in p:
+            raise ValueError(f"adapter {path} phase {i} missing required key 'id'")
+        phases.append(Phase(id=p["id"], marker=p.get("marker", "")))
+
     if not phases:
         phases = [Phase(id="impl", marker="")]
 
@@ -69,6 +79,8 @@ def render(template: str, variables: Dict[str, str]) -> str:
         name = match.group(1)
         if name not in ALLOWED_VARS:
             raise ValueError(f"unknown adapter variable: {name}")
-        return str(variables.get(name, ""))
+        if name not in variables:
+            raise ValueError(f"adapter variable {name} not provided")
+        return str(variables[name])
 
     return _VAR.sub(replace, template)

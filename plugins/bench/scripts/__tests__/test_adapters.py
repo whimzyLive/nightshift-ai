@@ -53,6 +53,16 @@ class TestLoadAdapter(unittest.TestCase):
         with self.assertRaises(ValueError):
             adapters.load_adapter(_write("id: bad\nlabel: Bad\n"))
 
+    def test_non_dict_yaml_document_is_an_error(self):
+        # Finding 1: bare list raises descriptive ValueError, not AttributeError
+        with self.assertRaisesRegex(ValueError, "must be a YAML mapping"):
+            adapters.load_adapter(_write("- a\n- b\n"))
+
+    def test_phase_entry_missing_id_is_an_error(self):
+        # Finding 2: phase without id raises descriptive ValueError, not KeyError
+        with self.assertRaisesRegex(ValueError, "phase 0 missing required key 'id'"):
+            adapters.load_adapter(_write("id: bad\nrun:\n  prompt: hi\nphases:\n  - {marker: x}\n"))
+
 
 class TestRender(unittest.TestCase):
     def test_substitutes_known_variables(self):
@@ -66,6 +76,16 @@ class TestRender(unittest.TestCase):
     def test_does_not_evaluate_shell(self):
         out = adapters.render("{{ticket_summary}}", {"ticket_summary": "$(rm -rf /)"})
         self.assertEqual(out, "$(rm -rf /)")
+
+    def test_allowed_variable_absent_from_dict_is_an_error(self):
+        # Finding 3: allowed var missing from variables dict raises ValueError
+        with self.assertRaisesRegex(ValueError, "adapter variable ticket_key not provided"):
+            adapters.render("{{ticket_key}}", {})
+
+    def test_allowed_variable_present_but_empty_renders_empty(self):
+        # Finding 3 corollary: a key present with empty-string value is legitimate
+        out = adapters.render("result: {{ticket_summary}}", {"ticket_summary": ""})
+        self.assertEqual(out, "result: ")
 
 
 class TestShippedAdapters(unittest.TestCase):
