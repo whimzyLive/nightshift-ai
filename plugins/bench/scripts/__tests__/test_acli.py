@@ -171,6 +171,97 @@ class TestFieldExtraction(unittest.TestCase):
         self.assertIn("  - Nested", result)
         self.assertIn("- Item 2", result)
 
+    def test_description_flat_bullet_list_exact_output(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 1"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 2"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 3"}],
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        expected = "- Item 1\n\n\n- Item 2\n\n\n- Item 3"
+        self.assertEqual(result, expected)
+
+    def test_description_nested_bullet_list_exact_output(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 1"}],
+                                },
+                                {
+                                    "type": "bulletList",
+                                    "content": [
+                                        {
+                                            "type": "listItem",
+                                            "content": [
+                                                {
+                                                    "type": "paragraph",
+                                                    "content": [
+                                                        {"type": "text", "text": "Nested"}
+                                                    ],
+                                                }
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 2"}],
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        expected = "- Item 1\n\n  - Nested\n\n\n\n\n\n- Item 2"
+        self.assertEqual(result, expected)
+
 
 if __name__ == "__main__":
     unittest.main()

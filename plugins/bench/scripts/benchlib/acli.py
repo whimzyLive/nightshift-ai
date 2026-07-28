@@ -58,16 +58,18 @@ def _flatten_adf(node: Any, out: List[str], depth: int = 0) -> None:
             indent = "  " * depth
             out.append(indent + "- ")
             for child in node.get("content", []) or []:
-                _flatten_adf(child, out, depth)
+                # Nested lists increment depth
+                if isinstance(child, dict) and child.get("type") in ("bulletList", "orderedList"):
+                    _flatten_adf(child, out, depth + 1)
+                else:
+                    _flatten_adf(child, out, depth)
             out.append("\n")
 
         # All other container nodes
         else:
-            # Lists should increment depth for their children
-            child_depth = depth + 1 if node_type in ("bulletList", "orderedList") else depth
-
+            # Pass current depth to children (no increment)
             for child in node.get("content", []) or []:
-                _flatten_adf(child, out, child_depth)
+                _flatten_adf(child, out, depth)
 
             # Block elements get double newline separator
             if node_type in ("paragraph", "heading", "codeBlock", "bulletList", "orderedList"):
