@@ -2,7 +2,7 @@
 id: monolith-split-cross-slice-deps-not-just-core
 agent: [ai-enablement-engineer]
 trigger: [splitting a monolithic reference file into section-scoped slices, verifying slice self-sufficiency, mechanical file split with preserved section numbers]
-rule: When mechanically splitting a monolith ref file into mode-scoped slices, audit each slice's own cross-references — a non-core slice can depend on a DIFFERENT non-core slice, not just core, and even core can depend on content split into a non-core slice; qualify every pointer with its target filename and report the dependency rather than silently duplicating content.
+rule: When splitting a monolith ref file into slices, audit cross-refs — a non-core slice can depend on a different non-core slice; qualify pointers with the filename, report it, don't duplicate.
 evidence: [NA-79]
 uses: 0
 status: active
