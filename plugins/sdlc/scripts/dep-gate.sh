@@ -21,9 +21,13 @@
 # acli is the only source of truth — any acli query error => GATE=STOP (cannot verify).
 set -uo pipefail
 
+here="$(cd "$(dirname "$0")" && pwd)"
+
 story="${1:?usage: dep-gate.sh <STORY-KEY>}"
 
 fail() { echo "REASON=$1"; echo "GATE=STOP"; exit 1; }
+
+guard_err="$(bash "$here/jira-site-guard.sh" 2>&1)" || fail "jira-site-guard: ${guard_err:-unknown failure (re-run: bash $here/jira-site-guard.sh)}"
 
 # 1. Parent epic — MUST pass --fields parent; the default view strips it (returns null).
 epic="$(acli jira workitem view "$story" --fields parent --json 2>/dev/null \

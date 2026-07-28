@@ -66,6 +66,7 @@ the Principal Engineer role directly.
    `https://github.com/...`, never a placeholder):
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem comment create --key <STORY-KEY> \
   --body "Implementation complete.
 

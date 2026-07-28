@@ -3,8 +3,8 @@ id: set-e-safe-best-effort-block-needs-if-condition
 agent: [ai-enablement-engineer]
 trigger: [set -euo pipefail best-effort block, external command failure must not abort script]
 rule: Under `set -euo pipefail`, put every external-command failure inside an `if`/`elif`/`while` condition (or an explicit `|| true`).
-evidence: [NA-47]
-uses: 0
+evidence: [NA-47, NA-77]
+uses: 1
 status: active
 ---
 

@@ -59,6 +59,12 @@ cat > "$epic_desc" << 'EOF'
 EOF
 ```
 
+Both branches below write to Jira — run the site guard once first:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+```
+
 **If `MODE=update`:**
 
 ```bash

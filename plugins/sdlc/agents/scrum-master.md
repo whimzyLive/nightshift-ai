@@ -108,13 +108,16 @@ Break a Jira Epic into a full set of ordered, dependency-aware user stories.
 
 > ⚠️ **Do NOT use `acli ... create-bulk` for Epic-linked stories.** Its `--from-json` schema accepts only `summary`, `projectKey`, `issueType`, `label`, `assignee` — it has **no parent field**. A `parentKey`/`parent` entry in the bulk JSON is **silently dropped**, so every story is created **orphaned** (not under the Epic). Only `acli jira workitem create` links a child to its parent, via the `--parent` flag — `create-bulk`/`edit` cannot set the parent (and `edit` rejects a `parent` field outright). Use the per-story `create` loop below.
 
-For each story, in the dependency order from step 8:
+For each story, in the dependency order from step 8. Run the site guard for EVERY story, not once
+for the batch — acli's active site is global across every authenticated account and has been
+observed reverting mid-session, including between two consecutive acli calls seconds apart (NA-77):
 
 ```bash
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
 desc=$(mktemp "$dir/acli-desc.XXXXXX")                 # ADF JSON or text per ${CLAUDE_PLUGIN_ROOT}/refs/jira-adf.md
 trap 'rm -f "$desc"' EXIT
 # write the story description to "$desc" first
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 key=$(acli jira workitem create \
   --project "<PROJECT-KEY>" \
   --type "Story" \
@@ -164,6 +167,7 @@ The returned set **must equal** the created-keys list. If any created key is mis
 11. Issue keys are captured inline by the per-story `create` loop in step 10 (the `key=$(... | jq -r '.key')` capture) — no separate collection step is needed.
 12. **Link blocking dependencies.** Use the `link create` form (the positional `link <a> <b>` form is unreliable; do not use it). **acli's direction is counter-intuitive — verified against the Jira UI: `--in` is the BLOCKER, `--out` is the BLOCKED story.** So to express "**A blocks B**" (A is the prerequisite, B depends on A), put the blocker in `--in`:
     ```bash
+    bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
     # A blocks B   →   --out <B, the blocked/downstream>   --in <A, the blocker/prerequisite>
     acli jira workitem link create --out <blocked-key> --in <blocker-key> --type Blocks --yes
     ```
@@ -175,7 +179,7 @@ The returned set **must equal** the created-keys list. If any created key is mis
 
     Every edge in this table MUST have a matching Jira link from step 12, and every Jira link MUST appear as a row — the doc and Jira must never drift.
 
-14. Comment each story: `acli jira workitem comment create <KEY> --body "Epic: <EPIC-KEY>"`
+14. Comment each story (site guard first: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1`): `acli jira workitem comment create <KEY> --body "Epic: <EPIC-KEY>"`
 15. Return: list of created story keys + dependency order + per-story points estimates (`<KEY>: estimated N pts — set Story Points manually in Jira`) + any flags
 
 ---
@@ -240,6 +244,7 @@ Refine an unpolished story in-place OR create new stories from raw text.
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
    refined=$(mktemp "$dir/acli-refined.XXXXXX")
    trap 'rm -f "$refined"' EXIT
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
    acli jira workitem edit <STORY-KEY> --description-file "$refined"
    ```
    7a. **Estimate story points — REPORT ONLY, never write the field.** The plugin does **not** set Story Points in Jira: acli cannot set custom-field values (no such flag through 1.3.22), and requiring the REST-token env contract of every consumer proved too fragile — auto-stamping is dropped until acli exposes custom fields natively. Sizing is still part of refinement, so estimate and hand the value to the human:
@@ -251,15 +256,17 @@ Refine an unpolished story in-place OR create new stories from raw text.
    for st in "${subtask_keys[@]}"; do           # zsh: keys MUST be an array, not a space string
      sub=$(mktemp "$dir/acli-subtask.XXXXXX")
      # ... write the minimal ADF for "$st" into "$sub" ...
+     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || { echo "STOP: site guard failed for $st"; rm -f "$sub"; exit 1; }
      acli jira workitem edit "$st" --description-file "$sub" || { echo "STOP: sub-task edit failed for $st"; rm -f "$sub"; exit 1; }
      rm -f "$sub"                               # deterministic per-iteration cleanup (no in-loop EXIT trap)
    done
    ```
    Sub-task edits are idempotent-friendly: re-running `/refine-issue` overwrites the minimal description with the same generated content — no duplicate content appended.
-9. Comment: `acli jira workitem comment create <STORY-KEY> --body "Refined — story template applied, ACs formalised, scope boundaries added"`. When step 7a produced an estimate, append it to the same comment body: `. Estimated: <N> pts — set Story Points manually in Jira (the plugin does not write this field).`
+9. Comment (site guard first: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1`): `acli jira workitem comment create <STORY-KEY> --body "Refined — story template applied, ACs formalised, scope boundaries added"`. When step 7a produced an estimate, append it to the same comment body: `. Estimated: <N> pts — set Story Points manually in Jira (the plugin does not write this field).`
 10. **Swap the refinement label — REQUIRED on every successful refine of an existing ticket, and GATED on sub-task annotation.** When `subtaskCount > 0`, swap the label **only after every sub-task edit in step 8 has succeeded**; if any sub-task edit failed, do NOT swap — leave the story in `AI-Refine` for retry and surface the failure. Add `AI-Ready` and remove `AI-Refine` in one call. This is the single signal the rest of the pipeline relies on: `/auto`'s Mode 3 reads `AI-Ready` to skip re-triage, and the worker/assessment treats the story as refined.
 
 ```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem edit --key "<STORY-KEY>" --labels "AI-Ready" --remove-labels "AI-Refine" --yes
 ```
 
@@ -289,6 +296,7 @@ acli jira workitem edit --key "<STORY-KEY>" --labels "AI-Ready" --remove-labels 
      dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
      desc=$(mktemp "$dir/acli-desc.XXXXXX"); trap 'rm -f "$desc"' EXIT
      # write the description to "$desc" first
+     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
      key=$(acli jira workitem create --project "<PROJECT-KEY>" --type "Story" --parent "<EPIC-KEY>" \
        --summary "<summary>" --description-file "$desc" --json 2>&1 | jq -r '.key')
      ```
@@ -296,11 +304,12 @@ acli jira workitem edit --key "<STORY-KEY>" --labels "AI-Ready" --remove-labels 
      ```bash
      dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
      bulk_file=$(mktemp "$dir/acli-bulk.XXXXXX"); trap 'rm -f "$bulk_file"' EXIT
+     bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
      acli jira workitem create-bulk --from-json "$bulk_file" 2>&1
      ```
 9. **If an Epic was found, verify the parent link (mandatory gate):** `acli jira workitem search --jql "parent = <EPIC-KEY> AND key in (<comma-joined created keys>)" --json | jq -r '.[].key'` must return every created key — **FAIL LOUD** on any orphan. Linkage happens at `create` time via `--parent`; do **not** use the post-create positional `link … --type "is child of"` form (unreliable, and `parent`/`view` JQL caveats from decompose step 10b apply here too).
-10. Link blocking dependencies using the `link create` form. **acli direction (verified): `--in` = blocker, `--out` = blocked.** For "A blocks B": `acli jira workitem link create --out <B-blocked> --in <A-blocker> --type Blocks --yes`
-11. Comment each story: `acli jira workitem comment create <KEY> --body "Created by /refine-issue triage | Source: raw input"`
+10. Link blocking dependencies using the `link create` form (site guard first: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1`). **acli direction (verified): `--in` = blocker, `--out` = blocked.** For "A blocks B": `acli jira workitem link create --out <B-blocked> --in <A-blocker> --type Blocks --yes`
+11. Comment each story (site guard first: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1`): `acli jira workitem comment create <KEY> --body "Created by /refine-issue triage | Source: raw input"`
 12. Return: list of created story keys + dependency order + any flags
 
 ---

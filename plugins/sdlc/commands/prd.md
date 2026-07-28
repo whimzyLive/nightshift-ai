@@ -21,6 +21,7 @@ The agent should:
 6. Commit, push, and raise PR titled `docs(prd): <Epic summary>`
 7. Comment the Epic with the PRD reference:
    ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
    acli jira workitem comment create --key <EPIC-KEY> \
      --body "PRD: docs/features/YYYY-MM-DD-<slug>.md | PR: <PR_URL>"
    ```
