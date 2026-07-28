@@ -89,7 +89,16 @@ def main(argv: Optional[list] = None) -> int:
     cfg = config.load_config(Path(cell["repo"]), {})
 
     worktree = Path(cell["worktree"])
-    variables = build_variables(cell, story, cfg.test_command, cfg.base_branch)
+
+    # Validate BEFORE the session runs. cfg.test_command is what the adapter
+    # prompt tells the model to run and what /bench:run captures as the
+    # grader's test evidence. If it is missing or unusable, fail here -- a
+    # cell that discovers it post-session has already spent the money and can
+    # only hand graders a shell error to grade.
+    test_command = config.require_command(
+        cfg.test_command, "test", source=str(Path(cell["repo"]) / config.CONTEXT_PATH)
+    )
+    variables = build_variables(cell, story, test_command, cfg.base_branch)
 
     setup_started = time.time()
     run_hooks(adapter.setup, worktree, variables)

@@ -70,10 +70,22 @@ For each approach, in the order given:
 
 4. Run tests inside the cell's worktree to capture test evidence for graders.
 
-   Load the test command from the project's `.claude/project/project-context.md` file (key: "Typecheck / Test"), or use an empty command if not configured. Run this command with the worktree as the working directory, and redirect combined stdout and stderr to the cell's artifacts directory (read the `artifacts` path from the cell's cell.json):
+   Resolve the test command with the harness, never by reading the markdown cell yourself. The `Typecheck / Test` row is a **pair** — `<typecheck> / <test>` — where either side may be an em dash meaning "none". Interpolating the whole cell into a shell runs garbage, and `|| true` would turn that shell error into the "Test output" every grader reads.
 
    ```bash
-   cd <WORKTREE> && <TEST_COMMAND> > "<CELL_ARTIFACTS>/tests.txt" 2>&1 || true
+   TEST_COMMAND=$(python3 -c "
+   import sys; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts')
+   from pathlib import Path
+   from benchlib import config
+   cfg = config.load_config(Path('<REPO>'), {})
+   print(config.require_command(cfg.test_command, 'test'))
+   ")
+   ```
+
+   `require_command` exits non-zero with a clear message if no usable test command is configured. If it fails, **stop this cell and report it** — do not fall back to an empty command. Then run it with the worktree as the working directory, redirecting combined stdout and stderr to the cell's artifacts directory (read the `artifacts` path from the cell's cell.json):
+
+   ```bash
+   cd <WORKTREE> && eval "$TEST_COMMAND" > "<CELL_ARTIFACTS>/tests.txt" 2>&1 || true
    ```
 
    The destination is the cell's artifacts directory, which provision.py has already created at an absolute path outside the worktree — so test evidence survives worktree removal. The `|| true` ensures this step does not fail the cell even if tests fail — a failing test suite is exactly the evidence the grader needs. Continue regardless.
