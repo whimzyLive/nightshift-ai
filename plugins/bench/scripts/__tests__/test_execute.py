@@ -4,6 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import execute  # noqa: E402
@@ -272,3 +273,314 @@ class TestDetectBillingMode(unittest.TestCase):
         self.assertIn("ANTHROPIC_API_KEY", mode["evidence"])
         subscription = execute.detect_billing_mode({}, [])
         self.assertIn("subscription", subscription["evidence"].lower())
+
+
+class TestDetectSimpleMode(unittest.TestCase):
+    """Simple/bare mode never reads OAuth or the keychain, so it must be
+    caught independently of key-based detection."""
+
+    def test_env_var_set_is_simple_mode(self):
+        reason = execute.detect_simple_mode({"CLAUDE_CODE_SIMPLE": "1"}, [])
+        self.assertIsNotNone(reason)
+        self.assertIn("CLAUDE_CODE_SIMPLE", reason)
+
+    def test_empty_env_var_is_not_simple_mode(self):
+        reason = execute.detect_simple_mode({"CLAUDE_CODE_SIMPLE": ""}, [])
+        self.assertIsNone(reason)
+
+    def test_bare_flag_is_simple_mode(self):
+        reason = execute.detect_simple_mode({}, ["--bare"])
+        self.assertIsNotNone(reason)
+        self.assertIn("--bare", reason)
+
+    def test_clean_env_and_flags_is_not_simple_mode(self):
+        reason = execute.detect_simple_mode({}, ["--permission-mode", "acceptEdits"])
+        self.assertIsNone(reason)
+
+
+class TestBillingPreflight(unittest.TestCase):
+    """CHANGE 2: a preflight guard that ABORTS before any hook or subprocess
+    runs, rather than merely recording the basis after the fact.
+    """
+
+    def test_clean_subscription_env_does_not_raise(self):
+        with TemporaryDirectory() as tmp:
+            mode = execute.billing_preflight({}, [Path(tmp) / "missing.json"], [], False)
+        self.assertEqual(mode["mode"], "subscription")
+
+    def test_api_key_in_env_aborts(self):
+        with self.assertRaises(execute.BillingGuardError) as ctx:
+            execute.billing_preflight(
+                {"ANTHROPIC_API_KEY": "sk-ant-SECRET"}, [], [], False
+            )
+        message = str(ctx.exception)
+        self.assertIn("ANTHROPIC_API_KEY", message)
+        self.assertNotIn("sk-ant-SECRET", message)
+        self.assertIn("--allow-api-billing", message)
+
+    def test_api_key_helper_in_settings_aborts(self):
+        with TemporaryDirectory() as tmp:
+            settings = Path(tmp) / "s.json"
+            settings.write_text(json.dumps({"apiKeyHelper": "/bin/get-key"}))
+            with self.assertRaises(execute.BillingGuardError) as ctx:
+                execute.billing_preflight({}, [settings], [], False)
+        self.assertIn("apiKeyHelper", str(ctx.exception))
+
+    def test_simple_mode_env_var_aborts(self):
+        with self.assertRaises(execute.BillingGuardError) as ctx:
+            execute.billing_preflight({"CLAUDE_CODE_SIMPLE": "1"}, [], [], False)
+        self.assertIn("CLAUDE_CODE_SIMPLE", str(ctx.exception))
+
+    def test_bare_flag_aborts(self):
+        with self.assertRaises(execute.BillingGuardError) as ctx:
+            execute.billing_preflight({}, [], ["--bare"], False)
+        self.assertIn("--bare", str(ctx.exception))
+
+    def test_allow_api_billing_bypasses_abort_and_records_api(self):
+        mode = execute.billing_preflight(
+            {"ANTHROPIC_API_KEY": "sk-ant-SECRET"}, [], [], True
+        )
+        self.assertEqual(mode["mode"], "api")
+        self.assertNotIn("sk-ant-SECRET", json.dumps(mode))
+
+    def test_allow_api_billing_still_lets_a_clean_env_through_as_subscription(self):
+        mode = execute.billing_preflight({}, [], [], True)
+        self.assertEqual(mode["mode"], "subscription")
+
+    def test_secret_never_appears_in_abort_message(self):
+        secret = "sk-ant-DO-NOT-LEAK-THIS-EITHER"
+        with TemporaryDirectory() as tmp:
+            settings = Path(tmp) / "s.json"
+            settings.write_text(json.dumps({"env": {"ANTHROPIC_API_KEY": secret}}))
+            with self.assertRaises(execute.BillingGuardError) as ctx:
+                execute.billing_preflight(
+                    {"ANTHROPIC_API_KEY": secret}, [settings], [], False
+                )
+        self.assertNotIn(secret, str(ctx.exception))
+
+
+def _write_adapter_yaml(path, flags=None, setup=None, teardown=None):
+    flags = flags or []
+    setup = setup or []
+    teardown = teardown or []
+    flags_literal = json.dumps(flags)
+    setup_literal = json.dumps(setup)
+    teardown_literal = json.dumps(teardown)
+    path.write_text(
+        "id: test-adapter\n"
+        "label: Test Adapter\n"
+        "setup: {0}\n"
+        "run:\n"
+        "  model: claude-opus-5\n"
+        "  prompt: |\n"
+        "    hello {{{{ticket_key}}}}\n"
+        "  flags: {1}\n"
+        "teardown: {2}\n".format(setup_literal, flags_literal, teardown_literal)
+    )
+
+
+class TestMainBillingPreflight(unittest.TestCase):
+    """execute.main() must abort at preflight -- before adapter.setup hooks
+    and before the `claude` subprocess -- for every API-billed or
+    simple-mode condition, and must proceed (without invoking `claude`) on a
+    clean subscription environment. Never invokes the real `claude` CLI.
+    """
+
+    def setUp(self):
+        self.tmp = TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        self.artifacts = self.root / "artifacts"
+        self.artifacts.mkdir()
+        self.worktree = self.root / "worktree"
+        self.worktree.mkdir()
+
+        self.cell_path = self.root / "cell.json"
+        self.cell_path.write_text(
+            json.dumps(
+                {
+                    "repo": str(self.repo),
+                    "worktree": str(self.worktree),
+                    "artifacts": str(self.artifacts),
+                }
+            )
+        )
+        self.story_path = self.root / "story.json"
+        self.story_path.write_text(
+            json.dumps(
+                {"key": "NA-1", "summary": "S", "description": "D", "acs": "- a"}
+            )
+        )
+        self.adapter_path = self.root / "adapter.yaml"
+        _write_adapter_yaml(self.adapter_path)
+        self.out_path = self.root / "result.json"
+
+        # Fake $HOME so a real ~/.claude/settings.json on the dev machine
+        # never leaks into these tests.
+        self.fake_home = self.root / "fake-home"
+        self.fake_home.mkdir()
+
+        # Neutralise anything genuinely set in this process's environment so
+        # the tests are hermetic regardless of what machine runs them.
+        self.env_patch = patch.dict(
+            execute.os.environ,
+            {
+                "ANTHROPIC_API_KEY": "",
+                "ANTHROPIC_AUTH_TOKEN": "",
+                "CLAUDE_CODE_SIMPLE": "",
+            },
+        )
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
+        self.home_patch = patch.object(execute.Path, "home", return_value=self.fake_home)
+        self.home_patch.start()
+        self.addCleanup(self.home_patch.stop)
+
+    def _argv(self, extra=None):
+        argv = [
+            "--cell",
+            str(self.cell_path),
+            "--story",
+            str(self.story_path),
+            "--adapter",
+            str(self.adapter_path),
+            "--out",
+            str(self.out_path),
+        ]
+        return argv + (extra or [])
+
+    def test_api_key_aborts_before_hooks_or_subprocess(self):
+        """A test that would pass because something later blew up is not
+        good enough: run_hooks and subprocess.run are wired to raise
+        AssertionError if called, so if the guard did NOT stop the run at
+        preflight, this test fails with the WRONG exception type, not with
+        BillingGuardError.
+        """
+        with patch.dict(execute.os.environ, {"ANTHROPIC_API_KEY": "sk-ant-LIVE"}):
+            with patch.object(
+                execute, "run_hooks", side_effect=AssertionError("hooks must not run")
+            ), patch.object(
+                execute.subprocess,
+                "run",
+                side_effect=AssertionError("claude must not be invoked"),
+            ):
+                with self.assertRaises(execute.BillingGuardError) as ctx:
+                    execute.main(self._argv())
+        self.assertIn("ANTHROPIC_API_KEY", str(ctx.exception))
+        self.assertNotIn("sk-ant-LIVE", str(ctx.exception))
+        self.assertFalse(self.out_path.exists())
+
+    def test_api_key_helper_in_settings_aborts_before_hooks_or_subprocess(self):
+        claude_dir = self.repo / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "settings.json").write_text(
+            json.dumps({"apiKeyHelper": "/bin/get-key"})
+        )
+        with patch.object(
+            execute, "run_hooks", side_effect=AssertionError("hooks must not run")
+        ), patch.object(
+            execute.subprocess,
+            "run",
+            side_effect=AssertionError("claude must not be invoked"),
+        ):
+            with self.assertRaises(execute.BillingGuardError) as ctx:
+                execute.main(self._argv())
+        self.assertIn("apiKeyHelper", str(ctx.exception))
+        self.assertFalse(self.out_path.exists())
+
+    def test_simple_mode_env_var_aborts_before_hooks_or_subprocess(self):
+        with patch.dict(execute.os.environ, {"CLAUDE_CODE_SIMPLE": "1"}):
+            with patch.object(
+                execute, "run_hooks", side_effect=AssertionError("hooks must not run")
+            ), patch.object(
+                execute.subprocess,
+                "run",
+                side_effect=AssertionError("claude must not be invoked"),
+            ):
+                with self.assertRaises(execute.BillingGuardError) as ctx:
+                    execute.main(self._argv())
+        self.assertIn("CLAUDE_CODE_SIMPLE", str(ctx.exception))
+        self.assertFalse(self.out_path.exists())
+
+    def test_clean_env_proceeds_past_preflight_without_invoking_claude(self):
+        """Proceeding is proven two ways: the stubbed `claude` call is
+        reached (mock_run gets called), and the real CLI is never invoked
+        (subprocess.run is stubbed, so no real process is spawned)."""
+        context_dir = self.repo / ".claude" / "project"
+        context_dir.mkdir(parents=True)
+        (context_dir / "project-context.md").write_text(
+            "| Token | Value |\n"
+            "| --- | --- |\n"
+            "| Typecheck / Test | — / echo ok |\n"
+        )
+        fake_completed = type(
+            "FakeCompletedProcess",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"session_id": "sess-1", "total_cost_usd": 0.0}),
+                "stderr": "",
+            },
+        )()
+        with patch.object(
+            execute.subprocess, "run", return_value=fake_completed
+        ) as mock_run:
+            code = execute.main(self._argv())
+        self.assertEqual(code, 0)
+        mock_run.assert_called_once()
+        called_argv = mock_run.call_args[0][0]
+        self.assertEqual(called_argv[0], "claude")
+        result = json.loads(self.out_path.read_text())
+        self.assertEqual(result["billing_mode"]["mode"], "subscription")
+
+    def test_allow_api_billing_with_key_present_proceeds_and_records_api(self):
+        context_dir = self.repo / ".claude" / "project"
+        context_dir.mkdir(parents=True)
+        (context_dir / "project-context.md").write_text(
+            "| Token | Value |\n"
+            "| --- | --- |\n"
+            "| Typecheck / Test | — / echo ok |\n"
+        )
+        fake_completed = type(
+            "FakeCompletedProcess",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"session_id": "sess-2", "total_cost_usd": 0.0}),
+                "stderr": "",
+            },
+        )()
+        with patch.dict(execute.os.environ, {"ANTHROPIC_API_KEY": "sk-ant-LIVE"}):
+            with patch.object(execute.subprocess, "run", return_value=fake_completed):
+                code = execute.main(self._argv(["--allow-api-billing"]))
+        self.assertEqual(code, 0)
+        result = json.loads(self.out_path.read_text())
+        self.assertEqual(result["billing_mode"]["mode"], "api")
+        self.assertNotIn("sk-ant-LIVE", self.out_path.read_text())
+
+    def test_planted_secret_never_reaches_result_json(self):
+        context_dir = self.repo / ".claude" / "project"
+        context_dir.mkdir(parents=True)
+        (context_dir / "project-context.md").write_text(
+            "| Token | Value |\n"
+            "| --- | --- |\n"
+            "| Typecheck / Test | — / echo ok |\n"
+        )
+        secret = "sk-ant-PLANTED-SECRET-VALUE"
+        fake_completed = type(
+            "FakeCompletedProcess",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"session_id": "sess-3", "total_cost_usd": 0.0}),
+                "stderr": "",
+            },
+        )()
+        with patch.dict(execute.os.environ, {"ANTHROPIC_API_KEY": secret}):
+            with patch.object(execute.subprocess, "run", return_value=fake_completed):
+                code = execute.main(self._argv(["--allow-api-billing"]))
+        self.assertEqual(code, 0)
+        self.assertNotIn(secret, self.out_path.read_text())

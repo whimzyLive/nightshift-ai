@@ -28,6 +28,8 @@ Runs execute against the real repository and consume real capacity. Before dispa
 - **`subscription`** — no API key is in play. **No per-run charge is incurred; no money leaves an account.** The scarce resource is **rate-limit budget**, not dollars. A large sweep can exhaust the operator's window and cut a session off mid-run, which the harness marks as a `CUT OFF` cell.
 - **`api`** — an API key is in play, so token consumption is real spend against that key.
 
+`execute.py` does not merely record which of these applies after the fact — it **checks first and refuses to start** a cell that would land on `api` (including simple/bare mode, which never reads the subscription credential). This is a guard against silently drifting onto per-token billing, not a warning; there is no `--allow-api-billing` default and no environment variable that suppresses it. If the founder deliberately wants an API-billed comparison run, that flag must be passed to `execute.py` explicitly for that invocation (see step 3).
+
 State plainly, for each approach:
 
 - the number of measured sessions this approach will run (one session per cell in the pipeline)
@@ -63,15 +65,20 @@ For each approach, in the order given:
 
 3. Execute.
 
+   **Before it does anything else, `execute.py` runs a preflight billing guard.** If the environment would bill this run to an API key rather than the operator's subscription — an `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` export, an `apiKeyHelper` in settings, or simple/bare mode (`CLAUDE_CODE_SIMPLE`, `--bare`), which never reads the subscription credential either — the run **aborts immediately**, before any setup hook and before `claude` is invoked. Nothing is spent. The error names exactly what was detected (variable or setting name only, never its value) and tells you to re-run with `--allow-api-billing` if that is genuinely what you want.
+
+   Treat this as a real stop, not a retry-with-backoff situation: figure out why the machine looks API-billed (an exported key, a stray settings change) before proceeding. Only pass `--allow-api-billing` deliberately, per invocation, when an API-billed comparison run is the intended point of the sweep — it is not read from an environment variable, so it cannot be left on by accident. When passed, the run proceeds and `result.json`'s `billing_mode` still records `api`, so the report cannot misrepresent what actually happened.
+
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/execute.py" \
      --cell docs/benchmarks/<TICKET>/<APPROACH>/cell.json \
      --story docs/benchmarks/<TICKET>/story.json \
      --adapter "${CLAUDE_PLUGIN_ROOT}/approaches/<APPROACH>.yaml" \
      --out docs/benchmarks/<TICKET>/<APPROACH>/result.json
+     # add --allow-api-billing only for a deliberate API-billed comparison run
    ```
 
-   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage consumes real capacity. Never auto-retry without explicit founder confirmation.
+   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage consumes real capacity. Never auto-retry without explicit founder confirmation. A preflight billing-guard abort is a failure of this kind — surface the error to the founder rather than adding the flag yourself.
 
    **If the output contains `ABNORMAL TERMINATION`:** the session was cut off mid-run — on a subscription, most often by the rate-limit window closing. The cell is FAILED. Still run **step 5 (measure)** so the record reaches `run.json` and the report can render the row as `CUT OFF`, then **skip step 6 (grade)** — grading a partial diff spends three more `claude` invocations to produce a number that means nothing. Do **not** sleep, retry, or resume. Report it to the founder, who re-runs the cell by hand once the cause has cleared.
 

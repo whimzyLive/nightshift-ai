@@ -28,6 +28,21 @@ from benchlib import adapters, config, termination  # noqa: E402
 # a credential and is never read into any recorded structure.
 API_KEY_ENV_VARS = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
 
+# Claude Code's "simple"/bare mode. Under it, auth is strictly
+# ANTHROPIC_API_KEY or apiKeyHelper -- OAuth and the keychain are never read
+# (confirmed via `claude --help`: --bare "Sets CLAUDE_CODE_SIMPLE=1 ... OAuth
+# and keychain are never read"). So a run under this mode cannot be billed to
+# the operator's subscription no matter what settings say.
+SIMPLE_MODE_ENV_VAR = "CLAUDE_CODE_SIMPLE"
+SIMPLE_MODE_FLAG = "--bare"
+
+
+class BillingGuardError(RuntimeError):
+    """Raised by the preflight guard when a run would consume money or quota
+    on a basis the operator did not deliberately choose. Never constructed
+    with a credential value -- only variable/setting NAMES.
+    """
+
 
 def settings_candidates(repo: Path) -> List[Path]:
     """Settings files whose contents can put a run on an API key.
@@ -117,6 +132,86 @@ def detect_billing_mode(
     }
 
 
+def detect_simple_mode(env: Dict[str, str], flags: List[str]) -> Optional[str]:
+    """Is this run's `claude` invocation going to run under simple/bare mode?
+
+    Under simple mode, OAuth and the keychain are never read -- auth is
+    strictly ANTHROPIC_API_KEY or apiKeyHelper. So a run that would enter
+    simple mode cannot land on the operator's subscription regardless of
+    what `detect_billing_mode` finds, and must be treated as an abort
+    condition of its own.
+
+    Only presence and the triggering name are returned -- never a value.
+    """
+    if (env.get(SIMPLE_MODE_ENV_VAR) or "").strip():
+        return "{0} is set in the environment".format(SIMPLE_MODE_ENV_VAR)
+    if SIMPLE_MODE_FLAG in flags:
+        return "the adapter passes {0} (sets {1}=1)".format(
+            SIMPLE_MODE_FLAG, SIMPLE_MODE_ENV_VAR
+        )
+    return None
+
+
+def billing_preflight(
+    env: Dict[str, str],
+    settings_paths: List[Path],
+    flags: List[str],
+    allow_api_billing: bool,
+) -> Dict[str, object]:
+    """Abort BEFORE any money-or-quota-consuming work if this run would be
+    billed to an API key or would run under simple mode.
+
+    This is deliberately separate from -- but built on -- detect_billing_mode:
+    recording the basis after the session has already run is not enough. A
+    key exported in some future shell, or a settings change, could route a
+    whole sweep to API billing and only be noticed once someone reads
+    run.json. This makes that outcome loud and immediate, before the first
+    setup hook or `claude` subprocess, so nothing has been spent yet.
+
+    Returns the billing-mode record that gated this decision, so the caller
+    records the SAME evaluation rather than recomputing one later that could
+    disagree with what actually gated the run (e.g. a key unset mid-run).
+
+    `allow_api_billing` is the one explicit, per-invocation escape hatch
+    (the CLI's --allow-api-billing). There is deliberately no environment
+    variable equivalent -- an env var escape hatch would be defeated by
+    exactly the scenario this guard exists to catch.
+    """
+    mode = detect_billing_mode(env, settings_paths)
+    simple_reason = detect_simple_mode(env, flags)
+
+    if simple_reason and mode["mode"] != "api":
+        # Simple mode forces API-only auth even when no key evidence was
+        # found elsewhere. Reporting "subscription" here would misstate what
+        # actually happens -- the subscription credential is never read.
+        mode = dict(mode)
+        mode["mode"] = "api"
+        mode["evidence"] = (
+            "simple mode is active ({0}) -- OAuth and the keychain are never "
+            "read under it, so this run cannot be billed to the operator's "
+            "subscription regardless of other key evidence.".format(simple_reason)
+        )
+
+    if allow_api_billing:
+        return mode
+
+    reasons: List[str] = []
+    if simple_reason:
+        reasons.append(simple_reason)
+    if mode["mode"] == "api" and not simple_reason:
+        reasons.append(mode["evidence"].rstrip("."))
+    if not reasons:
+        return mode
+
+    raise BillingGuardError(
+        "refusing to start: this run would NOT be billed to the operator's "
+        "Claude subscription -- {0}. Nothing has been spent -- this check "
+        "runs before any setup hook or `claude` invocation. If an "
+        "API-billed comparison run is genuinely wanted, re-run with "
+        "--allow-api-billing.".format("; ".join(reasons))
+    )
+
+
 def build_variables(
     cell: dict, story: dict, test_command: str, base_branch: str = ""
 ) -> Dict[str, str]:
@@ -182,11 +277,35 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--story", required=True)
     parser.add_argument("--adapter", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument(
+        "--allow-api-billing",
+        action="store_true",
+        help=(
+            "Explicit, per-invocation escape hatch. Without it, the preflight "
+            "guard aborts any run that would be billed to an API key or would "
+            "run under simple mode. There is no environment-variable "
+            "equivalent by design."
+        ),
+    )
     args = parser.parse_args(argv)
 
     cell = json.loads(Path(args.cell).read_text())
     story = json.loads(Path(args.story).read_text())
     adapter = adapters.load_adapter(Path(args.adapter))
+
+    # Preflight guard: abort BEFORE any money-or-quota-consuming work (setup
+    # hooks, the `claude` subprocess) if this run would be API-billed or
+    # would run under simple mode. See billing_preflight for why this can't
+    # wait until after the session runs. billing_mode is recorded verbatim
+    # into result.json below -- reusing this exact evaluation rather than
+    # recomputing one later.
+    billing_mode = billing_preflight(
+        dict(os.environ),
+        settings_candidates(Path(cell["repo"])),
+        adapter.flags,
+        args.allow_api_billing,
+    )
+
     cfg = config.load_config(Path(cell["repo"]), {})
 
     worktree = Path(cell["worktree"])
@@ -239,11 +358,12 @@ def main(argv: Optional[list] = None) -> int:
     payload["started_at"] = started_at
     payload["ended_at"] = ended_at
     payload["setup_seconds"] = round(setup_seconds, 3)
-    # Which basis this cell's dollar figures sit on. Recorded per run, never
-    # inferred later -- see detect_billing_mode.
-    payload["billing_mode"] = detect_billing_mode(
-        dict(os.environ), settings_candidates(Path(cell["repo"]))
-    )
+    # Which basis this cell's dollar figures sit on. This is the SAME
+    # evaluation the preflight guard used to decide whether to let the run
+    # start, not a fresh recomputation -- so a --allow-api-billing run is
+    # recorded as `api` even if, say, a key were unset in between (it can't
+    # misrepresent what actually gated this run). See billing_preflight.
+    payload["billing_mode"] = billing_mode
     # Allow-list check of the result payload's termination shape. Recorded
     # here so an abnormal end is visible immediately rather than only after
     # measure runs; measure re-derives it from the same fields and adds the
