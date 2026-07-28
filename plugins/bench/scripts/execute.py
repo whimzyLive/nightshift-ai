@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchlib import adapters, config  # noqa: E402
+from benchlib import adapters, config, termination  # noqa: E402
 
 # Environment variables that put `claude` on a pay-per-token API key rather
 # than the operator's subscription. Checked for PRESENCE only -- the value is
@@ -244,6 +244,11 @@ def main(argv: Optional[list] = None) -> int:
     payload["billing_mode"] = detect_billing_mode(
         dict(os.environ), settings_candidates(Path(cell["repo"]))
     )
+    # Allow-list check of the result payload's termination shape. Recorded
+    # here so an abnormal end is visible immediately rather than only after
+    # measure runs; measure re-derives it from the same fields and adds the
+    # transcript scan. See benchlib/termination.py.
+    payload["termination"] = termination.check_result_payload(payload)
 
     # Write result.json BEFORE running teardown. If teardown fails, the
     # already-paid-for result is still captured on disk.
@@ -259,13 +264,25 @@ def main(argv: Optional[list] = None) -> int:
         teardown_error = e
 
     print(
-        "executed {0} (model={1}): session={2} cost=${3:.4f}".format(
+        "executed {0} (model={1}): session={2} cost=${3:.4f} API-equiv "
+        "[billing mode: {4}]".format(
             adapter.id,
             adapter.model,
             payload.get("session_id"),
             payload.get("total_cost_usd", 0.0),
+            payload["billing_mode"]["mode"],
         )
     )
+
+    # Loud, and never silently swallowed. The result is still on disk: this
+    # cell's record is evidence, and measure.py needs it to render the row as
+    # failed. No auto-resume is attempted -- see benchlib/termination.py.
+    if not payload["termination"]["clean"]:
+        print(
+            "ABNORMAL TERMINATION -- this cell is FAILED, not measured: {0}".format(
+                "; ".join(payload["termination"]["violations"])
+            )
+        )
 
     if teardown_error is not None:
         raise RuntimeError(

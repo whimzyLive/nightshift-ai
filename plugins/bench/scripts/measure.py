@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchlib import adapters  # noqa: E402
+from benchlib import adapters, termination  # noqa: E402
 
 PRICING_PATH = Path(__file__).resolve().parent / "benchlib" / "pricing.json"
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
@@ -335,6 +335,19 @@ def billing_mode_from_result(result: dict) -> dict:
     }
 
 
+def termination_verdict(result: dict, transcript) -> dict:
+    """Whether this cell's session terminated cleanly, from both evidence sources.
+
+    Re-derived here from the result payload rather than trusting the verdict
+    execute.py stored alongside it, so a result.json written before that field
+    existed is still checked, and so the two can never silently diverge.
+    """
+    return termination.combine(
+        termination.check_result_payload(result),
+        termination.scan_transcript(transcript),
+    )
+
+
 def instruction_floor(residents: List[int]) -> int:
     return min(residents) if residents else 0
 
@@ -597,6 +610,7 @@ def main(argv: Optional[list] = None) -> int:
             "num_turns": result.get("num_turns"),
         },
         "billing_mode": billing_mode_from_result(result),
+        "termination": termination_verdict(result, transcript),
         "by_phase": summary["by_phase"],
         "context": summary["context"],
         "subagents": summary["subagents"],
@@ -618,6 +632,9 @@ def main(argv: Optional[list] = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(run, indent=2))
 
+    if not run["termination"]["clean"]:
+        print("FAILED CELL: " + run["termination"]["note"])
+
     if work_done["empty_diff"]:
         print("FAILED CELL: " + work_done["empty_diff_note"])
 
@@ -637,7 +654,11 @@ def main(argv: Optional[list] = None) -> int:
         print("WARNING: " + attribution["note"])
     for note in notes:
         print("WARNING: " + note)
-    return 0 if (ok and not work_done["empty_diff"]) else 1
+    return (
+        0
+        if (ok and not work_done["empty_diff"] and run["termination"]["clean"])
+        else 1
+    )
 
 
 if __name__ == "__main__":

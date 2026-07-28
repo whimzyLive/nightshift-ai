@@ -667,3 +667,54 @@ class TestBillingModeCarryThrough(unittest.TestCase):
         carried = measure.billing_mode_from_result({})
         self.assertEqual(carried["mode"], "unknown")
         self.assertTrue(carried["evidence"])
+
+
+class TestTerminationIntegration(unittest.TestCase):
+    """CHANGE 3: measure.py must fold the termination verdict into run.json
+    and must not report a truncated session as a measured cell."""
+
+    def test_clean_result_and_transcript_is_clean(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.jsonl"
+            path.write_text(json.dumps({"type": "assistant"}) + "\n")
+            verdict = measure.termination_verdict(
+                {
+                    "is_error": False,
+                    "subtype": "success",
+                    "stop_reason": "end_turn",
+                    "terminal_reason": "completed",
+                    "api_error_status": None,
+                    "num_turns": 5,
+                },
+                path,
+            )
+        self.assertTrue(verdict["clean"])
+
+    def test_rate_limited_transcript_fails_even_with_a_normal_result(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.jsonl"
+            path.write_text(
+                json.dumps(
+                    {
+                        "type": "system",
+                        "subtype": "api_error",
+                        "error": {"status": 429, "rateLimits": {"unified_5h": "gone"}},
+                    }
+                )
+                + "\n"
+            )
+            verdict = measure.termination_verdict(
+                {"is_error": False, "subtype": "success", "num_turns": 5}, path
+            )
+        self.assertFalse(verdict["clean"])
+        self.assertEqual(len(verdict["rate_limit_entries"]), 1)
+
+    def test_abnormal_result_payload_fails(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.jsonl"
+            path.write_text("")
+            verdict = measure.termination_verdict(
+                {"is_error": True, "subtype": "error_during_execution"}, path
+            )
+        self.assertFalse(verdict["clean"])
+        self.assertEqual(verdict["observed"]["subtype"], "error_during_execution")

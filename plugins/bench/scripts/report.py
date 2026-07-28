@@ -66,6 +66,7 @@ def phase_rows(runs: List[dict]) -> List[dict]:
         reconciliation = run.get("reconciliation") or {}
         attribution = run.get("phase_attribution") or {}
         work_done = run.get("work_done") or {}
+        term = run.get("termination") or {}
 
         # A run.json written before phase_attribution existed has no opinion;
         # treat that as available rather than retroactively invalidating it.
@@ -90,6 +91,14 @@ def phase_rows(runs: List[dict]) -> List[dict]:
                 "attribution_note": attribution.get("note", ""),
                 "empty_diff": bool(work_done.get("empty_diff")),
                 "empty_diff_note": work_done.get("empty_diff_note", ""),
+                # A run.json written before the termination check existed has
+                # no opinion; treat that as clean rather than retroactively
+                # marking every historical row as cut off.
+                "termination_clean": bool(term.get("clean", True)),
+                "termination_note": term.get("note", ""),
+                "termination_observed": term.get("observed") or {},
+                "termination_violations": term.get("violations") or [],
+                "rate_limit_entries": term.get("rate_limit_entries") or [],
             }
         )
     return rows
@@ -108,6 +117,11 @@ def artifact_inventory(runs: List[dict]) -> List[dict]:
         # "what the ceremony spend bought" would launder the same fabricated
         # number the main table refuses to print.
         if not (run.get("phase_attribution") or {}).get("available", True):
+            continue
+        # A cut-off cell's per-phase figures are the cost of a partial run.
+        # Listing them as "what the ceremony spend bought" would present a
+        # truncated session's spend as a completed deliverable.
+        if not (run.get("termination") or {}).get("clean", True):
             continue
 
         phases = run.get("by_phase") or {}
@@ -181,12 +195,20 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
     failed_notes = []
     unattributed_notes = []
     empty_diff_notes = []
+    cut_off_notes = []
     for i, row in enumerate(rows):
-        # Three independent reasons a row's numbers cannot be shown as-is.
+        # Four independent reasons a row's numbers cannot be shown as-is.
         # Order matters only for the status label; the em dashes are the
         # same either way, because in every one of these cases the split is
         # not a measurement.
-        if row["empty_diff"]:
+        #
+        # CUT OFF is checked FIRST and deliberately: a session that did not
+        # terminate cleanly explains every other symptom it produces (a
+        # half-finished diff, a broken phase split, a suspiciously low cost),
+        # so labelling it by one of those symptoms would bury the cause.
+        if not row["termination_clean"]:
+            status = "CUT OFF"
+        elif row["empty_diff"]:
             status = "NO DIFF"
         elif not row["reconciled"]:
             status = "FAILED"
@@ -199,15 +221,23 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             row["reconciled"]
             and row["attribution_available"]
             and not row["empty_diff"]
+            and row["termination_clean"]
         )
         impl_str = "{:.2f}".format(row["impl"]) if show_split else "—"
         review_str = "{:.2f}".format(row["review_fix"]) if show_split else "—"
         ceremony_str = "{:.2f}".format(row["ceremony"]) if show_split else "—"
 
+        # The total is normally still a valid figure even when the split is
+        # not. A cut-off cell is the one case where it is not: it is the cost
+        # of a partial run, and printing it invites reading a truncated
+        # session as a cheap one.
+        total_str = "—" if not row["termination_clean"] else "{:.2f}".format(row["total"])
+
         regressions_str = "yes" if row["regressions"] else "no"
-        if row["empty_diff"]:
-            # 0 findings against an empty diff is not a clean result; it is
-            # a grader with nothing to grade. Never render it as 0.
+        if row["empty_diff"] or not row["termination_clean"]:
+            # 0 findings against an empty or partial diff is not a clean
+            # result; it is a grader with nothing to grade. Never render it
+            # as 0.
             acs_str = "—"
             findings_str = "—"
         else:
@@ -223,7 +253,7 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
                 impl_str,
                 review_str,
                 ceremony_str,
-                "{:.2f}".format(row["total"]),
+                total_str,
                 regressions_str,
                 acs_str,
                 findings_str,
@@ -231,6 +261,8 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             )
         )
 
+        if not row["termination_clean"]:
+            cut_off_notes.append(row)
         if not row["reconciled"]:
             failed_notes.append((row["approach"], row["reconciliation_note"]))
         if not row["attribution_available"]:
@@ -272,6 +304,47 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         ]
         for skipped in skipped_files:
             lines.append("- `{0}`: {1}".format(skipped["path"], skipped["error"]))
+
+    # Footnotes for abnormally terminated cells
+    if cut_off_notes:
+        lines += [
+            "",
+            "## Abnormal termination — cells cut off mid-run",
+            "",
+            "These cells' sessions did **not** terminate cleanly, so every figure they",
+            "produced describes a partial run. **They are failed cells, not cheap ones.**",
+            "A truncated session still reports a cost and still reconciles — reconstructed",
+            "and reported are both derived from the same truncated data — which is why this",
+            "is checked separately and why the whole row, total included, is shown as `—`.",
+            "",
+            "The check is an allow-list: a cell passes only when its result payload matches",
+            "the known-good shape (`is_error: false`, `subtype: \"success\"`,",
+            "`stop_reason: \"end_turn\"`, `terminal_reason: \"completed\"`, no",
+            "`api_error_status`) and its transcript carries no `system`/`api_error` entry",
+            "with a populated `rateLimits` field. Observed values are recorded verbatim.",
+            "",
+            "**No auto-resume is attempted.** Re-run the cell by hand once the cause has",
+            "cleared — on a subscription the usual cause is exhausting the rate-limit window.",
+            "",
+        ]
+        for row in cut_off_notes:
+            lines.append("- **{0}**".format(row["approach"]))
+            for violation in row["termination_violations"]:
+                lines.append("  - {0}".format(violation))
+            if row["termination_observed"]:
+                lines.append(
+                    "  - observed: `{0}`".format(
+                        json.dumps(row["termination_observed"], sort_keys=True, default=str)
+                    )
+                )
+            for entry in row["rate_limit_entries"]:
+                lines.append(
+                    "  - rate-limit entry: `{0}`".format(
+                        json.dumps(entry, sort_keys=True, default=str)
+                    )
+                )
+            if not row["termination_violations"] and row["termination_note"]:
+                lines.append("  - {0}".format(row["termination_note"]))
 
     # Footnotes for failed reconciliation
     if failed_notes:

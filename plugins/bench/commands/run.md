@@ -71,7 +71,9 @@ For each approach, in the order given:
      --out docs/benchmarks/<TICKET>/<APPROACH>/result.json
    ```
 
-   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage spends money. Never auto-retry without explicit founder confirmation.
+   **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry — this stage consumes real capacity. Never auto-retry without explicit founder confirmation.
+
+   **If the output contains `ABNORMAL TERMINATION`:** the session was cut off mid-run — on a subscription, most often by the rate-limit window closing. The cell is FAILED. Still run **step 5 (measure)** so the record reaches `run.json` and the report can render the row as `CUT OFF`, then **skip step 6 (grade)** — grading a partial diff spends three more `claude` invocations to produce a number that means nothing. Do **not** sleep, retry, or resume. Report it to the founder, who re-runs the cell by hand once the cause has cleared.
 
 4. Run tests inside the cell's worktree to capture test evidence for graders.
 
@@ -95,9 +97,15 @@ For each approach, in the order given:
 
    The destination is the cell's artifacts directory, which provision.py has already created at an absolute path outside the worktree — so test evidence survives worktree removal. The `|| true` ensures this step does not fail the cell even if tests fail — a failing test suite is exactly the evidence the grader needs. Continue regardless.
 
-5. Measure. A non-zero exit means **either** reconciliation failed **or** the cell produced no code change — report whichever it is, do not hide it. Neither stops the cell; continue to grading, and let the report render the row as failed.
+5. Measure. A non-zero exit means reconciliation failed, **or** the cell produced no code change, **or** the session did not terminate cleanly — report whichever it is, do not hide it.
 
-   Read `run.json` after this step and surface three things to the founder if present: `reconciliation.unpriceable_models` (a model id with no rate card, so the computed cost is an undercount), `phase_attribution.available: false` (the per-phase split is an artefact and the report will show `—`), and `work_done.empty_diff: true` (**a failed cell** — the session committed nothing, so the graders will be grading an empty patch).
+   Read `run.json` after this step and surface four things to the founder if present:
+   - `termination.clean: false` — **a failed cell.** The session was cut off mid-run and every figure it produced describes a partial run. **Skip grading for this cell** and let the report render it as `CUT OFF`. Do not sleep, retry, or resume; the founder re-runs it by hand.
+   - `work_done.empty_diff: true` — **a failed cell.** The session committed nothing, so the graders would be grading an empty patch. Skip grading.
+   - `reconciliation.unpriceable_models` — a model id with no rate card, so the computed cost is an undercount.
+   - `phase_attribution.available: false` — the per-phase split is an artefact and the report will show `—`.
+
+   The last two do not stop the cell; continue to grading and let the report render the row as failed.
 
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/measure.py" \

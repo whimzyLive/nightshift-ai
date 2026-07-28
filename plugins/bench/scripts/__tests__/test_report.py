@@ -395,3 +395,67 @@ class TestApiEquivalentLabelling(unittest.TestCase):
         billing_line = [l for l in out.split("\n") if l.startswith("Billing mode")][0]
         self.assertIn("subscription", billing_line)
         self.assertIn("api", billing_line)
+
+
+class TestCutOffRendering(unittest.TestCase):
+    """CHANGE 3: an abnormally terminated cell must render distinctly and
+    must never present its figures as a measurement."""
+
+    def _cut_off_run(self):
+        run = copy.deepcopy(RUN)
+        run["termination"] = {
+            "clean": False,
+            "observed": {"subtype": "error_max_turns", "api_error_status": 429},
+            "violations": ["subtype is 'error_max_turns', expected 'success'"],
+            "rate_limit_entries": [],
+            "note": "FAILED CELL: the measured session did not terminate cleanly.",
+        }
+        return run
+
+    def test_status_is_distinct(self):
+        out = report.render_markdown("NA-80", [self._cut_off_run()])
+        self.assertIn("| CUT OFF", out)
+
+    def test_total_is_not_presented_as_a_measurement(self):
+        out = report.render_markdown("NA-80", [self._cut_off_run()])
+        row = [l for l in out.split("\n") if l.startswith("| CUT OFF")][0]
+        self.assertNotIn("46.67", row)
+        self.assertIn("—", row)
+
+    def test_acs_and_findings_are_not_presented(self):
+        out = report.render_markdown("NA-80", [self._cut_off_run()])
+        row = [l for l in out.split("\n") if l.startswith("| CUT OFF")][0]
+        self.assertNotIn("1/1", row)
+
+    def test_footnote_section_records_the_observed_values_verbatim(self):
+        out = report.render_markdown("NA-80", [self._cut_off_run()])
+        self.assertIn("Abnormal termination", out)
+        self.assertIn("error_max_turns", out)
+        self.assertIn("429", out)
+
+    def test_cut_off_takes_precedence_over_other_statuses(self):
+        """A cut-off session explains every other symptom it produces (a
+        half-finished diff, a broken split), so it must be the label."""
+        run = self._cut_off_run()
+        run["reconciliation"] = {"ok": False, "note": "drifted"}
+        run["work_done"] = {"empty_diff": True, "empty_diff_note": "nothing"}
+        out = report.render_markdown("NA-80", [run])
+        self.assertIn("| CUT OFF", out)
+        self.assertNotIn("| NO DIFF", out)
+        self.assertNotIn("| FAILED ", out)
+
+    def test_run_without_termination_field_is_not_retroactively_cut_off(self):
+        out = report.render_markdown("NA-80", [RUN])
+        self.assertNotIn("CUT OFF", out)
+
+    def test_rate_limit_entries_are_surfaced_in_the_footnote(self):
+        run = self._cut_off_run()
+        run["termination"]["rate_limit_entries"] = [
+            {"status": 429, "rateLimits": {"unified_5h": "exhausted"}}
+        ]
+        out = report.render_markdown("NA-80", [run])
+        self.assertIn("unified_5h", out)
+
+    def test_no_auto_resume_is_stated(self):
+        out = report.render_markdown("NA-80", [self._cut_off_run()])
+        self.assertIn("re-run", out.lower())
