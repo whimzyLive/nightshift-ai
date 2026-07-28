@@ -1,0 +1,23 @@
+id: opus
+label: Direct Opus, no framework
+# No setup: this approach deliberately brings no tooling, no skills, no process.
+setup: []
+run:
+  prompt: |
+    Implement the following ticket in this repository.
+
+    Ticket: {{ticket_key}} — {{ticket_summary}}
+
+    {{ticket_description}}
+
+    Acceptance criteria:
+    {{ticket_acs}}
+
+    Work on the current branch. Commit your changes when done.
+    Run the test suite with: {{test_command}}
+  flags: ['--permission-mode', 'acceptEdits']
+# One measured phase. This approach has no spec, plan, review or docs ceremony —
+# that absence is the thing being measured, not an omission in the adapter.
+phases:
+  - { id: impl, marker: '' }
+teardown: []
