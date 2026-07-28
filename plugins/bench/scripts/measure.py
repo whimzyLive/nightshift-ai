@@ -15,6 +15,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import namedtuple
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -38,6 +39,40 @@ def load_pricing() -> dict:
     return data["models"]
 
 
+class UnpriceableModelError(KeyError):
+    """No rate card exists for this model id.
+
+    Subclasses KeyError because that is what an unguarded pricing[model]
+    lookup used to raise -- but it is caught and recorded, never allowed to
+    abort a measurement. A run that has already been paid for must always
+    produce a run.json; losing the spend to a bare traceback because one
+    turn used an unrecognised model is the worst possible failure mode for
+    a cost-measurement harness.
+    """
+
+
+def canonical_model(model: str) -> str:
+    """Strip the context-window suffix (e.g. "claude-opus-5[1m]")."""
+    return _SUFFIX.sub("", model or "")
+
+
+def usage_token_total(usage: dict) -> int:
+    """Total billable tokens in a usage payload, across every class."""
+    cache_creation = usage.get("cache_creation")
+    if isinstance(cache_creation, dict):
+        cache_written = cache_creation.get(
+            "ephemeral_1h_input_tokens", 0
+        ) + cache_creation.get("ephemeral_5m_input_tokens", 0)
+    else:
+        cache_written = usage.get("cache_creation_input_tokens", 0)
+    return (
+        usage.get("input_tokens", 0)
+        + usage.get("output_tokens", 0)
+        + cache_written
+        + usage.get("cache_read_input_tokens", 0)
+    )
+
+
 def price_entry(usage: dict, model: str, pricing: dict) -> float:
     """Price one assistant turn's usage against a model's rate card.
 
@@ -51,8 +86,11 @@ def price_entry(usage: dict, model: str, pricing: dict) -> float:
     data isn't available, so real split data is never discarded in favor of
     the fallback.
     """
-    canonical = _SUFFIX.sub("", model or "")
-    rates = pricing[canonical]
+    canonical = canonical_model(model)
+    try:
+        rates = pricing[canonical]
+    except KeyError:
+        raise UnpriceableModelError(canonical)
 
     cache_creation = usage.get("cache_creation")
     if isinstance(cache_creation, dict):
@@ -69,6 +107,28 @@ def price_entry(usage: dict, model: str, pricing: dict) -> float:
         + cache_cost
         + usage.get("cache_read_input_tokens", 0) * rates["cache_read"]
     ) / 1_000_000
+
+
+def price_or_record(
+    usage: dict, model: str, pricing: dict, unpriceable: Dict[str, int]
+) -> float:
+    """Price a turn, RECORDING rather than raising on an unknown model id.
+
+    A turn whose usage is entirely zero costs nothing under any rate card,
+    so an unknown model with no tokens is not recorded -- there is no
+    information to lose, and flagging it would fail reconciliation over an
+    accounting non-event (Claude Code's `<synthetic>` pseudo-model, used for
+    locally generated error text, is always all-zero). Anything else is
+    recorded by model id and contributes 0.0 to the total: the honest floor,
+    since inventing a rate would be worse than admitting we do not have one.
+    """
+    try:
+        return price_entry(usage, model, pricing)
+    except UnpriceableModelError:
+        if usage_token_total(usage) > 0:
+            name = canonical_model(model) or "<missing model id>"
+            unpriceable[name] = unpriceable.get(name, 0) + 1
+        return 0.0
 
 
 def find_transcript(session_id: str) -> Optional[Path]:
@@ -95,6 +155,27 @@ def find_transcript(session_id: str) -> Optional[Path]:
 
 
 def read_entries(transcript: Path) -> List[dict]:
+    """Parse a transcript into per-entry accounting records.
+
+    Two independent sources of spend live in one transcript:
+
+      1. The MAIN session's own turns -- `type == "assistant"` entries, priced
+         from `message.usage` against `message.model`.
+      2. SUBAGENT turns -- which do NOT appear in this file as entries at all.
+         A subagent runs in its own transcript; the parent session records
+         only the rolled-up `toolUseResult.usage`, `toolUseResult.resolvedModel`
+         and `toolUseResult.agentId` on the entry that carries the tool result.
+
+    Reading `isSidechain` was the earlier attempt at (2) and finds nothing:
+    across 60 recent real transcripts on this machine there are ZERO
+    `isSidechain: true` entries, so subagent spend was silently absent from
+    every per-phase figure while still being inside the reported total --
+    small enough (measured: 1.8% of one real session) to pass the 2%
+    reconciliation tolerance and look clean.
+
+    `is_sidechain` is still parsed: it costs nothing and remains the correct
+    marker if a future harness version does inline subagent turns.
+    """
     entries = []
     for line in transcript.read_text().splitlines():
         if not line.strip():
@@ -108,6 +189,14 @@ def read_entries(transcript: Path) -> List[dict]:
             )
         else:
             text = str(content or "")
+
+        tool_result = raw.get("toolUseResult")
+        if not isinstance(tool_result, dict):
+            tool_result = {}
+        subagent_usage = tool_result.get("usage")
+        if not isinstance(subagent_usage, dict):
+            subagent_usage = None
+
         entries.append(
             {
                 "type": raw.get("type"),
@@ -115,14 +204,34 @@ def read_entries(transcript: Path) -> List[dict]:
                 "model": message.get("model"),
                 "usage": message.get("usage") or {},
                 "is_sidechain": bool(raw.get("isSidechain")),
+                "subagent_usage": subagent_usage,
+                "subagent_model": tool_result.get("resolvedModel"),
+                "subagent_id": tool_result.get("agentId"),
                 "timestamp": raw.get("timestamp"),
             }
         )
     return entries
 
 
-def assign_phases(entries: List[dict], phases: List[dict]) -> List[dict]:
-    """Tag each entry with the phase whose marker most recently fired.
+PhaseAssignment = namedtuple("PhaseAssignment", "entries marker_fires")
+
+
+def assign_phases_with_fires(
+    entries: List[dict], phases: List[dict]
+) -> PhaseAssignment:
+    """Tag each entry with the phase whose marker most recently fired, and
+    report how many times each phase's marker actually matched.
+
+    The fire counts are not diagnostics -- they are the only evidence that
+    the per-phase split means anything. `current` seeds to the first declared
+    phase and moves only on a marker match, so an approach whose phases run
+    inline inside a single `claude -p` session (every approach that is not
+    literally typing slash commands) fires no marker at all and lands 100% of
+    its spend in whichever phase happens to be declared first. That produced
+    a real report row reading `| OK | sdlc | 0.00 | 0.00 | 27.07 | 27.07 |`
+    whose impl-only figure -- the report's central claim -- was fabricated
+    and unflagged. Callers must consult these counts before presenting a
+    split.
 
     Entries before any marker belong to the first declared phase, so preamble
     work is never dropped from the accounting.
@@ -136,7 +245,9 @@ def assign_phases(entries: List[dict], phases: List[dict]) -> List[dict]:
     list comprehension.
     """
     compiled = []
+    fires: Dict[str, int] = {}
     for p in phases:
+        fires[p["id"]] = 0
         marker = p.get("marker")
         if not marker:
             compiled.append((p["id"], None))
@@ -154,11 +265,51 @@ def assign_phases(entries: List[dict], phases: List[dict]) -> List[dict]:
         for phase_id, pattern in compiled:
             if pattern is not None and pattern.search(entry.get("text") or ""):
                 current = phase_id
+                fires[phase_id] += 1
                 break
         tagged = dict(entry)
         tagged["phase"] = current
         out.append(tagged)
-    return out
+    return PhaseAssignment(entries=out, marker_fires=fires)
+
+
+def assign_phases(entries: List[dict], phases: List[dict]) -> List[dict]:
+    """Tagged entries only. See assign_phases_with_fires for the fire counts."""
+    return assign_phases_with_fires(entries, phases).entries
+
+
+def phase_attribution(phases: List[dict], marker_fires: Dict[str, int]) -> dict:
+    """Decide whether this run's per-phase split is meaningful, and say why.
+
+    Two cases look identical in the data and must not be conflated:
+
+      * ONE declared phase with an empty marker (opus.yaml) -- there is
+        nothing to attribute, every entry belongs to the only phase there is,
+        and the split is trivially correct. `available: true`.
+      * SEVERAL declared phases and no marker ever fired -- everything landed
+        in the first declared phase by default, which is an artefact of the
+        seeding rule, not a measurement. `available: false`.
+    """
+    declared = [p["id"] for p in phases]
+    total_fires = sum(marker_fires.values())
+    available = len(declared) <= 1 or total_fires > 0
+    if available:
+        note = ""
+    else:
+        note = (
+            "phase attribution unavailable: {0} phases declared ({1}) but no phase "
+            "marker matched anywhere in the transcript, so every entry defaulted to "
+            "the first declared phase. The per-phase split for this row is an "
+            "artefact, not a measurement.".format(len(declared), ", ".join(declared))
+        )
+    return {
+        "declared_phases": declared,
+        "markers_declared": sum(1 for p in phases if p.get("marker")),
+        "marker_fires": dict(marker_fires),
+        "any_marker_fired": total_fires > 0,
+        "available": available,
+        "note": note,
+    }
 
 
 def instruction_floor(residents: List[int]) -> int:
@@ -248,36 +399,72 @@ def compute_work_done(cell: dict, transcript: Path) -> Dict[str, int]:
     }
 
 
+def _new_bucket() -> dict:
+    return {
+        "cost_usd": 0.0,
+        "requests": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_write_tokens": 0,
+        "cache_read_tokens": 0,
+        "subagent_requests": 0,
+        "subagent_cost_usd": 0.0,
+        "subagent_tokens": 0,
+    }
+
+
 def summarise(entries: List[dict], pricing: dict) -> dict:
+    """Roll entries up into per-phase cost, tokens and context metrics.
+
+    `cost_usd` per phase is main-session cost PLUS subagent cost attributed
+    to that phase, because that is what the phase actually cost. The
+    subagent share is also broken out separately (`subagent_cost_usd` /
+    `subagent_requests`) so a reader can see how much of a phase was
+    delegated.
+
+    Token counters and the context block stay MAIN-SESSION ONLY. The
+    instruction floor and resident-token figures describe the measured
+    session's own context window; folding a subagent's fresh context into
+    them would make an approach that delegates heavily look like it carried
+    a larger prompt. Subagent tokens are reported separately as
+    `subagent_tokens`.
+    """
     by_phase: Dict[str, dict] = {}
     residents: List[int] = []
+    unpriceable: Dict[str, int] = {}
+    subagent_models: Dict[str, int] = {}
+
     for entry in entries:
-        if entry["type"] != "assistant":
-            continue
-        usage = entry["usage"]
-        bucket = by_phase.setdefault(
-            entry["phase"],
-            {
-                "cost_usd": 0.0,
-                "requests": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_write_tokens": 0,
-                "cache_read_tokens": 0,
-                "subagent_requests": 0,
-            },
-        )
-        bucket["cost_usd"] += price_entry(usage, entry["model"], pricing)
-        bucket["requests"] += 1
-        bucket["input_tokens"] += usage.get("input_tokens", 0)
-        bucket["output_tokens"] += usage.get("output_tokens", 0)
-        bucket["cache_write_tokens"] += usage.get("cache_creation_input_tokens", 0)
-        bucket["cache_read_tokens"] += usage.get("cache_read_input_tokens", 0)
-        if entry["is_sidechain"]:
+        if entry["type"] == "assistant":
+            usage = entry["usage"]
+            bucket = by_phase.setdefault(entry["phase"], _new_bucket())
+            bucket["cost_usd"] += price_or_record(
+                usage, entry["model"], pricing, unpriceable
+            )
+            bucket["requests"] += 1
+            bucket["input_tokens"] += usage.get("input_tokens", 0)
+            bucket["output_tokens"] += usage.get("output_tokens", 0)
+            bucket["cache_write_tokens"] += usage.get("cache_creation_input_tokens", 0)
+            bucket["cache_read_tokens"] += usage.get("cache_read_input_tokens", 0)
+            residents.append(
+                usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0)
+            )
+
+        sub_usage = entry.get("subagent_usage")
+        if sub_usage:
+            bucket = by_phase.setdefault(entry["phase"], _new_bucket())
+            sub_model = entry.get("subagent_model")
+            sub_cost = price_or_record(sub_usage, sub_model, pricing, unpriceable)
+            bucket["cost_usd"] += sub_cost
+            bucket["subagent_cost_usd"] += sub_cost
             bucket["subagent_requests"] += 1
-        residents.append(
-            usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0)
-        )
+            bucket["subagent_tokens"] += usage_token_total(sub_usage)
+            name = canonical_model(sub_model) or "<missing model id>"
+            subagent_models[name] = subagent_models.get(name, 0) + 1
+
+    for bucket in by_phase.values():
+        bucket["cost_usd"] = round(bucket["cost_usd"], 6)
+        bucket["subagent_cost_usd"] = round(bucket["subagent_cost_usd"], 6)
 
     floor = instruction_floor(residents)
     mean_resident = sum(residents) / len(residents) if residents else 0
@@ -289,6 +476,15 @@ def summarise(entries: List[dict], pricing: dict) -> dict:
             "peak_resident_tokens": max(residents) if residents else 0,
             "work_context_tokens": round(max(0.0, mean_resident - floor)),
         },
+        "subagents": {
+            "requests": sum(b["subagent_requests"] for b in by_phase.values()),
+            "cost_usd": round(
+                sum(b["subagent_cost_usd"] for b in by_phase.values()), 6
+            ),
+            "tokens": sum(b["subagent_tokens"] for b in by_phase.values()),
+            "models": subagent_models,
+        },
+        "unpriceable_models": unpriceable,
     }
 
 
@@ -310,13 +506,34 @@ def main(argv: Optional[list] = None) -> int:
         raise RuntimeError(f"no transcript found for session {result['session_id']}")
 
     phases = [{"id": p.id, "marker": p.marker} for p in adapter.phases]
-    entries = assign_phases(read_entries(transcript), phases)
-    summary = summarise(entries, pricing)
+    assignment = assign_phases_with_fires(read_entries(transcript), phases)
+    summary = summarise(assignment.entries, pricing)
+    attribution = phase_attribution(phases, assignment.marker_fires)
     work_done = compute_work_done(cell, transcript)
 
     computed = sum(bucket["cost_usd"] for bucket in summary["by_phase"].values())
     reported = float(result.get("total_cost_usd") or 0.0)
-    ok = reconcile(computed, reported)
+    unpriceable = summary["unpriceable_models"]
+
+    # An unpriceable model means `computed` is a known undercount, so the
+    # reconciliation result cannot be trusted even if it happens to land
+    # inside tolerance. Force the failure and name the model ids.
+    within_tolerance = reconcile(computed, reported)
+    ok = within_tolerance and not unpriceable
+
+    notes = []
+    if not within_tolerance:
+        notes.append("computed cost drifted past tolerance; excluded from aggregates")
+    if unpriceable:
+        notes.append(
+            "unpriceable model ids (no rate card, priced as $0 -- computed cost is an "
+            "undercount): {0}".format(
+                ", ".join(
+                    "{0} ({1} turn{2})".format(name, count, "" if count == 1 else "s")
+                    for name, count in sorted(unpriceable.items())
+                )
+            )
+        )
 
     run = {
         "ticket": cell["ticket"],
@@ -332,23 +549,41 @@ def main(argv: Optional[list] = None) -> int:
         },
         "by_phase": summary["by_phase"],
         "context": summary["context"],
+        "subagents": summary["subagents"],
+        "phase_attribution": attribution,
         "work_done": work_done,
         "reconciliation": {
             "ok": ok,
+            "within_tolerance": within_tolerance,
             "tolerance": 0.02,
-            "note": "" if ok else "computed cost drifted past tolerance; excluded from aggregates",
+            "unpriceable_models": unpriceable,
+            "note": "; ".join(notes),
         },
     }
 
+    # Written unconditionally, before any exit-status decision: the session
+    # has already been paid for, and a measurement failure must never cost
+    # the operator the record of what was spent.
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(run, indent=2))
+
     status = "ok" if ok else "RECONCILIATION FAILED"
     print(
-        "measured {0}: reported=${1:.4f} computed=${2:.4f} [{3}]".format(
-            cell["approach"], reported, computed, status
+        "measured {0}: reported=${1:.4f} computed=${2:.4f} "
+        "(subagents ${3:.4f} over {4} call(s)) [{5}]".format(
+            cell["approach"],
+            reported,
+            computed,
+            summary["subagents"]["cost_usd"],
+            summary["subagents"]["requests"],
+            status,
         )
     )
+    if not attribution["available"]:
+        print("WARNING: " + attribution["note"])
+    for note in notes:
+        print("WARNING: " + note)
     return 0 if ok else 1
 
 

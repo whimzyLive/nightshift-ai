@@ -1,6 +1,20 @@
 {
   "_calibration_note": "claude-opus-5 cache_write split into cache_write_1h and cache_write_5m after fix-round-1 review (Finding 1). Original single cache_write=6.25 assumed 5-minute TTL and overpriced 1-hour-TTL cache writes by 1.6x. Calibrated against a real claude -p usage payload: usage.cache_creation = {ephemeral_1h_input_tokens: 14888, ephemeral_5m_input_tokens: 0}, reported costUSD 0.1565825. price_entry now reads usage['cache_creation']['ephemeral_1h_input_tokens'] / ['ephemeral_5m_input_tokens'] when that sub-object is present, and only falls back to pricing the flat 'cache_creation_input_tokens' bucket at the 1h rate when it is absent. cache_write_1h = 2x input (standard 1-hour TTL multiplier); cache_write_5m = 1.25x input (standard 5-minute TTL multiplier), applied uniformly across models per documented Anthropic caching economics. Real calibration data exists only for claude-opus-5; sonnet-5 and haiku rates are the standard multipliers, unverified against observed cost. This note is nested outside the 'models' object (not a sibling key needing convention-based filtering) so it can never be mistaken for a model's rate card by a pricing[canonical] lookup.",
   "models": {
+    "claude-fable-5": {
+      "input": 10.0,
+      "output": 50.0,
+      "cache_write_1h": 20.0,
+      "cache_write_5m": 12.5,
+      "cache_read": 1.0
+    },
+    "claude-opus-4-8": {
+      "input": 5.0,
+      "output": 25.0,
+      "cache_write_1h": 10.0,
+      "cache_write_5m": 6.25,
+      "cache_read": 0.5
+    },
     "claude-opus-5": {
       "input": 5.0,
       "output": 25.0,
@@ -15,6 +29,20 @@
       "cache_write_5m": 3.75,
       "cache_read": 0.3
     },
+    "claude-sonnet-4-6": {
+      "input": 3.0,
+      "output": 15.0,
+      "cache_write_1h": 6.0,
+      "cache_write_5m": 3.75,
+      "cache_read": 0.3
+    },
+    "claude-haiku-4-5": {
+      "input": 1.0,
+      "output": 5.0,
+      "cache_write_1h": 2.0,
+      "cache_write_5m": 1.25,
+      "cache_read": 0.1
+    },
     "claude-haiku-4-5-20251001": {
       "input": 1.0,
       "output": 5.0,
@@ -22,5 +50,6 @@
       "cache_write_5m": 1.25,
       "cache_read": 0.1
     }
-  }
+  },
+  "_observed_model_ids_note": "Model ids reconciled against a full survey of all 2204 transcripts under ~/.claude/projects on this machine (2026-07-29). Observed as message.model on assistant entries: claude-sonnet-4-6 (32597 turns), claude-fable-5 (14384), claude-opus-4-8 (13264), claude-opus-5 (3798), claude-haiku-4-5-20251001 (730), <synthetic> (25). Observed as toolUseResult.resolvedModel on subagent tool results: claude-sonnet-5 (296), claude-opus-4-8[1m] (156), claude-fable-5 (79), claude-opus-5[1m] (25), claude-haiku-4-5-20251001 (18), claude-sonnet-4-6 (7). Before this pass only claude-opus-5, claude-sonnet-5 and claude-haiku-4-5-20251001 were listed, so the three most common model ids on this machine -- claude-sonnet-4-6, claude-fable-5 and claude-opus-4-8 -- each raised KeyError and destroyed the whole measurement of an already-paid-for session. Their rates ($3/$15, $10/$50 and $5/$25 per MTok) are Anthropic first-party list prices, not estimates; cache multipliers are the same standard ones every other row uses (cache_read 0.1x input, cache_write_5m 1.25x, cache_write_1h 2x). <synthetic> is deliberately NOT priced: it is Claude Code's pseudo-model for locally generated error text and carries all-zero usage in all 25 observed entries, so it costs zero under any rate card -- measure.price_or_record returns $0.00 for a zero-token unknown model without flagging the run. KNOWN GAP: claude-sonnet-5 currently has an introductory rate of $2/$10 per MTok running through 2026-08-31; this file carries the $3/$15 standard rate, so sonnet-5 turns are OVERpriced until that date. That is deliberate -- the harness does not do date-dependent pricing, and the effect surfaces as reconciliation drift (loud) rather than a silent error."
 }

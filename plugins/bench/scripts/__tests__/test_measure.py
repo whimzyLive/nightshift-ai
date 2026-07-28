@@ -283,7 +283,11 @@ class TestGitNumstat(unittest.TestCase):
 
 
 class TestSummarise(unittest.TestCase):
-    def test_sidechain_entries_are_priced_into_their_phase_bucket_not_skipped(self):
+    def test_every_assistant_entry_is_priced_into_its_phase_bucket(self):
+        # NOTE: this test previously asserted that an `isSidechain: true`
+        # entry incremented subagent_requests. That behaviour was dead code
+        # -- real transcripts contain no isSidechain entries at all (finding
+        # C1) -- so the assertion has moved to the toolUseResult path below.
         entries = [
             {
                 "type": "assistant",
@@ -296,19 +300,17 @@ class TestSummarise(unittest.TestCase):
                 "type": "assistant",
                 "phase": "impl",
                 "model": "claude-opus-5",
-                "is_sidechain": True,  # a subagent turn
+                "is_sidechain": True,
                 "usage": {"input_tokens": 200},
             },
         ]
         summary = measure.summarise(entries, PRICING)
         bucket = summary["by_phase"]["impl"]
-        # Both requests counted, including the sidechain one's cost.
         self.assertEqual(bucket["requests"], 2)
-        self.assertEqual(bucket["subagent_requests"], 1)
         expected_cost = (100 * PRICING["claude-opus-5"]["input"] + 200 * PRICING["claude-opus-5"]["input"]) / 1_000_000
         self.assertAlmostEqual(bucket["cost_usd"], expected_cost, places=6)
 
-    def test_non_assistant_entries_are_excluded(self):
+    def test_non_assistant_entries_without_tool_usage_are_excluded(self):
         entries = [
             {"type": "user", "phase": "impl", "model": None, "is_sidechain": False, "usage": {}},
         ]
@@ -329,6 +331,238 @@ class TestSummarise(unittest.TestCase):
         summary = measure.summarise(entries, PRICING)
         self.assertEqual(summary["context"]["instruction_floor_tokens"], 15000)
         self.assertEqual(summary["context"]["peak_resident_tokens"], 31000)
+
+
+def _sub_entry(phase, model, usage, entry_type="user"):
+    return {
+        "type": entry_type,
+        "phase": phase,
+        "model": None,
+        "is_sidechain": False,
+        "usage": {},
+        "subagent_usage": usage,
+        "subagent_model": model,
+        "subagent_id": "agent_1",
+    }
+
+
+class TestSubagentAccounting(unittest.TestCase):
+    """Subagent spend lives in toolUseResult, not isSidechain (finding C1)."""
+
+    def test_read_entries_captures_tool_use_result_usage(self):
+        with TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "s.jsonl"
+            transcript.write_text(
+                json.dumps(
+                    {
+                        "type": "user",
+                        "toolUseResult": {
+                            "usage": {"input_tokens": 500, "output_tokens": 20},
+                            "resolvedModel": "claude-opus-5[1m]",
+                            "agentId": "agent_abc",
+                        },
+                    }
+                )
+                + "\n"
+            )
+            entries = measure.read_entries(transcript)
+        self.assertEqual(entries[0]["subagent_usage"]["input_tokens"], 500)
+        self.assertEqual(entries[0]["subagent_model"], "claude-opus-5[1m]")
+        self.assertEqual(entries[0]["subagent_id"], "agent_abc")
+
+    def test_read_entries_tolerates_non_dict_tool_use_result(self):
+        # toolUseResult is frequently a plain string (e.g. Bash output).
+        with TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "s.jsonl"
+            transcript.write_text(
+                json.dumps({"type": "user", "toolUseResult": "some stdout"}) + "\n"
+            )
+            entries = measure.read_entries(transcript)
+        self.assertIsNone(entries[0]["subagent_usage"])
+
+    def test_subagent_cost_is_counted_and_attributed_to_the_entrys_phase(self):
+        entries = [
+            {
+                "type": "assistant",
+                "phase": "impl",
+                "model": "claude-opus-5",
+                "is_sidechain": False,
+                "usage": {"input_tokens": 1_000_000},
+            },
+            _sub_entry("impl", "claude-opus-5", {"input_tokens": 200_000}),
+        ]
+        summary = measure.summarise(entries, PRICING)
+        bucket = summary["by_phase"]["impl"]
+        self.assertEqual(bucket["subagent_requests"], 1)
+        self.assertAlmostEqual(bucket["subagent_cost_usd"], 1.0, places=6)
+        # Phase cost is main + subagent, so the total reconciles.
+        self.assertAlmostEqual(bucket["cost_usd"], 6.0, places=6)
+        self.assertEqual(summary["subagents"]["requests"], 1)
+        self.assertAlmostEqual(summary["subagents"]["cost_usd"], 1.0, places=6)
+
+    def test_subagent_requests_is_no_longer_always_zero(self):
+        entries = [_sub_entry("impl", "claude-opus-5", {"output_tokens": 1000})]
+        summary = measure.summarise(entries, PRICING)
+        self.assertEqual(summary["by_phase"]["impl"]["subagent_requests"], 1)
+        self.assertGreater(summary["by_phase"]["impl"]["cost_usd"], 0.0)
+
+    def test_subagent_tokens_do_not_pollute_the_context_floor(self):
+        entries = [
+            {
+                "type": "assistant",
+                "phase": "impl",
+                "model": "claude-opus-5",
+                "is_sidechain": False,
+                "usage": {"input_tokens": 15000},
+            },
+            _sub_entry("impl", "claude-opus-5", {"input_tokens": 400}),
+        ]
+        summary = measure.summarise(entries, PRICING)
+        # 400 is not the instruction floor -- that subagent context is not
+        # the measured session's context.
+        self.assertEqual(summary["context"]["instruction_floor_tokens"], 15000)
+        self.assertEqual(summary["by_phase"]["impl"]["subagent_tokens"], 400)
+
+    def test_subagent_models_are_recorded(self):
+        entries = [_sub_entry("impl", "claude-opus-5[1m]", {"input_tokens": 10})]
+        summary = measure.summarise(entries, PRICING)
+        self.assertEqual(summary["subagents"]["models"], {"claude-opus-5": 1})
+
+
+class TestUnpriceableModels(unittest.TestCase):
+    """An unknown model id must never destroy a paid run (finding C2)."""
+
+    def test_price_entry_raises_a_named_error_not_a_bare_keyerror(self):
+        with self.assertRaises(measure.UnpriceableModelError):
+            measure.price_entry({"input_tokens": 1}, "claude-sonnet-4-6", PRICING)
+
+    def test_summarise_does_not_raise_on_an_unknown_model(self):
+        entries = [
+            {
+                "type": "assistant",
+                "phase": "impl",
+                "model": "claude-sonnet-4-6",
+                "is_sidechain": False,
+                "usage": {"input_tokens": 1_000_000},
+            }
+        ]
+        summary = measure.summarise(entries, PRICING)
+        self.assertEqual(summary["unpriceable_models"], {"claude-sonnet-4-6": 1})
+        self.assertEqual(summary["by_phase"]["impl"]["cost_usd"], 0.0)
+
+    def test_none_model_is_recorded_not_crashed_on(self):
+        entries = [
+            {
+                "type": "assistant",
+                "phase": "impl",
+                "model": None,
+                "is_sidechain": False,
+                "usage": {"output_tokens": 5},
+            }
+        ]
+        summary = measure.summarise(entries, PRICING)
+        self.assertIn("<missing model id>", summary["unpriceable_models"])
+
+    def test_zero_usage_unknown_model_is_not_flagged(self):
+        # `<synthetic>` always carries all-zero usage -- zero tokens cost zero
+        # under any rate card, so there is nothing to flag.
+        entries = [
+            {
+                "type": "assistant",
+                "phase": "impl",
+                "model": "<synthetic>",
+                "is_sidechain": False,
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0,
+                },
+            }
+        ]
+        summary = measure.summarise(entries, PRICING)
+        self.assertEqual(summary["unpriceable_models"], {})
+
+    def test_unpriceable_subagent_model_is_recorded_too(self):
+        entries = [_sub_entry("impl", "some-future-model", {"input_tokens": 10})]
+        summary = measure.summarise(entries, PRICING)
+        self.assertEqual(summary["unpriceable_models"], {"some-future-model": 1})
+
+    def test_shipped_pricing_json_prices_every_observed_model_id(self):
+        pricing = measure.load_pricing()
+        # Every model id observed across all 2204 transcripts on this
+        # machine, plus the [1m] suffixed forms seen on subagent results.
+        for model in (
+            "claude-opus-5",
+            "claude-opus-5[1m]",
+            "claude-opus-4-8",
+            "claude-opus-4-8[1m]",
+            "claude-fable-5",
+            "claude-sonnet-5",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5",
+            "claude-haiku-4-5-20251001",
+        ):
+            measure.price_entry({"input_tokens": 1}, model, pricing)
+
+
+class TestPhaseMarkerFires(unittest.TestCase):
+    """The split is only meaningful if a marker actually fired (finding C3)."""
+
+    def _entries(self, *texts):
+        return [{"type": "assistant", "text": t} for t in texts]
+
+    def test_counts_each_phases_marker_fires(self):
+        phases = [
+            {"id": "spec", "marker": r"/sdlc:spec"},
+            {"id": "impl", "marker": r"/sdlc:impl"},
+        ]
+        result = measure.assign_phases_with_fires(
+            self._entries("run /sdlc:spec", "now /sdlc:impl", "more /sdlc:impl"),
+            phases,
+        )
+        self.assertEqual(result.marker_fires, {"spec": 1, "impl": 2})
+
+    def test_reports_zero_fires_when_no_marker_matches(self):
+        phases = [
+            {"id": "spec", "marker": r"/sdlc:spec"},
+            {"id": "impl", "marker": r"/sdlc:impl"},
+        ]
+        result = measure.assign_phases_with_fires(
+            self._entries("just doing the work inline"), phases
+        )
+        self.assertEqual(result.marker_fires, {"spec": 0, "impl": 0})
+        # ...and everything defaulted into the first declared phase.
+        self.assertEqual(result.entries[0]["phase"], "spec")
+
+    def test_attribution_unavailable_when_many_phases_and_no_fire(self):
+        phases = [
+            {"id": "spec", "marker": r"/sdlc:spec"},
+            {"id": "impl", "marker": r"/sdlc:impl"},
+            {"id": "review-fix", "marker": r"/sdlc:review"},
+        ]
+        attribution = measure.phase_attribution(
+            phases, {"spec": 0, "impl": 0, "review-fix": 0}
+        )
+        self.assertFalse(attribution["available"])
+        self.assertFalse(attribution["any_marker_fired"])
+        self.assertIn("no phase marker matched", attribution["note"])
+
+    def test_attribution_available_for_a_single_markerless_phase(self):
+        # opus.yaml: one declared phase, empty marker. Nothing to attribute.
+        attribution = measure.phase_attribution([{"id": "impl", "marker": ""}], {"impl": 0})
+        self.assertTrue(attribution["available"])
+        self.assertEqual(attribution["note"], "")
+
+    def test_attribution_available_once_any_marker_fires(self):
+        phases = [{"id": "spec", "marker": "a"}, {"id": "impl", "marker": "b"}]
+        attribution = measure.phase_attribution(phases, {"spec": 0, "impl": 3})
+        self.assertTrue(attribution["available"])
+
+    def test_assign_phases_still_returns_a_plain_list(self):
+        tagged = measure.assign_phases(self._entries("x"), [{"id": "impl", "marker": ""}])
+        self.assertIsInstance(tagged, list)
+        self.assertEqual(tagged[0]["phase"], "impl")
 
 
 if __name__ == "__main__":
