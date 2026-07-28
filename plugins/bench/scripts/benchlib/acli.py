@@ -43,12 +43,32 @@ def issue_summary(fields: dict) -> str:
 
 def _flatten_adf(node: Any, out: List[str]) -> None:
     if isinstance(node, dict):
-        if node.get("type") == "text":
+        node_type = node.get("type")
+
+        # Text node: append literal text
+        if node_type == "text":
             out.append(node.get("text", ""))
-        for child in node.get("content", []) or []:
-            _flatten_adf(child, out)
-        if node.get("type") in ("paragraph", "heading"):
-            out.append("\n\n")
+
+        # Hard break: single newline within flow
+        elif node_type == "hardBreak":
+            out.append("\n")
+
+        # List item: special case with marker
+        elif node_type == "listItem":
+            out.append("- ")
+            for child in node.get("content", []) or []:
+                _flatten_adf(child, out)
+            out.append("\n")
+
+        # All other container nodes
+        else:
+            for child in node.get("content", []) or []:
+                _flatten_adf(child, out)
+
+            # Block elements get double newline separator
+            if node_type in ("paragraph", "heading", "codeBlock", "bulletList", "orderedList"):
+                out.append("\n\n")
+
     elif isinstance(node, list):
         for child in node:
             _flatten_adf(child, out)

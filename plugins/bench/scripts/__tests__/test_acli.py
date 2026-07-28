@@ -49,6 +49,77 @@ class TestFieldExtraction(unittest.TestCase):
     def test_description_missing_returns_empty(self):
         self.assertEqual(acli.issue_description({}), "")
 
+    def test_description_hardbreak_inside_paragraph(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Line 1"},
+                        {"type": "hardBreak"},
+                        {"type": "text", "text": "Line 2"},
+                    ],
+                },
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        # Should not concatenate into "Line 1Line 2"
+        self.assertIn("Line 1\nLine 2", result)
+
+    def test_description_codeblock_separated(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Before"}]},
+                {
+                    "type": "codeBlock",
+                    "content": [{"type": "text", "text": "code"}],
+                },
+                {"type": "paragraph", "content": [{"type": "text", "text": "After"}]},
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        # Should not concatenate: "Beforecode" or "codeAfter"
+        self.assertNotIn("Beforecode", result)
+        self.assertNotIn("codeAfter", result)
+
+    def test_description_bullet_list_items_separated(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 1"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Item 2"}],
+                                }
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        result = acli.issue_description({"description": adf})
+        # Should not concatenate: "Item 1Item 2"
+        self.assertNotIn("Item 1Item 2", result)
+        # Should have markers
+        self.assertIn("- Item 1", result)
+        self.assertIn("- Item 2", result)
+
 
 if __name__ == "__main__":
     unittest.main()
