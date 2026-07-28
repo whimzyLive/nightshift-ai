@@ -33,6 +33,32 @@ class TestParseProjectContext(unittest.TestCase):
         self.assertNotIn("----------------", parsed)
         self.assertNotIn("Token", parsed)
 
+    def test_scopes_to_token_value_table_only(self):
+        """Ensure only Token/Value config table is harvested, not other tables."""
+        mixed = """
+# Project Context
+
+| Token            | Value                        |
+| ---------------- | ---------------------------- |
+| Jira site        | whimzylive.atlassian.net     |
+| Base branch      | develop                      |
+
+# Workspace Ownership
+
+| Path             | Owner                        |
+| ---------------- | ---------------------------- |
+| Base branch      | some-engineer                |
+| plugins/         | ai-enablement-engineer       |
+"""
+        parsed = config.parse_project_context(mixed)
+        # Config table values should be present
+        self.assertEqual(parsed["Jira site"], "whimzylive.atlassian.net")
+        self.assertEqual(parsed["Base branch"], "develop")
+        # Other table's keys should not be present
+        self.assertNotIn("Path", parsed)
+        self.assertNotIn("Owner", parsed)
+        self.assertNotIn("plugins/", parsed)
+
 
 class TestLoadConfig(unittest.TestCase):
     def _repo_with_context(self, text):
@@ -51,8 +77,8 @@ class TestLoadConfig(unittest.TestCase):
 
     def test_overrides_beat_project_context(self):
         repo = self._repo_with_context(SAMPLE)
-        cfg = config.load_config(repo, {"base_branch": "main"})
-        self.assertEqual(cfg.base_branch, "main")
+        cfg = config.load_config(repo, {"base_branch": "release"})
+        self.assertEqual(cfg.base_branch, "release")
 
     def test_defaults_apply_without_project_context(self):
         tmp = Path(tempfile.mkdtemp())

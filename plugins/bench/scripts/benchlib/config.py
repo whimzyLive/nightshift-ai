@@ -30,18 +30,42 @@ class BenchConfig:
 
 
 def parse_project_context(text: str) -> Dict[str, str]:
-    """Extract key/value pairs from the markdown tables in project-context.md."""
+    """Extract key/value pairs from Token/Value markdown tables only."""
     out: Dict[str, str] = {}
-    for line in text.splitlines():
-        match = _ROW.match(line.strip())
+    lines = text.splitlines()
+    in_config_table = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Check if this line is a table row
+        match = _ROW.match(stripped)
         if not match:
+            # If we were in a config table, check if this ends the table
+            if in_config_table and stripped and not stripped.startswith("|"):
+                in_config_table = False
             continue
+
         key, value = match.group(1).strip(), match.group(2).strip()
-        if not key or key == "Token" or set(key) <= set("- "):
+
+        # Detect if this is the Token/Value header
+        if key == "Token" and value == "Value":
+            in_config_table = True
             continue
+
+        # Skip rows if not in a config table
+        if not in_config_table:
+            continue
+
+        # Skip separator rows (all dashes/spaces)
+        if not key or set(key) <= set("- "):
+            continue
+        # Skip separator values
         if set(value) <= set("- ") and value:
             continue
+
         out.setdefault(key, value)
+
     return out
 
 
