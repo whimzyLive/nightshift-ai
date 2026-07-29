@@ -103,8 +103,8 @@ permissions:
   - Bash(acli:*)
 ```
 
-Allow entries only. The deny list — push, merge, rebase, PR-merge — is a harness boundary and is
-not adapter-settable.
+Allow entries only. The deny list and the push guard are harness boundaries and are not
+adapter-settable — an adapter that could write them could un-deny `gh pr merge`.
 
 ## Version pinning
 
