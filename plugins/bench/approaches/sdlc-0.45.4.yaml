@@ -1,0 +1,67 @@
+id: sdlc
+label: SDLC plugin 0.45.4 (full lifecycle)
+# ---------------------------------------------------------------------------
+# NOT YET RUNNABLE. Two harness preconditions are unmet, both tracked as the
+# next piece of work rather than worked around here:
+#
+#   1. Scratch Jira issue. Every SDLC entry point reads AND WRITES its Jira
+#      story -- comments, transitions, PR links. The design spec calls for a
+#      scratch issue cloned into the real project and labelled `bench-run`,
+#      with the source ticket never written to. provision.py does not create
+#      one yet, so running this today would post benchmark noise onto the
+#      real ticket.
+#   2. Bench-scoped push. SDLC's lifecycle ends at a pull request, so it
+#      cannot complete without pushing. provision.py currently denies
+#      `git push` outright. The spec's mechanism is a PreToolUse hook that
+#      permits pushes to `bench/` refs and blocks everything else; the blunt
+#      deny is a stand-in for it. The deny is deliberately left in place --
+#      an adapter cannot un-deny it, and weakening the branch boundary to
+#      make a benchmark run would be the wrong trade.
+#
+# Until both land, this cell fails at the first push. That failure is loud
+# and lands in the run record; it does not silently produce a cheap-looking
+# row that skipped the phases it could not perform.
+# ---------------------------------------------------------------------------
+plugins:
+  enable:
+    - sdlc@nightshift
+version:
+  plugin: sdlc@nightshift
+  version: 0.45.4
+setup: []
+permissions:
+  # The SDLC lifecycle is Jira- and GitHub-coupled by design; measuring it
+  # without these measures a blocked session, not the approach.
+  - Bash(acli:*)
+  - Bash(gh:*)
+  - Bash(bash:*)
+run:
+  model: claude-opus-5
+  # `/sdlc:auto` is the plugin's own one-shot entry point: it triages the
+  # story, routes it through spec -> gate -> plan+impl, and runs its review
+  # loop inline. Passing the story key alone is how the plugin is actually
+  # used, so the row measures the product rather than a benchmark-shaped
+  # variant of it.
+  #
+  # The ticket body is NOT pasted in. /sdlc:auto fetches the story itself,
+  # and handing it pre-fetched text would both double the ticket in context
+  # and skip a step the approach genuinely pays for. This is the one adapter
+  # whose prompt is deliberately shorter than the others.
+  prompt: |
+    /sdlc:auto {{ticket_key}}
+  flags: ['--permission-mode', 'acceptEdits']
+# SDLC runs its whole lifecycle inline in one session, dispatching domain
+# agents with the Agent tool rather than typing slash commands. So markers
+# match the `subagent_type` of each dispatch, which measure.py exposes to
+# markers via tool-call inputs. Matching agent identity means the phase
+# boundary is where the session actually handed work to the next role.
+phases:
+  - { id: spec, marker: 'solutions-architect' }
+  - { id: plan, marker: 'tech-lead' }
+  - {
+      id: impl,
+      marker: 'web-engineer|platform-engineer|database-administrator|sync-engineer|mobile-engineer|ai-enablement-engineer|principal-engineer',
+    }
+  - { id: review-fix, marker: 'qa-engineer|code-reviewer|sdlc:review' }
+  - { id: docs, marker: 'knowledge-engineer|sdlc:docs' }
+teardown: []

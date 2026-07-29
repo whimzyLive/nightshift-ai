@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchlib import config  # noqa: E402
+from benchlib import adapters, config, environment  # noqa: E402
 
 BENCH_PREFIX = "bench/"
 
@@ -168,6 +168,18 @@ BENCH_DENIED_PERMISSIONS = [
     "Bash(gh pr merge:*)",
 ]
 
+PLUGIN_RATIONALE = (
+    "enabledPlugins is written EXHAUSTIVELY -- true for the adapter's declared "
+    "plugin set, false for every other plugin this machine knows about. This "
+    "file overrides both the repository's committed .claude/settings.json and "
+    "the operator's ~/.claude/settings.json, which is the only reason the "
+    "measurement means anything: a bench worktree is a checkout of the subject "
+    "repo, so without this an approach labelled 'no framework' would run with "
+    "whatever plugins the operator happens to have enabled. Hooks declared in "
+    "those two settings files cannot be overridden from here; they are recorded "
+    "in the run as ambient_hooks instead."
+)
+
 SETTINGS_RATIONALE = (
     "Written by plugins/bench/scripts/provision.py for a benchmark cell. "
     "The worktree is a fresh checkout that carries the committed "
@@ -183,7 +195,26 @@ SETTINGS_RATIONALE = (
 )
 
 
-def write_bench_settings(worktree: Path) -> Path:
+def merge_allow(extra: list) -> list:
+    """Harness permissions plus the adapter's own, order-stable, deduplicated.
+
+    Adapter entries cannot weaken anything: Claude Code resolves deny before
+    allow, so an adapter that asked for `Bash(git push:*)` would still be
+    denied it. The adapter list widens what an approach can do to perform its
+    own behaviour; it does not touch the boundary.
+    """
+    merged = list(BENCH_PERMISSIONS)
+    for entry in extra:
+        if entry not in merged:
+            merged.append(entry)
+    return merged
+
+
+def write_bench_settings(
+    worktree: Path,
+    enabled_plugins: Optional[dict] = None,
+    extra_allow: Optional[list] = None,
+) -> Path:
     """Write .claude/settings.local.json into a benchmark worktree.
 
     Provisioning owns this, not execute.py: the file is a property of the
@@ -191,23 +222,26 @@ def write_bench_settings(worktree: Path) -> Path:
     worktree is never in a state where it exists but cannot be worked in.
     It also keeps the measured window clean -- execute.py's timer starts at
     the session, and writing permissions is setup, not measured work.
+
+    `enabled_plugins` is the exhaustive true/false map from
+    benchlib.environment. Passing None writes no plugin control at all, which
+    means the cell inherits the operator's enabled plugins -- only correct for
+    callers that are not measuring anything.
     """
     settings_dir = worktree / ".claude"
     settings_dir.mkdir(parents=True, exist_ok=True)
     target = settings_dir / "settings.local.json"
-    target.write_text(
-        json.dumps(
-            {
-                "_comment": SETTINGS_RATIONALE,
-                "permissions": {
-                    "allow": BENCH_PERMISSIONS,
-                    "deny": BENCH_DENIED_PERMISSIONS,
-                },
-            },
-            indent=2,
-        )
-        + "\n"
-    )
+    payload = {
+        "_comment": SETTINGS_RATIONALE,
+        "permissions": {
+            "allow": merge_allow(extra_allow or []),
+            "deny": BENCH_DENIED_PERMISSIONS,
+        },
+    }
+    if enabled_plugins is not None:
+        payload["_plugins_comment"] = PLUGIN_RATIONALE
+        payload["enabledPlugins"] = enabled_plugins
+    target.write_text(json.dumps(payload, indent=2) + "\n")
     return target
 
 
@@ -234,6 +268,17 @@ def main(argv: Optional[list] = None) -> int:
             "match the adapter's version.version; execute.py enforces that."
         ),
     )
+    parser.add_argument(
+        "--adapter",
+        required=True,
+        help=(
+            "Path to the approach YAML. Required: the adapter declares the "
+            "exact plugin set the measured session may load, and without it "
+            "the worktree inherits whatever plugins the operator has enabled "
+            "-- which is the difference between measuring an approach and "
+            "measuring this machine."
+        ),
+    )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--repo", default=".")
     parser.add_argument("--base-sha", default=None)
@@ -245,7 +290,18 @@ def main(argv: Optional[list] = None) -> int:
     story = json.loads(Path(args.story).read_text())
     ticket = story["key"]
 
+    adapter = adapters.load_adapter(Path(args.adapter))
+
     cell_name = cell_id(args.approach, args.version)
+    # execute.py makes the same assertion before spending anything. Making it
+    # here too means a mismatch costs one provisioning call rather than a
+    # worktree that has to be torn down.
+    if cell_name != adapter.cell_id:
+        raise UnsafeBranchError(
+            "adapter/flag mismatch: --approach/--version resolve to {0!r} but "
+            "{1} resolves to {2!r}.".format(cell_name, args.adapter, adapter.cell_id)
+        )
+
     branch = branch_name(ticket, cell_name, args.run_id)
     assert_bench_branch(branch)
 
@@ -259,7 +315,12 @@ def main(argv: Optional[list] = None) -> int:
     artifacts.mkdir(parents=True, exist_ok=True)
 
     git(repo, "worktree", "add", "-b", branch, str(worktree), base_sha)
-    settings_path = write_bench_settings(worktree)
+    env_record = environment.environment_record(adapter.plugins, repo)
+    settings_path = write_bench_settings(
+        worktree,
+        enabled_plugins=env_record["enabled_plugins"],
+        extra_allow=adapter.permissions,
+    )
 
     cell = {
         "ticket": ticket,
@@ -276,12 +337,35 @@ def main(argv: Optional[list] = None) -> int:
         "base_sha": base_sha,
         "repo": str(repo),
         "settings_local": str(settings_path),
+        # What this cell's session runs inside. execute.py copies it into
+        # result.json so the run record carries it without re-deriving it
+        # from a machine that may have changed since.
+        "environment": env_record,
     }
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(cell, indent=2))
     print(f"provisioned {branch} at {worktree}")
     print(f"  wrote {settings_path} (harness permissions: git commit + test runner)")
+    print(
+        "  plugins enabled: {0}".format(", ".join(adapter.plugins) or "NONE")
+    )
+    print(
+        "  plugins explicitly disabled: {0}".format(
+            len(env_record["disabled_plugins"])
+        )
+    )
+    if env_record["ambient_hooks"]:
+        # Not suppressible from a project settings file, so it is stated at
+        # provisioning time rather than discovered in the report.
+        print(
+            "  WARNING: {0} hook(s) from user/project settings will run inside "
+            "the measured session and cannot be disabled from here:".format(
+                len(env_record["ambient_hooks"])
+            )
+        )
+        for hook in env_record["ambient_hooks"]:
+            print("    {0}: {1}".format(hook["event"], hook["command"]))
     return 0
 
 

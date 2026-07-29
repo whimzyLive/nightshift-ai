@@ -437,6 +437,13 @@ def main(argv: Optional[list] = None) -> int:
         # What this cell CLAIMS it measured. measure.py independently recovers
         # what the session actually loaded from the transcript and compares the
         # two -- this field alone is an intent, not evidence.
+        # What the session ran inside: the exact plugin set enabled, everything
+        # explicitly disabled, and any hook from user/project settings that
+        # could not be turned off. Written by provision.py at worktree-creation
+        # time and carried verbatim, so the record reflects what actually
+        # gated this cell rather than a re-derivation from a machine whose
+        # settings may have changed since.
+        payload["environment"] = cell.get("environment")
         payload["plugin_version"] = {
             "declared": (
                 {

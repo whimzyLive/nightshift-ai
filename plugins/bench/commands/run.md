@@ -88,9 +88,19 @@ For each approach, in the order given:
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/provision.py" \
      --story docs/benchmarks/<TICKET>/story.json \
      --approach <APPROACH> --run-id <RUN_ID> --repo <REPO> \
+     --adapter "${CLAUDE_PLUGIN_ROOT}/approaches/<APPROACH_FILE>.yaml" \
      [--version <VERSION>] \
      --out docs/benchmarks/<TICKET>/<CELL>/<RUN_ID>/cell.json
    ```
+
+   `--adapter` is the same file passed to `execute.py` in step 3, and it is required here:
+   provisioning writes the worktree's `enabledPlugins` from the adapter's declared plugin set.
+   Without it the cell would inherit whatever plugins the operator has enabled, and a row labelled
+   "no framework" would have run with every one of them loaded.
+
+   Read provisioning's output. If it warns about hooks from user or repository settings, those run
+   inside every measured session and cannot be disabled from the worktree — say so when reporting,
+   because a hook that rewrites commands or injects text moves the number being measured.
 
    **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry or skip to measure — the worktree is the evidence of what happened.
 

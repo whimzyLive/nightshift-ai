@@ -369,6 +369,8 @@ def _write_adapter_yaml(path, flags=None, setup=None, teardown=None):
     path.write_text(
         "id: test-adapter\n"
         "label: Test Adapter\n"
+        "plugins:\n"
+        "  enable: []\n"
         "setup: {0}\n"
         "run:\n"
         "  model: claude-opus-5\n"

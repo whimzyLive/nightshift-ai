@@ -1,0 +1,81 @@
+id: speckit
+label: GitHub spec-kit v0.14.3
+# spec-kit is not a Claude Code plugin -- it is a CLI that writes prompt files
+# into .claude/commands/. So there is nothing to enable, and the list must
+# still be spelled out: an empty list is what stops the operator's own plugins
+# (SDLC, superpowers, and the rest) from being loaded alongside it and
+# contaminating a row labelled "spec-kit".
+plugins:
+  enable: []
+setup:
+  # Pinned to a release tag, not to whatever `latest` resolves to on the day.
+  # spec-kit renamed its commands from `/specify` to `/speckit.specify` between
+  # releases, so an unpinned install silently changes what the phase markers
+  # below are matching, and a sweep repeated a month later measures a
+  # different tool under the same label.
+  #
+  # Outside the measured window by design: installing a toolchain is a
+  # one-time tax per machine, not a per-story cost.
+  - uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git@v0.14.3
+  - specify init --here --force --integration claude
+permissions:
+  - Bash(uv:*)
+  - Bash(specify:*)
+  # spec-kit's command prompts drive its own bash helpers under .specify/.
+  - Bash(bash:*)
+  - Bash(.specify/scripts/bash/:*)
+run:
+  model: claude-opus-5
+  # WHY THIS PROMPT LOOKS DIFFERENT FROM THE OTHERS
+  #
+  # spec-kit is driven by a human typing `/speckit.specify`, then
+  # `/speckit.plan`, then `/speckit.tasks`, then `/speckit.implement` across
+  # four separate turns. A model cannot invoke a slash command, and
+  # `claude -p` takes exactly one prompt -- so the flow cannot be reproduced
+  # by asking nicely.
+  #
+  # What it CAN do is read those command files, because that is all a slash
+  # command is: `specify init` writes each one to .claude/commands/, and the
+  # text the human's slash command would have expanded to is the file's
+  # contents. Naming the files in order therefore runs the same instructions
+  # in the same sequence, in one session.
+  #
+  # The deviation this leaves is real and is not papered over: a human would
+  # read each artefact between commands and could redirect. This run cannot.
+  # That makes this row a measurement of spec-kit's prompt pipeline executed
+  # unattended, which is the same thing every other row in this benchmark
+  # measures -- but it is NOT a measurement of a human using spec-kit well.
+  prompt: |
+    Implement the following ticket in this repository using the spec-kit
+    workflow that has been installed into `.claude/commands/`.
+
+    Ticket: {{ticket_key}} — {{ticket_summary}}
+
+    {{ticket_description}}
+
+    Acceptance criteria:
+    {{ticket_acs}}
+
+    Run the spec-kit workflow in order. For each step, read the command file
+    and follow its instructions exactly as written, treating the ticket text
+    above as the argument that would have followed the slash command:
+
+    1. `.claude/commands/speckit.specify.md`
+    2. `.claude/commands/speckit.plan.md`
+    3. `.claude/commands/speckit.tasks.md`
+    4. `.claude/commands/speckit.implement.md`
+
+    Work on the current branch. Commit your changes when done.
+    Run the test suite with: {{test_command}}
+  flags: ['--permission-mode', 'acceptEdits']
+# Markers match the command file paths, which appear in the `file_path` input
+# of the Read tool call that opens each one -- measure.py exposes tool-call
+# inputs to markers precisely so a framework that runs inline can still be
+# attributed. Matching the file path rather than the model's narration means
+# the phase boundary is where the session actually opened the next command,
+# not where it announced it would.
+phases:
+  - { id: spec, marker: 'speckit\.specify' }
+  - { id: plan, marker: 'speckit\.plan' }
+  - { id: impl, marker: 'speckit\.tasks|speckit\.implement' }
+teardown: []

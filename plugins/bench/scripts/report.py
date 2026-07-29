@@ -219,6 +219,79 @@ COST_BASIS_NOTE = [
 ]
 
 
+def render_environment(runs: List[dict]) -> List[str]:
+    """What each cell's session actually loaded, and what leaked in anyway.
+
+    Printed even when it is unremarkable. A reader comparing "SDLC" against
+    "no framework" is entitled to check that the second row really had no
+    framework, and the only honest way to let them is to state the plugin set
+    per row rather than assert isolation in prose.
+
+    Runs recorded before plugin isolation existed carry no environment block.
+    Those are called out explicitly rather than rendered as an empty plugin
+    set, because "not recorded" and "none loaded" are opposite claims.
+    """
+    seen = [run for run in runs if "approach" in run]
+    if not seen:
+        return []
+
+    lines = ["", "## What each cell loaded", ""]
+
+    unrecorded = [run["approach"] for run in seen if not run.get("environment")]
+    recorded = [run for run in seen if run.get("environment")]
+
+    if recorded:
+        lines += [
+            "Every plugin not listed below was **explicitly disabled** in the cell's",
+            "worktree, overriding both the repository's committed settings and the",
+            "operator's own. Without that, a cell inherits whatever the operator had",
+            "enabled and its label describes a session it did not have.",
+            "",
+            "| Approach | Plugins enabled |",
+            "| --- | --- |",
+        ]
+        rendered = []
+        for run in recorded:
+            declared = (run["environment"] or {}).get("declared_plugins") or []
+            entry = (run["approach"], ", ".join("`{0}`".format(p) for p in declared) or "*none*")
+            if entry not in rendered:
+                rendered.append(entry)
+        for approach, plugins in rendered:
+            lines.append("| {0} | {1} |".format(approach, plugins))
+
+    if unrecorded:
+        lines += [
+            "",
+            "These cells carry **no environment record** — they were measured before plugin",
+            "isolation existed, so what they loaded is unknown rather than nothing: "
+            + ", ".join(sorted(set(unrecorded))),
+            ".",
+        ]
+
+    hooks = []
+    for run in recorded:
+        for hook in (run["environment"] or {}).get("ambient_hooks") or []:
+            pair = (hook.get("event", ""), hook.get("command", ""))
+            if pair not in hooks:
+                hooks.append(pair)
+    if hooks:
+        lines += [
+            "",
+            "### Hooks that ran regardless",
+            "",
+            "Hooks declared in user or repository settings merge additively across settings",
+            "layers and cannot be switched off from a project file, so these ran inside every",
+            "measured session. They are a confound on every row equally — which does not make",
+            "them harmless, since a hook that rewrites commands or injects text changes the",
+            "tokens this benchmark counts.",
+            "",
+        ]
+        for event, command in hooks:
+            lines.append("- `{0}` — `{1}`".format(event, command))
+
+    return lines
+
+
 def comparable(row: dict) -> bool:
     """Whether a row's figures can be differenced against another row's.
 
@@ -559,6 +632,7 @@ def render_markdown(ticket: str, runs: List[dict], baseline: Optional[str] = Non
     lines += COST_BASIS_NOTE
     lines += render_baseline(rows, baseline)
     lines += render_variance(rows)
+    lines += render_environment(runs)
 
     if version_notes:
         lines += [

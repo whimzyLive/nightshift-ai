@@ -1,0 +1,60 @@
+id: superpowers
+label: Superpowers skills, no SDLC plugin
+# Skills only -- superpowers ships no commands. Its SessionStart hook injects
+# the `using-superpowers` skill, which is what routes an ordinary prompt into
+# brainstorming -> writing-plans -> subagent-driven-development. So this
+# approach needs no special prompt to activate: it needs the plugin enabled
+# and an ordinary ticket, which is exactly how a person uses it.
+plugins:
+  enable:
+    - superpowers@claude-plugins-official
+version:
+  plugin: superpowers@claude-plugins-official
+  version: 6.2.0
+# No install step: the plugin is already in the cache and provisioning enables
+# it per worktree.
+setup: []
+permissions:
+  # subagent-driven-development creates git worktrees for isolation and reads
+  # its own scripts out of the plugin cache. Without these the skill's very
+  # first setup step fails and the run measures a blocked session rather than
+  # the approach.
+  - Bash(git worktree:*)
+  - Bash(bash:*)
+run:
+  model: claude-opus-5
+  prompt: |
+    Implement the following ticket in this repository.
+
+    Ticket: {{ticket_key}} — {{ticket_summary}}
+
+    {{ticket_description}}
+
+    Acceptance criteria:
+    {{ticket_acs}}
+
+    Work on the current branch. Commit your changes when done.
+    Run the test suite with: {{test_command}}
+  flags: ['--permission-mode', 'acceptEdits']
+# Markers match skill invocations, not slash commands: superpowers has no
+# commands, and its phases run inline inside this single session. `Skill` tool
+# calls carry the skill name in their input, which measure.py exposes to
+# markers via tool_text -- so these fire on what the session DID, not on
+# whether it narrated it.
+#
+# Ordering note: `writing-plans` is reached from inside brainstorming, so a
+# transcript legitimately shows brainstorm -> plan -> impl. Markers move the
+# current phase on each match in declaration order, which matches that flow.
+phases:
+  - { id: spec, marker: 'brainstorming' }
+  - { id: plan, marker: 'writing-plans' }
+  - {
+      id: impl,
+      marker: 'subagent-driven-development|executing-plans|test-driven-development',
+    }
+  - {
+      id: review-fix,
+      marker: 'requesting-code-review|receiving-code-review|code-reviewer',
+    }
+  - { id: docs, marker: 'finishing-a-development-branch' }
+teardown: []

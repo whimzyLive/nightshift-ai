@@ -9,6 +9,8 @@ from benchlib import adapters  # noqa: E402
 YAML = """
 id: demo
 label: Demo Approach
+plugins:
+  enable: []
 setup:
   - echo setting up
 run:
@@ -47,7 +49,7 @@ class TestLoadAdapter(unittest.TestCase):
 
     def test_missing_phases_defaults_to_single_impl_phase(self):
         adapter = adapters.load_adapter(
-            _write("id: bare\nlabel: Bare\nrun:\n  model: claude-opus-5\n  prompt: hi\n")
+            _write("id: bare\nlabel: Bare\nplugins:\n  enable: []\nrun:\n  model: claude-opus-5\n  prompt: hi\n")
         )
         self.assertEqual([p.id for p in adapter.phases], ["impl"])
         self.assertEqual(adapter.phases[0].marker, "")
@@ -66,7 +68,7 @@ class TestLoadAdapter(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "phase 0 missing required key 'id'"):
             adapters.load_adapter(
                 _write(
-                    "id: bad\nrun:\n  model: claude-opus-5\n  prompt: hi\n"
+                    "id: bad\nplugins:\n  enable: []\nrun:\n  model: claude-opus-5\n  prompt: hi\n"
                     "phases:\n  - {marker: x}\n"
                 )
             )
@@ -119,12 +121,12 @@ class TestAdapterModelContract(unittest.TestCase):
 
     def test_model_is_loaded(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._adapter(tmp, "id: x\nrun:\n  model: claude-opus-5\n  prompt: hi\n")
+            path = self._adapter(tmp, "id: x\nplugins:\n  enable: []\nrun:\n  model: claude-opus-5\n  prompt: hi\n")
             self.assertEqual(adapters.load_adapter(path).model, "claude-opus-5")
 
     def test_missing_model_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._adapter(tmp, "id: x\nrun:\n  prompt: hi\n")
+            path = self._adapter(tmp, "id: x\nplugins:\n  enable: []\nrun:\n  prompt: hi\n")
             with self.assertRaises(ValueError) as ctx:
                 adapters.load_adapter(path)
             self.assertIn("run.model", str(ctx.exception))

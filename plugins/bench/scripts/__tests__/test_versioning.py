@@ -21,6 +21,9 @@ from benchlib import adapters, plugins  # noqa: E402
 VERSIONED_YAML = """
 id: sdlc
 label: SDLC plugin
+plugins:
+  enable:
+    - sdlc@nightshift
 version:
   plugin: sdlc@nightshift
   version: 0.44.0
@@ -33,6 +36,8 @@ run:
 UNVERSIONED_YAML = """
 id: opus
 label: Direct Opus
+plugins:
+  enable: []
 run:
   model: claude-opus-5
   prompt: |

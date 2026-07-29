@@ -2,6 +2,15 @@ id: opus
 label: Direct Opus, no framework
 # No setup: this approach deliberately brings no tooling, no skills, no process.
 setup: []
+# The control arm, and the only row whose value depends entirely on this list
+# being empty. Left unset, the worktree inherits the repository's committed
+# .claude/settings.json and the operator's ~/.claude/settings.json -- which on
+# the machine this was written for meant this "no framework" cell ran with the
+# SDLC plugin loaded and with superpowers' SessionStart hook telling it "You
+# have superpowers." provision.py writes an explicit `false` for every
+# installed plugin because of this line.
+plugins:
+  enable: []
 run:
   # Required. Passed to `claude --model`, so the row is labelled honestly:
   # without it the session runs on whatever the operator's default happens

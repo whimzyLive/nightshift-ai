@@ -190,6 +190,8 @@ def read_entries(transcript: Path) -> List[dict]:
         else:
             text = str(content or "")
 
+        tool_text = tool_use_text(content)
+
         tool_result = raw.get("toolUseResult")
         if not isinstance(tool_result, dict):
             tool_result = {}
@@ -201,6 +203,7 @@ def read_entries(transcript: Path) -> List[dict]:
             {
                 "type": raw.get("type"),
                 "text": text,
+                "tool_text": tool_text,
                 "model": message.get("model"),
                 "usage": message.get("usage") or {},
                 "is_sidechain": bool(raw.get("isSidechain")),
@@ -211,6 +214,59 @@ def read_entries(transcript: Path) -> List[dict]:
             }
         )
     return entries
+
+
+# Tool-call fields a phase marker can meaningfully key on. Deliberately a
+# short allow-list rather than the whole input dict: a Write or Edit input
+# carries the entire file body, and matching markers across megabytes of file
+# content per entry is both slow and a source of accidental fires (a marker
+# like "qa-engineer" would match any file that merely mentions it).
+_MARKER_TOOL_FIELDS = (
+    "subagent_type",
+    "skill",
+    "command",
+    "description",
+    "file_path",
+    "notebook_path",
+    "pattern",
+    "path",
+    "url",
+)
+
+# Enough to carry an agent name, a skill name or a command line; far short of
+# a file body.
+_MARKER_FIELD_LIMIT = 500
+
+
+def tool_use_text(content) -> str:
+    """The searchable trace of what an entry DID, for phase markers.
+
+    `text` above holds only `text` content parts, so a turn whose entire
+    substance is a tool call -- dispatching the `solutions-architect` agent,
+    invoking a skill, running a command -- contributes an empty string and is
+    invisible to markers. That matters because every framework worth
+    benchmarking runs its phases inline through tool calls rather than by
+    typing slash commands, so keying phases off prose alone means keying them
+    off narration the model is free not to write.
+
+    Kept separate from `text` so token accounting and any future consumer of
+    the model's actual words are unaffected by what is matched here.
+    """
+    if not isinstance(content, list):
+        return ""
+    parts: List[str] = []
+    for part in content:
+        if not isinstance(part, dict) or part.get("type") != "tool_use":
+            continue
+        parts.append(str(part.get("name") or ""))
+        data = part.get("input")
+        if not isinstance(data, dict):
+            continue
+        for field in _MARKER_TOOL_FIELDS:
+            value = data.get(field)
+            if isinstance(value, str) and value:
+                parts.append(value[:_MARKER_FIELD_LIMIT])
+    return " ".join(parts)
 
 
 PhaseAssignment = namedtuple("PhaseAssignment", "entries marker_fires")
@@ -263,7 +319,8 @@ def assign_phases_with_fires(
     out = []
     for entry in entries:
         for phase_id, pattern in compiled:
-            if pattern is not None and pattern.search(entry.get("text") or ""):
+            haystack = "{0} {1}".format(entry.get("text") or "", entry.get("tool_text") or "")
+            if pattern is not None and pattern.search(haystack):
                 current = phase_id
                 fires[phase_id] += 1
                 break
@@ -721,6 +778,12 @@ def main(argv: Optional[list] = None) -> int:
         "approach_id": cell.get("approach_id", cell["approach"]),
         "version": cell.get("version"),
         "plugin_version": plugin_version,
+        # Preferred from result.json (what execute.py recorded at run time)
+        # and falling back to cell.json. Both are written by provisioning; a
+        # result.json from before this field existed has neither, and None
+        # correctly reads as "this run predates plugin isolation" rather than
+        # as "nothing was loaded".
+        "environment": result.get("environment") or cell.get("environment"),
         "run_id": cell["run_id"],
         "session_id": result["session_id"],
         "total": {

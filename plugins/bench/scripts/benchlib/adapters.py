@@ -11,6 +11,13 @@ from typing import Dict, List, Optional
 
 import yaml
 
+# A plugin is identified as `<name>@<marketplace>` everywhere Claude Code
+# records one. A bare name is ambiguous -- `superpowers` exists in both
+# `claude-plugins-official` and `superpowers-marketplace` on this machine at
+# different versions -- so an adapter naming one without its marketplace is
+# rejected rather than resolved by guesswork.
+_PLUGIN_KEY = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$")
+
 ALLOWED_VARS = {
     "ticket_key",
     "ticket_summary",
@@ -56,6 +63,12 @@ class Adapter:
     phases: List[Phase] = field(default_factory=list)
     teardown: List[str] = field(default_factory=list)
     version: Optional[PluginVersion] = None
+    # The EXACT plugin set this approach is. Not "extra plugins to add" --
+    # the complete list, because provision.py explicitly disables every
+    # installed plugin absent from it. See `load_plugins` for why an empty
+    # list must be spelled out rather than left off.
+    plugins: List[str] = field(default_factory=list)
+    permissions: List[str] = field(default_factory=list)
 
     @property
     def cell_id(self) -> str:
@@ -102,6 +115,137 @@ def load_version(raw, path: Path) -> Optional[PluginVersion]:
     return PluginVersion(plugin=plugin, version=version)
 
 
+def load_plugins(raw, path: Path) -> List[str]:
+    """Parse the REQUIRED `plugins.enable` block.
+
+    This is required, and an approach that loads no plugins must say
+    `enable: []` rather than omit the block, because omission and emptiness
+    mean opposite things here. A benchmark worktree is a checkout of the
+    subject repository, so it carries that repo's committed
+    `.claude/settings.json`; the operator's `~/.claude/settings.json` adds
+    more on top. Left alone, a cell labelled "no framework" runs with every
+    plugin the operator happens to have enabled -- on the machine this was
+    written for, that meant the SDLC plugin, superpowers (whose SessionStart
+    hook injects "You have superpowers" into the very session meant to have
+    none), and four others. The label would be a claim the measurement
+    contradicts.
+
+    So provision.py writes an explicit true/false for EVERY installed
+    plugin, and this list is the true side. Requiring it makes the plugin
+    set a deliberate statement per approach rather than a property of
+    whoever ran the sweep.
+    """
+    if raw is None:
+        raise ValueError(
+            "adapter {0} has no `plugins:` block. Declare the exact plugin set "
+            "this approach loads -- `plugins: {{enable: []}}` for an approach "
+            "that loads none. Omitting it would let the operator's own enabled "
+            "plugins leak into the measured session, so there is no safe "
+            "default to assume.".format(path)
+        )
+    if not isinstance(raw, dict) or "enable" not in raw:
+        raise ValueError(
+            "adapter {0} has a `plugins:` block without an `enable:` key. "
+            "Expected `plugins: {{enable: [<name>@<marketplace>, ...]}}`.".format(path)
+        )
+
+    enable = raw["enable"]
+    if enable is None:
+        enable = []
+    if not isinstance(enable, list):
+        raise ValueError(
+            "adapter {0} has a `plugins.enable` that is not a list: {1!r}.".format(
+                path, enable
+            )
+        )
+
+    keys = []
+    for entry in enable:
+        key = str(entry).strip()
+        if not _PLUGIN_KEY.match(key):
+            raise ValueError(
+                "adapter {0} names plugin {1!r}, which is not in "
+                "`<name>@<marketplace>` form. A bare name is ambiguous: the "
+                "same plugin name can exist in two marketplaces at different "
+                "versions.".format(path, entry)
+            )
+        if key in keys:
+            raise ValueError(
+                "adapter {0} lists plugin {1!r} twice.".format(path, key)
+            )
+        keys.append(key)
+    return keys
+
+
+def load_permissions(raw, path: Path) -> List[str]:
+    """Parse the optional `permissions.allow` block.
+
+    Grants an approach the tools it genuinely needs to perform its own
+    behaviour -- spec-kit cannot run without `uv` and `specify`, and the
+    SDLC plugin cannot run without `acli` and `gh`. These are per-approach
+    because granting every approach every tool would let one approach's
+    requirements silently widen another's blast radius.
+
+    Allow entries only. The deny list in provision.py is not adapter-settable:
+    an adapter that could deny nothing could also un-deny `git push`, and the
+    bench/ branch boundary is not an approach's decision to make.
+    """
+    if raw is None:
+        return []
+    # A bare list is the common case and reads better in the YAML, since
+    # `allow` is the only thing an adapter may set. `permissions: {allow: []}`
+    # stays valid so the block matches how Claude Code itself spells it.
+    if isinstance(raw, list):
+        return [str(entry) for entry in raw]
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "adapter {0} has a `permissions:` that is neither a list nor a "
+            "mapping. Expected `permissions: [...]` or "
+            "`permissions: {{allow: [...]}}`.".format(path)
+        )
+    unknown = sorted(set(raw) - {"allow"})
+    if unknown:
+        raise ValueError(
+            "adapter {0} has unsupported `permissions:` key(s): {1}. Only "
+            "`allow` is adapter-settable -- the deny list is a harness "
+            "boundary, not an approach's choice.".format(path, ", ".join(unknown))
+        )
+
+    allow = raw.get("allow") or []
+    if not isinstance(allow, list):
+        raise ValueError(
+            "adapter {0} has a `permissions.allow` that is not a list: "
+            "{1!r}.".format(path, allow)
+        )
+    return [str(entry) for entry in allow]
+
+
+def assert_version_plugin_enabled(
+    version: Optional[PluginVersion], plugins: List[str], path: Path
+) -> None:
+    """A pinned plugin must be one this approach actually enables.
+
+    Otherwise the cell pins version 0.44.0 of a plugin it then explicitly
+    disables: the pin is applied, the transcript shows no plugin root
+    because the plugin never loads, and the row is filed under a version
+    that contributed nothing to the session.
+    """
+    if version is None:
+        return
+    if version.plugin not in plugins:
+        raise ValueError(
+            "adapter {0} pins {1} at {2} but does not list it in "
+            "`plugins.enable` ({3}). The pin would be applied to a plugin the "
+            "cell then disables, so the row would be labelled with a version "
+            "that never loaded.".format(
+                path,
+                version.plugin,
+                version.version,
+                ", ".join(plugins) or "empty",
+            )
+        )
+
+
 def load_adapter(path: Path) -> Adapter:
     data = yaml.safe_load(Path(path).read_text()) or {}
 
@@ -137,8 +281,14 @@ def load_adapter(path: Path) -> Adapter:
     if not phases:
         phases = [Phase(id="impl", marker="")]
 
+    version = load_version(data.get("version"), path)
+    plugin_keys = load_plugins(data.get("plugins"), path)
+    assert_version_plugin_enabled(version, plugin_keys, path)
+
     return Adapter(
-        version=load_version(data.get("version"), path),
+        version=version,
+        plugins=plugin_keys,
+        permissions=load_permissions(data.get("permissions"), path),
         id=data.get("id") or Path(path).stem,
         label=data.get("label") or data.get("id") or Path(path).stem,
         prompt=prompt,
