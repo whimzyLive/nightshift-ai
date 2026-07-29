@@ -335,6 +335,122 @@ def billing_mode_from_result(result: dict) -> dict:
     }
 
 
+# Plugins announce their resolved root into session context via a SessionStart
+# hook, in the shape:
+#   "SDLC plugin root (this session): /Users/x/.claude/plugins/cache/nightshift/sdlc/0.45.4"
+# The line is emitted by a script living INSIDE the resolved directory, so its
+# presence is evidence that that directory is what executed -- not merely what
+# some config file claimed. Path characters stop at whitespace, a quote, or a
+# backslash because the transcript is JSON-escaped JSONL.
+_PLUGIN_ROOT = re.compile(
+    r"([A-Za-z][\w .-]*?) plugin root \(this session\): ([^\s\"\\]+)"
+)
+
+
+def resolved_plugin_versions(transcript) -> Dict[str, dict]:
+    """Recover which plugin versions the session ACTUALLY loaded.
+
+    The adapter's declared pin is an intent. This is the independent check on
+    it: if the pin silently failed to apply, the declared and resolved
+    versions disagree and the row can be marked rather than published under a
+    version it did not measure.
+
+    Keyed by the installed-plugin key (`sdlc@nightshift`) so it can be
+    compared directly against an adapter's `version.plugin`.
+    """
+    if transcript is None:
+        return {}
+    try:
+        text = Path(transcript).read_text(errors="ignore")
+    except (IOError, OSError):
+        return {}
+
+    found: Dict[str, dict] = {}
+    for _label, raw_path in _PLUGIN_ROOT.findall(text):
+        path = Path(raw_path)
+        version = path.name
+        plugin = path.parent.name
+        marketplace = path.parent.parent.name
+        if not version or not plugin or not marketplace:
+            continue
+        found["{0}@{1}".format(plugin, marketplace)] = {
+            "version": version,
+            "install_path": raw_path,
+        }
+    return found
+
+
+def plugin_version_verdict(result: dict, transcript) -> dict:
+    """Compare the cell's declared version pin against what actually ran.
+
+    Three outcomes, deliberately distinct:
+
+    - no pin declared: nothing to verify. Any versions recovered from the
+      transcript are still recorded, because knowing what ran is useful even
+      when nothing was pinned.
+    - declared and resolved agree: verified.
+    - declared and resolved disagree: `ok` is false. This is a mislabelled
+      row, which is worse than a missing one -- a benchmark that reports
+      0.44.0's cost under 0.45.4's name silently inverts the conclusion the
+      operator is trying to reach.
+
+    A pin that cannot be verified (the plugin announces no root line) is NOT
+    treated as a failure -- absence of the hook is not evidence of the wrong
+    version -- but it is reported so the reader knows the label rests on the
+    declaration alone.
+    """
+    declared = (result.get("plugin_version") or {}).get("declared")
+    resolved = resolved_plugin_versions(transcript)
+
+    if not declared:
+        return {
+            "declared": None,
+            "resolved": resolved,
+            "verified": False,
+            "ok": True,
+            "note": "no version pin declared for this cell; nothing to verify.",
+        }
+
+    key = declared.get("plugin")
+    want = declared.get("version")
+    actual = resolved.get(key)
+
+    if actual is None:
+        return {
+            "declared": declared,
+            "resolved": resolved,
+            "verified": False,
+            "ok": True,
+            "note": (
+                "{0} was pinned to {1}, but the session transcript carries no "
+                "plugin-root announcement for it, so the version rests on the "
+                "declaration alone and could not be independently "
+                "confirmed.".format(key, want)
+            ),
+        }
+
+    if actual["version"] != want:
+        return {
+            "declared": declared,
+            "resolved": resolved,
+            "verified": True,
+            "ok": False,
+            "note": (
+                "VERSION MISMATCH: {0} was pinned to {1} but the session actually "
+                "loaded {2} (from {3}). Every figure in this row describes {2}, not "
+                "{1}.".format(key, want, actual["version"], actual["install_path"])
+            ),
+        }
+
+    return {
+        "declared": declared,
+        "resolved": resolved,
+        "verified": True,
+        "ok": True,
+        "note": "{0} {1} confirmed from the session transcript.".format(key, want),
+    }
+
+
 def termination_verdict(result: dict, transcript) -> dict:
     """Whether this cell's session terminated cleanly, from both evidence sources.
 
@@ -597,9 +713,14 @@ def main(argv: Optional[list] = None) -> int:
             )
         )
 
+    plugin_version = plugin_version_verdict(result, transcript)
+
     run = {
         "ticket": cell["ticket"],
         "approach": cell["approach"],
+        "approach_id": cell.get("approach_id", cell["approach"]),
+        "version": cell.get("version"),
+        "plugin_version": plugin_version,
         "run_id": cell["run_id"],
         "session_id": result["session_id"],
         "total": {
@@ -638,6 +759,9 @@ def main(argv: Optional[list] = None) -> int:
     if work_done["empty_diff"]:
         print("FAILED CELL: " + work_done["empty_diff_note"])
 
+    if not plugin_version["ok"]:
+        print("FAILED CELL: " + plugin_version["note"])
+
     status = "ok" if ok else "RECONCILIATION FAILED"
     print(
         "measured {0}: reported=${1:.4f} computed=${2:.4f} "
@@ -652,11 +776,18 @@ def main(argv: Optional[list] = None) -> int:
     )
     if not attribution["available"]:
         print("WARNING: " + attribution["note"])
+    if plugin_version["declared"] and not plugin_version["verified"]:
+        print("WARNING: " + plugin_version["note"])
     for note in notes:
         print("WARNING: " + note)
     return (
         0
-        if (ok and not work_done["empty_diff"] and run["termination"]["clean"])
+        if (
+            ok
+            and not work_done["empty_diff"]
+            and run["termination"]["clean"]
+            and plugin_version["ok"]
+        )
         else 1
     )
 

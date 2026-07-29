@@ -12,7 +12,7 @@ Usage:
 import argparse
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 IMPL = "impl"
 REVIEW_FIX = "review-fix"
@@ -21,7 +21,15 @@ REVIEW_FIX = "review-fix"
 def collect_runs(ticket_dir: Path) -> List[dict]:
     runs = []
     skipped = []
-    for run_file in sorted(ticket_dir.glob("*/run.json")):
+    # Two layouts are read. `<cell>/run.json` is the original one-run-per-cell
+    # shape; `<cell>/<run_id>/run.json` is what provisioning writes now, so a
+    # cell can be repeated without each run overwriting the last. Both are
+    # supported because reports written under the old layout must keep
+    # rendering.
+    candidates = sorted(ticket_dir.glob("*/run.json")) + sorted(
+        ticket_dir.glob("*/*/run.json")
+    )
+    for run_file in candidates:
         try:
             run = json.loads(run_file.read_text())
         except (json.JSONDecodeError, IOError) as e:
@@ -67,6 +75,7 @@ def phase_rows(runs: List[dict]) -> List[dict]:
         attribution = run.get("phase_attribution") or {}
         work_done = run.get("work_done") or {}
         term = run.get("termination") or {}
+        plugin_version = run.get("plugin_version") or {}
 
         # A run.json written before phase_attribution existed has no opinion;
         # treat that as available rather than retroactively invalidating it.
@@ -104,9 +113,34 @@ def phase_rows(runs: List[dict]) -> List[dict]:
                 "filtered_diff_empty": bool(grades.get("filtered_diff_empty")),
                 "filtered_diff_note": grades.get("filtered_diff_note", ""),
                 "stripped_paths": grades.get("stripped_paths") or [],
+                # Version provenance. `version` is what the cell was filed
+                # under; `version_resolved` is what measure.py recovered from
+                # the transcript. A run.json predating version support has
+                # neither, and renders as an unversioned row rather than
+                # claiming a version it never recorded.
+                "approach_id": run.get("approach_id", run["approach"]),
+                "version": run.get("version"),
+                "version_ok": bool(plugin_version.get("ok", True)),
+                "version_verified": bool(plugin_version.get("verified", False)),
+                "version_note": plugin_version.get("note", ""),
+                "version_resolved": resolved_version(plugin_version),
             }
         )
     return rows
+
+
+def resolved_version(plugin_version: dict) -> Optional[str]:
+    """The version the transcript proves ran, when there is one.
+
+    Preferred over the declared version everywhere it exists: the declared
+    value is what the adapter asked for, this is what actually happened.
+    """
+    declared = plugin_version.get("declared") or {}
+    resolved = plugin_version.get("resolved") or {}
+    entry = resolved.get(declared.get("plugin")) if declared else None
+    if entry:
+        return entry.get("version")
+    return declared.get("version") or None
 
 
 def artifact_inventory(runs: List[dict]) -> List[dict]:
@@ -185,7 +219,211 @@ COST_BASIS_NOTE = [
 ]
 
 
-def render_markdown(ticket: str, runs: List[dict]) -> str:
+def comparable(row: dict) -> bool:
+    """Whether a row's figures can be differenced against another row's.
+
+    A cut-off, unreconciled, empty-diff or unattributed row does not carry a
+    measurement, so a delta computed from it would be arithmetic on
+    non-numbers dressed up as a finding.
+    """
+    return (
+        row["termination_clean"]
+        and row["reconciled"]
+        and row["attribution_available"]
+        and not row["empty_diff"]
+    )
+
+
+def spread_by_approach(rows: List[dict]) -> Dict[str, dict]:
+    """Per-cell repeat statistics, for cells that were run more than once.
+
+    Only comparable rows count: averaging a cut-off run into a mean would
+    drag it toward a number no session actually produced.
+    """
+    groups: Dict[str, List[dict]] = {}
+    for row in rows:
+        if comparable(row):
+            groups.setdefault(row["approach"], []).append(row)
+
+    out = {}
+    for approach, group in groups.items():
+        if len(group) < 2:
+            continue
+        totals = [r["total"] for r in group]
+        mean = sum(totals) / len(totals)
+        out[approach] = {
+            "n": len(group),
+            "mean": mean,
+            "min": min(totals),
+            "max": max(totals),
+            "spread": max(totals) - min(totals),
+        }
+    return out
+
+
+def render_variance(rows: List[dict]) -> List[str]:
+    """Report the observed run-to-run spread, when there is any to report.
+
+    A benchmark that reports one run per cell cannot distinguish a real
+    regression from sampling noise. Rather than assume either, this section
+    states the measured spread so a reader can judge a delta against it.
+    """
+    spreads = spread_by_approach(rows)
+    if not spreads:
+        return []
+
+    lines = [
+        "",
+        "## Repeat runs — the noise floor",
+        "",
+        "Cells run more than once. A difference between approaches smaller than the",
+        "spread below is not distinguishable from sampling variation.",
+        "",
+        "| Approach            | runs | mean total API-eq $ | min    | max    | spread |",
+        "| ------------------- | ---: | ------------------: | -----: | -----: | -----: |",
+    ]
+    for approach in sorted(spreads):
+        stat = spreads[approach]
+        lines.append(
+            "| {0:<19} | {1:>4} | {2:>19.2f} | {3:>6.2f} | {4:>6.2f} | {5:>6.2f} |".format(
+                approach, stat["n"], stat["mean"], stat["min"], stat["max"], stat["spread"]
+            )
+        )
+    return lines
+
+
+def render_baseline(rows: List[dict], baseline: Optional[str]) -> List[str]:
+    """Difference every row against one named row.
+
+    The intended use is a before/after on the same approach at two versions:
+    `--baseline sdlc@0.44.0` answers "what did upgrading change" directly,
+    rather than leaving the reader to subtract two rows by eye and guess
+    whether the difference clears the noise floor.
+    """
+    if not baseline:
+        return []
+
+    # Aggregate per approach so repeats collapse into one comparison point.
+    # With a single run per cell this is exactly the row itself; with several
+    # it is their mean, which is the only figure a delta should be taken
+    # against once a spread exists.
+    order: List[str] = []
+    for row in rows:
+        if row["approach"] not in order:
+            order.append(row["approach"])
+    aggregates = {name: aggregate_rows(rows, name) for name in order}
+
+    base = aggregates.get(baseline)
+    if base is None:
+        available = ", ".join(r["approach"] for r in rows) or "none"
+        return [
+            "",
+            "## Compared against `{0}`".format(baseline),
+            "",
+            "**No row named `{0}` is present in this sweep**, so no deltas could be".format(
+                baseline
+            ),
+            "computed. Rows available: {0}.".format(available),
+        ]
+
+    lines = [
+        "",
+        "## Compared against `{0}`".format(baseline),
+        "",
+        "Positive means the row cost more, or found more, than the baseline.",
+        "",
+        "| Approach            | Version  | Δ impl API-eq $ | Δ total API-eq $ | Δ total % | Δ ACs met | Δ findings |",
+        "| ------------------- | -------- | --------------: | ---------------: | --------: | --------: | ---------: |",
+    ]
+
+    if base["n"] == 0:
+        lines += [
+            "",
+            "**The baseline cell does not carry a usable measurement** (no run of it "
+            "reached status OK), so every delta below would be arithmetic on a number "
+            "the table already refuses to print. No deltas computed.",
+        ]
+        return lines
+
+    for name in order:
+        if name == baseline:
+            continue
+        row = aggregates[name]
+        if row["n"] == 0:
+            lines.append(
+                "| {0:<19} | {1:<8} | {2:>15} | {3:>16} | {4:>9} | {5:>9} | {6:>10} |".format(
+                    name, row["version_resolved"] or "—", "—", "—", "—", "—", "—"
+                )
+            )
+            continue
+
+        d_total = row["total"] - base["total"]
+        pct = (d_total / base["total"] * 100.0) if base["total"] else 0.0
+        lines.append(
+            "| {0:<19} | {1:<8} | {2:>+15.2f} | {3:>+16.2f} | {4:>+8.1f}% | {5:>+9.1f} | {6:>+10.1f} |".format(
+                name,
+                row["version_resolved"] or "—",
+                row["impl"] - base["impl"],
+                d_total,
+                pct,
+                row["acs_met"] - base["acs_met"],
+                row["findings"] - base["findings"],
+            )
+        )
+
+    # Whether a delta means anything depends on the run-to-run spread. Say
+    # which case this sweep is in rather than leaving the reader to assume.
+    spreads = spread_by_approach(rows)
+    if spreads:
+        worst = max(stat["spread"] for stat in spreads.values())
+        lines += [
+            "",
+            "Repeat runs in this sweep varied by up to **{0:.2f} API-eq $** for the same".format(
+                worst
+            ),
+            "cell (see *Repeat runs* below). Treat any delta smaller than that as noise.",
+        ]
+    else:
+        lines += [
+            "",
+            "**Every cell here ran once, so this sweep has no variance estimate.** Two runs",
+            "of the same approach at the same version differ by some amount purely from",
+            "sampling; until that spread is measured, a delta smaller than it is",
+            "indistinguishable from noise. Re-run cells with a different `--run-id` to",
+            "establish the floor before treating a small difference as a result.",
+        ]
+    return lines
+
+
+def aggregate_rows(rows: List[dict], approach: str) -> dict:
+    """Collapse every comparable run of one cell into a single comparison point.
+
+    `n` is how many runs contributed. Zero means the cell ran but produced
+    nothing usable — distinct from the cell being absent, and rendered as a
+    dashed row rather than a delta.
+    """
+    matching = [r for r in rows if r["approach"] == approach]
+    usable = [r for r in matching if comparable(r)]
+    version = next(
+        (r["version_resolved"] for r in matching if r.get("version_resolved")), None
+    )
+    if not usable:
+        return {"n": 0, "version_resolved": version}
+
+    def mean(key):
+        return sum(r[key] for r in usable) / float(len(usable))
+
+    return {
+        "n": len(usable),
+        "version_resolved": version,
+        "impl": mean("impl"),
+        "total": mean("total"),
+        "acs_met": mean("acs_met"),
+        "findings": mean("findings"),
+    }
+
+
+def render_markdown(ticket: str, runs: List[dict], baseline: Optional[str] = None) -> str:
     rows = phase_rows(runs)
     lines = [
         f"# Benchmark: {ticket}",
@@ -193,8 +431,8 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         "Cost is split by phase. `impl-only` is the comparable figure across approaches;",
         "`review + fix` and `ceremony` are what the process-heavy approaches additionally buy.",
         "",
-        "| Status   | Approach            | impl-only API-eq $ | review + fix API-eq $ | ceremony API-eq $ | total API-eq $ | Regressions | ACs met   | findings | wall clock |",
-        "| -------- | ------------------- | -----------------: | --------------------: | ----------------: | -------------: | ----------- | --------- | -------- | ---------- |",
+        "| Status    | Approach            | Version  | impl-only API-eq $ | review + fix API-eq $ | ceremony API-eq $ | total API-eq $ | Regressions | ACs met   | findings | wall clock |",
+        "| --------- | ------------------- | -------- | -----------------: | --------------------: | ----------------: | -------------: | ----------- | --------- | -------- | ---------- |",
     ]
 
     failed_notes = []
@@ -202,6 +440,7 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
     empty_diff_notes = []
     cut_off_notes = []
     no_patch_notes = []
+    version_notes = []
     for i, row in enumerate(rows):
         # Four independent reasons a row's numbers cannot be shown as-is.
         # Order matters only for the status label; the em dashes are the
@@ -214,6 +453,12 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
         # so labelling it by one of those symptoms would bury the cause.
         if not row["termination_clean"]:
             status = "CUT OFF"
+        elif not row["version_ok"]:
+            # The measurement is real -- it just describes a different version
+            # than the one requested. The Version column is relabelled to what
+            # actually ran, so the row stays usable rather than being
+            # discarded; the status marks that the pin did not take.
+            status = "WRONG VER"
         elif row["empty_diff"]:
             status = "NO DIFF"
         elif row["filtered_diff_empty"]:
@@ -257,8 +502,18 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
                 acs_str += " ({0} fail)".format(row["grader_failure_count"])
             findings_str = str(row["findings"])
 
+        # Always the version that actually ran, never the one requested: a
+        # column showing the declared version on a row where the pin failed
+        # would restate the mislabelling the status is warning about. `!`
+        # marks a mismatch, `?` a pin nothing in the transcript could confirm.
+        version_str = row["version_resolved"] or "—"
+        if not row["version_ok"]:
+            version_str += " !"
+        elif row["version"] and not row["version_verified"]:
+            version_str += " ?"
+
         lines.append(
-            "| {0:<8} | {1:<19} | {2:>18} | {3:>21} | {4:>17} | {5:>14} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
+            "| {0:<9} | {1:<19} | {10:<8} | {2:>18} | {3:>21} | {4:>17} | {5:>14} | {6:<11} | {7:<9} | {8:<8} | {9:>10} |".format(
                 status,
                 row["approach"],
                 impl_str,
@@ -269,6 +524,7 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
                 acs_str,
                 findings_str,
                 "{:.1f}s".format(row["duration_ms"] / 1000.0),
+                version_str,
             )
         )
 
@@ -282,6 +538,8 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             unattributed_notes.append((row["approach"], row["attribution_note"]))
         if row["empty_diff"]:
             empty_diff_notes.append((row["approach"], row["empty_diff_note"]))
+        if not row["version_ok"] or (row["version"] and not row["version_verified"]):
+            version_notes.append((row["approach"], row["version_note"]))
 
     # Cost basis, stated directly under the table. Read from what each run
     # recorded at execute time -- never hardcoded to either mode.
@@ -299,6 +557,25 @@ def render_markdown(ticket: str, runs: List[dict]) -> str:
             lines.append("- **{0}**: {1}".format(mode, evidence))
     lines.append("")
     lines += COST_BASIS_NOTE
+    lines += render_baseline(rows, baseline)
+    lines += render_variance(rows)
+
+    if version_notes:
+        lines += [
+            "",
+            "## Version provenance",
+            "",
+            "A pinned version is verified against the session transcript, not against the",
+            "adapter that requested it: plugins announce their resolved root from a hook",
+            "inside the resolved directory, so the announcement is evidence that directory",
+            "executed. `!` in the Version column means the pin did **not** take and the row",
+            "measures a different version than the one requested — the column shows what",
+            "actually ran. `?` means the pin could not be confirmed either way, because that",
+            "plugin announces no root, so the label rests on the declaration alone.",
+            "",
+        ]
+        for approach, note in version_notes:
+            lines.append("- **{0}**: {1}".format(approach, note))
 
     # Skipped files section
     skipped_files = None
@@ -468,6 +745,15 @@ def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ticket", required=True)
     parser.add_argument("--benchmarks", default="docs/benchmarks")
+    parser.add_argument(
+        "--baseline",
+        default=None,
+        help=(
+            "Row to difference every other row against, e.g. sdlc@0.44.0. "
+            "Adds a delta table answering 'what changed between these two "
+            "versions' directly."
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
 
@@ -478,7 +764,7 @@ def main(argv: Optional[list] = None) -> int:
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_markdown(args.ticket, runs))
+    out.write_text(render_markdown(args.ticket, runs, args.baseline))
     print(f"wrote {out} ({len(runs)} runs)")
     return 0
 

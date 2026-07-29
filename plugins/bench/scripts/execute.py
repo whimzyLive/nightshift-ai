@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchlib import adapters, config, termination  # noqa: E402
+from benchlib import adapters, config, plugins, termination  # noqa: E402
 
 # Environment variables that put `claude` on a pay-per-token API key rather
 # than the operator's subscription. Checked for PRESENCE only -- the value is
@@ -212,6 +212,39 @@ def billing_preflight(
     )
 
 
+def assert_cell_matches_adapter(cell: dict, adapter) -> None:
+    """The cell's identity and the adapter's must be the same thing.
+
+    provision.py builds paths and the branch from `--approach`/`--version`;
+    the adapter declares its own id and pin. If those drift -- a cell
+    provisioned as `sdlc@0.44.0` executed with the 0.45.4 adapter -- every
+    artifact would be filed under a version it did not measure, which is
+    precisely the mislabelling this feature exists to prevent. Cheap to
+    check, and it costs nothing to fail here.
+    """
+    expected = adapter.cell_id
+    actual = cell.get("approach")
+    if actual != expected:
+        raise plugins.PluginPinError(
+            "cell/adapter mismatch: this cell was provisioned as {0!r} but the "
+            "adapter resolves to {1!r}. Re-provision with --approach {2} "
+            "{3}or pass the matching adapter.".format(
+                actual,
+                expected,
+                adapter.id,
+                "--version {0} ".format(adapter.version.version) if adapter.version else "",
+            )
+        )
+
+    declared = cell.get("version")
+    pinned = adapter.version.version if adapter.version else None
+    if (declared or None) != (pinned or None):
+        raise plugins.PluginPinError(
+            "cell/adapter version mismatch: cell says {0!r}, adapter says "
+            "{1!r}.".format(declared, pinned)
+        )
+
+
 def build_variables(
     cell: dict, story: dict, test_command: str, base_branch: str = ""
 ) -> Dict[str, str]:
@@ -306,110 +339,165 @@ def main(argv: Optional[list] = None) -> int:
         args.allow_api_billing,
     )
 
+    # Identity check before anything is spent: a cell filed under one version
+    # but executed with another adapter would mislabel every artifact.
+    assert_cell_matches_adapter(cell, adapter)
+
     cfg = config.load_config(Path(cell["repo"]), {})
 
     worktree = Path(cell["worktree"])
 
-    # Validate BEFORE the session runs. cfg.test_command is what the adapter
-    # prompt tells the model to run and what /bench:run captures as the
-    # grader's test evidence. If it is missing or unusable, fail here -- a
-    # cell that discovers it post-session has already spent the money and can
-    # only hand graders a shell error to grade.
-    test_command = config.require_command(
-        cfg.test_command, "test", source=str(Path(cell["repo"]) / config.CONTEXT_PATH)
-    )
-    variables = build_variables(cell, story, test_command, cfg.base_branch)
+    # Version pin preflight. The cache garbage-collects unreferenced versions,
+    # so the target may simply be gone; failing here costs nothing, whereas
+    # discovering it after the session means a row labelled with a version
+    # that was never loaded.
+    pin_record = None
+    plugins_snapshot = None
+    pin_applied = False
+    if adapter.version is not None:
+        plugins.assert_version_available(adapter.version.plugin, adapter.version.version)
+        plugins_snapshot = plugins.read_snapshot()
 
-    setup_started = time.time()
-    run_hooks(adapter.setup, worktree, variables)
-    setup_seconds = time.time() - setup_started
-
-    prompt = adapters.render(adapter.prompt, variables)
-    # Archived for the record: the exact prompt is part of the run's evidence.
-    Path(cell["artifacts"]).joinpath("prompt.txt").write_text(prompt)
-
-    started_at = datetime.now(timezone.utc).isoformat()
-    proc = subprocess.run(
-        claude_argv(adapter.flags, adapter.model),
-        cwd=str(worktree),
-        input=prompt,
-        capture_output=True,
-        text=True,
-    )
-    ended_at = datetime.now(timezone.utc).isoformat()
-
-    if proc.returncode != 0:
-        Path(cell["artifacts"]).joinpath("claude.stderr").write_text(proc.stderr)
-        raise RuntimeError(f"claude exited {proc.returncode}; stderr archived in artifacts")
-
-    # Archive raw stdout BEFORE attempting to parse. If JSON parsing fails,
-    # the raw output is preserved for diagnostics.
-    artifacts_dir = Path(cell["artifacts"])
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
-    artifacts_dir.joinpath("claude.stdout.raw").write_text(proc.stdout)
-
+    # Everything below runs under `finally: restore`. The pin mutates a file
+    # this harness does not own (~/.claude/plugins/installed_plugins.json),
+    # shared with every other Claude Code session on this machine, so leaving
+    # it rewritten is not an acceptable failure mode for ANY exit path --
+    # including an exception, a cut-off session, or a teardown error. This is
+    # deliberately not an adapter `teardown:` hook: teardown failures here are
+    # reported rather than fatal, which is the wrong tier for un-breaking the
+    # operator's plugin installation.
     try:
-        payload = json.loads(proc.stdout)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"claude stdout is not valid JSON; raw output archived in artifacts/claude.stdout.raw: {e}"
+        if adapter.version is not None:
+            pin_record = plugins.apply_pin(
+                adapter.version.plugin,
+                adapter.version.version,
+                str(worktree),
+            )
+            pin_applied = True
+            print(
+                "pinned {0} to {1} for {2}".format(
+                    adapter.version.plugin, adapter.version.version, worktree
+                )
+            )
+
+        # Validate BEFORE the session runs. cfg.test_command is what the adapter
+        # prompt tells the model to run and what /bench:run captures as the
+        # grader's test evidence. If it is missing or unusable, fail here -- a
+        # cell that discovers it post-session has already spent the money and can
+        # only hand graders a shell error to grade.
+        test_command = config.require_command(
+            cfg.test_command, "test", source=str(Path(cell["repo"]) / config.CONTEXT_PATH)
         )
+        variables = build_variables(cell, story, test_command, cfg.base_branch)
 
-    payload["started_at"] = started_at
-    payload["ended_at"] = ended_at
-    payload["setup_seconds"] = round(setup_seconds, 3)
-    # Which basis this cell's dollar figures sit on. This is the SAME
-    # evaluation the preflight guard used to decide whether to let the run
-    # start, not a fresh recomputation -- so a --allow-api-billing run is
-    # recorded as `api` even if, say, a key were unset in between (it can't
-    # misrepresent what actually gated this run). See billing_preflight.
-    payload["billing_mode"] = billing_mode
-    # Allow-list check of the result payload's termination shape. Recorded
-    # here so an abnormal end is visible immediately rather than only after
-    # measure runs; measure re-derives it from the same fields and adds the
-    # transcript scan. See benchlib/termination.py.
-    payload["termination"] = termination.check_result_payload(payload)
+        setup_started = time.time()
+        run_hooks(adapter.setup, worktree, variables)
+        setup_seconds = time.time() - setup_started
 
-    # Write result.json BEFORE running teardown. If teardown fails, the
-    # already-paid-for result is still captured on disk.
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(payload, indent=2))
+        prompt = adapters.render(adapter.prompt, variables)
+        # Archived for the record: the exact prompt is part of the run's evidence.
+        Path(cell["artifacts"]).joinpath("prompt.txt").write_text(prompt)
 
-    # Run teardown. Failures are reported but do not destroy the captured result.
-    teardown_error = None
-    try:
-        run_hooks(adapter.teardown, worktree, variables)
-    except RuntimeError as e:
-        teardown_error = e
-
-    print(
-        "executed {0} (model={1}): session={2} cost=${3:.4f} API-equiv "
-        "[billing mode: {4}]".format(
-            adapter.id,
-            adapter.model,
-            payload.get("session_id"),
-            payload.get("total_cost_usd", 0.0),
-            payload["billing_mode"]["mode"],
+        started_at = datetime.now(timezone.utc).isoformat()
+        proc = subprocess.run(
+            claude_argv(adapter.flags, adapter.model),
+            cwd=str(worktree),
+            input=prompt,
+            capture_output=True,
+            text=True,
         )
-    )
+        ended_at = datetime.now(timezone.utc).isoformat()
 
-    # Loud, and never silently swallowed. The result is still on disk: this
-    # cell's record is evidence, and measure.py needs it to render the row as
-    # failed. No auto-resume is attempted -- see benchlib/termination.py.
-    if not payload["termination"]["clean"]:
+        if proc.returncode != 0:
+            Path(cell["artifacts"]).joinpath("claude.stderr").write_text(proc.stderr)
+            raise RuntimeError(f"claude exited {proc.returncode}; stderr archived in artifacts")
+
+        # Archive raw stdout BEFORE attempting to parse. If JSON parsing fails,
+        # the raw output is preserved for diagnostics.
+        artifacts_dir = Path(cell["artifacts"])
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        artifacts_dir.joinpath("claude.stdout.raw").write_text(proc.stdout)
+
+        try:
+            payload = json.loads(proc.stdout)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"claude stdout is not valid JSON; raw output archived in artifacts/claude.stdout.raw: {e}"
+            )
+
+        payload["started_at"] = started_at
+        payload["ended_at"] = ended_at
+        payload["setup_seconds"] = round(setup_seconds, 3)
+        # Which basis this cell's dollar figures sit on. This is the SAME
+        # evaluation the preflight guard used to decide whether to let the run
+        # start, not a fresh recomputation -- so a --allow-api-billing run is
+        # recorded as `api` even if, say, a key were unset in between (it can't
+        # misrepresent what actually gated this run). See billing_preflight.
+        payload["billing_mode"] = billing_mode
+        # What this cell CLAIMS it measured. measure.py independently recovers
+        # what the session actually loaded from the transcript and compares the
+        # two -- this field alone is an intent, not evidence.
+        payload["plugin_version"] = {
+            "declared": (
+                {
+                    "plugin": adapter.version.plugin,
+                    "version": adapter.version.version,
+                }
+                if adapter.version is not None
+                else None
+            ),
+            "pin": pin_record,
+        }
+        # Allow-list check of the result payload's termination shape. Recorded
+        # here so an abnormal end is visible immediately rather than only after
+        # measure runs; measure re-derives it from the same fields and adds the
+        # transcript scan. See benchlib/termination.py.
+        payload["termination"] = termination.check_result_payload(payload)
+
+        # Write result.json BEFORE running teardown. If teardown fails, the
+        # already-paid-for result is still captured on disk.
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, indent=2))
+
+        # Run teardown. Failures are reported but do not destroy the captured result.
+        teardown_error = None
+        try:
+            run_hooks(adapter.teardown, worktree, variables)
+        except RuntimeError as e:
+            teardown_error = e
+
         print(
-            "ABNORMAL TERMINATION -- this cell is FAILED, not measured: {0}".format(
-                "; ".join(payload["termination"]["violations"])
+            "executed {0} (model={1}): session={2} cost=${3:.4f} API-equiv "
+            "[billing mode: {4}]".format(
+                adapter.cell_id,
+                adapter.model,
+                payload.get("session_id"),
+                payload.get("total_cost_usd", 0.0),
+                payload["billing_mode"]["mode"],
             )
         )
 
-    if teardown_error is not None:
-        raise RuntimeError(
-            f"result captured successfully to {args.out}, but teardown failed: {teardown_error}"
-        )
+        # Loud, and never silently swallowed. The result is still on disk: this
+        # cell's record is evidence, and measure.py needs it to render the row as
+        # failed. No auto-resume is attempted -- see benchlib/termination.py.
+        if not payload["termination"]["clean"]:
+            print(
+                "ABNORMAL TERMINATION -- this cell is FAILED, not measured: {0}".format(
+                    "; ".join(payload["termination"]["violations"])
+                )
+            )
 
-    return 0
+        if teardown_error is not None:
+            raise RuntimeError(
+                f"result captured successfully to {args.out}, but teardown failed: {teardown_error}"
+            )
+
+        return 0
+    finally:
+        if pin_applied:
+            plugins.restore_snapshot(plugins_snapshot)
+            print("restored installed_plugins.json to its pre-run state")
 
 
 if __name__ == "__main__":

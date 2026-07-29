@@ -26,6 +26,21 @@ class UnsafeBranchError(RuntimeError):
     pass
 
 
+def cell_id(approach: str, version: Optional[str]) -> str:
+    """The identity this cell is filed under.
+
+    A version-pinned cell must not share an identity with the same approach
+    at a different version: `artifacts` below carries no run_id, so two
+    versions under one id would have the second overwrite the first's test
+    evidence, and the report would show two rows it cannot tell apart.
+
+    Mirrors adapters.Adapter.cell_id; execute.py asserts the two agree.
+    """
+    if not version:
+        return approach
+    return "{0}@{1}".format(approach, version)
+
+
 def branch_name(ticket: str, approach: str, run_id: str) -> str:
     return f"{BENCH_PREFIX}{ticket}/{approach}/{run_id}"
 
@@ -209,6 +224,16 @@ def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--story", required=True)
     parser.add_argument("--approach", required=True)
+    parser.add_argument(
+        "--version",
+        default=None,
+        help=(
+            "Plugin version this cell measures (e.g. 0.44.0). Namespaces the "
+            "branch, worktree and artifacts as <approach>@<version> so two "
+            "versions of one approach can be compared without collision. Must "
+            "match the adapter's version.version; execute.py enforces that."
+        ),
+    )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--repo", default=".")
     parser.add_argument("--base-sha", default=None)
@@ -220,12 +245,17 @@ def main(argv: Optional[list] = None) -> int:
     story = json.loads(Path(args.story).read_text())
     ticket = story["key"]
 
-    branch = branch_name(ticket, args.approach, args.run_id)
+    cell_name = cell_id(args.approach, args.version)
+    branch = branch_name(ticket, cell_name, args.run_id)
     assert_bench_branch(branch)
 
     base_sha = args.base_sha or git(repo, "rev-parse", cfg.base_branch)
-    worktree = repo / ".bench-worktrees" / f"{ticket}-{args.approach}-{args.run_id}"
-    artifacts = repo / "docs" / "benchmarks" / ticket / args.approach / "artifacts"
+    worktree = repo / ".bench-worktrees" / f"{ticket}-{cell_name}-{args.run_id}"
+    # run_id is part of the path so the same cell can be run repeatedly
+    # without each run destroying the previous one's evidence. Repeats are
+    # what gives a delta a noise floor: without them, a small difference
+    # between two versions cannot be told apart from sampling spread.
+    artifacts = repo / "docs" / "benchmarks" / ticket / cell_name / args.run_id / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
 
     git(repo, "worktree", "add", "-b", branch, str(worktree), base_sha)
@@ -233,7 +263,12 @@ def main(argv: Optional[list] = None) -> int:
 
     cell = {
         "ticket": ticket,
-        "approach": args.approach,
+        # The versioned identity: what paths, the branch and the report row
+        # are keyed on. `approach_id` keeps the unversioned name so a report
+        # can group two versions of one approach together.
+        "approach": cell_name,
+        "approach_id": args.approach,
+        "version": args.version,
         "run_id": args.run_id,
         "branch": branch,
         "worktree": str(worktree),

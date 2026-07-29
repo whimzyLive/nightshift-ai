@@ -402,6 +402,13 @@ class TestMainBillingPreflight(unittest.TestCase):
         self.cell_path.write_text(
             json.dumps(
                 {
+                    # `approach` must match the adapter's cell_id: execute.py
+                    # refuses to run a cell whose identity disagrees with the
+                    # adapter it was handed, so an incomplete cell here is not
+                    # a valid fixture.
+                    "approach": "test-adapter",
+                    "approach_id": "test-adapter",
+                    "version": None,
                     "repo": str(self.repo),
                     "worktree": str(self.worktree),
                     "artifacts": str(self.artifacts),
