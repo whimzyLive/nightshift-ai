@@ -8,6 +8,19 @@ Each approach is a declarative YAML file in `approaches/`. Adding one requires n
 
 - `/bench:run <TICKET>` — run one or more approaches against a ticket
 - `/bench:report <TICKET>` — regenerate the aggregate report from stored run data
+- `/bench:cleanup <TICKET>` — close draft PRs, delete bench branches, worktrees and scratch issues
+
+## Cost
+
+Every cell is a **cold** `claude -p` session, deliberately: cells sharing a warm cache in one live
+session would make whichever approach ran second look cheaper purely from cache reuse, so the
+comparison would measure run order rather than approach.
+
+That correctness is paid for in quota — a cold session re-reads its system prompt, plugin
+definitions and CLAUDE.md at full rate every time. `benchlib/quota.py` forecasts a sweep before it
+starts, refuses to begin above a cost threshold without `--acknowledge-cost`, and caps cells per
+sweep outright. The cap is not clearable by acknowledgement: acknowledging a number you did not
+intend to produce is not consent.
 
 ## Pipeline
 
@@ -26,9 +39,37 @@ overwriting its earlier runs.
 | `speckit.yaml`                         | GitHub spec-kit, pinned to a release tag          |
 | `sdlc-0.44.0.yaml`, `sdlc-0.45.4.yaml` | the SDLC plugin at two versions, for before/after |
 
-The SDLC adapters are **not yet runnable**: every SDLC entry point writes to its Jira story and
-ends at a pull request, and the harness has neither the scratch Jira issue nor the bench-scoped
-push guard the design calls for. Both files say so in their header.
+## Real Jira, real draft PRs
+
+An approach that writes to Jira sets `scratch_ticket: true`. Provisioning then clones the source
+ticket into a **per-cell** issue labelled `bench-run`, and the session works against that: its
+comments, transitions and pull request land on a real, visible ticket while the source ticket is
+never written to.
+
+Per cell, not per sweep, and that is the load-bearing part. The SDLC plugin derives its git branch
+from the story key, and its playbook reuses an existing `feat/<KEY>` branch rather than creating a
+duplicate — so two cells sharing one issue would share one branch, and the second would check out
+the first's finished work and measure nothing.
+
+Pushes are policed by a `PreToolUse` guard (`scripts/bench_guard.py`), registered per worktree:
+
+|         |                                                                                                |
+| ------- | ---------------------------------------------------------------------------------------------- |
+| Allowed | this cell's `bench/` branch, anything under `bench/`, `feat\|fix/<SCRATCH-KEY>`                |
+| Denied  | every other ref, `main`/`master`/`develop` unconditionally, force-push, `--delete`, `--mirror` |
+| Denied  | `gh pr create` without `--draft`, `gh pr ready`, `gh pr merge`, merge endpoints via `gh api`   |
+| Denied  | any guarded verb behind `&&`, `;`, `\|` or `$(…)` — unparseable means refused, not guessed     |
+
+It fails closed: a missing or malformed guard config denies every guarded verb, as does any
+unexpected exception. Deny reasons are returned to the session, so `gh pr create` without `--draft`
+comes back as an instruction to retry rather than an unexplained failure — which is why the SDLC
+adapter's prompt does not mention drafts. `/sdlc:auto` parses its whole `$ARGUMENTS` as the story
+key, so an appended instruction would be swallowed into the key.
+
+Merge, rebase, force-push and `gh pr ready` remain blunt denies **as well**, because deny rules
+resolve before any hook — those hold even if the guard fails to load.
+
+Clean up with `/bench:cleanup <TICKET>`, which is dry-run by default.
 
 ## Plugin isolation
 

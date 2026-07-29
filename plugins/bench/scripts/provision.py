@@ -11,13 +11,15 @@ Usage:
 """
 import argparse
 import json
+import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchlib import adapters, config, environment  # noqa: E402
+from benchlib import acli, adapters, config, environment  # noqa: E402
 
 BENCH_PREFIX = "bench/"
 
@@ -161,12 +163,103 @@ BENCH_PERMISSIONS = [
     "Bash(find:*)",
 ]
 
+# `git push` is deliberately ABSENT here. It moved to the PreToolUse guard
+# (scripts/bench_guard.py), which allows pushes to this cell's own refs and
+# denies everything else -- because a blanket deny measures a blocked session
+# rather than an approach, and the SDLC lifecycle ends at a pull request.
+#
+# The rest stay as a blunt deny as well as being checked by the guard. Deny
+# rules resolve before allow and before any hook, so these hold even if the
+# hook fails to load, and the guard's parser is never the only thing standing
+# between a run and a merge.
 BENCH_DENIED_PERMISSIONS = [
-    "Bash(git push:*)",
     "Bash(git merge:*)",
     "Bash(git rebase:*)",
     "Bash(gh pr merge:*)",
+    "Bash(gh pr ready:*)",
+    "Bash(git push --force:*)",
+    "Bash(git push -f:*)",
 ]
+
+GUARD_CONFIG_NAME = "bench-guard.json"
+
+GUARD_RATIONALE = (
+    "Read by plugins/bench/scripts/bench_guard.py, registered as this "
+    "worktree's PreToolUse hook. `allowed_refs` are anchored regexes: a push "
+    "whose destination matches none of them is denied with a reason the model "
+    "sees. main/master/develop are refused regardless of what this file says. "
+    "The hook fails closed -- if this file is missing or malformed, every "
+    "guarded verb is denied rather than allowed."
+)
+
+
+def allowed_refs(ticket: str, branch: str) -> list:
+    """The refs this cell may write.
+
+    Three entries, each earning its place:
+
+    * the cell's own bench branch -- what provisioning created;
+    * `bench/**` -- an approach may legitimately branch again beneath it;
+    * `feat/<TICKET>` and `fix/<TICKET>` for THIS cell's ticket only -- the
+      SDLC plugin derives its story branch from the ticket key and cannot be
+      told otherwise.
+
+    The ticket key is the per-cell scratch issue, not the source ticket, which
+    is what keeps two cells of the same source story from writing the same
+    `feat/` ref and reusing each other's branch.
+    """
+    return [
+        re.escape(branch),
+        r"bench/[^\s]+",
+        r"(feat|fix)/{0}(-[A-Za-z0-9._-]+)?".format(re.escape(ticket)),
+    ]
+
+
+def write_guard_config(worktree: Path, ticket: str, branch: str, cell: str) -> Path:
+    settings_dir = worktree / ".claude"
+    settings_dir.mkdir(parents=True, exist_ok=True)
+    target = settings_dir / GUARD_CONFIG_NAME
+    target.write_text(
+        json.dumps(
+            {
+                "_comment": GUARD_RATIONALE,
+                "ticket": ticket,
+                "cell": cell,
+                "branch": branch,
+                "allowed_refs": allowed_refs(ticket, branch),
+                # Same rules, phrased for the deny message the model reads.
+                "allowed_refs_human": [
+                    branch,
+                    "anything under bench/",
+                    "feat/{0} or fix/{0}".format(ticket),
+                ],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    return target
+
+
+def guard_hook_block(guard_script: Path) -> dict:
+    return {
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        # Both halves quoted: the interpreter path and the
+                        # script path can each contain spaces, and this string
+                        # is executed by a shell.
+                        "command": "{0} {1}".format(
+                            shlex.quote(sys.executable), shlex.quote(str(guard_script))
+                        ),
+                    }
+                ],
+            }
+        ]
+    }
 
 PLUGIN_RATIONALE = (
     "enabledPlugins is written EXHAUSTIVELY -- true for the adapter's declared "
@@ -214,6 +307,7 @@ def write_bench_settings(
     worktree: Path,
     enabled_plugins: Optional[dict] = None,
     extra_allow: Optional[list] = None,
+    guard_script: Optional[Path] = None,
 ) -> Path:
     """Write .claude/settings.local.json into a benchmark worktree.
 
@@ -241,8 +335,59 @@ def write_bench_settings(
     if enabled_plugins is not None:
         payload["_plugins_comment"] = PLUGIN_RATIONALE
         payload["enabledPlugins"] = enabled_plugins
+    if guard_script is not None:
+        payload["hooks"] = guard_hook_block(guard_script)
     target.write_text(json.dumps(payload, indent=2) + "\n")
     return target
+
+
+SCRATCH_BODY = """{description}
+
+---
+Benchmark scratch issue. Cloned from {source} for cell `{cell}` run `{run_id}`
+of the bench harness. Work, comments and pull requests for this run land here so
+that {source} is never written to.
+
+Delete with `/bench:cleanup {source}`.
+"""
+
+
+def create_scratch_issue(source_key: str, story: dict, project: str, cell: str, run_id: str) -> dict:
+    """Clone the source ticket into a per-cell issue, and return its story dict.
+
+    ONE ISSUE PER CELL, not one per sweep. Two cells sharing an issue also
+    share a branch name: the SDLC plugin derives its story branch from the
+    ticket key, and its playbook explicitly reuses an existing
+    `feat/<STORY-KEY>` branch rather than creating a duplicate -- so the second
+    cell would check out the first cell's finished work and measure nothing.
+    Separate issues give each cell its own branch, its own pull request, and
+    its own comment thread.
+
+    The issue type is copied rather than defaulted: the SDLC plugin routes a
+    defect past the spec and plan phases entirely, so a Story cloned as a Bug
+    measures a shorter lifecycle than the source ticket would have.
+    """
+    fields = acli.fetch_issue(source_key)
+    itype = acli.issue_type(fields) or "Task"
+    summary = "[bench {0}] {1}".format(cell, story["summary"])
+    body = SCRATCH_BODY.format(
+        description=story["description"],
+        source=source_key,
+        cell=cell,
+        run_id=run_id,
+    )
+    key = acli.create_issue(project, summary, body, itype)
+    acli.comment(
+        source_key,
+        "Benchmark cell `{0}` run `{1}` is running against {2}.".format(
+            cell, run_id, key
+        ),
+    )
+    scratch = dict(story)
+    scratch["key"] = key
+    scratch["summary"] = summary
+    scratch["source_key"] = source_key
+    return scratch
 
 
 def git(repo: Path, *args: str) -> str:
@@ -314,16 +459,37 @@ def main(argv: Optional[list] = None) -> int:
     artifacts = repo / "docs" / "benchmarks" / ticket / cell_name / args.run_id / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
 
+    # The issue the SESSION works against. Distinct from `ticket`, which stays
+    # the source key so every cell's artifacts, branch and report row file
+    # under one story and the comparison can group them. Only the prompt, the
+    # Jira writes and the guard's ref allow-list follow the scratch key.
+    #
+    # Created AFTER the branch-safety check and BEFORE the worktree, so a
+    # rejected branch name never leaves an orphan issue behind.
+    scratch_key = None
+    if adapter.scratch_ticket:
+        scratch = create_scratch_issue(
+            ticket, story, cfg.jira_project, cell_name, args.run_id
+        )
+        scratch_key = scratch["key"]
+
     git(repo, "worktree", "add", "-b", branch, str(worktree), base_sha)
     env_record = environment.environment_record(adapter.plugins, repo)
+    guard_script = Path(__file__).resolve().parent / "bench_guard.py"
+    guard_path = write_guard_config(
+        worktree, scratch_key or ticket, branch, cell_name
+    )
     settings_path = write_bench_settings(
         worktree,
         enabled_plugins=env_record["enabled_plugins"],
         extra_allow=adapter.permissions,
+        guard_script=guard_script,
     )
 
     cell = {
         "ticket": ticket,
+        "scratch_ticket": scratch_key,
+        "guard_config": str(guard_path),
         # The versioned identity: what paths, the branch and the report row
         # are keyed on. `approach_id` keeps the unversioned name so a report
         # can group two versions of one approach together.
@@ -347,6 +513,18 @@ def main(argv: Optional[list] = None) -> int:
     out.write_text(json.dumps(cell, indent=2))
     print(f"provisioned {branch} at {worktree}")
     print(f"  wrote {settings_path} (harness permissions: git commit + test runner)")
+    if scratch_key:
+        print(
+            "  scratch Jira issue: {0} (cloned from {1}, labelled {2}) -- this "
+            "cell's comments and PR land there".format(
+                scratch_key, ticket, acli.BENCH_LABEL
+            )
+        )
+    print(
+        "  push guard: {0} (refs allowed: {1})".format(
+            guard_path, ", ".join(allowed_refs(scratch_key or ticket, branch))
+        )
+    )
     print(
         "  plugins enabled: {0}".format(", ".join(adapter.plugins) or "NONE")
     )

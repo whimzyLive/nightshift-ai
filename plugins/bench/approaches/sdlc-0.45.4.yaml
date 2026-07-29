@@ -1,27 +1,31 @@
 id: sdlc
 label: SDLC plugin 0.45.4 (full lifecycle)
 # ---------------------------------------------------------------------------
-# NOT YET RUNNABLE. Two harness preconditions are unmet, both tracked as the
-# next piece of work rather than worked around here:
+# This cell runs SDLC's real lifecycle against a real Jira issue and opens a
+# real pull request, so the shipped output can be reviewed rather than
+# inferred from a cost table.
 #
-#   1. Scratch Jira issue. Every SDLC entry point reads AND WRITES its Jira
-#      story -- comments, transitions, PR links. The design spec calls for a
-#      scratch issue cloned into the real project and labelled `bench-run`,
-#      with the source ticket never written to. provision.py does not create
-#      one yet, so running this today would post benchmark noise onto the
-#      real ticket.
-#   2. Bench-scoped push. SDLC's lifecycle ends at a pull request, so it
-#      cannot complete without pushing. provision.py currently denies
-#      `git push` outright. The spec's mechanism is a PreToolUse hook that
-#      permits pushes to `bench/` refs and blocks everything else; the blunt
-#      deny is a stand-in for it. The deny is deliberately left in place --
-#      an adapter cannot un-deny it, and weakening the branch boundary to
-#      make a benchmark run would be the wrong trade.
+# Three things make that safe rather than reckless:
 #
-# Until both land, this cell fails at the first push. That failure is loud
-# and lands in the run record; it does not silently produce a cheap-looking
-# row that skipped the phases it could not perform.
+#   1. Its own Jira issue. `scratch_ticket: true` makes provisioning clone the
+#      source ticket into a per-cell issue labelled `bench-run`. The source
+#      ticket is never written to, and -- decisively -- two SDLC cells of the
+#      same story get DIFFERENT story keys. They would otherwise both derive
+#      the branch `feat/<KEY>`, and the playbook reuses an existing branch
+#      rather than duplicating it, so the second cell would check out the
+#      first cell's finished work and measure nothing.
+#   2. Draft pull requests. The PreToolUse guard denies `gh pr create` without
+#      `--draft` and denies `gh pr ready` outright, so branch protection and
+#      auto-merge cannot land one. The deny reason is fed back to the session,
+#      which retries correctly rather than failing blind.
+#   3. A per-cell ref allow-list. Pushes are permitted to this cell's bench
+#      branch, anything under `bench/`, and `feat|fix/<SCRATCH-KEY>` -- nothing
+#      else. main, master and develop are refused whatever the config says,
+#      and merge, rebase and force-push stay denied outright.
+#
+# Clean up with `/bench:cleanup <SOURCE-TICKET>`.
 # ---------------------------------------------------------------------------
+scratch_ticket: true
 plugins:
   enable:
     - sdlc@nightshift
@@ -47,6 +51,12 @@ run:
   # and handing it pre-fetched text would both double the ticket in context
   # and skip a step the approach genuinely pays for. This is the one adapter
   # whose prompt is deliberately shorter than the others.
+  # Draft enforcement lives in the PreToolUse guard, NOT here. `/sdlc:auto`
+  # parses its whole $ARGUMENTS as the story key, so any instruction appended
+  # after the command would be swallowed into the key and break the run. The
+  # guard denies `gh pr create` without `--draft` and returns that as the
+  # reason, which the session sees and retries on -- shaping the behaviour
+  # without touching the argument the command actually parses.
   prompt: |
     /sdlc:auto {{ticket_key}}
   flags: ['--permission-mode', 'acceptEdits']

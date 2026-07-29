@@ -202,14 +202,22 @@ class TestBenchSettingsLocal(unittest.TestCase):
         data = json.loads(provision.write_bench_settings(wt).read_text())
         allow = data["permissions"]["allow"]
         deny = data["permissions"]["deny"]
+        # The base allow list still grants none of these. `git push` is no
+        # longer blanket-denied -- it moved to the PreToolUse guard, which
+        # permits only this cell's own refs -- but nothing grants it here
+        # either, so the guard is the only thing that can let one through.
         for forbidden in ("push", "merge", "rebase"):
             self.assertFalse(
                 any(forbidden in entry for entry in allow),
                 "allow list must never permit {0}: {1}".format(forbidden, allow),
             )
-        self.assertIn("Bash(git push:*)", deny)
+        # Force-push and history rewriting stay blunt denies: deny resolves
+        # before any hook, so these hold even if the guard fails to load.
+        self.assertIn("Bash(git push --force:*)", deny)
         self.assertIn("Bash(git merge:*)", deny)
+        self.assertIn("Bash(git rebase:*)", deny)
         self.assertIn("Bash(gh pr merge:*)", deny)
+        self.assertIn("Bash(gh pr ready:*)", deny)
 
     def test_carries_a_comment_explaining_why_it_exists(self):
         wt = self._worktree()

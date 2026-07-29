@@ -69,6 +69,19 @@ class Adapter:
     # list must be spelled out rather than left off.
     plugins: List[str] = field(default_factory=list)
     permissions: List[str] = field(default_factory=list)
+    # Whether this approach needs its own Jira issue to work against.
+    #
+    # True only for approaches that WRITE to Jira. The SDLC plugin comments,
+    # transitions and links PRs on its story, and derives its git branch from
+    # the story key -- so two SDLC cells sharing one issue also share one
+    # branch, and its playbook reuses an existing `feat/<KEY>` branch rather
+    # than creating a duplicate. The second cell would check out the first
+    # cell's finished work and measure nothing.
+    #
+    # Approaches that only READ the ticket text (they receive it in the
+    # prompt) leave this false: an issue nobody writes to is noise to create
+    # and noise to clean up.
+    scratch_ticket: bool = False
 
     @property
     def cell_id(self) -> str:
@@ -289,6 +302,7 @@ def load_adapter(path: Path) -> Adapter:
         version=version,
         plugins=plugin_keys,
         permissions=load_permissions(data.get("permissions"), path),
+        scratch_ticket=bool(data.get("scratch_ticket")),
         id=data.get("id") or Path(path).stem,
         label=data.get("label") or data.get("id") or Path(path).stem,
         prompt=prompt,

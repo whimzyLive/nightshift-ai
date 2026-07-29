@@ -242,15 +242,19 @@ class TestProvisionWritesIsolation(unittest.TestCase):
         self.assertIn("Bash(git commit:*)", data["permissions"]["allow"])
 
     def test_adapter_cannot_weaken_the_deny_list(self):
-        # Even if an adapter asks for push, deny still carries it -- Claude
-        # Code resolves deny before allow, and the deny list is not
-        # adapter-writable in the first place.
+        # An adapter may ask for anything; the deny list is not adapter-
+        # writable and Claude Code resolves deny before allow. A blanket
+        # `Bash(git push:*)` grant therefore still cannot force-push, merge,
+        # or undraft a PR -- and every ordinary push it does permit is still
+        # checked ref-by-ref by the PreToolUse guard.
         path = provision.write_bench_settings(
             self.worktree, enabled_plugins={}, extra_allow=["Bash(git push:*)"]
         )
         data = json.loads(Path(path).read_text())
-        self.assertIn("Bash(git push:*)", data["permissions"]["deny"])
-        self.assertIn("Bash(gh pr merge:*)", data["permissions"]["deny"])
+        deny = data["permissions"]["deny"]
+        self.assertIn("Bash(git push --force:*)", deny)
+        self.assertIn("Bash(gh pr merge:*)", deny)
+        self.assertIn("Bash(gh pr ready:*)", deny)
 
     def test_merge_allow_does_not_duplicate(self):
         merged = provision.merge_allow(["Bash(git add:*)", "Bash(uv:*)"])
