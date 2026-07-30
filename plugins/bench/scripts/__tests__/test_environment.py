@@ -162,10 +162,21 @@ class TestEnabledPluginsMap(unittest.TestCase):
             self.assertIn(key, result)
             self.assertFalse(result[key])
 
-    def test_declared_plugin_is_true_and_everything_else_false(self):
+    def test_declared_plugin_is_true_and_unrelated_ones_false(self):
+        # `superpowers` is deliberately NOT asserted false here: sdlc declares
+        # it as a dependency, and disabling a dependency unloads the plugin
+        # entirely. `caveman` is unrelated to sdlc, so it is the honest probe
+        # for "everything else is off".
         result = self._map(["sdlc@nightshift"])
         self.assertTrue(result["sdlc@nightshift"])
-        self.assertFalse(result["superpowers@claude-plugins-official"])
+        self.assertFalse(result["caveman@caveman"])
+
+    def test_a_dependency_of_a_declared_plugin_is_enabled(self):
+        result = self._map(["sdlc@nightshift"])
+        self.assertTrue(
+            result["superpowers@claude-plugins-official"],
+            "sdlc declares superpowers; disabling it makes sdlc fail to load",
+        )
 
     def test_declared_but_uninstalled_plugin_is_still_written_true(self):
         # A silent drop would report a run that measured an approach without
@@ -409,3 +420,94 @@ class TestShippedApproachesAreValid(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDependencyResolutionIsMandatory(unittest.TestCase):
+    """A disabled dependency does not degrade a plugin -- it unloads it.
+
+    Cost a real cell: sdlc declares superpowers and claude-mem, the exhaustive
+    disable map wrote false for both, the plugin registered no skills, and the
+    session answered `Unknown skill: sdlc:auto` in 11ms.
+    """
+
+    def setUp(self):
+        self.cache = Path(tempfile.mkdtemp())
+        self._plugin("nightshift", "sdlc", "0.45.4", deps=[
+            ("superpowers", "claude-plugins-official"),
+            ("claude-mem", "thedotmack"),
+        ])
+        self._plugin("claude-plugins-official", "superpowers", "6.2.0")
+        self._plugin("thedotmack", "claude-mem", "13.8.1")
+
+    def _plugin(self, marketplace, name, version, deps=()):
+        d = self.cache / marketplace / name / version / ".claude-plugin"
+        d.mkdir(parents=True)
+        (d / "plugin.json").write_text(json.dumps({
+            "name": name, "version": version,
+            "dependencies": [{"name": n, "marketplace": m} for n, m in deps],
+        }))
+
+    def test_declared_dependencies_are_read(self):
+        deps = environment.plugin_dependencies("sdlc@nightshift", self.cache)
+        self.assertEqual(sorted(deps), [
+            "claude-mem@thedotmack", "superpowers@claude-plugins-official",
+        ])
+
+    def test_resolution_includes_the_plugin_and_its_dependencies(self):
+        got = environment.resolve_dependencies(["sdlc@nightshift"], self.cache)
+        self.assertIn("sdlc@nightshift", got)
+        self.assertIn("superpowers@claude-plugins-official", got)
+        self.assertIn("claude-mem@thedotmack", got)
+
+    def test_resolution_is_transitive(self):
+        self._plugin("acme", "leaf", "1.0.0")
+        self._plugin("acme", "mid", "1.0.0", deps=[("leaf", "acme")])
+        self._plugin("acme", "top", "1.0.0", deps=[("mid", "acme")])
+        got = environment.resolve_dependencies(["top@acme"], self.cache)
+        self.assertEqual(sorted(got), ["leaf@acme", "mid@acme", "top@acme"])
+
+    def test_a_dependency_cycle_terminates(self):
+        self._plugin("acme", "a", "1.0.0", deps=[("b", "acme")])
+        self._plugin("acme", "b", "1.0.0", deps=[("a", "acme")])
+        self.assertEqual(
+            sorted(environment.resolve_dependencies(["a@acme"], self.cache)),
+            ["a@acme", "b@acme"],
+        )
+
+    def test_newest_cached_version_is_read(self):
+        # A pinned version whose directory was swept must not break resolution.
+        self._plugin("nightshift", "sdlc", "0.44.0", deps=[("gone", "nowhere")])
+        deps = environment.plugin_dependencies("sdlc@nightshift", self.cache)
+        self.assertIn("claude-mem@thedotmack", deps)
+        self.assertNotIn("gone@nowhere", deps)
+
+    def test_uninstalled_plugin_resolves_to_itself_not_an_error(self):
+        self.assertEqual(
+            environment.resolve_dependencies(["ghost@nowhere"], self.cache),
+            ["ghost@nowhere"],
+        )
+
+
+class TestReportStatesTheDependencyOverlap(unittest.TestCase):
+    def test_overlapping_rows_are_flagged_as_not_independent(self):
+        runs = [
+            {"approach": "sdlc@0.45.4", "environment": {
+                "declared_plugins": ["sdlc@nightshift"],
+                "dependency_plugins": ["superpowers@claude-plugins-official"],
+                "ambient_hooks": []}},
+            {"approach": "superpowers@6.2.0", "environment": {
+                "declared_plugins": ["superpowers@claude-plugins-official"],
+                "dependency_plugins": [], "ambient_hooks": []}},
+        ]
+        text = "\n".join(report.render_environment(runs))
+        self.assertIn("not independent", text)
+        self.assertIn("(dep)", text)
+        self.assertIn("sdlc@0.45.4", text)
+
+    def test_no_overlap_means_no_caveat(self):
+        runs = [
+            {"approach": "opus", "environment": {
+                "declared_plugins": [], "dependency_plugins": [], "ambient_hooks": []}},
+        ]
+        text = "\n".join(report.render_environment(runs))
+        self.assertNotIn("not independent", text)

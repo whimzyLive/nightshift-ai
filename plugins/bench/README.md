@@ -90,8 +90,18 @@ enabled — on the machine this was built on, that meant the SDLC plugin loaded 
 SessionStart hook injecting _"You have superpowers"_ into the session meant to have none.
 
 `provision.py` therefore writes an **exhaustive** `enabledPlugins` map into the worktree's
-`settings.local.json`: true for the declared set, explicitly false for every other installed
-plugin. That file overrides both the repository and user layers.
+`settings.local.json`: true for the declared set **plus its transitive dependencies**, explicitly
+false for every other installed plugin. That file overrides both the repository and user layers.
+
+Dependencies are not optional. A plugin whose declared dependency is disabled does not lose that
+dependency's features — it **fails to load entirely**, registering none of its own skills or agents.
+That cost a real cell: `sdlc@nightshift` declares `superpowers` and `claude-mem`, the disable map
+wrote `false` for both, and the session answered `Unknown skill: sdlc:auto` in 11 ms having done
+nothing. Bisected to a single key; re-enabling either dependency fixed it.
+
+The consequence is a measurement one, and the report states it on the rows rather than burying it
+here: an SDLC row necessarily also loads superpowers, so it **contains** the superpowers row's
+tooling and the two are not independent treatments.
 
 Hooks are the part this cannot fix. Hooks merge additively across settings layers with no override
 key, so any hook in the user or repository settings runs in every cell. Plugin-supplied hooks

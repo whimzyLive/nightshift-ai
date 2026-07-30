@@ -252,12 +252,48 @@ def render_environment(runs: List[dict]) -> List[str]:
         ]
         rendered = []
         for run in recorded:
-            declared = (run["environment"] or {}).get("declared_plugins") or []
-            entry = (run["approach"], ", ".join("`{0}`".format(p) for p in declared) or "*none*")
+            env = run["environment"] or {}
+            declared = env.get("declared_plugins") or []
+            deps = env.get("dependency_plugins") or []
+            shown = ["`{0}`".format(p) for p in declared]
+            shown += ["`{0}` *(dep)*".format(p) for p in deps]
+            entry = (run["approach"], ", ".join(shown) or "*none*")
             if entry not in rendered:
                 rendered.append(entry)
         for approach, plugins in rendered:
             lines.append("| {0} | {1} |".format(approach, plugins))
+
+        # The dependency caveat, stated where the numbers are read rather than
+        # left in a design doc. A plugin whose declared dependency is disabled
+        # fails to load entirely, so dependencies MUST be enabled -- which
+        # means a row can silently contain another row's treatment.
+        overlaps = []
+        approaches = {r["approach"] for r in recorded}
+        for run in recorded:
+            env = run["environment"] or {}
+            for dep in env.get("dependency_plugins") or []:
+                short = dep.split("@")[0]
+                for other in approaches:
+                    if other != run["approach"] and other.split("@")[0] == short:
+                        pair = (run["approach"], other, dep)
+                        if pair not in overlaps:
+                            overlaps.append(pair)
+        if overlaps:
+            lines += [
+                "",
+                "> **These rows are not independent.** A plugin that declares a dependency",
+                "> fails to load outright if that dependency is disabled, so dependencies are",
+                "> enabled by necessity — not by choice. Where one approach's dependency is",
+                "> itself another approach in this table, the first row contains the second's",
+                "> tooling and the two cannot be read as separate treatments:",
+                "",
+            ]
+            for approach, other, dep in overlaps:
+                lines.append(
+                    "> - `{0}` loads `{1}` as a dependency, which is what row `{2}` measures on its own.".format(
+                        approach, dep, other
+                    )
+                )
 
     if unrecorded:
         lines += [

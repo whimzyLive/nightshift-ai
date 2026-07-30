@@ -93,11 +93,99 @@ def known_plugin_keys(
     )
 
 
+CACHE_ROOT = Path.home() / ".claude" / "plugins" / "cache"
+
+
+def _version_sort_key(name: str):
+    """Order version directory names newest-last, numerically where possible.
+
+    Falls back to string order for non-numeric names (a git sha, "unknown"), so
+    a mixed directory still yields a deterministic pick rather than raising.
+    """
+    parts = []
+    for chunk in str(name).replace("-", ".").split("."):
+        parts.append((0, int(chunk)) if chunk.isdigit() else (1, chunk))
+    return parts
+
+
+def plugin_dependencies(
+    key: str, cache_root: Optional[Path] = None
+) -> List[str]:
+    """The plugin keys `key` declares as dependencies.
+
+    Read from the plugin's own `.claude-plugin/plugin.json`, whose
+    `dependencies` entries are `{name, marketplace}` pairs.
+
+    The NEWEST cached version is read, not the pinned one. Dependency
+    declarations are a property of the plugin's identity rather than of a
+    particular release, and a pinned version whose directory has been swept
+    would otherwise make dependency resolution fail exactly when it matters.
+    If a future version genuinely changes its dependencies, the union across
+    versions is the safe direction: enabling one plugin too many costs a little
+    context, and disabling one costs the entire measurement (see below).
+    """
+    root = Path(cache_root or CACHE_ROOT)
+    if "@" not in key:
+        return []
+    name, marketplace = key.split("@", 1)
+    base = root / marketplace / name
+    if not base.is_dir():
+        return []
+    versions = sorted(
+        (d for d in base.iterdir() if d.is_dir()), key=lambda d: _version_sort_key(d.name)
+    )
+    for version_dir in reversed(versions):
+        manifest = version_dir / ".claude-plugin" / "plugin.json"
+        data = _read_json(manifest)
+        if data is None:
+            continue
+        out = []
+        for dep in data.get("dependencies") or []:
+            if isinstance(dep, dict) and dep.get("name") and dep.get("marketplace"):
+                out.append("{0}@{1}".format(dep["name"], dep["marketplace"]))
+        return out
+    return []
+
+
+def resolve_dependencies(
+    declared: List[str], cache_root: Optional[Path] = None
+) -> List[str]:
+    """`declared` plus every plugin it transitively depends on.
+
+    THIS IS NOT A CONVENIENCE. A plugin whose declared dependency is disabled
+    does not merely lose that dependency's features -- it fails to load
+    entirely, registering none of its own skills or agents.
+
+    That cost a real benchmark cell. `sdlc@nightshift` declares
+    `superpowers@claude-plugins-official` and `claude-mem@thedotmack`; the
+    exhaustive disable map wrote `false` for both; the plugin silently did not
+    load; and the measured session answered `Unknown skill: sdlc:auto` in 11ms
+    having done nothing. Bisected to a single key: re-enabling either
+    dependency alone fixed it.
+
+    Callers must treat the extra keys as part of what the approach IS, and say
+    so in the report -- an SDLC row necessarily also loads superpowers, so it
+    is not independent of the superpowers row.
+    """
+    seen: List[str] = []
+    queue = list(declared)
+    while queue:
+        key = queue.pop(0)
+        if key in seen:
+            continue
+        seen.append(key)
+        for dep in plugin_dependencies(key, cache_root):
+            if dep not in seen:
+                queue.append(dep)
+    return seen
+
+
 def enabled_plugins_map(
     declared: List[str],
     repo: Path,
     installed_path: Optional[Path] = None,
     user_settings: Optional[Path] = None,
+    cache_root: Optional[Path] = None,
 ) -> Dict[str, bool]:
     """The explicit enabledPlugins map to write into the worktree.
 
@@ -109,9 +197,14 @@ def enabled_plugins_map(
     Code will simply not find it, and that is a louder, more diagnosable
     failure than quietly dropping it and reporting a run that measured an
     approach without the plugin it is named after.
+
+    The true side is the declared set PLUS its transitive dependencies -- see
+    resolve_dependencies for why disabling one is fatal rather than merely
+    reductive.
     """
-    keys = set(known_plugin_keys(repo, installed_path, user_settings)) | set(declared)
-    return {key: key in declared for key in sorted(keys)}
+    required = resolve_dependencies(declared, cache_root)
+    keys = set(known_plugin_keys(repo, installed_path, user_settings)) | set(required)
+    return {key: key in required for key in sorted(keys)}
 
 
 def _hook_commands(data: dict) -> List[Dict[str, str]]:
@@ -157,6 +250,7 @@ def environment_record(
     repo: Path,
     installed_path: Optional[Path] = None,
     user_settings: Optional[Path] = None,
+    cache_root: Optional[Path] = None,
 ) -> Dict[str, object]:
     """What this cell's session runs inside, for the run record.
 
@@ -165,11 +259,20 @@ def environment_record(
     one after the operator installs a plugin or adds a hook. A reader months
     later cannot reconstruct either from the numbers alone.
     """
-    plugin_map = enabled_plugins_map(declared, repo, installed_path, user_settings)
+    plugin_map = enabled_plugins_map(
+        declared, repo, installed_path, user_settings, cache_root
+    )
     hooks = ambient_hooks(repo, user_settings)
+    # Split out so a reader can tell what the approach asked for from what its
+    # dependencies dragged in. The distinction decides whether two rows are
+    # independent: an approach whose dependency IS another approach cannot be
+    # compared against it as though they were separate treatments.
+    required = resolve_dependencies(declared, cache_root)
+    pulled_in = sorted(set(required) - set(declared))
     return {
         "enabled_plugins": plugin_map,
         "declared_plugins": sorted(declared),
+        "dependency_plugins": pulled_in,
         "disabled_plugins": sorted(k for k, v in plugin_map.items() if not v),
         "ambient_hooks": hooks,
         "isolated": True,
