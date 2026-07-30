@@ -109,11 +109,11 @@ All TypeScript interfaces must be fully typed. No `any`.
 
 ### Permissions
 
-| Role     | List       | Get        | Create | Update | Delete |
-| -------- | ---------- | ---------- | ------ | ------ | ------ |
-| [role-1] | ✓ own org  | ✓ own org  | ✓      | ✓ own  | ✗      |
-| [role-2] | ✓ assigned | ✓ assigned | ✗      | ✗      | ✗      |
-| [role-3] | ✓ org      | ✓ org      | ✓      | ✓      | ✓      |
+| Role | List | Get | Create | Update | Delete |
+| --- | --- | --- | --- | --- | --- |
+| [role-1] | ✓ own org | ✓ own org | ✓ | ✓ own | ✗ |
+| [role-2] | ✓ assigned | ✓ assigned | ✗ | ✗ | ✗ |
+| [role-3] | ✓ org | ✓ org | ✓ | ✓ | ✓ |
 
 Derive role/permission names from the project's permission source (see project-context) — never invent. Locate that source and enumerate the actual roles before filling this table.
 
@@ -131,7 +131,7 @@ Derive role/permission names from the project's permission source (see project-c
 
 **Pages:**
 | Route | File | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | /[domain] | src/pages/[domain]/index.tsx | List view |
 | /[domain]/[id] | src/pages/[domain]/[id].tsx | Detail view |
 
@@ -147,7 +147,7 @@ Derive role/permission names from the project's permission source (see project-c
 
 **Screens:**
 | Route | File | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | /(app)/[domain] | app/(app)/[domain]/index.tsx | List screen |
 | /(app)/[domain]/[id] | app/(app)/[domain]/[id].tsx | Detail screen |
 
@@ -170,12 +170,12 @@ Define these using the project's offline-sync technology and config location (se
 
 ## Error Handling
 
-| Scenario                | Behaviour                    | HTTP Status |
-| ----------------------- | ---------------------------- | ----------- |
-| [Entity] not found      | Return 404                   | 404         |
-| Unauthorised role       | Return 403                   | 403         |
-| Validation failure      | Return 400 with field errors | 400         |
-| [Domain-specific error] | [behaviour]                  | [status]    |
+| Scenario | Behaviour | HTTP Status |
+| --- | --- | --- |
+| [Entity] not found | Return 404 | 404 |
+| Unauthorised role | Return 403 | 403 |
+| Validation failure | Return 400 with field errors | 400 |
+| [Domain-specific error] | [behaviour] | [status] |
 
 **Offline behaviour:** [what happens if user submits offline write while disconnected — does it queue, fail, or show an error?]
 

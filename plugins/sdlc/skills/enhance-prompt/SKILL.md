@@ -35,14 +35,14 @@ Follow these steps to enhance any prompt:
 
 Evaluate what's missing from the user's prompt:
 
-| Element          | Check for                           | If missing...                 |
-| ---------------- | ----------------------------------- | ----------------------------- |
-| **Platform**     | "web", "mobile", "desktop"          | Add based on context or ask   |
-| **Page type**    | "landing page", "dashboard", "form" | Infer from description        |
-| **Structure**    | Numbered sections/components        | Create logical page structure |
-| **Visual style** | Adjectives, mood, vibe              | Add appropriate descriptors   |
-| **Colors**       | Specific values or roles            | Add design system or suggest  |
-| **Components**   | UI-specific terms                   | Translate to proper keywords  |
+| Element | Check for | If missing... |
+| --- | --- | --- |
+| **Platform** | "web", "mobile", "desktop" | Add based on context or ask |
+| **Page type** | "landing page", "dashboard", "form" | Infer from description |
+| **Structure** | Numbered sections/components | Create logical page structure |
+| **Visual style** | Adjectives, mood, vibe | Add appropriate descriptors |
+| **Colors** | Specific values or roles | Add design system or suggest |
+| **Components** | UI-specific terms | Translate to proper keywords |
 
 ### Step 2: Check for DESIGN.md
 
@@ -73,24 +73,24 @@ Transform the input using these techniques:
 
 Replace vague terms with specific component names:
 
-| Vague             | Enhanced                                              |
-| ----------------- | ----------------------------------------------------- |
-| "menu at the top" | "navigation bar with logo and menu items"             |
-| "button"          | "primary call-to-action button"                       |
-| "list of items"   | "card grid layout" or "vertical list with thumbnails" |
-| "form"            | "form with labeled input fields and submit button"    |
-| "picture area"    | "hero section with full-width image"                  |
+| Vague | Enhanced |
+| --- | --- |
+| "menu at the top" | "navigation bar with logo and menu items" |
+| "button" | "primary call-to-action button" |
+| "list of items" | "card grid layout" or "vertical list with thumbnails" |
+| "form" | "form with labeled input fields and submit button" |
+| "picture area" | "hero section with full-width image" |
 
 #### B. Amplify the Vibe
 
 Add descriptive adjectives to set the mood:
 
-| Basic          | Enhanced                                                    |
-| -------------- | ----------------------------------------------------------- |
-| "modern"       | "clean, minimal, with generous whitespace"                  |
-| "professional" | "sophisticated, trustworthy, with subtle shadows"           |
-| "fun"          | "vibrant, playful, with rounded corners and bold colors"    |
-| "dark mode"    | "dark theme with high-contrast accents on deep backgrounds" |
+| Basic | Enhanced |
+| --- | --- |
+| "modern" | "clean, minimal, with generous whitespace" |
+| "professional" | "sophisticated, trustworthy, with subtle shadows" |
+| "fun" | "vibrant, playful, with rounded corners and bold colors" |
+| "dark mode" | "dark theme with high-contrast accents on deep backgrounds" |
 
 #### C. Structure the Page
 

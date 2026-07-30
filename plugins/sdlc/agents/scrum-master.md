@@ -35,9 +35,9 @@ loads land in the transcript once and survive resumes.)
 Loading happens up front, but `user-story-mapping` and `user-story-splitting` are _applied_ at the
 specific steps below — loading early does not mean applying early:
 
-| Skill                  | When to invoke                                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| `user-story-mapping`   | Mode 1: after fetching the Epic, before drafting any stories — map the user journey first             |
+| Skill | When to invoke |
+| --- | --- |
+| `user-story-mapping` | Mode 1: after fetching the Epic, before drafting any stories — map the user journey first |
 | `user-story-splitting` | Mode 1 + 2: whenever a story is >8 points or spans multiple distinct outcomes — split before creating |
 
 You MUST apply these skills at the steps marked below. Do not skip.

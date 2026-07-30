@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded
 agents: [ai-enablement-engineer, qa-engineer]
 source-stories: [NA-25, NA-27, NA-43, NA-51, NA-52, NA-54, NA-57, NA-58, NA-60, NA-61, NA-62]
 ---
@@ -8,7 +8,7 @@ source-stories: [NA-25, NA-27, NA-43, NA-51, NA-52, NA-54, NA-57, NA-58, NA-60, 
 
 ## Status
 
-Accepted
+Superseded by [0016. Prettier-ignored plugin markdown](0016-prettier-ignored-plugin-markdown.md).
 
 ## Decision
 

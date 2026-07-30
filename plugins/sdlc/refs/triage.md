@@ -74,12 +74,12 @@ Threshold `T` (default `3`); lightweight uses an **inclusive upper bound** — e
 The **Bug row is highest priority and overrides the points threshold unconditionally** — an 8-point Bug
 is still `lightweight` (defects skip spec+plan):
 
-| Condition                  | `WORK_KIND` | `TRIAGE`      | Notes                                             |
-| -------------------------- | ----------- | ------------- | ------------------------------------------------- |
-| `issuetype` is Bug         | `defect`    | `lightweight` | **forced** — overrides points; highest priority   |
-| `points <= T` (non-Bug)    | `feature`   | `lightweight` | inclusive upper bound (exactly `T` ⇒ lightweight) |
-| `points > T` (non-Bug)     | `feature`   | `full`        | spec + plan required                              |
-| `points` missing (non-Bug) | `feature`   | `full`        | fail-safe default; also emit a `WARNING:` line    |
+| Condition | `WORK_KIND` | `TRIAGE` | Notes |
+| --- | --- | --- | --- |
+| `issuetype` is Bug | `defect` | `lightweight` | **forced** — overrides points; highest priority |
+| `points <= T` (non-Bug) | `feature` | `lightweight` | inclusive upper bound (exactly `T` ⇒ lightweight) |
+| `points > T` (non-Bug) | `feature` | `full` | spec + plan required |
+| `points` missing (non-Bug) | `feature` | `full` | fail-safe default; also emit a `WARNING:` line |
 
 A defect with `STORY_POINTS=missing` still reports `STORY_POINTS=missing` honestly on its line, but
 `TRIAGE=lightweight` — the missing-points fail-safe-to-`full` rule applies to **features only**.
@@ -102,15 +102,15 @@ existing two-line parsers stay back-compatible. `STORY_POINTS=` carries the same
 
 ## Error handling
 
-| Scenario                                                 | Behaviour                                                                                                                                                                           | Result                                                        |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `issuetype` is Bug                                       | force the lightweight defect path, regardless of points                                                                                                                             | `WORK_KIND=defect`, `TRIAGE=lightweight`                      |
-| `issuetype.name` unreadable/empty                        | fail-safe to feature — never route a feature into the debugging path                                                                                                                | `WORK_KIND=feature` (then point-based `TRIAGE`)               |
-| `points <= T` (non-Bug)                                  | route lightweight                                                                                                                                                                   | `TRIAGE=lightweight`                                          |
-| `points > T` (non-Bug)                                   | route full                                                                                                                                                                          | `TRIAGE=full`                                                 |
-| `points` unset (`missing`, non-Bug)                      | fail-safe to the full path; emit a warning to set points before running lightweight `/impl` (AC-5)                                                                                  | `TRIAGE=full`, `STORY_POINTS=missing`, plus a `WARNING:` line |
-| `acli` Jira fetch fails (auth/DNS)                       | **STOP** — never guess a route; surface the acli error to the caller. Triage must never silently default to a route when Jira is unreachable; emit no `WORK_KIND=`/`TRIAGE=` block. | non-zero / explicit STOP message                              |
-| threshold token malformed/non-numeric in project-context | ignore the override, use the built-in default `3`, and emit a warning                                                                                                               | `TRIAGE` computed against `T = 3`                             |
+| Scenario | Behaviour | Result |
+| --- | --- | --- |
+| `issuetype` is Bug | force the lightweight defect path, regardless of points | `WORK_KIND=defect`, `TRIAGE=lightweight` |
+| `issuetype.name` unreadable/empty | fail-safe to feature — never route a feature into the debugging path | `WORK_KIND=feature` (then point-based `TRIAGE`) |
+| `points <= T` (non-Bug) | route lightweight | `TRIAGE=lightweight` |
+| `points > T` (non-Bug) | route full | `TRIAGE=full` |
+| `points` unset (`missing`, non-Bug) | fail-safe to the full path; emit a warning to set points before running lightweight `/impl` (AC-5) | `TRIAGE=full`, `STORY_POINTS=missing`, plus a `WARNING:` line |
+| `acli` Jira fetch fails (auth/DNS) | **STOP** — never guess a route; surface the acli error to the caller. Triage must never silently default to a route when Jira is unreachable; emit no `WORK_KIND=`/`TRIAGE=` block. | non-zero / explicit STOP message |
+| threshold token malformed/non-numeric in project-context | ignore the override, use the built-in default `3`, and emit a warning | `TRIAGE` computed against `T = 3` |
 
 ## Warning line format
 

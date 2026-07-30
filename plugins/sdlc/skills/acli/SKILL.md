@@ -81,7 +81,7 @@ acli jira workitem create \
 
 Flags reference:
 | Flag | Purpose |
-|---|---|
+| --- | --- |
 | `-p, --project` | Jira project key (e.g. `CER`) |
 | `-t, --type` | Work item type: `Story`, `Task`, `Bug`, `Epic`, `Sub-task` |
 | `-s, --summary` | Title (max 255 chars) |

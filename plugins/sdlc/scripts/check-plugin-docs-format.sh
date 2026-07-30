@@ -20,6 +20,14 @@
 #   Exit 0 + "OK" when every plugins/**/*.md is a Prettier fixed point.
 #   Exit 1 + prettier's native [warn] offender list when one or more are not (or on an empty glob /
 #   missing prettier).
+#
+# SCOPE NARROWED BY NA-86 / ADR 0016
+#   .prettierignore now ignores all plugins/sdlc/**/*.md, so plugins/gtm/** is the SOLE remaining
+#   non-ignored tree this script's plugins/**/*.md glob actually checks — one more .prettierignore
+#   entry away from this gate silently checking zero files and reporting a vacuous pass (see the
+#   "bare directory-level .prettierignore" limitation noted above: this script cannot detect that
+#   case itself). plugins/sdlc/scripts/__tests__/prettier-ignore.test.sh assertion 3
+#   (plugins/gtm/README.md must still report ignored:false) is the only thing that would catch it.
 
 set -uo pipefail
 

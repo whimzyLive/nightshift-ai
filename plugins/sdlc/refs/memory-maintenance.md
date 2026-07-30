@@ -12,12 +12,12 @@ refused, not queued.
 
 ## The four operations
 
-| Op                       | Rule                                                                                                                                                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Decay / demotion         | `status: active` + `uses: 0` + newest `evidence` older than the retention window → propose `status: deprecated`. Already `deprecated` and one further window elapsed → propose deletion.                                              |
-| Review-file GC           | Delete a review file when (a) every id in its `## Rules written` is now `status: promoted`, or (b) it is an `issue_count: 0` marker older than the retention window, or (c) it wrote no rules and is older than the retention window. |
-| ADR-candidate nomination | Nominate every rule with `uses >= 3` OR `agent` length >= 2; emit the candidate list (id, rule, evidence, uses) and hand it to `knowledge-engineer` for `/sdlc:docs distill`. **Nomination never writes an ADR.**                     |
-| T1 deletion-on-promotion | When distill lands an ADR that supersedes a rule, set the rule `status: promoted`, then delete it in the maintenance PR. Promotion is one-way and terminal — a promoted rule is deleted, never revived.                               |
+| Op | Rule |
+| --- | --- |
+| Decay / demotion | `status: active` + `uses: 0` + newest `evidence` older than the retention window → propose `status: deprecated`. Already `deprecated` and one further window elapsed → propose deletion. |
+| Review-file GC | Delete a review file when (a) every id in its `## Rules written` is now `status: promoted`, or (b) it is an `issue_count: 0` marker older than the retention window, or (c) it wrote no rules and is older than the retention window. |
+| ADR-candidate nomination | Nominate every rule with `uses >= 3` OR `agent` length >= 2; emit the candidate list (id, rule, evidence, uses) and hand it to `knowledge-engineer` for `/sdlc:docs distill`. **Nomination never writes an ADR.** |
+| T1 deletion-on-promotion | When distill lands an ADR that supersedes a rule, set the rule `status: promoted`, then delete it in the maintenance PR. Promotion is one-way and terminal — a promoted rule is deleted, never revived. |
 
 Run the four ops in this order when the maintenance op is invoked as a whole (decay/demotion and
 review-file GC are independent of each other; nomination reads the post-decay rule set; T1 deletion
