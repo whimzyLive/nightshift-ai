@@ -361,6 +361,12 @@ def main(argv: Optional[list] = None) -> int:
     if adapter.version is not None:
         plugins.assert_version_available(adapter.version.plugin, adapter.version.version)
         plugins_snapshot = plugins.read_snapshot()
+        # To DISK, before the pin. The in-memory snapshot below covers an
+        # exception and a clean exit; it cannot survive the process being
+        # killed, and a cell is a long job an operator will interrupt. When
+        # that happened it left the operator's main repo without its plugin
+        # registrations. provision.py sweeps this marker on the next run.
+        plugins.write_durable_snapshot(plugins_snapshot)
 
     # Everything below runs under `finally: restore`. The pin mutates a file
     # this harness does not own (~/.claude/plugins/installed_plugins.json),
@@ -508,6 +514,9 @@ def main(argv: Optional[list] = None) -> int:
     finally:
         if pin_applied:
             plugins.restore_snapshot(plugins_snapshot)
+            # Only now: while the marker exists, the next provision treats this
+            # run as abandoned and restores from it.
+            plugins.clear_durable_snapshot()
             print("restored installed_plugins.json to its pre-run state")
 
 

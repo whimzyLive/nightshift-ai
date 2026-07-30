@@ -183,3 +183,111 @@ class TestApplyPin(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPinBeatsAUserScopeWildcard(unittest.TestCase):
+    """A user-scope install has an EMPTY projectPath and matches every project.
+
+    Resolution honours array order, so a pin appended after such an entry is
+    written, looks correct in the file, and never takes effect. Demonstrated
+    live: pinning superpowers 6.2.0 for a project whose array already held a
+    user-scope 6.1.1 entry kept resolving 6.1.1 until the entry was moved to
+    the front.
+    """
+
+    def _data(self):
+        return {
+            "plugins": {
+                "superpowers@claude-plugins-official": [
+                    {"scope": "user", "projectPath": "", "version": "6.1.1",
+                     "installPath": "/cache/6.1.1"},
+                    {"scope": "project", "projectPath": "/other", "version": "6.0.3",
+                     "installPath": "/cache/6.0.3"},
+                ]
+            }
+        }
+
+    def test_new_entry_is_prepended_ahead_of_the_wildcard(self):
+        out = plugins.pin_entry(
+            self._data(), "superpowers@claude-plugins-official", "/repo",
+            Path("/cache/6.2.0"), "6.2.0",
+        )
+        entries = out["plugins"]["superpowers@claude-plugins-official"]
+        self.assertEqual(entries[0]["projectPath"], "/repo")
+        self.assertEqual(entries[0]["version"], "6.2.0")
+        # The wildcard survives -- it is a legitimate user-scope install.
+        self.assertTrue(any(e.get("scope") == "user" for e in entries))
+
+    def test_existing_entry_is_also_moved_to_the_front(self):
+        data = self._data()
+        data["plugins"]["superpowers@claude-plugins-official"].append(
+            {"scope": "project", "projectPath": "/repo", "version": "6.1.1",
+             "installPath": "/cache/6.1.1"}
+        )
+        out = plugins.pin_entry(
+            data, "superpowers@claude-plugins-official", "/repo",
+            Path("/cache/6.2.0"), "6.2.0",
+        )
+        entries = out["plugins"]["superpowers@claude-plugins-official"]
+        self.assertEqual(entries[0]["projectPath"], "/repo")
+        self.assertEqual(entries[0]["version"], "6.2.0")
+        # Rewritten in place, not duplicated.
+        self.assertEqual(sum(1 for e in entries if e.get("projectPath") == "/repo"), 1)
+
+    def test_no_entries_are_lost(self):
+        out = plugins.pin_entry(
+            self._data(), "superpowers@claude-plugins-official", "/repo",
+            Path("/cache/6.2.0"), "6.2.0",
+        )
+        self.assertEqual(len(out["plugins"]["superpowers@claude-plugins-official"]), 3)
+
+
+class TestDurableSnapshotSurvivesAKilledRun(unittest.TestCase):
+    """The in-memory restore cannot survive the process being killed.
+
+    It didn't: an interrupted cell left 24 auto-created entries behind, and the
+    measured session had already replaced the parent repo's own registrations --
+    superpowers silently fell back 6.2.0 -> 6.1.1, context-mode 1.0.162 ->
+    1.0.103, and sdlc lost its main-repo entry entirely.
+    """
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.installed = self.root / "installed_plugins.json"
+        self.snapshot = self.root / ".bench-restore.json"
+        self.original = json.dumps({"plugins": {"sdlc@nightshift": [{"version": "0.45.4"}]}})
+        self.installed.write_text(self.original)
+
+    def test_snapshot_round_trips_byte_for_byte(self):
+        plugins.write_durable_snapshot(self.original, self.snapshot)
+        # Simulate the killed run: the file is left rewritten.
+        self.installed.write_text('{"plugins": {}}')
+        msg = plugins.recover_if_abandoned(self.installed, self.snapshot)
+        self.assertIsNotNone(msg)
+        self.assertEqual(self.installed.read_text(), self.original)
+
+    def test_recovery_clears_the_marker(self):
+        plugins.write_durable_snapshot(self.original, self.snapshot)
+        plugins.recover_if_abandoned(self.installed, self.snapshot)
+        self.assertFalse(self.snapshot.exists())
+        # A second provision must not "recover" again over a healthy file.
+        self.assertIsNone(plugins.recover_if_abandoned(self.installed, self.snapshot))
+
+    def test_no_marker_is_a_no_op(self):
+        self.assertIsNone(plugins.recover_if_abandoned(self.installed, self.snapshot))
+        self.assertEqual(self.installed.read_text(), self.original)
+
+    def test_absent_original_is_recorded_as_null_and_restored_as_absent(self):
+        plugins.write_durable_snapshot(None, self.snapshot)
+        self.installed.write_text('{"plugins": {}}')
+        plugins.recover_if_abandoned(self.installed, self.snapshot)
+        self.assertFalse(self.installed.exists())
+
+    def test_unreadable_marker_does_not_touch_installed_plugins(self):
+        self.snapshot.write_text("{ not json")
+        msg = plugins.recover_if_abandoned(self.installed, self.snapshot)
+        self.assertIn("unreadable", msg)
+        self.assertEqual(self.installed.read_text(), self.original)
+
+    def test_clear_is_safe_when_nothing_exists(self):
+        plugins.clear_durable_snapshot(self.snapshot)  # must not raise

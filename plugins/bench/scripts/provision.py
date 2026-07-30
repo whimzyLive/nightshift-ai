@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benchlib import acli, adapters, config, environment  # noqa: E402
+from benchlib import acli, adapters, config, environment, plugins  # noqa: E402
 
 BENCH_PREFIX = "bench/"
 
@@ -434,6 +434,14 @@ def main(argv: Optional[list] = None) -> int:
     cfg = config.load_config(repo, {})
     story = json.loads(Path(args.story).read_text())
     ticket = story["key"]
+
+    # Before anything else: if a previous cell was killed before it could
+    # restore installed_plugins.json, put it back. Left alone, this machine's
+    # plugin registrations stay rewritten and every later cell measures
+    # whatever that run happened to leave behind.
+    recovery = plugins.recover_if_abandoned()
+    if recovery:
+        print("  " + recovery)
 
     adapter = adapters.load_adapter(Path(args.adapter))
 

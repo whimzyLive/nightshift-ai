@@ -157,6 +157,87 @@ def restore_snapshot(snapshot: Optional[str], path: Optional[Path] = None) -> No
     target.write_text(snapshot)
 
 
+SNAPSHOT_PATH = Path.home() / ".claude" / "plugins" / ".bench-restore.json"
+
+
+def write_durable_snapshot(snapshot, path: Optional[Path] = None) -> Path:
+    """Persist the pre-run installed_plugins.json so a KILLED run can be undone.
+
+    execute.py restores from a snapshot held in memory inside a `finally`. That
+    covers an exception and a clean exit; it does NOT cover the process being
+    killed, and a benchmark cell is a long-running job an operator will
+    reasonably interrupt.
+
+    That gap did real damage: an interrupted cell left 24 auto-created entries
+    behind AND the measured session had already REPLACED the parent repository's
+    own entries -- so the operator's main repo lost its plugin registrations,
+    superpowers silently fell back from 6.2.0 to a user-scope 6.1.1, and
+    context-mode from 1.0.162 to 1.0.103. None of it was visible without
+    reading the file.
+
+    So the snapshot goes to disk before the pin is applied, and provisioning
+    sweeps it on the next run. A file, not a lock: the point is that recovery
+    survives the process that created it.
+    """
+    target = Path(path or SNAPSHOT_PATH)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "note": (
+            "Pre-run copy of installed_plugins.json, written by the bench "
+            "harness before it pinned a plugin version. If this file exists, a "
+            "benchmark cell did not reach its restore step -- most likely it "
+            "was killed. `content` is the byte-for-byte original; null means "
+            "the file did not exist before the run."
+        ),
+        "content": snapshot,
+    }
+    target.write_text(json.dumps(payload, indent=2) + "\n")
+    return target
+
+
+def clear_durable_snapshot(path: Optional[Path] = None) -> None:
+    """Drop the snapshot once the in-memory restore has succeeded."""
+    target = Path(path or SNAPSHOT_PATH)
+    try:
+        target.unlink()
+    except (IOError, OSError):
+        # Its absence is the desired end state; failing to remove it only
+        # means the next run reports a stale recovery, never data loss.
+        pass
+
+
+def recover_if_abandoned(
+    installed_path: Optional[Path] = None, snapshot_path: Optional[Path] = None
+) -> Optional[str]:
+    """Undo an abandoned run's pin. Returns a message, or None if nothing to do.
+
+    Called at provision time rather than execute time: by the time a cell is
+    executing it has already pinned, and a stale snapshot from a previous run
+    would be indistinguishable from its own.
+    """
+    snap = Path(snapshot_path or SNAPSHOT_PATH)
+    if not snap.is_file():
+        return None
+    try:
+        payload = json.loads(snap.read_text())
+    except (IOError, OSError, ValueError):
+        return (
+            "found an unreadable {0}; leaving installed_plugins.json alone. "
+            "Check it by hand -- a previous benchmark cell may have left a "
+            "version pin applied.".format(snap)
+        )
+
+    restore_snapshot(payload.get("content"), installed_path)
+    captured = payload.get("captured_at", "an earlier run")
+    clear_durable_snapshot(snap)
+    return (
+        "recovered: a benchmark cell from {0} was interrupted before it could "
+        "restore installed_plugins.json. Its pre-run state has been put back "
+        "and the recovery marker cleared.".format(captured)
+    )
+
+
 def pin_entry(data: dict, key: str, project_path: str, target: Path, version: str) -> dict:
     """Return ``data`` with ``project_path`` pinned to ``version``.
 
@@ -165,20 +246,39 @@ def pin_entry(data: dict, key: str, project_path: str, target: Path, version: st
     duplicated -- two entries for one path would leave which one wins up to
     Claude Code's resolution order, which is not something a measurement
     should depend on.
+
+    A NEW entry is prepended, not appended, and that ordering is load-bearing.
+    Resolution honours array order, and a user-scope install carries an EMPTY
+    projectPath which behaves as a wildcard matching every project. Appending
+    after such an entry means the pin is written, looks correct in the file,
+    and never takes effect.
+
+    Demonstrated, not theorised: pinning superpowers 6.2.0 for a project whose
+    array already held a user-scope 6.1.1 entry produced a correct-looking
+    6.2.0 entry while `claude plugin details` kept resolving 6.1.1. Moving the
+    entry to the front flipped it to 6.2.0 with no other change. Every plugin
+    with a user-scope install -- superpowers, caveman, claude-mem,
+    context-mode, typescript-lsp on this machine -- is exposed to this, so an
+    appended pin would silently measure the wrong version for exactly the
+    approaches most likely to be benchmarked.
     """
     out = dict(data or {})
     plugins = dict(out.get("plugins") or {})
     entries = [dict(e) for e in (plugins.get(key) or [])]
 
     now = datetime.now(timezone.utc).isoformat()
-    for entry in entries:
+    for index, entry in enumerate(entries):
         if entry.get("projectPath") == project_path:
             entry["installPath"] = str(target)
             entry["version"] = version
             entry["lastUpdated"] = now
+            # Rewriting in place is not enough if the existing entry sits
+            # behind a wildcard; move it to the front too.
+            entries.insert(0, entries.pop(index))
             break
     else:
-        entries.append(
+        entries.insert(
+            0,
             {
                 "scope": "project",
                 "projectPath": project_path,
@@ -186,7 +286,7 @@ def pin_entry(data: dict, key: str, project_path: str, target: Path, version: st
                 "version": version,
                 "installedAt": now,
                 "lastUpdated": now,
-            }
+            },
         )
 
     plugins[key] = entries
