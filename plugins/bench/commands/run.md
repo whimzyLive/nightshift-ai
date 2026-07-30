@@ -73,6 +73,29 @@ Do not proceed without that confirmation.
 
 `<CELL>` below is `<APPROACH>` for an unversioned adapter and `<APPROACH>@<VERSION>` for a pinned one. Paths carry `<RUN_ID>` so repeats of the same cell do not overwrite each other.
 
+**Step 0 runs ONCE for the whole sweep, before anything else.** Steps 1 onward run per approach.
+
+0. Preflight the sweep. This spends nothing and writes nothing.
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.py" \
+     --ticket <TICKET> --repo <REPO> --repeats <N> \
+     --adapter "${CLAUDE_PLUGIN_ROOT}/approaches/<APPROACH_FILE>.yaml" \
+     [--adapter ... one per approach ...]
+   ```
+
+   Exit 2 means it refused. Two different refusals, and they are not interchangeable:
+   - **Cell cap exceeded** — the sweep is bigger than you meant. Do not pass `--acknowledge-cost`;
+     it does not clear this gate by design. Fix the sweep, or raise `--max-cells` deliberately
+     after telling the founder why.
+   - **Over the cost threshold** — the sweep is intentional but expensive. Show the founder the
+     forecast verbatim, including its stated basis, and re-run with `--acknowledge-cost` only after
+     they agree.
+
+   Show the founder the `WILL CREATE` line whatever the outcome. Approaches that write to Jira
+   create one issue, one branch and one draft pull request **per cell**, and that is a cleanup
+   obligation regardless of cost. Name `/bench:cleanup <TICKET>` when you report it.
+
 For each approach, in the order given:
 
 1. Resolve the ticket.
@@ -101,6 +124,17 @@ For each approach, in the order given:
    Read provisioning's output. If it warns about hooks from user or repository settings, those run
    inside every measured session and cannot be disabled from the worktree — say so when reporting,
    because a hook that rewrites commands or injects text moves the number being measured.
+
+   Two more lines to relay rather than skip:
+   - **`scratch Jira issue: <KEY>`** — this cell works against that issue, not `<TICKET>`. Its
+     comments and pull request land there. Report the key, because it is what the founder needs to
+     look at the shipped output, and it is what `/bench:cleanup` will delete.
+   - **`push guard: … (refs allowed: …)`** — the cell may push only those refs. If a run later
+     reports a denied push, that is the guard working, not a bug; the deny reason states which ref
+     was refused.
+
+   If the adapter sets `scratch_ticket: true` and no scratch key is printed, **stop**. The session
+   would otherwise run `/sdlc:auto` against the source ticket and write benchmark noise onto it.
 
    **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry or skip to measure — the worktree is the evidence of what happened.
 

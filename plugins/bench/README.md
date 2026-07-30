@@ -10,6 +10,9 @@ Each approach is a declarative YAML file in `approaches/`. Adding one requires n
 - `/bench:report <TICKET>` — regenerate the aggregate report from stored run data
 - `/bench:cleanup <TICKET>` — close draft PRs, delete bench branches, worktrees and scratch issues
 
+Step 0 of `/bench:run` is `scripts/preflight.py`: it forecasts the sweep, states how many Jira
+issues and draft PRs it will create, and refuses to start above a cost threshold or a cell cap.
+
 ## Cost
 
 Every cell is a **cold** `claude -p` session, deliberately: cells sharing a warm cache in one live
