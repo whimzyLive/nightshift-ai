@@ -20,3 +20,9 @@ docs/features
 # output; reformatting them would desync the committed golden files from what the generator
 # actually writes and break docs-sync-fixtures.test.sh's diff assertion.
 plugins/sdlc/scripts/__tests__/fixtures/*/expected/
+
+# Benchmark run artifacts — measurement evidence, kept byte-exact to what the harness wrote.
+# The r1-r4 NA-82 cells were committed before this rule existed and were reformatted in
+# transit (1590 -> 1534 lines, indentation only); everything recorded from here on stays
+# faithful, so a committed run.json can be diffed against a fresh one without noise.
+docs/benchmarks/
