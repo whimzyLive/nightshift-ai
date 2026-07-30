@@ -328,7 +328,15 @@ class TestProvisionMainCompletesEndToEnd(unittest.TestCase):
         # authorises the story branch the lifecycle pushes.
         guard = json.loads(Path(cell["guard_config"]).read_text())
         self.assertEqual(guard["ticket"], "NA-90")
-        self.assertTrue(any("NA-90" in r for r in guard["allowed_refs"]))
+        # Asserted through the guard itself rather than by substring: the
+        # allow-list holds regex-ESCAPED patterns (`(feat|fix)/NA\-90(...)?`),
+        # so a naive `"NA-90" in pattern` check fails on a correct config.
+        import bench_guard
+        allowed = guard["allowed_refs"]
+        self.assertTrue(bench_guard.ref_allowed("feat/NA-90", allowed))
+        self.assertTrue(bench_guard.ref_allowed(cell["branch"], allowed))
+        self.assertFalse(bench_guard.ref_allowed("feat/NA-82", allowed))
+        self.assertFalse(bench_guard.ref_allowed("develop", allowed))
 
     def test_missing_twin_refuses_before_creating_a_worktree(self):
         with self.assertRaises(provision.TwinTicketError):
