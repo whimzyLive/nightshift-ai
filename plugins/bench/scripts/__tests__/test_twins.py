@@ -219,3 +219,48 @@ class TestEmptyAcsGetTheirOwnDiagnosis(unittest.TestCase):
             with self.assertRaises(provision.TwinTicketError) as ctx:
                 provision.validate_twin("NA-90", SOURCE, POINTS_FIELD)
         self.assertNotIn("flat paragraph", str(ctx.exception))
+
+
+class TestWorktreeCheckedOutBranchIsNotSkipped(unittest.TestCase):
+    """`git branch --list` marks a worktree-checked-out branch with `+`.
+
+    Only `*` was stripped, so such a branch parsed as "+ bench/..." and was
+    dropped. plan() runs before the worktree is removed, so that was ALWAYS the
+    branch cleanup most needed to delete -- it reported "Branches to delete (0)"
+    while the branch sat there untouched.
+    """
+
+    def setUp(self):
+        import subprocess
+        import cleanup
+        self.cleanup = cleanup
+        self.root = Path(tempfile.mkdtemp())
+        self.env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                    "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+                    "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.root), "commit", "-q", "--allow-empty", "-m", "x"],
+            check=True, env=self.env)
+        # A real worktree, so the branch really does get the `+` marker.
+        subprocess.run(
+            ["git", "-C", str(self.root), "worktree", "add", "-q", "-b",
+             "bench/NA-82/opus/r1", str(self.root / "wt")],
+            check=True, env=self.env)
+
+    def test_the_marker_is_present(self):
+        out = self.cleanup.git(self.root, "branch", "--list", "bench/NA-82/*")
+        self.assertTrue(out.strip().startswith("+"), out)
+
+    def test_the_branch_is_still_found(self):
+        self.assertIn(
+            "bench/NA-82/opus/r1", self.cleanup.bench_branches(self.root, "NA-82")
+        )
+
+    def test_current_branch_marker_still_handled(self):
+        import subprocess
+        subprocess.run(["git", "-C", str(self.root), "checkout", "-q", "-b",
+                        "bench/NA-82/opus/r2"], check=True)
+        found = self.cleanup.bench_branches(self.root, "NA-82")
+        self.assertIn("bench/NA-82/opus/r2", found)
+        self.assertIn("bench/NA-82/opus/r1", found)

@@ -45,11 +45,24 @@ def git(repo: Path, *args: str) -> str:
     return proc.stdout.strip()
 
 
+def _branch_name(line: str) -> str:
+    """The branch name from one `git branch --list` line.
+
+    Git marks the CURRENT branch with `*` and a branch checked out in another
+    WORKTREE with `+`. Only `*` was stripped, so a worktree-checked-out branch
+    parsed as "+ bench/..." and was silently dropped -- and since plan() runs
+    before the worktree is removed, that was always the branch cleanup most
+    needed to delete. It reported "Branches to delete (0)" while the branch sat
+    there.
+    """
+    return line.strip().lstrip("*+ ").strip()
+
+
 def bench_branches(repo: Path, ticket: str) -> List[str]:
     out = git(repo, "branch", "--list", "{0}{1}/*".format(BENCH_PREFIX, ticket))
     branches = []
     for line in out.splitlines():
-        name = line.strip().lstrip("* ").strip()
+        name = _branch_name(line)
         # Belt and braces: the glob above should make this impossible, but a
         # deletion loop is the wrong place to trust a glob.
         if name.startswith(BENCH_PREFIX):
@@ -99,7 +112,7 @@ def twin_branches(repo: Path, twin_keys: List[str]) -> List[str]:
         for prefix in ("feat", "fix"):
             out = git(repo, "branch", "--list", "{0}/{1}".format(prefix, key))
             for line in out.splitlines():
-                name = line.strip().lstrip("* ").strip()
+                name = _branch_name(line)
                 if name:
                     found.append(name)
     return found
