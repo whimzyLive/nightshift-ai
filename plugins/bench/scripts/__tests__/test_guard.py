@@ -419,3 +419,61 @@ class TestCleanupPlanIsReadOnly(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestZeroTurnAndUnknownCommandAreFailures(unittest.TestCase):
+    """The NA-82 regression: a rejected prompt looked like a clean $0 success.
+
+    `/sdlc:auto NA-83` returned subtype "success", is_error false, num_turns 0,
+    duration 11ms, cost $0, result "Unknown command: /sdlc:auto". Every
+    allow-listed field was clean, so the cell was recorded as a successful run
+    and only the downstream empty-diff check noticed -- which reads as "this
+    approach wrote no code", a claim about the approach rather than about a
+    broken cell.
+    """
+
+    def _check(self, **payload):
+        from benchlib import termination
+        base = {"is_error": False, "subtype": "success"}
+        base.update(payload)
+        return termination.check_result_payload(base)
+
+    def test_the_exact_na82_payload_is_not_clean(self):
+        verdict = self._check(
+            num_turns=0, duration_ms=11, total_cost_usd=0,
+            result="Unknown command: /sdlc:auto",
+        )
+        self.assertFalse(verdict["clean"])
+        joined = " ".join(verdict["violations"])
+        self.assertIn("no turns", joined)
+        self.assertIn("Unknown command", joined)
+
+    def test_zero_turns_alone_is_a_violation(self):
+        self.assertFalse(self._check(num_turns=0)["clean"])
+
+    def test_unknown_command_alone_is_a_violation(self):
+        verdict = self._check(num_turns=4, result="Unknown command: /nope")
+        self.assertFalse(verdict["clean"])
+        # The message must point at the fix, since this is an adapter bug.
+        self.assertIn("plain language", " ".join(verdict["violations"]))
+
+    def test_a_real_session_stays_clean(self):
+        verdict = self._check(num_turns=37, result="Implemented the blog collection.")
+        self.assertTrue(verdict["clean"], verdict["violations"])
+
+    def test_missing_num_turns_is_not_invented_as_a_failure(self):
+        # An older CLI that emitted no num_turns must not fail every cell.
+        self.assertTrue(self._check(result="done")["clean"])
+
+
+class TestSdlcAdaptersDoNotUseSlashSyntax(unittest.TestCase):
+    def test_prompt_invokes_the_skill_by_name(self):
+        from benchlib import adapters
+        for name in ("sdlc-0.44.0.yaml", "sdlc-0.45.4.yaml"):
+            with self.subTest(adapter=name):
+                a = adapters.load_adapter(
+                    Path(__file__).resolve().parents[2] / "approaches" / name
+                )
+                self.assertNotIn("/sdlc:auto", a.prompt)
+                self.assertIn("sdlc:auto skill", a.prompt)
+                self.assertIn("{{ticket_key}}", a.prompt)

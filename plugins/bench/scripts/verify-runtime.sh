@@ -2,10 +2,14 @@
 # Answer the two runtime questions the unit tests CANNOT answer, as cheaply as
 # it is possible to answer them.
 #
-#   Q1  Does `claude -p "/some:command"` expand a slash command?
-#       The SDLC adapter's entire prompt is `/sdlc:auto <KEY>`. If expansion
-#       does not happen headlessly, that prompt is literal text and the cell
-#       measures nothing.
+#   Q1  ANSWERED on NA-82, and the answer was no. `claude -p "/sdlc:auto NA-83"`
+#       returned `Unknown command: /sdlc:auto` with num_turns 0, duration 11ms
+#       and cost $0. A headless session does not accept plugin commands in
+#       slash form -- the CLI resolves the leading token itself. Plugin
+#       commands reach a session as SKILLS, invoked via its Skill tool, so
+#       adapter prompts ask for the capability in plain language. Kept here as
+#       a regression check: Q1 now verifies a plain-language skill request
+#       reaches a model at all.
 #
 #   Q2  Does a PreToolUse hook declared in .claude/settings.local.json fire in
 #       a headless session?
@@ -19,10 +23,9 @@
 #     would be waste.
 #   * Every plugin disabled. A cold session's system prompt is the bulk of a
 #     short session's cost, and plugin definitions are the bulk of that.
-#   * Q1 uses a throwaway one-line command of our own rather than /sdlc:auto.
-#     It asks whether EXPANSION happens -- the actual unknown -- without
-#     loading the SDLC plugin or starting a lifecycle that would create a Jira
-#     issue and a pull request.
+#   * Q1 uses a throwaway capability of our own rather than sdlc:auto, so it
+#     tests the prompt SHAPE without loading the SDLC plugin or starting a
+#     lifecycle that would create a Jira issue and a pull request.
 #   * Two sessions total, a handful of tokens each.
 #
 # Safe: operates only inside a throwaway `bench/verify/*` worktree, removed at
@@ -101,18 +104,21 @@ description: Harness verification probe
 Reply with exactly this one word and nothing else: EXPANDED
 EOF
 
-# --- Q1: slash-command expansion -------------------------------------------
+# Slash form is known-broken headlessly (see Q1 above); the probe asks the way
+# a real adapter now does, so a PASS means an adapter prompt of this shape
+# reaches a model.
+Q1_PROMPT='Use the benchprobe skill and follow it exactly.'
+
+# --- Q1: is a plain-language skill request reachable? ----------------------
 echo
-echo "-- Q1: does a slash command expand in a headless session?"
-Q1="$(cd "$WT" && claude --print --model "$MODEL" "/benchprobe" 2>&1)"
+echo "-- Q1: does a plain-language skill request reach a model?"
+Q1="$(cd "$WT" && claude --print --model "$MODEL" "$Q1_PROMPT" 2>&1)"
 if printf '%s' "$Q1" | grep -q "EXPANDED"; then
-  echo "   PASS: the command file was expanded and followed."
-  # Single-quoted: backticks inside double quotes would be command-substituted.
-  echo '         => the SDLC adapter'"'"'s "/sdlc:auto <KEY>" prompt will expand.'
+  echo "   PASS: the capability was reached and followed."
+  echo "         => the SDLC adapters plain-language prompt shape works."
 else
-  echo "   FAIL: the slash command did not expand."
-  echo "         => the SDLC adapter cannot work as written; its prompt would"
-  echo "            reach the model as literal text. Session said:"
+  echo "   FAIL: the probe capability was not reachable."
+  echo "         => an adapter prompt of this shape will not work. Session said:"
   printf '%s\n' "$Q1" | head -5 | sed 's/^/            /'
 fi
 

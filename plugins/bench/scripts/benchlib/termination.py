@@ -106,6 +106,41 @@ def check_result_payload(payload: dict) -> Dict[str, object]:
             "api_error_status is {0!r}, expected null".format(api_error_status)
         )
 
+    # A session that took no turns did no work, whatever else the payload says.
+    #
+    # Observed on NA-82: an adapter prompt of `/sdlc:auto NA-83` came back as
+    # subtype "success", is_error false, num_turns 0, duration 11ms,
+    # total_cost_usd 0, and result "Unknown command: /sdlc:auto". Every
+    # allow-listed field above was clean, so the cell was recorded as a
+    # successful $0 run and only the downstream empty-diff check noticed
+    # anything was wrong -- which reads as "the approach produced no code",
+    # not "the prompt never reached a model".
+    #
+    # Those are different failures and must not look alike: the first is a
+    # result about an approach, the second is a broken cell.
+    num_turns = payload.get("num_turns")
+    if isinstance(num_turns, int) and num_turns <= 0:
+        violations.append(
+            "num_turns is {0!r} -- the session took no turns, so nothing was "
+            "measured. The prompt was rejected or the session died before its "
+            "first turn; the result text says why.".format(num_turns)
+        )
+
+    # The CLI reports an unrecognised slash command as a successful result whose
+    # text is the error. Checked explicitly because it is the single most likely
+    # way an adapter prompt silently measures nothing.
+    result_text = payload.get("result")
+    if isinstance(result_text, str) and result_text.strip().startswith(
+        "Unknown command:"
+    ):
+        violations.append(
+            "the session rejected the prompt: {0!r}. An adapter prompt cannot "
+            "invoke a plugin command with slash syntax in a headless session; "
+            "ask for the capability in plain language instead.".format(
+                result_text.strip()[:120]
+            )
+        )
+
     return {"clean": not violations, "observed": observed, "violations": violations}
 
 

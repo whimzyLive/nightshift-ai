@@ -66,14 +66,26 @@ run:
   # and handing it pre-fetched text would both double the ticket in context
   # and skip a step the approach genuinely pays for. This is the one adapter
   # whose prompt is deliberately shorter than the others.
-  # Draft enforcement lives in the PreToolUse guard, NOT here. `/sdlc:auto`
-  # parses its whole $ARGUMENTS as the story key, so any instruction appended
-  # after the command would be swallowed into the key and break the run. The
+  # NOT `/sdlc:auto {{ticket_key}}`. A headless `claude -p` session does not
+  # accept plugin commands in slash form: the CLI resolves the leading token
+  # itself and answers `Unknown command: /sdlc:auto` with num_turns 0,
+  # duration 11ms and cost $0 -- observed on NA-82. The plugin's commands are
+  # exposed to a session as SKILLS (`claude plugin details sdlc@nightshift`
+  # lists `auto`, `impl`, `spec` and the rest under Skills), which a model
+  # invokes through its Skill tool, not by typing a slash.
+  #
+  # So the prompt asks for the capability by name in plain language and lets
+  # the session route it. The story key is on its own line so it cannot be
+  # mistaken for part of the instruction.
+  #
+  # Draft-PR enforcement stays in the PreToolUse guard rather than here: the
   # guard denies `gh pr create` without `--draft` and returns that as the
-  # reason, which the session sees and retries on -- shaping the behaviour
-  # without touching the argument the command actually parses.
+  # reason, which the session sees and retries on.
   prompt: |
-    /sdlc:auto {{ticket_key}}
+    Use the sdlc:auto skill to run the full SDLC lifecycle for this Jira story,
+    end to end, exactly as that skill specifies.
+
+    Story key: {{ticket_key}}
   flags: ['--permission-mode', 'acceptEdits']
 # SDLC runs its whole lifecycle inline in one session, dispatching domain
 # agents with the Agent tool rather than typing slash commands. So markers
