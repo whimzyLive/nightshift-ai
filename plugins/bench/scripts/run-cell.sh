@@ -24,7 +24,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 S="$REPO/plugins/bench/scripts"
 A="$REPO/plugins/bench/approaches"
 
-TICKET=""; ADAPTER=""; RUN_ID="r1"; GO=0; GRADE=0
+TICKET=""; ADAPTER=""; RUN_ID="r1"; GO=0; GRADE=0; WATCH=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --ticket) TICKET="$2"; shift 2 ;;
@@ -32,11 +32,12 @@ while [ $# -gt 0 ]; do
     --run-id) RUN_ID="$2"; shift 2 ;;
     --go) GO=1; shift ;;
     --grade) GRADE=1; shift ;;
+    --watch) WATCH=1; shift ;;
     *) echo "unknown argument: $1"; exit 1 ;;
   esac
 done
 [ -n "$TICKET" ] && [ -n "$ADAPTER" ] || {
-  echo "usage: run-cell.sh --ticket <KEY> --adapter <name> --run-id <id> [--go] [--grade]"
+  echo "usage: run-cell.sh --ticket <KEY> --adapter <name> --run-id <id> [--go] [--grade] [--watch]"
   exit 1
 }
 
@@ -110,13 +111,13 @@ To proceed, re-run with --go. That will:
   * run ONE measured \`claude\` session — this is the benchmark, and the spend
   * open a DRAFT pull request (the guard denies a non-draft one)
 
+Add --watch to stream the session live instead of waiting in silence.
 Add --grade to also run three grader sessions afterwards. Leave it off if you
 only want cost and shipped output; grading is what scores AC coverage.
 
-Before the first SDLC cell, consider: bash $S/verify-runtime.sh
-It confirms that a slash command expands headlessly and that the push guard
-actually loads. Neither is confirmed yet, and if the guard does not load this
-cell can push to refs the harness believes are blocked.
+Before the first SDLC cell: bash $S/verify-runtime.sh
+It confirms the push guard actually loads. If it does not, this cell can push
+to refs the harness believes are blocked.
 
 Clean up afterwards with:
   python3 $S/cleanup.py --ticket $TICKET --repo $REPO
@@ -160,12 +161,34 @@ fi
 # ---- spends: execute ---------------------------------------------------------
 echo
 echo "[4/7] execute — THE MEASURED SESSION (this is the spend)"
+
+# --watch streams the session's transcript while it runs. Without it this step
+# prints nothing at all for the whole cell -- `--output-format json` emits one
+# blob at the end -- and 20 minutes of silence has already been read as a hung
+# run when the run was fine.
+#
+# A background reader, not a change to how the session is invoked: the watcher
+# only reads a transcript file, so it cannot affect the measurement.
+WATCH_PID=""
+if [ $WATCH -eq 1 ]; then
+  bash "$S/watch-cell.sh" "$(basename "$WORKTREE")" &
+  WATCH_PID=$!
+  # Stop the watcher on any exit path, including Ctrl-C, so it never outlives
+  # the run it is describing.
+  trap 'kill $WATCH_PID 2>/dev/null' EXIT INT TERM
+fi
+
 python3 "$S/execute.py" \
   --cell "$REPO/$DIR/cell.json" \
   --story "$REPO/$BASE/story.json" \
   --adapter "$YAML" \
   --out "$REPO/$DIR/result.json"
 EXEC=$?
+if [ -n "$WATCH_PID" ]; then
+  kill "$WATCH_PID" 2>/dev/null
+  WATCH_PID=""
+  echo
+fi
 [ $EXEC -eq 0 ] || echo "      execute exited $EXEC — continuing to measure so the"
 [ $EXEC -eq 0 ] || echo "      partial record is captured rather than discarded."
 
