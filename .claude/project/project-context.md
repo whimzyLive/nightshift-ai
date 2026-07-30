@@ -27,6 +27,7 @@
 | .agents/                                              | ai-enablement-engineer                                             |
 | agents/, .codex/, .opencode/, .gemini/, opencode.json | ai-enablement-engineer (nx-generated mirrors — machine-maintained) |
 | tools/                                                | platform-engineer                                                  |
+| .github/                                              | platform-engineer                                                  |
 | brand/                                                | web-engineer                                                       |
 | apps/marketing/                                       | web-engineer                                                       |
 | apps/marketing-e2e/                                   | web-engineer                                                       |
