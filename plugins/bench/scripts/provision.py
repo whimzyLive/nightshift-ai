@@ -625,7 +625,7 @@ def main(argv: Optional[list] = None) -> int:
         )
     print(
         "  push guard: {0} (refs allowed: {1})".format(
-            guard_path, ", ".join(allowed_refs(scratch_key or ticket, branch))
+            guard_path, ", ".join(allowed_refs(twin_key or ticket, branch))
         )
     )
     print(

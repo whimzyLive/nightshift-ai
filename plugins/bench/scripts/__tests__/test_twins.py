@@ -264,3 +264,73 @@ class TestWorktreeCheckedOutBranchIsNotSkipped(unittest.TestCase):
         found = self.cleanup.bench_branches(self.root, "NA-82")
         self.assertIn("bench/NA-82/opus/r2", found)
         self.assertIn("bench/NA-82/opus/r1", found)
+
+
+class TestProvisionMainCompletesEndToEnd(unittest.TestCase):
+    """A success-path smoke test, because unit tests missed a NameError.
+
+    The twin rename left one `scratch_key` reference in a print statement that
+    only runs AFTER provisioning succeeds. Every validation test passed, the
+    module imported and compiled cleanly, and the cell still died at step 3 --
+    having already created a branch and a worktree that then needed cleaning up.
+
+    Nothing here mocks provision's own logic: a real git repo, a real worktree,
+    real settings written. Only the Jira read is stubbed.
+    """
+
+    def setUp(self):
+        import subprocess
+        self.root = Path(tempfile.mkdtemp())
+        env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+               "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "develop", str(self.repo)], check=True)
+        (self.repo / "README.md").write_text("x\n")
+        subprocess.run(["git", "-C", str(self.repo), "add", "-A"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo), "commit", "-q", "-m", "init"],
+            check=True, env=env)
+        ctx = self.repo / ".claude" / "project"
+        ctx.mkdir(parents=True)
+        # The `| Token | Value |` header is required: parse_project_context
+        # ignores table rows until it sees it, so a fixture without one silently
+        # falls back to every default.
+        (ctx / "project-context.md").write_text(
+            "| Token            | Value       |\n"
+            "| ---------------- | ----------- |\n"
+            "| Jira project key | NA          |\n"
+            "| Base branch      | develop     |\n"
+            "| Typecheck / Test | — / echo ok |\n"
+        )
+        self.story = self.root / "story.json"
+        self.story.write_text(json.dumps(SOURCE))
+        self.out = self.root / "cell.json"
+
+    def _run(self, extra=()):
+        argv = [
+            "--story", str(self.story), "--approach", "sdlc", "--version", "0.45.4",
+            "--run-id", "s1", "--repo", str(self.repo),
+            "--adapter", str(APPROACHES / "sdlc-0.45.4.yaml"),
+            "--out", str(self.out),
+        ] + list(extra)
+        with mock.patch.object(acli, "fetch_issue", return_value=_fields()):
+            return provision.main(argv)
+
+    def test_success_path_runs_to_completion(self):
+        self.assertEqual(self._run(["--twin-ticket", "NA-90"]), 0)
+        cell = json.loads(self.out.read_text())
+        self.assertEqual(cell["twin_ticket"], "NA-90")
+        self.assertEqual(cell["approach"], "sdlc@0.45.4")
+        self.assertTrue(Path(cell["worktree"]).is_dir())
+        # The guard config must name the TWIN, not the source -- that is what
+        # authorises the story branch the lifecycle pushes.
+        guard = json.loads(Path(cell["guard_config"]).read_text())
+        self.assertEqual(guard["ticket"], "NA-90")
+        self.assertTrue(any("NA-90" in r for r in guard["allowed_refs"]))
+
+    def test_missing_twin_refuses_before_creating_a_worktree(self):
+        with self.assertRaises(provision.TwinTicketError):
+            self._run()
+        self.assertFalse((self.repo / ".bench-worktrees").exists())
