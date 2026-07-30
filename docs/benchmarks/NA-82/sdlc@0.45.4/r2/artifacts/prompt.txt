@@ -1,0 +1,4 @@
+Use the sdlc:auto skill to run the full SDLC lifecycle for this Jira story,
+end to end, exactly as that skill specifies.
+
+Story key: NA-84

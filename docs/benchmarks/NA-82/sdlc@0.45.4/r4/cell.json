@@ -1,0 +1,52 @@
+{
+  "ticket": "NA-82",
+  "twin_ticket": "NA-84",
+  "guard_config": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.bench-worktrees/NA-82-sdlc@0.45.4-r4/.claude/bench-guard.json",
+  "approach": "sdlc@0.45.4",
+  "approach_id": "sdlc",
+  "version": "0.45.4",
+  "run_id": "r4",
+  "branch": "bench/NA-82/sdlc@0.45.4/r4",
+  "worktree": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.bench-worktrees/NA-82-sdlc@0.45.4-r4",
+  "artifacts": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/docs/benchmarks/NA-82/sdlc@0.45.4/r4/artifacts",
+  "base_sha": "1c8bb837571187e93ceb63124d829c3906163259",
+  "repo": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift",
+  "settings_local": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.bench-worktrees/NA-82-sdlc@0.45.4-r4/.claude/settings.local.json",
+  "environment": {
+    "enabled_plugins": {
+      "caveman@caveman": false,
+      "claude-mem@thedotmack": true,
+      "context-mode@context-mode": false,
+      "gtm@nightshift": false,
+      "marketing-skills@marketingskills": false,
+      "nx@nx-claude-plugins": false,
+      "postiz@postiz-agent": false,
+      "sdlc@nightshift": true,
+      "superpowers@claude-plugins-official": true,
+      "typescript-lsp@claude-plugins-official": false
+    },
+    "declared_plugins": ["sdlc@nightshift"],
+    "dependency_plugins": [
+      "claude-mem@thedotmack",
+      "superpowers@claude-plugins-official"
+    ],
+    "disabled_plugins": [
+      "caveman@caveman",
+      "context-mode@context-mode",
+      "gtm@nightshift",
+      "marketing-skills@marketingskills",
+      "nx@nx-claude-plugins",
+      "postiz@postiz-agent",
+      "typescript-lsp@claude-plugins-official"
+    ],
+    "ambient_hooks": [
+      {
+        "event": "PreToolUse",
+        "command": "rtk hook claude",
+        "source": "/Users/Rushi/.claude/settings.json"
+      }
+    ],
+    "isolated": true,
+    "note": "Plugins are pinned to the adapter's declared set: every other installed plugin is explicitly disabled in the worktree's settings.local.json, which overrides both the repository's committed settings and the operator's user settings. Hooks declared in those two settings files cannot be overridden from a project file and run in every cell -- they are listed under ambient_hooks as a recorded confound, not a suppressed one."
+  }
+}

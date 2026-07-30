@@ -1,0 +1,140 @@
+{
+  "is_error": false,
+  "duration_api_ms": 0,
+  "num_turns": 0,
+  "stop_reason": null,
+  "session_id": "b2cbfad7-52ae-4600-8d31-d85acfffd48f",
+  "total_cost_usd": 0,
+  "usage": {
+    "input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 0,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [],
+    "speed": "standard"
+  },
+  "modelUsage": {},
+  "permission_denials": [],
+  "fast_mode_state": "off",
+  "fast_mode_disabled_reason": "sdk_opt_in_required",
+  "subtype": "success",
+  "result": "Unknown command: /sdlc:auto",
+  "type": "result",
+  "duration_ms": 11,
+  "uuid": "75a20561-cee5-452b-980c-a35ef01f5558",
+  "started_at": "2026-07-30T08:00:40.308673+00:00",
+  "ended_at": "2026-07-30T08:00:41.726599+00:00",
+  "setup_seconds": 0.0,
+  "billing_mode": {
+    "mode": "subscription",
+    "api_key_env_var": null,
+    "settings_evidence": [],
+    "env_vars_checked": ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+    "settings_files_checked": [
+      "/Users/Rushi/.claude/settings.json",
+      "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/settings.json",
+      "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/settings.local.json"
+    ],
+    "evidence": "no API key present (checked ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN and 3 settings file(s)) -- `claude` authenticates via the operator's Claude subscription, so reported cost figures are API-list-price equivalents for the tokens consumed, not per-run spend."
+  },
+  "environment": {
+    "enabled_plugins": {
+      "caveman@caveman": false,
+      "claude-mem@thedotmack": false,
+      "code-review@claude-plugins-official": false,
+      "code-simplifier@claude-plugins-official": false,
+      "commit-commands@claude-plugins-official": false,
+      "context-mode@context-mode": false,
+      "ecc@ecc": false,
+      "feature-dev@claude-plugins-official": false,
+      "frontend-design@claude-plugins-official": false,
+      "github@claude-plugins-official": false,
+      "gtm@nightshift": false,
+      "hookify@claude-plugins-official": false,
+      "marketing-skills@marketingskills": false,
+      "nx@nx-claude-plugins": false,
+      "playwright@claude-plugins-official": false,
+      "postiz@postiz-agent": false,
+      "pr-review-toolkit@claude-plugins-official": false,
+      "prd-development@pm-skills": false,
+      "sdlc@nightshift": true,
+      "security-guidance@claude-plugins-official": false,
+      "skill-creator@claude-plugins-official": false,
+      "superpowers@claude-plugins-official": false,
+      "superpowers@superpowers-marketplace": false,
+      "typescript-lsp@claude-plugins-official": false,
+      "workshop-facilitation@pm-skills": false
+    },
+    "declared_plugins": ["sdlc@nightshift"],
+    "disabled_plugins": [
+      "caveman@caveman",
+      "claude-mem@thedotmack",
+      "code-review@claude-plugins-official",
+      "code-simplifier@claude-plugins-official",
+      "commit-commands@claude-plugins-official",
+      "context-mode@context-mode",
+      "ecc@ecc",
+      "feature-dev@claude-plugins-official",
+      "frontend-design@claude-plugins-official",
+      "github@claude-plugins-official",
+      "gtm@nightshift",
+      "hookify@claude-plugins-official",
+      "marketing-skills@marketingskills",
+      "nx@nx-claude-plugins",
+      "playwright@claude-plugins-official",
+      "postiz@postiz-agent",
+      "pr-review-toolkit@claude-plugins-official",
+      "prd-development@pm-skills",
+      "security-guidance@claude-plugins-official",
+      "skill-creator@claude-plugins-official",
+      "superpowers@claude-plugins-official",
+      "superpowers@superpowers-marketplace",
+      "typescript-lsp@claude-plugins-official",
+      "workshop-facilitation@pm-skills"
+    ],
+    "ambient_hooks": [
+      {
+        "event": "PreToolUse",
+        "command": "rtk hook claude",
+        "source": "/Users/Rushi/.claude/settings.json"
+      }
+    ],
+    "isolated": true,
+    "note": "Plugins are pinned to the adapter's declared set: every other installed plugin is explicitly disabled in the worktree's settings.local.json, which overrides both the repository's committed settings and the operator's user settings. Hooks declared in those two settings files cannot be overridden from a project file and run in every cell -- they are listed under ambient_hooks as a recorded confound, not a suppressed one."
+  },
+  "plugin_version": {
+    "declared": {
+      "plugin": "sdlc@nightshift",
+      "version": "0.45.4"
+    },
+    "pin": {
+      "plugin": "sdlc@nightshift",
+      "version": "0.45.4",
+      "install_path": "/Users/Rushi/.claude/plugins/cache/nightshift/sdlc/0.45.4",
+      "project_path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.bench-worktrees/NA-82-sdlc@0.45.4-r1",
+      "installed_plugins_path": "/Users/Rushi/.claude/plugins/installed_plugins.json"
+    }
+  },
+  "termination": {
+    "clean": true,
+    "observed": {
+      "is_error": false,
+      "subtype": "success",
+      "stop_reason": null,
+      "terminal_reason": null,
+      "api_error_status": null,
+      "num_turns": 0
+    },
+    "violations": []
+  }
+}

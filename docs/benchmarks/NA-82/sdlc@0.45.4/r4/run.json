@@ -1,0 +1,162 @@
+{
+  "ticket": "NA-82",
+  "approach": "sdlc@0.45.4",
+  "approach_id": "sdlc",
+  "version": "0.45.4",
+  "plugin_version": {
+    "declared": {
+      "plugin": "sdlc@nightshift",
+      "version": "0.45.4"
+    },
+    "resolved": {
+      "sdlc@nightshift": {
+        "version": "0.45.4",
+        "install_path": "/Users/Rushi/.claude/plugins/cache/nightshift/sdlc/0.45.4"
+      }
+    },
+    "verified": true,
+    "ok": true,
+    "note": "sdlc@nightshift 0.45.4 confirmed from the session transcript."
+  },
+  "environment": {
+    "enabled_plugins": {
+      "caveman@caveman": false,
+      "claude-mem@thedotmack": true,
+      "context-mode@context-mode": false,
+      "gtm@nightshift": false,
+      "marketing-skills@marketingskills": false,
+      "nx@nx-claude-plugins": false,
+      "postiz@postiz-agent": false,
+      "sdlc@nightshift": true,
+      "superpowers@claude-plugins-official": true,
+      "typescript-lsp@claude-plugins-official": false
+    },
+    "declared_plugins": ["sdlc@nightshift"],
+    "dependency_plugins": [
+      "claude-mem@thedotmack",
+      "superpowers@claude-plugins-official"
+    ],
+    "disabled_plugins": [
+      "caveman@caveman",
+      "context-mode@context-mode",
+      "gtm@nightshift",
+      "marketing-skills@marketingskills",
+      "nx@nx-claude-plugins",
+      "postiz@postiz-agent",
+      "typescript-lsp@claude-plugins-official"
+    ],
+    "ambient_hooks": [
+      {
+        "event": "PreToolUse",
+        "command": "rtk hook claude",
+        "source": "/Users/Rushi/.claude/settings.json"
+      }
+    ],
+    "isolated": true,
+    "note": "Plugins are pinned to the adapter's declared set: every other installed plugin is explicitly disabled in the worktree's settings.local.json, which overrides both the repository's committed settings and the operator's user settings. Hooks declared in those two settings files cannot be overridden from a project file and run in every cell -- they are listed under ambient_hooks as a recorded confound, not a suppressed one."
+  },
+  "run_id": "r4",
+  "session_id": "756ed0b8-24c3-495f-a29d-7bb22757a86b",
+  "total": {
+    "reported_cost_usd": 11.544375649999997,
+    "computed_cost_usd": 12.242213,
+    "duration_ms": 1642493,
+    "setup_seconds": 0.0,
+    "num_turns": 73
+  },
+  "billing_mode": {
+    "mode": "subscription",
+    "api_key_env_var": null,
+    "settings_evidence": [],
+    "env_vars_checked": ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+    "settings_files_checked": [
+      "/Users/Rushi/.claude/settings.json",
+      "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/settings.json",
+      "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/settings.local.json"
+    ],
+    "evidence": "no API key present (checked ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN and 3 settings file(s)) -- `claude` authenticates via the operator's Claude subscription, so reported cost figures are API-list-price equivalents for the tokens consumed, not per-run spend."
+  },
+  "termination": {
+    "clean": true,
+    "observed": {
+      "is_error": false,
+      "subtype": "success",
+      "stop_reason": "end_turn",
+      "terminal_reason": "completed",
+      "api_error_status": null,
+      "num_turns": 73
+    },
+    "violations": [],
+    "rate_limit_entries": [],
+    "note": ""
+  },
+  "by_phase": {
+    "spec": {
+      "cost_usd": 6.779195,
+      "requests": 74,
+      "input_tokens": 140,
+      "output_tokens": 43868,
+      "cache_write_tokens": 172562,
+      "cache_read_tokens": 7523927,
+      "subagent_requests": 3,
+      "subagent_cost_usd": 0.194212,
+      "subagent_tokens": 271330
+    },
+    "review-fix": {
+      "cost_usd": 5.463018,
+      "requests": 59,
+      "input_tokens": 110,
+      "output_tokens": 39724,
+      "cache_write_tokens": 126953,
+      "cache_read_tokens": 6399676,
+      "subagent_requests": 0,
+      "subagent_cost_usd": 0.0,
+      "subagent_tokens": 0
+    }
+  },
+  "context": {
+    "instruction_floor_tokens": 15187,
+    "mean_resident_tokens": 104691,
+    "peak_resident_tokens": 152222,
+    "work_context_tokens": 89504
+  },
+  "subagents": {
+    "requests": 3,
+    "cost_usd": 0.194212,
+    "tokens": 271330,
+    "models": {
+      "claude-sonnet-5": 1,
+      "claude-opus-5": 2
+    }
+  },
+  "phase_attribution": {
+    "declared_phases": ["spec", "plan", "impl", "review-fix", "docs"],
+    "markers_declared": 5,
+    "marker_fires": {
+      "spec": 4,
+      "plan": 0,
+      "impl": 0,
+      "review-fix": 3,
+      "docs": 0
+    },
+    "any_marker_fired": true,
+    "available": true,
+    "note": ""
+  },
+  "work_done": {
+    "files_touched": 294,
+    "lines_added": 7711,
+    "lines_removed": 7311,
+    "edit_calls": 0,
+    "write_calls": 10,
+    "empty_diff": false,
+    "empty_diff_note": ""
+  },
+  "reconciliation": {
+    "ok": false,
+    "within_tolerance": false,
+    "tolerance": 0.02,
+    "unpriceable_models": {},
+    "note": "computed cost drifted past tolerance; excluded from aggregates"
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "ticket": "NA-82",
+  "approach": "sdlc@0.45.4",
+  "approach_id": "sdlc",
+  "version": "0.45.4",
+  "plugin_version": {
+    "declared": {
+      "plugin": "sdlc@nightshift",
+      "version": "0.45.4"
+    },
+    "resolved": {},
+    "verified": false,
+    "ok": true,
+    "note": "sdlc@nightshift was pinned to 0.45.4, but the session transcript carries no plugin-root announcement for it, so the version rests on the declaration alone and could not be independently confirmed."
+  },
+  "environment": {
+    "enabled_plugins": {
+      "caveman@caveman": false,
+      "claude-mem@thedotmack": false,
+      "code-review@claude-plugins-official": false,
+      "code-simplifier@claude-plugins-official": false,
+      "commit-commands@claude-plugins-official": false,
+      "context-mode@context-mode": false,
+      "ecc@ecc": false,
+      "feature-dev@claude-plugins-official": false,
+      "frontend-design@claude-plugins-official": false,
+      "github@claude-plugins-official": false,
+      "gtm@nightshift": false,
+      "hookify@claude-plugins-official": false,
+      "marketing-skills@marketingskills": false,
+      "nx@nx-claude-plugins": false,
+      "playwright@claude-plugins-official": false,
+      "postiz@postiz-agent": false,
+      "pr-review-toolkit@claude-plugins-official": false,
+      "prd-development@pm-skills": false,
+      "sdlc@nightshift": true,
+      "security-guidance@claude-plugins-official": false,
+      "skill-creator@claude-plugins-official": false,
+      "superpowers@claude-plugins-official": false,
+      "superpowers@superpowers-marketplace": false,
+      "typescript-lsp@claude-plugins-official": false,
+      "workshop-facilitation@pm-skills": false
+    },
+    "declared_plugins": ["sdlc@nightshift"],
+    "disabled_plugins": [
+      "caveman@caveman",
+      "claude-mem@thedotmack",
+      "code-review@claude-plugins-official",
+      "code-simplifier@claude-plugins-official",
+      "commit-commands@claude-plugins-official",
+      "context-mode@context-mode",
+      "ecc@ecc",
+      "feature-dev@claude-plugins-official",
+      "frontend-design@claude-plugins-official",
+      "github@claude-plugins-official",
+      "gtm@nightshift",
+      "hookify@claude-plugins-official",
+      "marketing-skills@marketingskills",
+      "nx@nx-claude-plugins",
+      "playwright@claude-plugins-official",
+      "postiz@postiz-agent",
+      "pr-review-toolkit@claude-plugins-official",
+      "prd-development@pm-skills",
+      "security-guidance@claude-plugins-official",
+      "skill-creator@claude-plugins-official",
+      "superpowers@claude-plugins-official",
+      "superpowers@superpowers-marketplace",
+      "typescript-lsp@claude-plugins-official",
+      "workshop-facilitation@pm-skills"
+    ],
+    "ambient_hooks": [
+      {
+        "event": "PreToolUse",
+        "command": "rtk hook claude",
+        "source": "/Users/Rushi/.claude/settings.json"
+      }
+    ],
+    "isolated": true,
+    "note": "Plugins are pinned to the adapter's declared set: every other installed plugin is explicitly disabled in the worktree's settings.local.json, which overrides both the repository's committed settings and the operator's user settings. Hooks declared in those two settings files cannot be overridden from a project file and run in every cell -- they are listed under ambient_hooks as a recorded confound, not a suppressed one."
+  },
+  "run_id": "r2",
+  "session_id": "43ac9f64-3e75-4b5e-beaf-e5a08208cba1",
+  "total": {
+    "reported_cost_usd": 2.3773172499999995,
+    "computed_cost_usd": 3.789976,
+    "duration_ms": 449907,
+    "setup_seconds": 0.0,
+    "num_turns": 31
+  },
+  "billing_mode": {
+    "mode": "subscription",
+    "api_key_env_var": null,
+    "settings_evidence": [],
+    "env_vars_checked": ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+    "settings_files_checked": [
+      "/Users/Rushi/.claude/settings.json",
+      "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/settings.json",
+      "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/settings.local.json"
+    ],
+    "evidence": "no API key present (checked ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN and 3 settings file(s)) -- `claude` authenticates via the operator's Claude subscription, so reported cost figures are API-list-price equivalents for the tokens consumed, not per-run spend."
+  },
+  "termination": {
+    "clean": true,
+    "observed": {
+      "is_error": false,
+      "subtype": "success",
+      "stop_reason": "end_turn",
+      "terminal_reason": "completed",
+      "api_error_status": null,
+      "num_turns": 31
+    },
+    "violations": [],
+    "rate_limit_entries": [],
+    "note": ""
+  },
+  "by_phase": {
+    "spec": {
+      "cost_usd": 3.789976,
+      "requests": 61,
+      "input_tokens": 116,
+      "output_tokens": 37255,
+      "cache_write_tokens": 135141,
+      "cache_read_tokens": 2889500,
+      "subagent_requests": 1,
+      "subagent_cost_usd": 0.061861,
+      "subagent_tokens": 47609
+    }
+  },
+  "context": {
+    "instruction_floor_tokens": 15187,
+    "mean_resident_tokens": 47371,
+    "peak_resident_tokens": 72944,
+    "work_context_tokens": 32184
+  },
+  "subagents": {
+    "requests": 1,
+    "cost_usd": 0.061861,
+    "tokens": 47609,
+    "models": {
+      "claude-opus-5": 1
+    }
+  },
+  "phase_attribution": {
+    "declared_phases": ["spec", "plan", "impl", "review-fix", "docs"],
+    "markers_declared": 5,
+    "marker_fires": {
+      "spec": 1,
+      "plan": 0,
+      "impl": 0,
+      "review-fix": 0,
+      "docs": 0
+    },
+    "any_marker_fired": true,
+    "available": true,
+    "note": ""
+  },
+  "work_done": {
+    "files_touched": 0,
+    "lines_added": 0,
+    "lines_removed": 0,
+    "edit_calls": 1,
+    "write_calls": 2,
+    "empty_diff": true,
+    "empty_diff_note": "no code change: `git diff 1c8bb837571187e93ceb63124d829c3906163259..HEAD` in /Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.bench-worktrees/NA-82-sdlc@0.45.4-r2 is empty. The measured session ran but committed nothing, so there is nothing to grade. The session made 1 Edit and 2 Write tool call(s) -- if those are non-zero the work was done but never committed (check that the worktree's .claude/settings.local.json grants Bash(git commit:*)); if they are zero the session produced no work at all."
+  },
+  "reconciliation": {
+    "ok": false,
+    "within_tolerance": false,
+    "tolerance": 0.02,
+    "unpriceable_models": {},
+    "note": "computed cost drifted past tolerance; excluded from aggregates"
+  }
+}
