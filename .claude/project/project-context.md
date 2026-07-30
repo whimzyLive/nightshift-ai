@@ -60,7 +60,7 @@ round.
 | Token        | Value           |
 | ------------ | --------------- |
 | Review agent | `claude-inline` |
-| Review mode  | `on-create`     |
+| Review mode  | `on-update`     |
 
 ## Pipeline
 
