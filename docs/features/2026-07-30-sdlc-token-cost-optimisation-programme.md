@@ -114,8 +114,8 @@ Secondary personas:
 
 Binary, testable at programme level. Each child story additionally carries its own workstream-scoped ACs.
 
-1. Measured cost of one 8-point story via `/sdlc:auto` (refine → PR) drops to **≤ $72** from the $114.12 mean baseline (−36.9%), evidenced by the API `usage` records for that story's transcripts. This is the committed target — it is the floor reachable from the measured-and-projected workstreams (A, B, C, D) alone. **≤ $60 (−48.1%) is a stretch target**, binding only once E, F, G and H have each passed their AC-10 pilot; a workstream whose pilot fails reduces the stretch target by that workstream's share rather than failing this AC.
-2. Per-story **instruction load** drops to **≤ 230,000 tokens** (from 466,887), evidenced by a static+runtime inventory of instruction files loaded during one story. The 466,887 → 225,250 projection this bound is drawn from is part hand-measured (re-encoding, −21%) and part projected (lazy loading, the remainder) — see Solution. A runtime inventory landing above 230,000 fails this AC regardless of what the static projection said.
+1. **Trailing indicator, confirmed once at end of programme.** Measured cost of an 8-point story via `/sdlc:auto` (refine → PR) drops to **≤ $72** from the $114.12 mean baseline (−36.9%), evidenced by the API `usage` records across a **rolling median of ≥ 3 manually-measured 8-point stories** — a single story cannot satisfy this AC, because the 8-point cost distribution has an IQR of $68.72 (see Measurement basis). The after-figure must be point-labelled by the same method as the baseline, which is itself noisy. This is the committed target: the floor reachable from the measured-and-projected workstreams (A, B, C, D) alone. **≤ $60 (−48.1%) is a stretch target**, binding only once E, F, G and H have each passed their AC-10 pilot; a workstream whose pilot fails reduces the stretch target by that workstream's share rather than failing this AC.
+2. **Primary gate, checked on every child story.** Per-story **instruction load** drops to **≤ 230,000 tokens** (from 466,887), evidenced by a static+runtime inventory of instruction files loaded during one manually-measured story. Instruction load is near-deterministic for a given plugin version, so one run is sufficient evidence — this is what the programme is actually held to. The 466,887 → 225,250 projection this bound is drawn from is part hand-measured (re-encoding, −21%) and part projected (lazy loading, the remainder) — see Solution. A runtime inventory landing above 230,000 fails this AC regardless of what the static projection said.
 3. All validation gates hold on the measured story, each at the level it applies (see the Validation gates table under Dependencies):
    - **Per child story** — every workstream must clear these: cache-read ratio **≥ 94%**; billed tokens per story **decreased**; avg and peak resident **not increased**; QA rounds per story not increased; `Status: blocked` rate not increased; review findings per round not increased; loop passes per PR not increased.
    - **Programme level** — only after all of A–H are Done: avg and peak resident **decreased**. F and G are the only workstreams that move resident materially, so no Phase 1 or Phase 2 child story is held to a resident *decrease*.
@@ -137,8 +137,8 @@ Binary, testable at programme level. Each child story additionally carries its o
 3. **Phase 1 (free / LOW risk):** A1 prettier unpad ships first (4.1%, zero semantic risk, ~1h). Then C (duplicate reads), B (artifact templates), D (RTK hook) in any order.
 4. **Phase 2 (instruction surface):** A5 loop split → A4 docs-pipeline split → A6, A7, A8, A9. A2/A3 pseudocode conversion is folded into those same PRs rather than shipped standalone. A10 rationale extraction lands last.
 5. **Phase 3 (MED risk, validate per story):** F context editing, G subagent offload, E bounded reads, H Haiku routing — each piloted on one real story.
-6. For each child story: measure the gates on a real story **before** the change, ship the change, measure the same gates **after**, record both in the PR body, then merge. Only the per-story gates apply here — the resident *decrease* is asserted once at programme level, since Phase 1/2 workstreams cannot move it.
-7. When all A–H children are Done, the operator re-measures one 8-point story end to end and confirms AC-1 through AC-3 against the programme baseline.
+6. For each child story: manually measure the gates on a real story **before** the change, ship the change, manually measure the same gates **after**, record both in the PR body, then merge. AC-2 (instruction load) is the binding number here — dollar cost is recorded but not gated per story, since n=1 cannot clear the distribution. Only the per-story gates apply — the resident *decrease* is asserted once at programme level, since Phase 1/2 workstreams cannot move it.
+7. When all A–H children are Done, the operator manually measures **≥ 3** 8-point stories end to end and confirms AC-1 (rolling median ≤ $72) plus the programme-level resident gate against the baseline. AC-2 has already been confirmed on each child story along the way.
 
 ### Edge case — a change cuts tokens but degrades the pipeline
 
@@ -181,10 +181,11 @@ Binary, testable at programme level. Each child story additionally carries its o
 - **The "real ceiling" question** — how many of the 2,932 Reads and 1,104 requests per story are actually necessary. Higher ceiling than this whole Epic, not yet scoped, and explicitly a follow-up.
 - **Unsized candidates / a possible ninth workstream** — deferred to a follow-up Epic decision, not delivered here.
 - **NA-81 (plan-doc read slicing)** overlaps this programme's basis and is parked behind the A–H work; it is not a deliverable of this Epic as scoped today.
+- **Building an automated measurement harness.** Decided 2026-07-30: the NA-80 harness is not extended to reach the impl phase, and no replacement rig is built. Measurement is manual from real story runs. Making full-lifecycle headless measurement work would mean changing the `/sdlc:auto` spec review gate and replacing the push/PR guard with something that fires headless — a larger programme than this one, and a prerequisite for nothing here.
 
 ## Open Questions
 
-Recorded 2026-07-28 as parked; not blocking Phase 0/1.
+Items 1–6 were recorded 2026-07-28 as parked; 7–8 were added during PRD review on 2026-07-30. None block Phase 0/1. The measurement-instrument question that sat here has been **decided** (2026-07-30: no harness, manual measurement from real story runs) — see Measurement basis under Dependencies.
 
 1. **Phase 0 diagnostics are questions, not tasks.** Three unknowns may resize their own workstreams once answered — context-mode hook firing on 0.34%, RTK hook on 3.1%, and whether `Bash: cd` at 6.6% of exposure is an attribution artifact. Decision needed: do these become their own child stories, or stay as an unticketed diagnosis pass?
 2. **Story points are not set** on NA-76 or any child, and the SDLC plugin never writes them. Per-workstream sizing must be entered by hand before `/sdlc:stories` can decompose the Epic and before `/sdlc:auto` can route any child (a story with no points short-circuits at Step 2).
@@ -192,7 +193,8 @@ Recorded 2026-07-28 as parked; not blocking Phase 0/1.
 4. **E / F / G / H cut-rates are judgement, not measurement.** 4.9% / 7.0% / 4.2% / 3.0% are sized from measured distributions but the reduction percentages are estimates. Confirm they must be piloted and gate-validated before counting in any budget or savings claim — this is what splits AC-1 into a committed ≤ $72 and a stretch ≤ $60.
 5. **Unsized candidates — ninth workstream or follow-up Epic?** Product decision on where they land.
 6. **The real ceiling is unknown.** Nobody has measured how many of the per-story Reads and requests are actually necessary. Owner and timing for scoping that question are undecided.
-7. **Does the delivered cut become a standing budget?** i.e. after delivery, is there a per-story cost guardrail (≤ $72 committed, ≤ $60 stretch) that CI or the loop budget file enforces, or is this a one-off reduction?
+7. **`commands/docs.md` (31,051 tok) has no sub-item — gap or deliberate?** It is the second-largest static file in the plugin, behind only `refs/docs-pipeline.md` (which A4 does split). `commands/init.md` (16,462 tok) is likewise untouched, though init runs once per repo rather than once per story, so its per-story cost is near zero. Decide whether `commands/docs.md` earns an A11 sub-item or belongs with the excluded set.
+8. **Does the delivered cut become a standing budget?** i.e. after delivery, is there a per-story cost guardrail (≤ $72 committed, ≤ $60 stretch) that CI or the loop budget file enforces, or is this a one-off reduction?
 
 ## Dependencies
 
@@ -201,10 +203,25 @@ Must exist first:
 - **NA-77 (Done)** — active Jira site verified against project-context before Jira calls. Cost telemetry was collected while `acli` was pointed at the wrong site, which is why per-point figures are labelled noisy; correct attribution depends on this fix.
 - **NA-78 (Done)** — `refine-feature` no longer hardcodes `--project ET`. Required for any child story to be created under the right project key.
 - **NA-79 (Done)** — post-QA docs sync no longer burns 7M tokens for 2 edits on a 3-point story. This is the same waste class as workstream A4/G and its fix is part of the measured baseline.
-- **NA-80 (Done)** — benchmark harness (SDLC vs superpowers vs spec-kit vs direct Opus). Provides the repeatable measurement rig the validation gates rely on.
-- **Baseline telemetry and analyser scripts** — `~/.claude/projects/**/*.jsonl` transcripts, plus `/tmp/cache_an.py`, `/tmp/plugin_rows.json`, `scratchpad/cost8.py`. Without a reproducible before-measurement no child story can pass its gates.
+- **NA-80 (Done)** — benchmark harness (SDLC vs superpowers vs spec-kit vs direct Opus). **Not the instrument for this programme.** The harness measures the spec phase only ($11.54 on its last run) and cannot cross the `/sdlc:auto` spec review gate in a single headless session, so it cannot produce the end-to-end per-story figures the gates need. Measurement for this Epic is **manual, from real story runs** — see Measurement basis below. NA-80 remains useful for cross-approach comparison and is not a dependency of any child story here.
+- **Analyser scripts, checked into the repo** — the manual measurement path makes these load-bearing, and they currently live at ephemeral paths (`/tmp/cache_an.py`, `/tmp/plugin_rows.json`, `scratchpad/cost8.py`) that macOS clears on reboot. They must move under `tools/` (platform-engineer-owned per the workspace map) and be committed **before Phase 1 lands**, or the before-measurement is unreproducible and no child story can pass its gates.
+- **Baseline telemetry** — `~/.claude/projects/**/*.jsonl` transcripts, including subagent transcripts. Immutable history; the source of every before-figure in this PRD.
 - **Story points on NA-76 children** — hard blocker for `/sdlc:auto` routing (Step 2 short-circuits on missing points).
 - **Internal ordering:** A5 must land before H. A10 must land after A2–A9. Phase 1 (A1, B, C, D) before Phase 2 (A4–A9). Phase 2 before Phase 3 (E, F, G, H).
+
+### Measurement basis
+
+Measurement is **manual, from real story runs** — no automated harness. This is a deliberate decision (2026-07-30): the NA-80 harness cannot reach the impl phase headless, and building a rig that can is a larger programme than this one. The operator runs a real story through the upgraded plugin and reads the figures out of the transcripts with the committed analyser scripts.
+
+That choice constrains what each metric can prove, because per-story dollar cost is a wide distribution (min $15.49 · p25 $50.61 · median $74.21 · p75 $119.33 · max $461.77 — an IQR of $68.72) while instruction load is near-deterministic for a given plugin version:
+
+| Metric class                                            | Variance                      | Credible evidence from manual runs                                                                                                                    |
+| ------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instruction load, static inventory, per-file load counts | ~none for a plugin version    | **A single run is sufficient.** This is the programme's primary evidence — AC-2                                                                        |
+| Billed tokens per story                                 | moderate, scales with story   | One run per child story, compared against a same-shape baseline story                                                                                 |
+| Dollar cost per story                                   | wide — IQR $68.72 on 8-pointers | **n=1 proves nothing.** Requires a rolling median over **≥ 3** 8-point stories, and the after-figure must be labelled by the same method as the noisy baseline |
+
+So AC-2 is the gate that gets checked every time, and AC-1 is a trailing indicator confirmed once at the end of the programme over a window of stories — not per child story.
 
 Validation gates — measured before and after, the programme's definition of "did not break anything". Each gate applies at one level: **per story** gates must hold for every child story; the **programme** gate is asserted once, after all of A–H are Done.
 
@@ -238,3 +255,4 @@ Validation gates — measured before and after, the programme's definition of "d
 - Largest static plugin files (81 files, 331,415 tok): `refs/docs-pipeline.md` 47,514 · `commands/docs.md` 31,051 · `commands/init.md` 16,462 · `commands/loop.md` 14,637 (×10 loop passes/story) · `refs/principal-engineer-playbook.md` 11,964 · `commands/auto.md` 11,859 · `agents/knowledge-engineer.md` 9,884 · `agents/scrum-master.md` 9,807 · `refs/qa-engineer-playbook.md` 9,256.
 - Encoding experiments were hand-converted and measured (`scratchpad/orig.md`, `cave.md`, `notation4.md`, `pseudo.md`, `tbl_orig.md`, `tbl_pseudo.md`). Full-plugin projection with padding exact and pseudocode ratios sampled by category: 73,022 tok saved of 331,415 = 22% static; per-story instruction load 466,887 → 366,755. Some encodings were rejected; the rejection list and known limitations live verbatim in the NA-76 comments.
 - Risk key used throughout: **LOW** = no behavioural change; **MED** = needs per-story validation.
+- **Cost of running the programme itself.** Points are unset (Open Question 2), so this is an estimate: ~12 child stories averaging 3–5 points at the measured $57–$80 per story ≈ **$700–$1,000**, declining as each landed workstream cuts the cost of the next. The E/F/G/H pilots and the ≥ 3 closing measurement stories are real product stories that would have been paid for anyway, so they are not marginal cost. Against the annualised saving ($16,471 at 25 stories/month) the programme pays for itself inside the first month post-delivery. Worth stating explicitly, since a cost-optimisation programme that never priced itself invites the question.
