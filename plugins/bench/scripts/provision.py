@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import resolve  # noqa: E402
 from benchlib import acli, adapters, config, environment, plugins  # noqa: E402
 
 BENCH_PREFIX = "bench/"
@@ -341,53 +342,105 @@ def write_bench_settings(
     return target
 
 
-SCRATCH_BODY = """{description}
+class TwinTicketError(RuntimeError):
+    """The dedicated ticket for this cell is missing or unusable.
 
----
-Benchmark scratch issue. Cloned from {source} for cell `{cell}` run `{run_id}`
-of the bench harness. Work, comments and pull requests for this run land here so
-that {source} is never written to.
-
-Delete with `/bench:cleanup {source}`.
-"""
-
-
-def create_scratch_issue(source_key: str, story: dict, project: str, cell: str, run_id: str) -> dict:
-    """Clone the source ticket into a per-cell issue, and return its story dict.
-
-    ONE ISSUE PER CELL, not one per sweep. Two cells sharing an issue also
-    share a branch name: the SDLC plugin derives its story branch from the
-    ticket key, and its playbook explicitly reuses an existing
-    `feat/<STORY-KEY>` branch rather than creating a duplicate -- so the second
-    cell would check out the first cell's finished work and measure nothing.
-    Separate issues give each cell its own branch, its own pull request, and
-    its own comment thread.
-
-    The issue type is copied rather than defaulted: the SDLC plugin routes a
-    defect past the spec and plan phases entirely, so a Story cloned as a Bug
-    measures a shorter lifecycle than the source ticket would have.
+    Raised BEFORE the worktree exists and before anything is spent. Every
+    condition here produced, or would have produced, a cell whose numbers look
+    real and describe something other than what the row claims.
     """
-    fields = acli.fetch_issue(source_key)
-    itype = acli.issue_type(fields) or "Task"
-    summary = "[bench {0}] {1}".format(cell, story["summary"])
-    body = SCRATCH_BODY.format(
-        description=story["description"],
-        source=source_key,
-        cell=cell,
-        run_id=run_id,
-    )
-    key = acli.create_issue(project, summary, body, itype)
-    acli.comment(
-        source_key,
-        "Benchmark cell `{0}` run `{1}` is running against {2}.".format(
-            cell, run_id, key
-        ),
-    )
-    scratch = dict(story)
-    scratch["key"] = key
-    scratch["summary"] = summary
-    scratch["source_key"] = source_key
-    return scratch
+
+
+def validate_twin(twin_key: str, source: dict, points_field: str) -> dict:
+    """Check a hand-made twin ticket is actually usable, and return its story.
+
+    The operator creates twins by hand because acli cannot set story points --
+    verified three ways on acli 1.3.22: no `--custom` flag, `--from-json` with
+    `additionalAttributes` rejected as an unknown field, and `clone` copies
+    summary, description, labels and type but leaves points unset.
+
+    Hand-made means hand-mistakeable, so each check below exists because
+    skipping it yields a plausible-looking wrong answer:
+
+    * **Exists** -- otherwise the session runs `/sdlc:auto` against a key Jira
+      does not have and burns a cell discovering that.
+    * **Points set** -- the entire reason twins exist. `/sdlc:auto` triages on
+      points, so an unpointed twin takes the lightweight path while the report
+      labels the row the full lifecycle.
+    * **Carries the bench label** -- cleanup finds twins by label. An unlabelled
+      twin is invisible to it, and its leftover branch collides with the next
+      run on the same twin.
+    * **Same acceptance criteria as the source** -- graders score the diff
+      against the SOURCE story's ACs. A twin whose ACs drifted has the session
+      implement one spec and be marked against another.
+    * **Not the source itself** -- running the lifecycle on the source ticket
+      writes benchmark noise onto real work.
+    """
+    if twin_key == source["key"]:
+        raise TwinTicketError(
+            "--twin-ticket is {0}, which is the source ticket itself. The "
+            "lifecycle writes comments, transitions and a PR to whatever key it "
+            "is given; point it at a dedicated twin.".format(twin_key)
+        )
+
+    try:
+        fields = acli.fetch_issue(twin_key)
+    except acli.AcliError as exc:
+        raise TwinTicketError(
+            "cannot read twin ticket {0}: {1}\nIf this says the issue does not "
+            "exist, check `acli jira auth status` names the configured Jira "
+            "site before concluding the ticket is missing.".format(twin_key, exc)
+        )
+
+    twin = resolve.build_story(fields, twin_key, points_field)
+
+    if twin["points"] is None:
+        raise TwinTicketError(
+            "twin ticket {0} has no story points. That is the one thing a twin "
+            "exists to carry: /sdlc:auto triages on points, so this cell would "
+            "run the lightweight path while its row claims the full lifecycle. "
+            "Set points on {0} in Jira (the source ticket has {1}), then "
+            "re-run.".format(twin_key, source["points"])
+        )
+
+    labels = fields.get("labels") or []
+    if acli.BENCH_LABEL not in labels:
+        raise TwinTicketError(
+            "twin ticket {0} does not carry the `{1}` label, so /bench:cleanup "
+            "cannot find it. Its story branch would survive cleanup and the "
+            "next run on this twin would reuse that branch instead of starting "
+            "fresh. Add the label to {0}.".format(twin_key, acli.BENCH_LABEL)
+        )
+
+    if _ac_lines(twin["acs"]) != _ac_lines(source["acs"]):
+        raise TwinTicketError(
+            "twin ticket {0} has different acceptance criteria from {1} "
+            "({2} vs {3} criteria). Graders score this cell's diff against "
+            "{1}'s criteria, so the session would implement one spec and be "
+            "marked against another. Copy {1}'s description onto {0}.".format(
+                twin_key,
+                source["key"],
+                len(_ac_lines(twin["acs"])),
+                len(_ac_lines(source["acs"])),
+            )
+        )
+
+    return twin
+
+
+def _ac_lines(acs: str) -> list:
+    """Acceptance criteria as comparable lines, whitespace-insensitive.
+
+    Compared rather than the whole description because a twin legitimately
+    differs in the parts that are not the spec -- a title prefix, a note about
+    which cell it belongs to. The criteria are what gets graded.
+    """
+    out = []
+    for line in (acs or "").splitlines():
+        stripped = line.strip().lstrip("-*+ ").strip()
+        if stripped:
+            out.append(" ".join(stripped.split()))
+    return out
 
 
 def git(repo: Path, *args: str) -> str:
@@ -426,7 +479,20 @@ def main(argv: Optional[list] = None) -> int:
     )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--repo", default=".")
-    parser.add_argument("--base-sha", default=None)
+    parser.add_argument(
+        "--base-sha", default=None
+    )
+    parser.add_argument(
+        "--twin-ticket",
+        default=None,
+        help=(
+            "Pre-made Jira ticket this cell works against, REQUIRED for an "
+            "adapter that sets `dedicated_ticket: true`. Must have story points "
+            "set, carry the bench-run label, and share the source ticket's "
+            "acceptance criteria. The harness cannot create it: acli on this "
+            "build cannot write story points by any route."
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
 
@@ -470,22 +536,41 @@ def main(argv: Optional[list] = None) -> int:
     # The issue the SESSION works against. Distinct from `ticket`, which stays
     # the source key so every cell's artifacts, branch and report row file
     # under one story and the comparison can group them. Only the prompt, the
-    # Jira writes and the guard's ref allow-list follow the scratch key.
+    # Jira writes and the guard's ref allow-list follow the twin key.
     #
-    # Created AFTER the branch-safety check and BEFORE the worktree, so a
-    # rejected branch name never leaves an orphan issue behind.
-    scratch_key = None
-    if adapter.scratch_ticket:
-        scratch = create_scratch_issue(
-            ticket, story, cfg.jira_project, cell_name, args.run_id
+    # Validated BEFORE the worktree exists: every failure mode in validate_twin
+    # produces a cell whose numbers look real and describe something else, so
+    # they are all worth one Jira read to rule out.
+    twin_key = None
+    if adapter.dedicated_ticket:
+        if not args.twin_ticket:
+            raise TwinTicketError(
+                "adapter {0} sets `dedicated_ticket: true` but no --twin-ticket "
+                "was given. This approach writes to Jira and derives its git "
+                "branch from the story key, so it needs a ticket of its own: two "
+                "cells sharing one would share a branch, and the playbook reuses "
+                "an existing branch rather than duplicating it -- the second cell "
+                "would check out the first's finished work and measure nothing.\n"
+                "Create a twin of {1} with story points set and the `{2}` label, "
+                "then pass --twin-ticket <KEY>.".format(
+                    args.adapter, ticket, acli.BENCH_LABEL
+                )
+            )
+        twin = validate_twin(args.twin_ticket, story, cfg.story_points_field)
+        twin_key = twin["key"]
+    elif args.twin_ticket:
+        raise TwinTicketError(
+            "--twin-ticket {0} was given, but adapter {1} does not set "
+            "`dedicated_ticket: true` -- it never writes to Jira, so the twin "
+            "would go unused and the row would silently not be what you "
+            "intended.".format(args.twin_ticket, args.adapter)
         )
-        scratch_key = scratch["key"]
 
     git(repo, "worktree", "add", "-b", branch, str(worktree), base_sha)
     env_record = environment.environment_record(adapter.plugins, repo)
     guard_script = Path(__file__).resolve().parent / "bench_guard.py"
     guard_path = write_guard_config(
-        worktree, scratch_key or ticket, branch, cell_name
+        worktree, twin_key or ticket, branch, cell_name
     )
     settings_path = write_bench_settings(
         worktree,
@@ -496,7 +581,7 @@ def main(argv: Optional[list] = None) -> int:
 
     cell = {
         "ticket": ticket,
-        "scratch_ticket": scratch_key,
+        "twin_ticket": twin_key,
         "guard_config": str(guard_path),
         # The versioned identity: what paths, the branch and the report row
         # are keyed on. `approach_id` keeps the unversioned name so a report
@@ -521,11 +606,11 @@ def main(argv: Optional[list] = None) -> int:
     out.write_text(json.dumps(cell, indent=2))
     print(f"provisioned {branch} at {worktree}")
     print(f"  wrote {settings_path} (harness permissions: git commit + test runner)")
-    if scratch_key:
+    if twin_key:
         print(
-            "  scratch Jira issue: {0} (cloned from {1}, labelled {2}) -- this "
-            "cell's comments and PR land there".format(
-                scratch_key, ticket, acli.BENCH_LABEL
+            "  twin Jira issue: {0} (points={1}) -- this cell's comments and PR "
+            "land there; {2} is not written to".format(
+                twin_key, twin["points"], ticket
             )
         )
     print(
@@ -556,4 +641,13 @@ def main(argv: Optional[list] = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # A refusal is an operator-facing message, not a crash. A traceback buries
+    # the one line that says what to do, and these messages exist precisely to
+    # say what to do.
+    try:
+        raise SystemExit(main())
+    except (TwinTicketError, UnsafeBranchError) as exc:
+        print("REFUSED: {0}".format(exc), file=sys.stderr)
+        # 2 distinguishes a deliberate refusal from a crash, matching
+        # preflight.py.
+        raise SystemExit(2)

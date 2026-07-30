@@ -44,15 +44,40 @@ overwriting its earlier runs.
 
 ## Real Jira, real draft PRs
 
-An approach that writes to Jira sets `scratch_ticket: true`. Provisioning then clones the source
-ticket into a **per-cell** issue labelled `bench-run`, and the session works against that: its
-comments, transitions and pull request land on a real, visible ticket while the source ticket is
-never written to.
+An approach that writes to Jira sets `dedicated_ticket: true` and is given a **twin ticket** per
+cell via `--twin-ticket`. The session's comments, transitions and pull request land there; the
+source ticket is never written to.
 
-Per cell, not per sweep, and that is the load-bearing part. The SDLC plugin derives its git branch
-from the story key, and its playbook reuses an existing `feat/<KEY>` branch rather than creating a
-duplicate — so two cells sharing one issue would share one branch, and the second would check out
-the first's finished work and measure nothing.
+You create twins by hand. The harness cannot, and this is settled rather than unexplored — on
+acli 1.3.22, all three routes to setting story points fail:
+
+| route                                  | result                                            |
+| -------------------------------------- | ------------------------------------------------- |
+| `--custom` flag                        | does not exist on `edit` or `create`              |
+| `--from-json` + `additionalAttributes` | `✗ json: unknown field "additionalAttributes"`    |
+| `acli jira workitem clone`             | copies description, labels, type — **not points** |
+
+Points are not cosmetic: `/sdlc:auto` triages on them, so an unpointed ticket runs the lightweight
+path while its report row claims the full lifecycle.
+
+One twin **per cell**, not per sweep. The SDLC plugin derives its git branch from the story key and
+its playbook reuses an existing `feat/<KEY>` branch rather than duplicating it — so two cells
+sharing a ticket share a branch, and the second checks out the first's finished work and measures
+nothing.
+
+`provision.py` validates a twin before the worktree exists. Each check prevents a specific
+plausible-looking wrong answer:
+
+| check                    | what it prevents                                               |
+| ------------------------ | -------------------------------------------------------------- |
+| exists                   | burning a cell to discover a typo'd key                        |
+| story points set         | lightweight path measured as the full lifecycle                |
+| carries `bench-run`      | invisible to cleanup, so its branch collides with the next run |
+| same ACs as the source   | session implements one spec, graders mark it against another   |
+| is not the source itself | benchmark noise written onto real work                         |
+
+`/bench:cleanup` **keeps** twins — they carry hand-set points acli cannot restore — and deletes
+their `feat|fix/<TWIN>` branches and closes their PRs, which is what actually has to go.
 
 Pushes are policed by a `PreToolUse` guard (`scripts/bench_guard.py`), registered per worktree:
 

@@ -69,7 +69,8 @@ class Adapter:
     # list must be spelled out rather than left off.
     plugins: List[str] = field(default_factory=list)
     permissions: List[str] = field(default_factory=list)
-    # Whether this approach needs its own Jira issue to work against.
+    # Whether this approach needs a Jira issue of its OWN to work against,
+    # supplied per cell via provision.py's --twin-ticket.
     #
     # True only for approaches that WRITE to Jira. The SDLC plugin comments,
     # transitions and links PRs on its story, and derives its git branch from
@@ -78,10 +79,17 @@ class Adapter:
     # than creating a duplicate. The second cell would check out the first
     # cell's finished work and measure nothing.
     #
-    # Approaches that only READ the ticket text (they receive it in the
-    # prompt) leave this false: an issue nobody writes to is noise to create
-    # and noise to clean up.
-    scratch_ticket: bool = False
+    # The harness does NOT create these. acli cannot write custom fields on
+    # this build -- no --custom flag, `additionalAttributes` rejected as an
+    # unknown field, and `clone` copies summary, description, labels and type
+    # but not story points (all three tested). A cloned issue therefore arrives
+    # with points unset, and /sdlc:auto triages on points: the cell would take
+    # the lightweight path while the report labelled it the full lifecycle. So
+    # the operator creates pointed twins by hand and names one per cell.
+    #
+    # Approaches that only READ the ticket text (they receive it in the prompt)
+    # leave this false: an issue nobody writes to is noise to require.
+    dedicated_ticket: bool = False
 
     @property
     def cell_id(self) -> str:
@@ -294,6 +302,15 @@ def load_adapter(path: Path) -> Adapter:
     if not phases:
         phases = [Phase(id="impl", marker="")]
 
+    if "scratch_ticket" in data:
+        raise ValueError(
+            "adapter {0} uses `scratch_ticket:`, which no longer exists. It "
+            "meant 'clone an issue for me', and the harness cannot do that "
+            "usefully: acli cannot set story points on a clone, so the clone "
+            "triages down the wrong path. Rename it to `dedicated_ticket:` and "
+            "pass the pre-pointed twin per cell with --twin-ticket.".format(path)
+        )
+
     version = load_version(data.get("version"), path)
     plugin_keys = load_plugins(data.get("plugins"), path)
     assert_version_plugin_enabled(version, plugin_keys, path)
@@ -302,7 +319,7 @@ def load_adapter(path: Path) -> Adapter:
         version=version,
         plugins=plugin_keys,
         permissions=load_permissions(data.get("permissions"), path),
-        scratch_ticket=bool(data.get("scratch_ticket")),
+        dedicated_ticket=bool(data.get("dedicated_ticket")),
         id=data.get("id") or Path(path).stem,
         label=data.get("label") or data.get("id") or Path(path).stem,
         prompt=prompt,

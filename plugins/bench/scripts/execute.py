@@ -249,11 +249,11 @@ def build_variables(
     cell: dict, story: dict, test_command: str, base_branch: str = ""
 ) -> Dict[str, str]:
     return {
-        # The scratch issue when the approach writes to Jira, the source
-        # ticket otherwise. Only the SESSION follows the scratch key: paths,
-        # branch, artifacts and the report row stay keyed on the source, so
-        # every cell of one story still groups together.
-        "ticket_key": cell.get("scratch_ticket") or story["key"],
+        # The twin issue when the approach writes to Jira, the source ticket
+        # otherwise. Only the SESSION follows the twin key: paths, branch,
+        # artifacts and the report row stay keyed on the source, so every cell
+        # of one story still groups together.
+        "ticket_key": cell.get("twin_ticket") or story["key"],
         "ticket_summary": story["summary"],
         "ticket_description": story["description"],
         "ticket_acs": story["acs"],

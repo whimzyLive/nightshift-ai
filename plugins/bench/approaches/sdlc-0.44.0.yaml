@@ -22,7 +22,7 @@ label: SDLC plugin 0.44.0 (full lifecycle)
 #
 # Three things make that safe rather than reckless:
 #
-#   1. Its own Jira issue. `scratch_ticket: true` makes provisioning clone the
+#   1. Its own Jira issue. `dedicated_ticket: true` makes provisioning clone the
 #      source ticket into a per-cell issue labelled `bench-run`. The source
 #      ticket is never written to, and -- decisively -- two SDLC cells of the
 #      same story get DIFFERENT story keys. They would otherwise both derive
@@ -40,7 +40,7 @@ label: SDLC plugin 0.44.0 (full lifecycle)
 #
 # Clean up with `/bench:cleanup <SOURCE-TICKET>`.
 # ---------------------------------------------------------------------------
-scratch_ticket: true
+dedicated_ticket: true
 plugins:
   enable:
     - sdlc@nightshift

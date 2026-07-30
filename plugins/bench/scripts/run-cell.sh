@@ -24,7 +24,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 S="$REPO/plugins/bench/scripts"
 A="$REPO/plugins/bench/approaches"
 
-TICKET=""; ADAPTER=""; RUN_ID="r1"; GO=0; GRADE=0; WATCH=0
+TICKET=""; ADAPTER=""; RUN_ID="r1"; GO=0; GRADE=0; WATCH=0; TWIN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --ticket) TICKET="$2"; shift 2 ;;
@@ -33,11 +33,12 @@ while [ $# -gt 0 ]; do
     --go) GO=1; shift ;;
     --grade) GRADE=1; shift ;;
     --watch) WATCH=1; shift ;;
+    --twin-ticket) TWIN="$2"; shift 2 ;;
     *) echo "unknown argument: $1"; exit 1 ;;
   esac
 done
 [ -n "$TICKET" ] && [ -n "$ADAPTER" ] || {
-  echo "usage: run-cell.sh --ticket <KEY> --adapter <name> --run-id <id> [--go] [--grade] [--watch]"
+  echo "usage: run-cell.sh --ticket <KEY> --adapter <name> --run-id <id> [--go] [--grade] [--watch] [--twin-ticket <KEY>]"
   exit 1
 }
 
@@ -135,6 +136,7 @@ python3 "$S/provision.py" \
   --story "$REPO/$BASE/story.json" \
   --approach "$APPROACH" "${VERSION_FLAG[@]}" \
   --run-id "$RUN_ID" --repo "$REPO" --adapter "$YAML" \
+  ${TWIN:+--twin-ticket "$TWIN"} \
   --out "$REPO/$DIR/cell.json" || { echo "STOP: provisioning failed."; exit 1; }
 
 WORKTREE="$(python3 -c "
@@ -142,7 +144,7 @@ import json; print(json.load(open('$REPO/$DIR/cell.json'))['worktree'])")"
 ARTIFACTS="$(python3 -c "
 import json; print(json.load(open('$REPO/$DIR/cell.json'))['artifacts'])")"
 SCRATCH="$(python3 -c "
-import json; print(json.load(open('$REPO/$DIR/cell.json')).get('scratch_ticket') or '-')")"
+import json; print(json.load(open('$REPO/$DIR/cell.json')).get('twin_ticket') or '-')")"
 
 # A cell whose adapter wants a scratch issue but has none would run the real
 # lifecycle against the SOURCE ticket. Stop rather than write to it.
@@ -150,11 +152,11 @@ WANTS_SCRATCH="$(python3 -c "
 import sys; sys.path.insert(0, '$S')
 from pathlib import Path
 from benchlib import adapters
-print(int(adapters.load_adapter(Path('$YAML')).scratch_ticket))
+print(int(adapters.load_adapter(Path('$YAML')).dedicated_ticket))
 ")"
 if [ "$WANTS_SCRATCH" = "1" ] && [ "$SCRATCH" = "-" ]; then
-  echo "STOP: this adapter declares scratch_ticket but no scratch issue was"
-  echo "      created. Continuing would run the lifecycle against $TICKET itself."
+  echo "STOP: this adapter needs a dedicated ticket but none is recorded."
+  echo "      Continuing would run the lifecycle against $TICKET itself."
   exit 1
 fi
 
@@ -263,7 +265,7 @@ echo "      -> $BASE/report.md"
 cat <<EOF
 
 --------------------------------------------------------------------------
-scratch Jira issue : $SCRATCH
+twin Jira issue    : $SCRATCH
 worktree           : $WORKTREE
 report             : $BASE/report.md
 

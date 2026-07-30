@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 """Enumerate and remove what a benchmark sweep left behind.
 
-A sweep now creates real artefacts: scratch Jira issues, `bench/` branches,
-worktrees and draft pull requests. Cleanup is a first-class command rather
-than a manual chore because the alternative is a Jira project that slowly
-fills with `[bench …]` issues nobody can safely delete later.
+A sweep leaves `bench/` branches, worktrees, draft pull requests, and -- for
+approaches that write to Jira -- a story branch named after the twin ticket.
+
+What it does NOT remove is the twin tickets themselves. Those are hand-made,
+with story points acli cannot write, so deleting one destroys setup the operator
+has to redo. Their BRANCHES are another matter and must go: the SDLC playbook
+reuses an existing `feat/<KEY>` branch rather than duplicating it, so a leftover
+one makes the next run on that twin check out the previous run's finished work
+and measure nothing.
 
 Two hard rules:
 
 * **Plan first, act second.** `plan()` only reads. Nothing is destroyed
-  without the caller printing the plan and passing `--confirm`, because
-  issue deletion is irreversible and a mis-scoped query is the one failure
-  mode with no undo.
-* **Label evidence, not memory.** Scratch issues are found by JQL on the
-  `bench-run` label, and an issue that does not carry it is never deleted --
-  even if it appears in a cell record. A sweep that crashed before writing
-  its records still leaves findable issues; a hand-edited record must not be
-  able to point deletion at someone's real ticket.
+  without the caller printing the plan and passing `--confirm`.
+* **Label evidence, not memory.** Twins are found by JQL on the `bench-run`
+  label rather than from cell records: a sweep that crashed before writing its
+  records still leaves findable twins, and a hand-edited record must never be
+  able to aim a deletion at someone's real ticket.
 
 Usage:
   python3 cleanup.py --ticket NA-68 --repo . [--confirm]
@@ -67,31 +69,47 @@ def bench_worktrees(repo: Path, ticket: str) -> List[str]:
     return found
 
 
-def scratch_issues(project: str, ticket: str) -> List[str]:
-    """Bench-labelled issues that name this ticket as their source.
+def twin_issues(project: str) -> List[str]:
+    """Bench-labelled issues in this project -- the operator's twin tickets.
 
-    Filtered by BOTH the label and the source reference. The label alone
-    would sweep in another ticket's cells; the source reference alone would
-    trust text over the label that marks an issue as ours.
+    These are NEVER deleted. The operator creates them by hand, with story
+    points set, precisely because acli cannot write points; deleting one means
+    that setup has to be redone. They are reported so a reader knows which
+    tickets a sweep touched, and so the branch sweep below knows which story
+    branches to look for.
+
+    Discovered by label rather than from cell records: a sweep that crashed
+    before writing its records still leaves findable twins, and a hand-edited
+    record must never be able to aim a deletion at a real ticket.
     """
-    keys = []
-    for key in acli.search_by_label(project):
-        try:
-            fields = acli.fetch_issue(key)
-        except acli.AcliError:
-            continue
-        body = acli.issue_description(fields)
-        labels = fields.get("labels") or []
-        if acli.BENCH_LABEL in labels and ticket in body:
-            keys.append(key)
-    return keys
+    return acli.search_by_label(project)
 
 
-def draft_prs(repo: Path, ticket: str, scratch_keys: List[str]) -> List[dict]:
+def twin_branches(repo: Path, twin_keys: List[str]) -> List[str]:
+    """`feat/<TWIN>` and `fix/<TWIN>` branches left behind by a cell.
+
+    These MUST go even though the twin stays. The SDLC playbook reuses an
+    existing story branch rather than creating a duplicate, so a leftover
+    `feat/<TWIN>` makes the next run on that twin check out the previous run's
+    finished work and measure nothing -- the exact collision twins exist to
+    avoid, reintroduced by not cleaning up.
+    """
+    found = []
+    for key in twin_keys:
+        for prefix in ("feat", "fix"):
+            out = git(repo, "branch", "--list", "{0}/{1}".format(prefix, key))
+            for line in out.splitlines():
+                name = line.strip().lstrip("* ").strip()
+                if name:
+                    found.append(name)
+    return found
+
+
+def draft_prs(repo: Path, ticket: str, twin_keys: List[str]) -> List[dict]:
     """Open PRs raised by this sweep.
 
     Matched on head branch, which is the only property tying a PR back to a
-    cell: the SDLC approach names its branch after the scratch issue, other
+    cell: the SDLC approach names its branch after its twin ticket, other
     approaches push the `bench/` branch itself.
     """
     proc = subprocess.run(
@@ -123,20 +141,21 @@ def draft_prs(repo: Path, ticket: str, scratch_keys: List[str]) -> List[dict]:
         if head.startswith("{0}{1}/".format(BENCH_PREFIX, ticket)):
             wanted.append(row)
             continue
-        if any(head.endswith("/{0}".format(key)) for key in scratch_keys):
+        if any(head.endswith("/{0}".format(key)) for key in twin_keys):
             wanted.append(row)
     return wanted
 
 
 def plan(repo: Path, ticket: str, project: str) -> Dict[str, object]:
     """Read-only. Everything cleanup would touch, and nothing touched."""
-    keys = scratch_issues(project, ticket) if project else []
+    twins = twin_issues(project) if project else []
     return {
         "ticket": ticket,
-        "branches": bench_branches(repo, ticket),
+        "branches": bench_branches(repo, ticket) + twin_branches(repo, twins),
         "worktrees": bench_worktrees(repo, ticket),
-        "scratch_issues": keys,
-        "pull_requests": draft_prs(repo, ticket, keys),
+        # Reported, never deleted -- see twin_issues.
+        "twin_issues": twins,
+        "pull_requests": draft_prs(repo, ticket, twins),
     }
 
 
@@ -144,7 +163,7 @@ def render_plan(data: Dict[str, object]) -> str:
     lines = ["Cleanup plan for {0}".format(data["ticket"]), ""]
     for label, key in (
         ("Draft pull requests to close", "pull_requests"),
-        ("Scratch Jira issues to DELETE (irreversible)", "scratch_issues"),
+        ("Twin Jira issues (KEPT — you created these by hand)", "twin_issues"),
         ("Worktrees to remove", "worktrees"),
         ("Branches to delete", "branches"),
     ):
@@ -170,9 +189,8 @@ def render_plan(data: Dict[str, object]) -> str:
 def execute(repo: Path, data: Dict[str, object]) -> List[str]:
     """Destroy what `plan` found. Ordered so nothing is orphaned.
 
-    Worktrees before branches (a checked-out branch cannot be deleted), and
-    Jira issues last, so a failure earlier leaves the issue -- the one record
-    that makes the rest findable again.
+    Worktrees before branches, because a checked-out branch cannot be deleted.
+    Twin issues are reported last and never touched.
     """
     log: List[str] = []
     for pr in data["pull_requests"] or []:
@@ -204,12 +222,12 @@ def execute(repo: Path, data: Dict[str, object]) -> List[str]:
         except RuntimeError as exc:
             log.append("FAILED to delete branch {0}: {1}".format(branch, exc))
 
-    for key in data["scratch_issues"] or []:
-        try:
-            acli.delete_issue(key)
-            log.append("deleted issue {0}".format(key))
-        except acli.AcliError as exc:
-            log.append("FAILED to delete issue {0}: {1}".format(key, exc))
+    for key in data["twin_issues"] or []:
+        # Deliberately not deleted. A twin carries hand-set story points that
+        # acli cannot restore, so destroying one costs the operator that setup
+        # for no benefit -- its branch and PR are what actually need clearing,
+        # and both are handled above.
+        log.append("kept twin issue {0} (branch and PR cleared; points intact)".format(key))
     return log
 
 

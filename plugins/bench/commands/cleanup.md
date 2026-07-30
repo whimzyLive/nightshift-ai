@@ -25,9 +25,13 @@ This command receives `${CLAUDE_PLUGIN_ROOT}` natively from the harness — use 
    Two things to call out if present:
    - Any pull request listed as `READY, not draft`. A benchmark PR should never have left draft;
      say so, because it means the guard was bypassed or the PR is not ours.
-   - An empty scratch-issue list alongside a non-empty branch list. That means the branches came
-     from approaches that write no Jira, which is normal — or that the label query failed, which
-     is not. Do not delete Jira issues to "match" the branches.
+   - An empty twin list alongside a non-empty branch list. That means the branches came from
+     approaches that write no Jira, which is normal — or that the label query failed, which is not.
+
+   Twin issues are listed as **KEPT**. That is deliberate: they carry hand-set story points acli
+   cannot write back, so deleting one destroys setup the founder has to redo. Their `feat|fix/`
+   branches and PRs are what must go, and those are cleared. If a founder asks why the twins
+   survived, that is the reason.
 
 3. Only after explicit confirmation:
 
@@ -41,5 +45,5 @@ This command receives `${CLAUDE_PLUGIN_ROOT}` natively from the harness — use 
 
 ## What is deliberately not deleted
 
-`docs/benchmarks/<TICKET>/**` — the run records, transcripts and reports. Those are the result of
+Twin Jira issues — see above. And `docs/benchmarks/<TICKET>/**` — the run records, transcripts and reports. Those are the result of
 the sweep, not its residue. Deleting them would throw away the measurement the sweep was for.

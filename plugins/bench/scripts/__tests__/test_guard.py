@@ -410,7 +410,7 @@ class TestCleanupPlanIsReadOnly(unittest.TestCase):
                 "ticket": "NA-68",
                 "branches": [],
                 "worktrees": [],
-                "scratch_issues": [],
+                "twin_issues": [],
                 "pull_requests": [{"number": 5, "title": "t", "isDraft": False}],
             }
         )

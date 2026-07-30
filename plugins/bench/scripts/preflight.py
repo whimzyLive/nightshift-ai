@@ -28,7 +28,7 @@ from typing import List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import report  # noqa: E402
-from benchlib import adapters, quota  # noqa: E402
+from benchlib import acli, adapters, quota  # noqa: E402
 
 
 def collect_history(repo: Path, ticket: str) -> List[dict]:
@@ -116,18 +116,31 @@ def main(argv: Optional[list] = None) -> int:
 
     # Blast radius, stated separately from cost because it is not undone by
     # having budget for it.
-    writers = [a for a in loaded if a.scratch_ticket]
+    writers = [a for a in loaded if a.dedicated_ticket]
     if writers:
-        created = len(writers) * max(args.repeats, 0)
+        needed = len(writers) * max(args.repeats, 0)
         print(
-            "  WILL CREATE: {0} Jira issue(s), {0} branch(es) and up to {0} draft "
-            "pull request(s), from: {1}".format(
-                created, ", ".join(a.cell_id for a in writers)
+            "  NEEDS {0} pre-made twin ticket(s), one per cell, from: {1}".format(
+                needed, ", ".join(a.cell_id for a in writers)
             )
         )
-        print("  Remove them afterwards with /bench:cleanup {0}".format(args.ticket))
+        print(
+            "    Each twin must have story points set and carry the `{0}` label. "
+            "The harness cannot create them -- acli on this build cannot write "
+            "story points by any route, and an unpointed ticket triages down the "
+            "wrong path while the row claims the full lifecycle.".format(
+                acli.BENCH_LABEL
+            )
+        )
+        print(
+            "  WILL CREATE: {0} branch(es) and up to {0} draft pull request(s). "
+            "Clear them afterwards with /bench:cleanup {1} -- which keeps the "
+            "twins and deletes only their branches.".format(needed, args.ticket)
+        )
     else:
-        print("  WILL CREATE: no Jira issues or pull requests (no approach writes Jira)")
+        print(
+            "  WILL CREATE: no Jira issues or pull requests (no approach writes Jira)"
+        )
 
     try:
         forecast = quota.preflight(

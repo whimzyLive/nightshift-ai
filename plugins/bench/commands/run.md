@@ -112,7 +112,7 @@ For each approach, in the order given:
      --story docs/benchmarks/<TICKET>/story.json \
      --approach <APPROACH> --run-id <RUN_ID> --repo <REPO> \
      --adapter "${CLAUDE_PLUGIN_ROOT}/approaches/<APPROACH_FILE>.yaml" \
-     [--version <VERSION>] \
+     [--version <VERSION>] [--twin-ticket <TWIN-KEY>] \
      --out docs/benchmarks/<TICKET>/<CELL>/<RUN_ID>/cell.json
    ```
 
@@ -126,15 +126,20 @@ For each approach, in the order given:
    because a hook that rewrites commands or injects text moves the number being measured.
 
    Two more lines to relay rather than skip:
-   - **`scratch Jira issue: <KEY>`** — this cell works against that issue, not `<TICKET>`. Its
-     comments and pull request land there. Report the key, because it is what the founder needs to
-     look at the shipped output, and it is what `/bench:cleanup` will delete.
+   - **`twin Jira issue: <KEY> (points=N)`** — this cell works against that issue, not `<TICKET>`.
+     Its comments and pull request land there. Report the key: it is what the founder opens to see
+     the shipped output. `/bench:cleanup` keeps the twin and clears only its branch and PR.
+
+   An adapter with `dedicated_ticket: true` REFUSES to provision without `--twin-ticket` (exit 2),
+   and refuses a twin that has no story points, lacks the `bench-run` label, has drifted acceptance
+   criteria, or is the source ticket itself. Relay the refusal verbatim — each one names the fix,
+   and none of them cost anything to hit.
    - **`push guard: … (refs allowed: …)`** — the cell may push only those refs. If a run later
      reports a denied push, that is the guard working, not a bug; the deny reason states which ref
      was refused.
 
-   If the adapter sets `scratch_ticket: true` and no scratch key is printed, **stop**. The session
-   would otherwise run `/sdlc:auto` against the source ticket and write benchmark noise onto it.
+   If the adapter sets `dedicated_ticket: true` and no twin key is printed, **stop**. The session
+   would otherwise run against the source ticket and write benchmark noise onto it.
 
    **On failure:** Abort this approach's cell, record the error, and continue to the next approach. Do not retry or skip to measure — the worktree is the evidence of what happened.
 

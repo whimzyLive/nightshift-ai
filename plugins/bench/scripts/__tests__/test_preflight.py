@@ -134,15 +134,29 @@ class TestBlastRadiusIsStated(unittest.TestCase):
         )
         return proc.stdout
 
-    def test_jira_writing_approach_announces_what_it_creates(self):
+    def test_jira_writing_approach_announces_the_twins_it_needs(self):
+        # The harness no longer creates these -- acli cannot set story points,
+        # so an operator makes them by hand and the preflight must say how many
+        # and what they must carry.
         out = self._out(
             [
                 "--ticket", "NA-68", "--repo", str(self.repo),
                 "--adapter", SDLC, "--repeats", "2",
             ]
         )
-        self.assertIn("WILL CREATE: 2 Jira issue(s)", out)
+        self.assertIn("NEEDS 2 pre-made twin ticket(s)", out)
+        self.assertIn("story points", out)
+        self.assertIn("bench-run", out)
         self.assertIn("/bench:cleanup NA-68", out)
+
+    def test_it_does_not_claim_to_create_jira_issues(self):
+        out = self._out(
+            [
+                "--ticket", "NA-68", "--repo", str(self.repo),
+                "--adapter", SDLC, "--repeats", "1",
+            ]
+        )
+        self.assertNotIn("WILL CREATE: 1 Jira issue", out)
 
     def test_read_only_approach_says_it_creates_nothing(self):
         out = self._out(
