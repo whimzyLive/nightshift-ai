@@ -28,7 +28,7 @@ Two secondary leaks are visible and unexplained: the RTK hook that CLAUDE.md cla
 
 ## Solution
 
-An eight-workstream programme that cuts the measured cost of one 8-point story from **$114.12 to $59.22 (−48.1%)** by shrinking and re-encoding the SDLC plugin's own instruction and context surface — without changing a single step of what the workflow does or what it produces.
+An eight-workstream programme that targets cutting the measured cost of one 8-point story from **$114.12 to $59.22 (−48.1%)** by shrinking and re-encoding the SDLC plugin's own instruction and context surface — without changing a single step of what the workflow does or what it produces. Roughly three-quarters of that cut rests on measured or projected token counts; the rest rests on estimates that must be piloted (see below and AC-1).
 
 The savings are multiplicative (each workstream applies to what the previous one left behind):
 
@@ -44,7 +44,16 @@ The savings are multiplicative (each workstream applies to what the previous one
 | 8   | D — fix the RTK hook            | 2.3%      | LOW     | hours         |
 |     | **Combined**                    | **48.1%** |         |               |
 
-Per-story outcome: NA-6 $100.24 → $52.01 · 8-pt mean $114.12 → $59.22 · p75 $119.33 → $61.92 · NA-50 $168.50 → $87.43 · NA-65 (tail) $377.55 → $195.91. Token view for one 8-pt story: billed 143.0M → 121.5M; instruction load 466,887 → 225,250 (−52%).
+**Measured versus estimated — the combined figure is not uniformly evidenced.** A1 is exact (padding measured byte-for-byte); A2/A3 use pseudocode ratios sampled by category; A4–A9, B, C and D are projected from measured per-file token counts and load counts. **E, F, G and H cut-rates are estimates only** — sized from measured distributions, but the reduction percentages are judgement (Open Question 4). Excluding them, the floor reachable from the measured-and-projected workstreams alone is **−36.9% ($114.12 → $72.03)**. The full **−48.1% ($59.22)** requires E/F/G/H to land at or near their estimated rates, and is therefore a stretch target under AC-1 rather than a committed one.
+
+Per-story outcome at the full stretch rate (−48.1%, i.e. all of E/F/G/H landing as estimated): NA-6 $100.24 → $52.01 · 8-pt mean $114.12 → $59.22 · p75 $119.33 → $61.92 · NA-50 $168.50 → $87.43 · NA-65 (tail) $377.55 → $195.91. At the committed −36.9% rate the 8-pt mean lands at $72.03 instead. Token view for one 8-pt story: billed 143.0M → 121.5M; instruction load 466,887 → 225,250 (−52%).
+
+That −52% instruction-load figure decomposes into two independently sourced parts, which the encoding experiments alone do not account for:
+
+- **Re-encoding (A1–A3)** — padding removal plus pseudocode conversion: the hand-measured **466,887 → 366,755 (−21%)** reported in Further Notes.
+- **Lazy loading (A4–A9)** — splitting large refs so only the needed slice loads, plus A8's dropped preload: the remaining **366,755 → 225,250 (−141,505)**, projected from the per-story sub-item figures in the A table below, not hand-measured.
+
+AC-2 is therefore validated by a runtime inventory on a real story, never by the static projection.
 
 Annualised: $13,694 → $7,106 (10 stories/mo, saves $6,588) · $34,236 → $17,765 (25/mo, saves $16,471) · $68,472 → $35,530 (50/mo, saves $32,942).
 
@@ -105,16 +114,19 @@ Secondary personas:
 
 Binary, testable at programme level. Each child story additionally carries its own workstream-scoped ACs.
 
-1. Measured cost of one 8-point story via `/sdlc:auto` (refine → PR) drops to **≤ $60** (from a $114.12 mean baseline), evidenced by the API `usage` records for that story's transcripts.
-2. Per-story **instruction load** drops to **≤ 230,000 tokens** (from 466,887), evidenced by a static+runtime inventory of instruction files loaded during one story.
-3. All seven validation gates hold on the measured story: cache-read ratio **≥ 94%**; requests per story not increased; avg and peak resident **decreased**; QA rounds per story not increased; `Status: blocked` rate not increased; review findings per round not increased; loop passes per PR not increased.
-4. Every one of workstreams **A (A1–A10), B, C, D, E, F, G, H** exists as a child story under NA-76, each with story points set and each with Phase 0/1/2/3 ordering expressed as Jira `Blocks` links.
+1. Measured cost of one 8-point story via `/sdlc:auto` (refine → PR) drops to **≤ $72** from the $114.12 mean baseline (−36.9%), evidenced by the API `usage` records for that story's transcripts. This is the committed target — it is the floor reachable from the measured-and-projected workstreams (A, B, C, D) alone. **≤ $60 (−48.1%) is a stretch target**, binding only once E, F, G and H have each passed their AC-10 pilot; a workstream whose pilot fails reduces the stretch target by that workstream's share rather than failing this AC.
+2. Per-story **instruction load** drops to **≤ 230,000 tokens** (from 466,887), evidenced by a static+runtime inventory of instruction files loaded during one story. The 466,887 → 225,250 projection this bound is drawn from is part hand-measured (re-encoding, −21%) and part projected (lazy loading, the remainder) — see Solution. A runtime inventory landing above 230,000 fails this AC regardless of what the static projection said.
+3. All validation gates hold on the measured story, each at the level it applies (see the Validation gates table under Dependencies):
+   - **Per child story** — every workstream must clear these: cache-read ratio **≥ 94%**; billed tokens per story **decreased**; avg and peak resident **not increased**; QA rounds per story not increased; `Status: blocked` rate not increased; review findings per round not increased; loop passes per PR not increased.
+   - **Programme level** — only after all of A–H are Done: avg and peak resident **decreased**. F and G are the only workstreams that move resident materially, so no Phase 1 or Phase 2 child story is held to a resident *decrease*.
+   - Requests per story is **not** a gate: G, H and the A4–A6 splits add dispatches and reads by design. Cost is judged on billed tokens.
+4. Every one of workstreams **A (A1–A10), B, C, D, E, F, G, H** is covered by at least one child story under NA-76, with story points set and Phase 0/1/2/3 ordering expressed as Jira `Blocks` links. The decomposition **shape** — one story per workstream versus splitting A's ten sub-items into their own stories — is an unresolved product decision (Open Question 3) and is deliberately not fixed by this AC; only full coverage, sizing and phase ordering are binding.
 5. Each merged child PR records a before/after measurement for its own workstream in the PR body — a workstream with no measurement is not accepted as complete.
-6. No `/sdlc:*` command gains, loses, or reorders a step, and no artifact type (PRD, spec, plan, ADR, review file, PR) loses a section or contract string — verified by a content-contract diff on the artifacts produced by one full run.
+6. No `/sdlc:*` command gains, loses, or reorders a step, and no artifact type (PRD, spec, plan, ADR, review file, PR) loses a section or contract string — verified by a content-contract diff on the artifacts produced by one full run. **"Step" means an observable unit of procedure — a gate, a dispatch, a decision outcome, or a written artifact — not the file it happens to be written in.** Moving a step's text into a conditionally-loaded ref (A4, A5, A6) or dropping a preload whose content the dispatching prompt already supplies (A8) is explicitly *not* a step change. The test is whether a run performs the same procedure in the same order, not whether the instruction lives at the same path.
 7. For every file converted to pseudocode under A2/A3, the count of distinct decision outcomes (branches, including else/failure branches) is identical before and after — evidenced by a branch-inventory diff attached to the PR.
 8. `prettier` no longer pads markdown tables under `plugins/sdlc/**/*.md`, and re-running the repo's format/lint pipeline (including `scripts/check-plugin-docs-format.sh`) does not re-pad them.
 9. Phase 0 diagnosis is answered in writing before Phase 1 lands: why the context-mode hook fires on 0.34% of calls, why the RTK hook fires on 3.1%, and whether `Bash: cd` at 6.6% of exposure is an attribution artifact of `cd $WORKTREE && <compound>` rather than a real leak.
-10. E, F and G are each piloted on one real story and validated against the gates **before** their cut-rates are counted in any savings claim; a pilot that fails a gate blocks that workstream from being reported as delivered.
+10. E, F, G and H — the four workstreams whose cut-rates are estimates rather than measurements — are each piloted on one real story and validated against the gates **before** their cut-rates are counted in any savings claim; a pilot that fails a gate blocks that workstream from being reported as delivered and reduces the AC-1 stretch target by that workstream's share.
 
 ## User Flows
 
@@ -125,7 +137,7 @@ Binary, testable at programme level. Each child story additionally carries its o
 3. **Phase 1 (free / LOW risk):** A1 prettier unpad ships first (4.1%, zero semantic risk, ~1h). Then C (duplicate reads), B (artifact templates), D (RTK hook) in any order.
 4. **Phase 2 (instruction surface):** A5 loop split → A4 docs-pipeline split → A6, A7, A8, A9. A2/A3 pseudocode conversion is folded into those same PRs rather than shipped standalone. A10 rationale extraction lands last.
 5. **Phase 3 (MED risk, validate per story):** F context editing, G subagent offload, E bounded reads, H Haiku routing — each piloted on one real story.
-6. For each child story: measure the gates on a real story **before** the change, ship the change, measure the same gates **after**, record both in the PR body, then merge.
+6. For each child story: measure the gates on a real story **before** the change, ship the change, measure the same gates **after**, record both in the PR body, then merge. Only the per-story gates apply here — the resident *decrease* is asserted once at programme level, since Phase 1/2 workstreams cannot move it.
 7. When all A–H children are Done, the operator re-measures one 8-point story end to end and confirms AC-1 through AC-3 against the programme baseline.
 
 ### Edge case — a change cuts tokens but degrades the pipeline
@@ -177,10 +189,10 @@ Recorded 2026-07-28 as parked; not blocking Phase 0/1.
 1. **Phase 0 diagnostics are questions, not tasks.** Three unknowns may resize their own workstreams once answered — context-mode hook firing on 0.34%, RTK hook on 3.1%, and whether `Bash: cd` at 6.6% of exposure is an attribution artifact. Decision needed: do these become their own child stories, or stay as an unticketed diagnosis pass?
 2. **Story points are not set** on NA-76 or any child, and the SDLC plugin never writes them. Per-workstream sizing must be entered by hand before `/sdlc:stories` can decompose the Epic and before `/sdlc:auto` can route any child (a story with no points short-circuits at Step 2).
 3. **Child stories for A–H are not yet created.** Confirm the intended shape: 8 linked child stories (one per workstream) with Phase 0/1/2/3 ordering as `Blocks` links — versus splitting A's ten sub-items into their own stories.
-4. **E / F / G cut-rates are judgement, not measurement.** 4.9% / 7.0% / 4.2% are sized from measured distributions but the reduction percentages are estimates. Confirm they must be piloted and gate-validated before counting in any budget or savings claim.
+4. **E / F / G / H cut-rates are judgement, not measurement.** 4.9% / 7.0% / 4.2% / 3.0% are sized from measured distributions but the reduction percentages are estimates. Confirm they must be piloted and gate-validated before counting in any budget or savings claim — this is what splits AC-1 into a committed ≤ $72 and a stretch ≤ $60.
 5. **Unsized candidates — ninth workstream or follow-up Epic?** Product decision on where they land.
 6. **The real ceiling is unknown.** Nobody has measured how many of the per-story Reads and requests are actually necessary. Owner and timing for scoping that question are undecided.
-7. **Does the 48.1% target become a standing budget?** i.e. after delivery, is there a per-story cost guardrail that CI or the loop budget enforces, or is this a one-off reduction?
+7. **Does the delivered cut become a standing budget?** i.e. after delivery, is there a per-story cost guardrail (≤ $72 committed, ≤ $60 stretch) that CI or the loop budget file enforces, or is this a one-off reduction?
 
 ## Dependencies
 
@@ -194,17 +206,19 @@ Must exist first:
 - **Story points on NA-76 children** — hard blocker for `/sdlc:auto` routing (Step 2 short-circuits on missing points).
 - **Internal ordering:** A5 must land before H. A10 must land after A2–A9. Phase 1 (A1, B, C, D) before Phase 2 (A4–A9). Phase 2 before Phase 3 (E, F, G, H).
 
-Validation gates (measured per story, before and after — the programme's definition of "did not break anything"):
+Validation gates — measured before and after, the programme's definition of "did not break anything". Each gate applies at one level: **per story** gates must hold for every child story; the **programme** gate is asserted once, after all of A–H are Done.
 
-| Metric                                     | Source                        | Guardrail          |
-| ------------------------------------------ | ----------------------------- | ------------------ |
-| `cache_read_input_tokens` / total input     | transcript usage              | must stay ≥ 94%    |
-| Requests per story                         | transcript count              | must not increase  |
-| Avg + peak resident                        | transcript usage              | must decrease      |
-| QA rounds per story                        | QA verdict block              | must not increase  |
-| `Status: blocked` rate                     | QA verdict / agent returns    | must not increase  |
-| Review findings per round                  | code-reviewer output          | must not increase  |
-| Loop passes per PR                         | `pass_count` in budget file   | must not increase  |
+| Metric                                  | Source                      | Level     | Guardrail                                                                                                         |
+| --------------------------------------- | --------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
+| `cache_read_input_tokens` / total input | transcript usage            | per story | must stay ≥ 94%                                                                                                   |
+| Billed tokens per story                 | transcript usage            | per story | must decrease — this, not request count, is the cost gate                                                          |
+| Requests per story                      | transcript count            | per story | **not a gate** — G, H and the A4–A6 splits add dispatches and reads by design. Recorded for attribution only       |
+| Avg + peak resident                     | transcript usage            | per story | must not increase                                                                                                 |
+| Avg + peak resident                     | transcript usage            | programme | must decrease — F and G are the only workstreams that move this, so Phase 1/2 stories are not held to a decrease   |
+| QA rounds per story                     | QA verdict block            | per story | must not increase                                                                                                 |
+| `Status: blocked` rate                  | QA verdict / agent returns  | per story | must not increase                                                                                                 |
+| Review findings per round               | code-reviewer output        | per story | must not increase                                                                                                 |
+| Loop passes per PR                      | `pass_count` in budget file | per story | must not increase                                                                                                 |
 
 ## Product Checks
 
