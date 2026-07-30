@@ -301,3 +301,75 @@ class TestFieldExtraction(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWriteOpsPassKeysAsFlags(unittest.TestCase):
+    """acli takes its targets by flag, not positionally, on the write verbs.
+
+    Two live failures came from getting this wrong, both silent until the call
+    ran against a real site:
+
+      acli jira workitem delete NA-83 --yes
+        -> "at least one of the flags in the group [key from-file jql filter]
+            is required" -- the bare key is ignored entirely.
+
+      acli jira workitem comment create NA-83 --body ...
+        -> same shape.
+
+    `view` is the exception: its usage really is `view [key] [flags]`. So this
+    cannot be a blanket rule, which is exactly why it needs a test per verb
+    rather than a convention.
+    """
+
+    def setUp(self):
+        self.calls = []
+        self._real_run = acli.run
+
+        def fake_run(args):
+            self.calls.append(list(args))
+            return '{"key": "NA-999", "issues": []}'
+
+        acli.run = fake_run
+
+    def tearDown(self):
+        acli.run = self._real_run
+
+    def test_delete_passes_key_as_a_flag(self):
+        acli.delete_issue("NA-83")
+        self.assertEqual(
+            self.calls[0], ["jira", "workitem", "delete", "--key", "NA-83", "--yes"]
+        )
+
+    def test_delete_takes_one_key_per_call(self):
+        # --key accepts a list, but a partial failure across a batch gives no
+        # way to tell which issues died. This is the irreversible operation.
+        acli.delete_issue("NA-83")
+        key_index = self.calls[0].index("--key")
+        self.assertNotIn(",", self.calls[0][key_index + 1])
+
+    def test_comment_passes_key_as_a_flag(self):
+        acli.comment("NA-83", "hello")
+        self.assertIn("--key", self.calls[0])
+        self.assertEqual(self.calls[0][self.calls[0].index("--key") + 1], "NA-83")
+
+    def test_search_uses_jql(self):
+        acli.search_by_label("NA")
+        self.assertIn("--jql", self.calls[0])
+
+    def test_create_names_project_type_and_summary_by_flag(self):
+        acli.create_issue("NA", "s", "d", "Story")
+        argv = self.calls[0]
+        for flag in ("--project", "--type", "--summary", "--description", "--label"):
+            self.assertIn(flag, argv)
+
+    def test_create_always_applies_the_bench_label(self):
+        # Cleanup finds scratch issues by this label. An issue created without
+        # it is undiscoverable and will never be cleaned up.
+        acli.create_issue("NA", "s", "d", "Story", labels=["other"])
+        argv = self.calls[0]
+        self.assertIn(acli.BENCH_LABEL, argv[argv.index("--label") + 1])
+
+    def test_view_still_uses_a_positional_key(self):
+        # `acli jira workitem view [key] [flags]` -- do not "fix" this one.
+        acli.fetch_issue("NA-82")
+        self.assertEqual(self.calls[0][:4], ["jira", "workitem", "view", "NA-82"])

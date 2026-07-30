@@ -224,4 +224,13 @@ def delete_issue(key: str) -> None:
     BENCH_LABEL -- this function deletes whatever key it is handed, so the
     safety lives at the call site where the label evidence is.
     """
-    run(["jira", "workitem", "delete", key, "--yes"])
+    # `--key`, not a positional. `acli jira workitem delete <KEY> --yes` fails
+    # with "at least one of the flags in the group [key from-file jql filter] is
+    # required" -- the bare argument is ignored entirely. Same shape as the
+    # `comment create` call above.
+    #
+    # Deliberately one key per call rather than a comma-joined list: --key
+    # accepts several, but a partial failure across a batch gives no way to tell
+    # which issues died and which survived, and this is the irreversible
+    # operation in the harness.
+    run(["jira", "workitem", "delete", "--key", key, "--yes"])
