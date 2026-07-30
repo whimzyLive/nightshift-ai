@@ -183,3 +183,39 @@ class TestCleanupKeepsTwinsButNotTheirBranches(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEmptyAcsGetTheirOwnDiagnosis(unittest.TestCase):
+    """Zero criteria extracted is a different problem from drifted criteria.
+
+    A cloned issue built from FLATTENED text arrives as one paragraph. The text
+    plainly says "Acceptance Criteria" to a human, but extraction looks for a
+    heading NODE, so nothing is found. That happened to NA-84 and cost a
+    debugging round: the operator had a ticket that looked correct and a message
+    that only said the criteria differed.
+    """
+
+    def test_zero_extracted_explains_the_flat_paragraph_cause(self):
+        flat = {
+            "summary": "[bench] Blogs",
+            # Everything in one blob: no heading, no list.
+            "description": "As a user I want blogs. Acceptance Criteria - one - two",
+            "labels": ["bench-run"],
+            "issuetype": {"name": "Story"},
+            POINTS_FIELD: 8,
+        }
+        with mock.patch.object(acli, "fetch_issue", return_value=flat):
+            with self.assertRaises(provision.TwinTicketError) as ctx:
+                provision.validate_twin("NA-84", SOURCE, POINTS_FIELD)
+        msg = str(ctx.exception)
+        self.assertIn("single flat paragraph", msg)
+        self.assertIn("--description-file", msg)
+
+    def test_drifted_but_present_acs_get_no_flat_paragraph_hint(self):
+        # Wrong advice is worse than none: this ticket's structure is fine.
+        with mock.patch.object(
+            acli, "fetch_issue", return_value=_fields(acs="- one\n- different\n")
+        ):
+            with self.assertRaises(provision.TwinTicketError) as ctx:
+                provision.validate_twin("NA-90", SOURCE, POINTS_FIELD)
+        self.assertNotIn("flat paragraph", str(ctx.exception))

@@ -412,16 +412,26 @@ def validate_twin(twin_key: str, source: dict, points_field: str) -> dict:
             "fresh. Add the label to {0}.".format(twin_key, acli.BENCH_LABEL)
         )
 
-    if _ac_lines(twin["acs"]) != _ac_lines(source["acs"]):
+    twin_acs, source_acs = _ac_lines(twin["acs"]), _ac_lines(source["acs"])
+    if twin_acs != source_acs:
+        # Zero extracted is its own diagnosis, and a common one: acceptance
+        # criteria are found by looking for a HEADING node in the description's
+        # ADF, so a description pasted or generated as one flat paragraph yields
+        # nothing even though the text is plainly there to a human reader.
+        empty_hint = (
+            "\nNone were extracted at all, which usually means {0}'s description "
+            "is a single flat paragraph rather than structured content -- "
+            "criteria are located by an 'Acceptance Criteria' HEADING, so text "
+            "that merely says those words inside a paragraph is invisible. Copy "
+            "{1}'s description across as structured content (acli "
+            "`--description-file` with {1}'s ADF) rather than retyping it."
+        ).format(twin_key, source["key"]) if not twin_acs else ""
         raise TwinTicketError(
             "twin ticket {0} has different acceptance criteria from {1} "
             "({2} vs {3} criteria). Graders score this cell's diff against "
             "{1}'s criteria, so the session would implement one spec and be "
-            "marked against another. Copy {1}'s description onto {0}.".format(
-                twin_key,
-                source["key"],
-                len(_ac_lines(twin["acs"])),
-                len(_ac_lines(source["acs"])),
+            "marked against another.{4}".format(
+                twin_key, source["key"], len(twin_acs), len(source_acs), empty_hint
             )
         )
 
