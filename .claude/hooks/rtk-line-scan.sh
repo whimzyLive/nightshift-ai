@@ -113,4 +113,52 @@ rewrite_line() {
   printf '%s' "$out"
 }
 
-emit_nothing
+changed=0
+continued=0
+quote_state=""
+out_lines=""
+first=1
+
+while IFS= read -r line || [ -n "$line" ]; do
+  keep="$line"
+  if [ -n "$quote_state" ] || [ "$continued" -eq 1 ]; then
+    :
+  elif [ -z "${line//[[:space:]]/}" ]; then
+    :
+  elif line_is_excluded "$line"; then
+    :
+  else
+    indent="${line%%[![:space:]]*}"
+    if rewritten="$(rewrite_line "$line")"; then
+      rewritten="$indent$rewritten"
+      if [ "$rewritten" != "$line" ]; then
+        keep="$rewritten"
+        changed=1
+      fi
+    fi
+  fi
+  quote_state="$(scan_quote_state "$line" "$quote_state")"
+  if ends_with_continuation "$line"; then continued=1; else continued=0; fi
+  if [ "$first" -eq 1 ]; then
+    out_lines="$keep"
+    first=0
+  else
+    out_lines="$out_lines
+$keep"
+  fi
+done <<COMMAND
+$cmd
+COMMAND
+
+[ "$changed" -eq 1 ] || emit_nothing
+[ "$out_lines" != "$cmd" ] || emit_nothing
+
+printf '%s' "$payload" | jq -c --arg c "$out_lines" '{
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    permissionDecision: "allow",
+    permissionDecisionReason: "RTK line-scan rewrite",
+    updatedInput: (.tool_input | .command = $c)
+  }
+}'
+exit 0
