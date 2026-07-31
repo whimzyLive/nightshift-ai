@@ -9,23 +9,34 @@ read classification, after:   NOT CAPTURED — this run executes almost entirely
 static instruction delta:     275269 -> 276262 est tok (+993, instruction-inventory.sh --base ce62d4b; POSITIVE, within the <= +1,000 budget)
 context-reuse.test.sh:        PASS (4 assertions)
 tier-1 regression, 5 rows:    5/5 CONTRACT_MATCH=true after C7 + C8
-QA rounds:                    <N>   (gate: must not increase) — DEFERRED: filled by the orchestrator (PE Step 4.1) once the QA loop (PE Step 6) completes; Phase 2 (this task) precedes QA in the ladder
-Fix dispatch:                 reuse <N> / fresh <N>   (AC-3 evidence, from the QA verdict block) — DEFERRED, same reason as QA rounds
+QA rounds:                    1   (clean, zero fix rounds — verdict clean on round 1) (gate: must not increase)
+Fix dispatch:                 reuse 0 / fresh 0   (AC-3 evidence, from the QA verdict block) — a clean round-1 verdict dispatches no fix agent, so D5's reuse-vs-fresh confirmation is unexercised on this run; it defers to the same named successor occasion as the runtime rows above (NA-89, or whichever Phase-1/2 story runs next) — stated here so it is not silently dropped, per D5.
 cache hit rate:                <before>% -> <after>%   (gate: >= 94%) — DEFERRED: cache-analysis.py needs this run's own completed transcripts, not available at Phase 2
 requests per story:           <before> -> <after>     (gate: must not increase) — DEFERRED, same reason as cache hit rate
 avg / peak resident:          <before> -> <after>     (gate: must not increase) — DEFERRED, same reason as cache hit rate
 loop passes per PR:            <before> -> <after>     (gate: must not increase) — DEFERRED, same reason as cache hit rate
 
-### NA-87 D12 tier-2 result — all five artifact types, real merged artifacts
+### NA-87 D12 tier-2 result — all five artifact types, real merged artifacts — FINAL: 5/5 CONTRACT_MATCH=true after C7 + C8
                     as found                              after C7 + C8
 1 spec doc          template 18 / artifact 1 / false      template 18 / artifact 18 / true
 2 plan doc          template 4 / artifact 2 / false       template 4 / artifact 4 / true
 3 adr               template 8 / artifact 1 / false       template 8 / artifact 8 / true
-4 review-round      DEFERRED to Task 3.1 (artifact not yet written by QA Step 5)
+4 review-round      template 8 / artifact 6 / false       template 8 / artifact 8 / true
 5 rule entry        template 7 / artifact 7 / true        template 7 / artifact 7 / true
-artifact used, per row: 1 docs/superpowers/specs/NA-88.md (post-change) | 2 docs/superpowers/plans/NA-88.md (post-change) | 3 docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md (pre-change merged instance) | 4 deferred | 5 .claude/memories/agents/ai-enablement-engineer/worktree-scoped-git-config-immutable-marker.md (named merged fallback, unless this run admits a rule entry)
-fence ordinals re-confirmed against post-C7/C8 files: yes — all four (rows 1, 2, 3, 5) resolved cleanly via --extract, no correction needed
-interpretation: rows 1-3 — instrument defect, not an NA-87 regression (see tier2-contract-diff.txt for the two independent causes per row, both now fixed by C7 + C8). Row 5 already matched under the pre-C7 matcher (flat 7-field YAML block, no extra structural headings) and continues to match — no regression, no new pass introduced by the remedy for this row. Row 4 deferred to Task 3.1.
+artifact used, per row: 1 docs/superpowers/specs/NA-88.md (post-change) | 2 docs/superpowers/plans/NA-88.md (post-change) | 3 docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md (pre-change merged instance) | 4 .claude/memories/reviews/2026-07-07-NA-3.md (pre-change merged instance, issue_count=8 — this run's own round file is clean/frontmatter-only and structurally unmeasurable, see finding below) | 5 .claude/memories/agents/ai-enablement-engineer/duplicated-canonical-block-blows-static-token-budget.md (post-change — this run's own admitted rule entry, Task 2.8; supersedes the named fallback)
+fence ordinals re-confirmed against post-C7/C8 files: yes — all five rows resolved cleanly via --extract, no correction needed
+interpretation: rows 1-4 — instrument defect, not an NA-87 regression (see tier2-contract-diff.txt for the per-row causes, all now fixed by C7 + C8). Row 5 already matched under the pre-C7 matcher (flat 7-field YAML block, no extra structural headings) and continues to match — no regression, no new pass introduced by the remedy for this row. Strongest evidence against an NA-87 content regression: row 3 is a pre-change merged ADR NA-87 never touched, and it fails pre-C7 / passes post-C7 — the failure tracked the instrument, not the artifact's content.
+
+Structural finding (row 4, recorded here and in tier2-contract-diff.txt): this run's own QA round
+  file (.claude/memories/reviews/2026-07-31-NA-88.md) is clean (issue_count: 0), so per
+  qa-engineer-playbook.md Step 5 it is frontmatter-only and carries only 5 of the review-round
+  contract's 8 items — it cannot report CONTRACT_MATCH=true regardless of encoding correctness. A
+  sibling of D11: an artifact that cannot exercise a gate's contract is not evidence about that
+  contract. Row 4's "after" reading above therefore uses a real merged round file with a body
+  (2026-07-07-NA-3.md, issue_count=8), following the row-3 (ADR) precedent — not this run's own
+  output. General form for future tier-2 runs: row 4 requires a round with issue_count > 0; a
+  clean-round story cannot supply one from itself. This is a measurement limitation, not a defect
+  in C8 or in NA-87's encoding.
 
 Gap fills recorded in this story (flag in PR body):
   1. base-ref substitution: spec quoted 0a905ff (develop tip pre-#210); this branch is cut from

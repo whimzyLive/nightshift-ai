@@ -166,4 +166,80 @@ interpretation: unchanged from the as-found reading — this artifact already ma
   after C7 + C8. No regression, no new pass introduced by the remedy for this row.
 
 === row 4 + row 5 final ===
+
+Structural finding (record before the row): this run's own QA round file
+(.claude/memories/reviews/2026-07-31-NA-88.md) is clean — issue_count: 0 — so per
+qa-engineer-playbook.md Step 5's rule "issue_count: 0 -> frontmatter only, no body", it carries only
+5 of the 8 review-round contract items (the frontmatter fields; the three body headings ## Issues,
+## Preventions, ## Rules written do not exist on a clean round). It cannot report
+CONTRACT_MATCH=true no matter how correct the encoding is — it is structurally unmeasurable against
+the review-round contract, not a defect in C8 or in NA-87's re-encoding. General form (a sibling of
+D11): an artifact that cannot exercise a gate's contract is not evidence about that contract; tier-2
+row 4 requires a round file with issue_count > 0. Any future tier-2 run on a clean-round story will
+hit this again — row 4's artifact must be a real merged round file with a body, following the row-3
+precedent (a pre-change merged instance, not this run's own output).
+
+--- row 4: review-round (final) ---
+as-found (pre-C7 matcher, run around the C7/C8 commits per the row-3 precedent):
+command: bash tools/sdlc-analyser/artifact-contract.pre-c7.sh --template plugins/sdlc/refs/qa-engineer-playbook.md --section "## Step 5 — Write learnings to memory" --fence 3,4 --artifact .claude/memories/reviews/2026-07-07-NA-3.md
+TEMPLATE=plugins/sdlc/refs/qa-engineer-playbook.md
+ARTIFACT=.claude/memories/reviews/2026-07-07-NA-3.md
+CONTRACT_TEMPLATE=8
+CONTRACT_ARTIFACT=6
+CONTRACT_MISSING=heading:## Preventions;;heading:## Rules written
+CONTRACT_MATCH=false
+exit=1
+(the pre-C7 comparator script was placed at tools/sdlc-analyser/artifact-contract.pre-c7.sh — same
+path depth as the original, per the plan's warning that the script derives repo_root from its own
+location — run, then deleted immediately; git status confirmed clean of it before this commit)
+
+after C7 + C8:
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/refs/qa-engineer-playbook.md --section "## Step 5 — Write learnings to memory" --fence 3,4 --artifact .claude/memories/reviews/2026-07-07-NA-3.md
+TEMPLATE=plugins/sdlc/refs/qa-engineer-playbook.md
+ARTIFACT=.claude/memories/reviews/2026-07-07-NA-3.md
+CONTRACT_TEMPLATE=8
+CONTRACT_ARTIFACT=8
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 8 (matches NA-87's stated 8 — no drift)
+provenance: PRE-CHANGE merged instance (.claude/memories/reviews/2026-07-07-NA-3.md, issue_count=8)
+  — NOT this run's own output. This run's own round file (2026-07-31-NA-88.md, issue_count=0) is
+  structurally unmeasurable against the 8-item contract (see the finding above), so a real merged
+  round file with a body is substituted, following the row-3 (ADR) precedent.
+interpretation: same instrument defect as rows 1-3 (positional matching cannot resynchronise past
+  this round file's own frontmatter-to-heading transition) — C7's ordered-subsequence fix resolves
+  it. No NA-87 content regression: NA-87 never touched the review-round encoding's body-heading
+  set, and this is a pre-change artifact.
+
+--- row 5: rule entry (final) ---
+This run admitted a rule entry at Task 2.8 — superseding the Task 1.1/2.7 named fallback per the
+plan's Task 3.1 instruction ("if this run admitted a rule entry ... use it and say so, post-change
+provenance").
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/refs/domain-agent-handoff.md --section "## Memory write (before committing)" --fence 2 --artifact .claude/memories/agents/ai-enablement-engineer/duplicated-canonical-block-blows-static-token-budget.md
+TEMPLATE=plugins/sdlc/refs/domain-agent-handoff.md
+ARTIFACT=.claude/memories/agents/ai-enablement-engineer/duplicated-canonical-block-blows-static-token-budget.md
+CONTRACT_TEMPLATE=7
+CONTRACT_ARTIFACT=7
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 7 (matches NA-87's stated 7 — no drift)
+provenance: POST-CHANGE — this run's own admitted rule entry (Task 2.8), not the named merged
+  fallback.
+interpretation: matches, consistent with the fallback's own as-found/after readings (rows unchanged
+  across the pre-/post-C7 matcher for this artifact type — a flat 7-field YAML block has no extra
+  structural headings to desynchronise the positional matcher on). Confirms the result generalises
+  beyond the one fallback artifact.
+
+=== final tier-2 tally: 5/5 CONTRACT_MATCH=true after C7 + C8 ===
+1 spec doc:      template 18 / artifact 18 / true
+2 plan doc:      template  4 / artifact  4 / true
+3 adr:           template  8 / artifact  8 / true  (pre-change merged instance)
+4 review-round:  template  8 / artifact  8 / true  (pre-change merged instance, 2026-07-07-NA-3.md)
+5 rule entry:    template  7 / artifact  7 / true  (post-change, this run's own admitted rule entry)
+Every as-found reading available (rows 1, 2, 3, 4) reported CONTRACT_MATCH=false before C7 (+C8 for
+row 1); every artifact reports CONTRACT_MATCH=true after. Strongest single evidence against an
+NA-87 content regression: row 3 is a pre-change merged ADR that NA-87 never touched, and it still
+fails pre-C7 / passes post-C7 — the failure tracked the instrument, not the artifact's content.
 (appended in Task 3.1 by ai-enablement-engineer, after QA Step 5 writes this run's review-round file)
