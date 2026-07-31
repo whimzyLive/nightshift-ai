@@ -1,0 +1,14 @@
+# NA-89 pinned replay corpus — generated once, never regenerated.
+# Regenerating invalidates every before/after comparison in this story (G4).
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/114ad679-8eb7-42d7-a516-9cc3ae2f04a6.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/1c3ebc11-1ba9-4835-85ee-9f9506e00c19.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/2187d75f-1977-4fec-b93b-2325b50eba4e.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/4a626eb7-2727-461c-8c1a-272d410d6df0.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/7a6098c2-0432-40ce-8115-6ad217ca06b4.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/81b433f8-4f4f-4b70-adf8-4a7d9586541c.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/8ec791f7-2dc5-438d-9728-d7cf8971fc87.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/966a7a6f-7a99-4e4d-8b1d-a1b479466bd3.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/ce018ff7-0f80-4a6c-b67b-7b31d72ee87f.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/d028eee8-6e2e-455d-9579-ff78cb27d0f7.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/e42c6a57-9153-41c0-90be-1328083cdca3.jsonl
+/Users/Rushi/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift/f61792c1-abe2-41a0-82d8-389cde652671.jsonl
