@@ -19,12 +19,22 @@ while [ $# -gt 0 ]; do
       base_ref="$2"
       shift 2
       ;;
+    --root)
+      [ $# -ge 2 ] || { echo "instruction-inventory: --root requires a directory" >&2; exit 1; }
+      scan_root="${2%/}"
+      shift 2
+      ;;
     *)
       echo "instruction-inventory: unknown argument: $1" >&2
       exit 1
       ;;
   esac
 done
+
+if [ ! -d "$repo_root/$scan_root" ]; then
+  echo "instruction-inventory: root directory does not exist: $repo_root/$scan_root" >&2
+  exit 1
+fi
 
 if [ -n "$base_ref" ]; then
   if ! git -C "$repo_root" rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
@@ -33,7 +43,19 @@ if [ -n "$base_ref" ]; then
   fi
 fi
 
-category_of() { # $1=repo-relative path under plugins/sdlc
+# A root with none of the recognised top-level category directories reports every row as
+# "artifact" (e.g. --root docs/superpowers); a root with at least one keeps today's category_of
+# behaviour unchanged ("other" for unrecognised sub-paths).
+root_has_categories=0
+for d in commands agents refs skills scripts; do
+  if [ -d "$repo_root/$scan_root/$d" ]; then root_has_categories=1; break; fi
+done
+
+category_of() { # $1=repo-relative path under $scan_root
+  if [ "$root_has_categories" -eq 0 ]; then
+    echo "artifact"
+    return
+  fi
   local rel="${1#"$scan_root"/}"
   case "$rel" in
     commands/*) echo "command" ;;

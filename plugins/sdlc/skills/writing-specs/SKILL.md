@@ -17,19 +17,18 @@ description: Use when producing a technical design spec for a feature or Jira st
 
 ## Output File
 
-Save to: `docs/superpowers/specs/<STORY-KEY>.md` — the Jira story key is the entire filename (e.g. `docs/superpowers/specs/CER-2037.md`). The key is globally unique, so any agent can derive this path without a Jira lookup.
-
-Commit on branch `spec/<STORY-KEY>`. Raise PR titled `docs(spec): <STORY-KEY> <story summary>`.
-
-After the PR is merged, comment on the story as a human-readable breadcrumb:
+```text
+save_path := docs/superpowers/specs/<STORY-KEY>.md   # story key is globally unique -> any agent derives this path with no Jira lookup, e.g. docs/superpowers/specs/CER-2037.md
+branch := spec/<STORY-KEY>
+pr_title := docs(spec): <STORY-KEY> <story summary>
+PR merged -> post breadcrumb comment on the story   # human reference only; other agents still derive save_path from the story key, not from this comment
+```
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 acli jira workitem comment create --key <STORY-KEY> \
   --body "Spec: docs/superpowers/specs/<STORY-KEY>.md | PR: <PR_URL>"
 ```
-
-This comment is for human reference only — other agents derive the path from the story key directly, not from this comment.
 
 **Guard:** If you did not successfully fetch the Jira ticket before calling this skill, STOP and return to fetch it first. Never generate spec content from repository files alone.
 
@@ -38,6 +37,8 @@ This comment is for human reference only — other agents derive the path from t
 ## Spec Template
 
 ````markdown
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
+
 # [Feature Name] — Technical Spec
 
 **Story:** [JIRA-KEY — link or key]
@@ -52,10 +53,10 @@ This comment is for human reference only — other agents derive the path from t
 
 ### New Entities
 
-| Field | Type | Nullable | Default           | Notes |
-| ----- | ---- | -------- | ----------------- | ----- |
-| id    | uuid | No       | gen_random_uuid() | PK    |
-| ...   | ...  | ...      | ...               | ...   |
+| Field | Type | Nullable | Default | Notes |
+| --- | --- | --- | --- | --- |
+| id | uuid | No | gen_random_uuid() | PK |
+| ... | ... | ... | ... | ... |
 
 Entity base class: choose the correct base class per the project's entity/ORM conventions (see project-context) — state explicitly which and why.
 
@@ -74,13 +75,13 @@ Entity base class: choose the correct base class per the project's entity/ORM co
 
 ### New Endpoints
 
-| Method | Path          | Auth/Route Type | Description      |
-| ------ | ------------- | --------------- | ---------------- |
-| GET    | /[entity]     | [auth type]     | List all for org |
-| POST   | /[entity]     | [auth type]     | Create           |
-| GET    | /[entity]/:id | [auth type]     | Get by ID        |
-| PATCH  | /[entity]/:id | [auth type]     | Update           |
-| DELETE | /[entity]/:id | [auth type]     | Soft delete      |
+| Method | Path | Auth/Route Type | Description |
+| --- | --- | --- | --- |
+| GET | /[entity] | [auth type] | List all for org |
+| POST | /[entity] | [auth type] | Create |
+| GET | /[entity]/:id | [auth type] | Get by ID |
+| PATCH | /[entity]/:id | [auth type] | Update |
+| DELETE | /[entity]/:id | [auth type] | Soft delete |
 
 Auth/route type — state exactly one per endpoint, using the project's route/auth conventions (see project-context). Distinguish at minimum:
 
@@ -103,7 +104,6 @@ interface [Entity]Response {
   createdAt: string;
 }
 ```
-````
 
 All TypeScript interfaces must be fully typed. No `any`.
 
@@ -190,7 +190,7 @@ Define these using the project's offline-sync technology and config location (se
 
 - [ ] [Question] — Suggested default: [answer]
 
-```
+````
 
 ---
 
@@ -218,15 +218,20 @@ Always derive from the project's permission source (see project-context) — nev
 
 ## Self-Review Checklist (run before saving)
 
-- [ ] No TBDs — every open question has a concrete answer OR a flagged decision with a suggested default
-- [ ] Every new endpoint has a row in the Permissions table
-- [ ] Every offline-synced entity has an Offline Sync section with an explicit tenant/org-scoped filter (only if the project uses offline sync)
-- [ ] Entity relationships state exact cardinality (1:1, 1:N, M:N)
-- [ ] Auth/route type stated for every endpoint, using the project's conventions
-- [ ] All TypeScript interfaces fully typed — no `any`
-- [ ] Spec says WHAT to build — no HOW (no line-by-line implementation instructions)
-- [ ] Web / Mobile / Offline Sync sections omitted if not applicable to this story
-- [ ] Entity base class choice stated and justified per the project's conventions
+```text
+gate := [
+  no TBDs — every open question has a concrete answer OR a flagged decision with a suggested default,
+  every new endpoint has a row in the Permissions table,
+  every offline-synced entity has an Offline Sync section with an explicit tenant/org-scoped filter (only if the project uses offline sync),
+  entity relationships state exact cardinality (1:1, 1:N, M:N),
+  auth/route type stated for every endpoint, using the project's conventions,
+  all TypeScript interfaces fully typed — no `any`,
+  spec says WHAT to build — no HOW (no line-by-line implementation instructions),
+  Web / Mobile / Offline Sync sections omitted if not applicable to this story,
+  entity base class choice stated and justified per the project's conventions
+]
+before saving -> every item in gate must hold
+```
 
 ---
 
@@ -242,4 +247,3 @@ Always derive from the project's permission source (see project-context) — nev
 | TBD without a suggested default | Add "Suggested default: X" so impl can proceed |
 | Spec contains implementation code | Move to agent instructions, not spec |
 | Offline Sync section absent for an offline-synced entity | Add the section — the sync implementer needs it |
-```
