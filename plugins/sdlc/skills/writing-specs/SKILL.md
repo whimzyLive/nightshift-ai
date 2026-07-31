@@ -127,7 +127,9 @@ Derive role/permission names from the project's permission source (see project-c
 
 **Permissions:** the project's permission source (see project-context) — list the exact permission keys to add.
 
-## Web UI (omit section if not web-scoped)
+## Web UI
+
+Omit this section if not web-scoped.
 
 **Pages:**
 | Route | File | Description |
@@ -143,7 +145,9 @@ Derive role/permission names from the project's permission source (see project-c
 
 **Route permissions:** the project's route-permission config (see project-context) — which roles can access which routes.
 
-## Mobile UI (omit section if not mobile-scoped)
+## Mobile UI
+
+Omit this section if not mobile-scoped.
 
 **Screens:**
 | Route | File | Description |
@@ -157,7 +161,9 @@ Derive role/permission names from the project's permission source (see project-c
 
 **Offline writes:** if the project uses offline sync, list the offline write/transaction builders needed (one per mutating operation) and state their location per the project's sync layer (see project-context).
 
-## Offline Sync (omit section entirely if the project has no offline sync — see project-context)
+## Offline Sync
+
+Omit this section entirely if the project has no offline sync — see project-context.
 
 If the project uses offline sync, the spec MUST cover:
 

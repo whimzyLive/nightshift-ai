@@ -354,6 +354,7 @@ Agent({
     commit — most dispatches admit nothing, and that's expected."
 11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+13. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md." Also carries this phase's ledger row — `LEDGER_PHASE`, `LEDGER_AGENT`, `LEDGER_PLAN_SECTION`, `LEDGER_START_SHA`, `LEDGER_END_SHA`, `LEDGER_FILES_CHANGED`, `LEDGER_FILES_READ` (shape computed in Step 5), real values substituted — it names paths, not content.
 
 Never send just a task title.
 
@@ -381,6 +382,17 @@ the primary checkout — the domain agent's commits live there):
 git -C "$WORKTREE" log <BRANCH_PREFIX>/<STORY-KEY> --oneline -5      # local HEAD must have advanced
 git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>           # YOU push, from the worktree
 git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
+```
+
+Record this phase's ledger row (a cache, never a required input — never a STOP if any of this fails):
+
+```text
+LEDGER_FILE := $(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/phase-ledger.txt   # never $WORKTREE (D4)
+before dispatch -> LEDGER_START_SHA := git -C "$WORKTREE" rev-parse HEAD
+after the phase's commits -> LEDGER_END_SHA := git -C "$WORKTREE" rev-parse HEAD
+LEDGER_FILES_CHANGED := git -C "$WORKTREE" diff --name-only $LEDGER_START_SHA..$LEDGER_END_SHA, sorted, comma-joined   # from git, never the agent's return (D2)
+LEDGER_FILES_READ := the paths THIS dispatch prompt itself named
+append the LEDGER_* block for this phase to LEDGER_FILE
 ```
 
 Then assert the primary checkout matches its pre-dispatch snapshot exactly:
@@ -473,6 +485,7 @@ must dispatch the `agent-skills:code-reviewer` subagent and domain fix agents, w
 - `WORK_KIND` (`defect` | `feature`) — re-points QA's Step-7 verification: on `defect`, QA requires
   the systematic-debugging regression-evidence contract (failing-before/passing-after test) instead
   of the plan-task checklist (see `qa-engineer-playbook.md`).
+- The phase ledger (`LEDGER_FILE`) — **optional**: QA Step 3 falls back to git when absent (D3).
 
 The QA playbook runs: request review → triage → fix loop (dispatching domain agents) →
 re-review until clean → write learnings to memory → quality gate (the quality-gate commands from `.claude/project/project-context.md`)

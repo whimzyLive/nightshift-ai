@@ -46,15 +46,15 @@ interface ReferenceExample {
 
 **N/A** — reference artifact, no backend implementation.
 
-## Web UI (omit section if not web-scoped)
+## Web UI
 
 **N/A** — reference artifact is not web-scoped.
 
-## Mobile UI (omit section if not mobile-scoped)
+## Mobile UI
 
 **N/A** — reference artifact is not mobile-scoped.
 
-## Offline Sync (omit section entirely if the project has no offline sync — see project-context)
+## Offline Sync
 
 **N/A** — reference artifact has no offline-sync scope.
 

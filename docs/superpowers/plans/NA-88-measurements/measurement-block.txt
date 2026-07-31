@@ -1,0 +1,61 @@
+### Duplicate-read measurement (NA-88 / workstream C)
+base-ref:                ce62d4b   (spec quoted 0a905ff — the pre-#210 develop tip; ce62d4b is this branch's actual point, with 0a905ff as an ancestor)
+read classification, before:  first 657 / redundant 103 (12.9%) / overlapping 14 / disjoint 24
+                              (duplicate-reads.py, global merged reading over all 107 resolved
+                              sessions in duplicate-reads-before.txt — no distinct NA-88 row exists;
+                              this run's own transcript had not flushed to a discoverable *.jsonl
+                              file at measurement time, a recorded timing artifact, not a tool defect)
+read classification, after:   NOT CAPTURED — this run executes almost entirely on the pre-change instruction surface; captured on the first full story run after NA-88 merges and posted as a comment on NA-88
+static instruction delta:     275269 -> 276262 est tok (+993, instruction-inventory.sh --base ce62d4b; POSITIVE, within the <= +1,000 budget)
+context-reuse.test.sh:        PASS (4 assertions)
+tier-1 regression, 5 rows:    5/5 CONTRACT_MATCH=true after C7 + C8
+QA rounds:                    <N>   (gate: must not increase) — DEFERRED: filled by the orchestrator (PE Step 4.1) once the QA loop (PE Step 6) completes; Phase 2 (this task) precedes QA in the ladder
+Fix dispatch:                 reuse <N> / fresh <N>   (AC-3 evidence, from the QA verdict block) — DEFERRED, same reason as QA rounds
+cache hit rate:                <before>% -> <after>%   (gate: >= 94%) — DEFERRED: cache-analysis.py needs this run's own completed transcripts, not available at Phase 2
+requests per story:           <before> -> <after>     (gate: must not increase) — DEFERRED, same reason as cache hit rate
+avg / peak resident:          <before> -> <after>     (gate: must not increase) — DEFERRED, same reason as cache hit rate
+loop passes per PR:            <before> -> <after>     (gate: must not increase) — DEFERRED, same reason as cache hit rate
+
+### NA-87 D12 tier-2 result — all five artifact types, real merged artifacts
+                    as found                              after C7 + C8
+1 spec doc          template 18 / artifact 1 / false      template 18 / artifact 18 / true
+2 plan doc          template 4 / artifact 2 / false       template 4 / artifact 4 / true
+3 adr               template 8 / artifact 1 / false       template 8 / artifact 8 / true
+4 review-round      DEFERRED to Task 3.1 (artifact not yet written by QA Step 5)
+5 rule entry        template 7 / artifact 7 / true        template 7 / artifact 7 / true
+artifact used, per row: 1 docs/superpowers/specs/NA-88.md (post-change) | 2 docs/superpowers/plans/NA-88.md (post-change) | 3 docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md (pre-change merged instance) | 4 deferred | 5 .claude/memories/agents/ai-enablement-engineer/worktree-scoped-git-config-immutable-marker.md (named merged fallback, unless this run admits a rule entry)
+fence ordinals re-confirmed against post-C7/C8 files: yes — all four (rows 1, 2, 3, 5) resolved cleanly via --extract, no correction needed
+interpretation: rows 1-3 — instrument defect, not an NA-87 regression (see tier2-contract-diff.txt for the two independent causes per row, both now fixed by C7 + C8). Row 5 already matched under the pre-C7 matcher (flat 7-field YAML block, no extra structural headings) and continues to match — no regression, no new pass introduced by the remedy for this row. Row 4 deferred to Task 3.1.
+
+Gap fills recorded in this story (flag in PR body):
+  1. base-ref substitution: spec quoted 0a905ff (develop tip pre-#210); this branch is cut from
+     ce62d4b, which has 0a905ff as an ancestor — ce62d4b used in every --base/--fence command per
+     the plan's gap fill.
+  2. (file, isSidechain) transcript partition (D9 + gap fill) — duplicate-reads.py partitions by
+     (file path, bool(record.get("isSidechain"))) rather than the spec's literal "separate files"
+     wording, to match this harness's actual record shape where a subagent's records can share a
+     file with the orchestrator's.
+  3. tools/sdlc-analyser/__tests__/ is a new test directory — tools/ had none before this story.
+
+duplicate-reads.py fail-then-pass evidence (Task 1.4, platform-engineer): assertions 2-5 of
+  artifact-contract.test.sh were confirmed to fail against the pre-C7 script
+  (git show ce62d4b:tools/sdlc-analyser/artifact-contract.sh) before C7 landed, then pass after —
+  see tools/sdlc-analyser/__tests__/artifact-contract.test.sh and the Phase 1 commit for the
+  captured evidence.
+
+context-reuse.test.sh fail-then-pass evidence (Task 2.5, this phase): run against HEAD before Task
+  2.1's commit (all 3 refs files stashed back to their pre-edit state) — all 6 applicable assertions
+  (a, b x2, c x3) FAILed for the expected reason (no '## Context reuse' heading/pointer/ledger token
+  present yet); assertion (d) trivially PASSed at 0 bytes. After restoring the edits, all 4
+  assertions (a-d) PASS, including (d) at 868 bytes (<= 900).
+
+branch-inventory.sh outcome counts (--base ce62d4b), recorded per Task 2.8's instruction — expected
+  to increase, not a regression: this story ADDS decision outcomes (the ledger fallback chain, the
+  REUSE reason set):
+  plugins/sdlc/refs/principal-engineer-playbook.md: OUTCOMES_BASE=56 -> OUTCOMES_HEAD=57
+  plugins/sdlc/refs/qa-engineer-playbook.md:        OUTCOMES_BASE=28 -> OUTCOMES_HEAD=30
+
+deferred-runtime obligation (stated here so it is not silently dropped): the "after" read-
+  classification row and the runtime rows marked DEFERRED above are captured by running
+  duplicate-reads.py / cache-analysis.py over the transcripts of the first full story run after
+  NA-88 merges (NA-89, or whichever Phase-1/2 story runs next), and posted as a comment on NA-88.

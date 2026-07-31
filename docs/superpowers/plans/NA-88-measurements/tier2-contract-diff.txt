@@ -81,7 +81,89 @@ CONTRACT_* report (no exit 2 / REASON=), so no ordinal correction was needed for
 this as-found reading.
 
 === after C7 + C8 ===
-(appended in Task 2.7 by ai-enablement-engineer)
+
+Fence ordinals re-confirmed against the post-C7/C8 files before trusting any of them (--extract on
+each template/section/fence used below): all four resolved cleanly to the expected schema items
+(spec template headings; plan-format headings; ADR template headings; the 7-field rule-entry
+schema) — no ordinal shifted, no correction needed. C1's new `## Context reuse` section sits above
+`## Memory write` in domain-agent-handoff.md and does not move row 5's `--fence 2`; C3/C4's new
+pseudocode lives in QA Step 3, not Step 5, so row 4's `--fence 3,4` (deferred to Task 3.1) is also
+unaffected; C8 inserts no fence, so row 1's `--fence 1` held.
+
+Tier-1 regression (the five NA-87 commands, against the five ref-*.md artifacts, post-C7+C8):
+5/5 CONTRACT_MATCH=true — merge gate satisfied.
+
+--- row 1: spec doc ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/skills/writing-specs/SKILL.md --section "## Spec Template" --fence 1 --artifact docs/superpowers/specs/NA-88.md
+TEMPLATE=plugins/sdlc/skills/writing-specs/SKILL.md
+ARTIFACT=docs/superpowers/specs/NA-88.md
+CONTRACT_TEMPLATE=18
+CONTRACT_ARTIFACT=18
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 18 (matches the as-found reading and NA-87's
+  stated 18 — no drift)
+provenance: post-change, produced by this run (spec doc for this very story) — same artifact as the
+  as-found reading
+interpretation: C7's ordered-subsequence fix resolves cause (1) (the artifact's own extra
+  structural headings no longer abort the match) and C8's heading fix resolves cause (2) (the three
+  instruction-parenthetical headings now match their plain counterparts) — full match.
+
+--- row 2: plan doc ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/agents/tech-lead.md --section "## Output: implementation plan" --fence 3 --artifact docs/superpowers/plans/NA-88.md
+TEMPLATE=plugins/sdlc/agents/tech-lead.md
+ARTIFACT=docs/superpowers/plans/NA-88.md
+CONTRACT_TEMPLATE=4
+CONTRACT_ARTIFACT=4
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 4 (matches the as-found reading and NA-87's
+  stated 4 — no drift)
+provenance: post-change, produced by this run (plan doc for this very story) — same artifact as the
+  as-found reading
+interpretation: C7's ordered-subsequence fix resolves cause (1) — the plan's own extra headings
+  (## Global Constraints, ## File structure, etc.) are now skipped rather than desyncing the match.
+  This row had no C8-addressable cause; C7 alone fixes it.
+
+--- row 3: adr ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/skills/writing-adrs/SKILL.md --section "## Template" --fence 1 --artifact docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md
+TEMPLATE=plugins/sdlc/skills/writing-adrs/SKILL.md
+ARTIFACT=docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md
+CONTRACT_TEMPLATE=8
+CONTRACT_ARTIFACT=8
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 8 (matches the as-found reading and NA-87's
+  stated 8 — no drift)
+provenance: PRE-CHANGE merged instance (docs/adr/0017-...) — unchanged artifact, same as the
+  as-found reading; proves the instrument and the no-section-drop property against a genuine ADR,
+  NOT the post-change template's own output.
+interpretation: C7's ordered-subsequence + placeholder-normalised fix resolves cause (1) — the
+  ADR's leading title-line placeholder (`[Decision title ...]`) and the `[Alternative 2 name]`
+  placeholder now match as wildcards after resynchronisation.
+
+--- row 4: review-round ---
+4 review-round: DEFERRED to Task 3.1 (artifact not yet written by QA Step 5)
+
+--- row 5: rule entry ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/refs/domain-agent-handoff.md --section "## Memory write (before committing)" --fence 2 --artifact .claude/memories/agents/ai-enablement-engineer/worktree-scoped-git-config-immutable-marker.md
+TEMPLATE=plugins/sdlc/refs/domain-agent-handoff.md
+ARTIFACT=.claude/memories/agents/ai-enablement-engineer/worktree-scoped-git-config-immutable-marker.md
+CONTRACT_TEMPLATE=7
+CONTRACT_ARTIFACT=7
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 7 (matches the as-found reading and NA-87's
+  stated 7 — no drift)
+provenance: named merged fallback (per spec/plan Task 1.1) unless this run admits a rule entry,
+  decided at Task 3.1
+interpretation: unchanged from the as-found reading — this artifact already matched under the
+  pre-C7 matcher (flat 7-field YAML block, no extra structural headings), and continues to match
+  after C7 + C8. No regression, no new pass introduced by the remedy for this row.
 
 === row 4 + row 5 final ===
 (appended in Task 3.1 by ai-enablement-engineer, after QA Step 5 writes this run's review-round file)
