@@ -273,11 +273,64 @@ function parse_value(line,    p, rest) {
   p = index(rest, ":")
   return substr(rest, p + 1)
 }
-function is_placeholder(v) {
-  if (v ~ /\[[^]]*\]/) return 1
-  if (v ~ /<[^>]*>/) return 1
-  if (index(v, "NNNN") > 0) return 1
-  return 0
+
+# esc_char: backslash-escape a single ERE metacharacter; every other character is returned as-is.
+function esc_char(c,    meta) {
+  meta = ".*+?()[]{}|^$\\"
+  if (index(meta, c) > 0) return "\\" c
+  return c
+}
+
+function is_word_char(c) { return (c ~ /[A-Za-z0-9_]/) }
+
+# regex_of: escape every ERE metacharacter in v, then replace each placeholder run — bracketed
+# [...], angled <...>, or the bare ordinal token NNNN or N (word-boundary delimited on both
+# sides so `N` inside `NON` or `LEDGER_PHASE` is never a placeholder) — with `.*`, then anchor
+# ^...$. Escaping happens character-by-character as we walk left to right, so a literal `[` or
+# `1.` in a non-placeholder position is escaped, never treated as a wildcard opener.
+function regex_of(v,    result, i, n, closeat, prevc, nextc) {
+  result = ""
+  n = length(v)
+  i = 1
+  while (i <= n) {
+    if (substr(v, i, 1) == "[") {
+      closeat = index(substr(v, i + 1), "]")
+      if (closeat > 0) {
+        result = result ".*"
+        i = i + 1 + closeat
+        continue
+      }
+    }
+    if (substr(v, i, 1) == "<") {
+      closeat = index(substr(v, i + 1), ">")
+      if (closeat > 0) {
+        result = result ".*"
+        i = i + 1 + closeat
+        continue
+      }
+    }
+    if (substr(v, i, 4) == "NNNN") {
+      prevc = (i > 1) ? substr(v, i - 1, 1) : ""
+      nextc = substr(v, i + 4, 1)
+      if (!is_word_char(prevc) && !is_word_char(nextc)) {
+        result = result ".*"
+        i = i + 4
+        continue
+      }
+    }
+    if (substr(v, i, 1) == "N") {
+      prevc = (i > 1) ? substr(v, i - 1, 1) : ""
+      nextc = substr(v, i + 1, 1)
+      if (!is_word_char(prevc) && !is_word_char(nextc)) {
+        result = result ".*"
+        i = i + 1
+        continue
+      }
+    }
+    result = result esc_char(substr(v, i, 1))
+    i++
+  }
+  return "^" result "$"
 }
 
 FNR == NR {
@@ -295,15 +348,25 @@ FNR == NR {
 }
 
 END {
+  # Ordered subsequence, not strict position: a forward-only cursor `a` over the artifact list.
+  # For each template item, scan artifact items from `a` upward for the first match; on a match,
+  # advance the cursor past it. Artifact-side items the template does not name are skipped, not
+  # treated as a mismatch — a produced artifact is legitimately a superset of its template.
+  a = 1
   missing = ""
   matched = 0
   for (j = 1; j <= T; j++) {
-    ok = 0
-    if (j <= A && tkind[j] == akind[j]) {
-      if (tval[j] == aval[j] || is_placeholder(tval[j])) ok = 1
+    tre = regex_of(tval[j])
+    found = 0
+    for (i = a; i <= A; i++) {
+      if (tkind[j] == akind[i] && aval[i] ~ tre) {
+        found = 1
+        matched++
+        a = i + 1
+        break
+      }
     }
-    if (ok) matched++
-    else {
+    if (!found) {
       item = tkind[j] ":" tval[j]
       missing = (missing == "") ? item : missing ";;" item
     }

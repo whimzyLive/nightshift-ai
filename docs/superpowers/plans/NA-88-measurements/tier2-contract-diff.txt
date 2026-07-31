@@ -1,0 +1,87 @@
+NA-88 tier-2 contract diff — NA-87 D12 obligation, all five artifact types, real merged artifacts.
+Captured with tools/sdlc-analyser/artifact-contract.sh — as-found readings taken with the CURRENT
+(pre-C7) matcher, BEFORE any change to artifact-contract.sh, per plan Task 1.1 ordering.
+
+=== as-found (pre-C7 matcher, this worktree @ 5c40c49) ===
+
+--- row 1: spec doc ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/skills/writing-specs/SKILL.md --section "## Spec Template" --fence 1 --artifact docs/superpowers/specs/NA-88.md
+TEMPLATE=plugins/sdlc/skills/writing-specs/SKILL.md
+ARTIFACT=docs/superpowers/specs/NA-88.md
+CONTRACT_TEMPLATE=18
+CONTRACT_ARTIFACT=1
+CONTRACT_MISSING=heading:## Overview;;heading:## Data Model;;heading:### New Entities;;heading:### Modified Entities;;heading:### Relationships;;heading:## API Surface;;heading:### New Endpoints;;heading:### Request / Response Shapes;;fence:typescript;;heading:### Permissions;;heading:## Backend Implementation;;heading:## Web UI (omit section if not web-scoped);;heading:## Mobile UI (omit section if not mobile-scoped);;heading:## Offline Sync (omit section entirely if the project has no offline sync — see project-context);;heading:## Error Handling;;heading:## Out of Scope;;heading:## Open Questions
+CONTRACT_MATCH=false
+exit=1
+CONTRACT_TEMPLATE re-derived from this run's output: 18 (matches NA-87's stated 18 — no drift)
+provenance: post-change, produced by this run (spec doc for this very story)
+interpretation: instrument defect, not an NA-87 regression. Two independent causes per the spec's
+  "Interpreting the result": (1) positional matching cannot resynchronise past the artifact's own
+  extra structural headings (## Scope map, ## Global Constraints, etc. — not named by the template)
+  -> C7's ordered-subsequence fix; (2) three template headings carry an instruction parenthetical
+  ("Web UI (omit section if not web-scoped)" etc.) that no produced artifact copies verbatim
+  -> C8's heading fix. This is the predicted finding, not a failure of this phase.
+
+--- row 2: plan doc ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/agents/tech-lead.md --section "## Output: implementation plan" --fence 3 --artifact docs/superpowers/plans/NA-88.md
+TEMPLATE=plugins/sdlc/agents/tech-lead.md
+ARTIFACT=docs/superpowers/plans/NA-88.md
+CONTRACT_TEMPLATE=4
+CONTRACT_ARTIFACT=2
+CONTRACT_MISSING=heading:## Execution order;;heading:## Phase N — [Domain] [agent-name]
+CONTRACT_MATCH=false
+exit=1
+CONTRACT_TEMPLATE re-derived from this run's output: 4 (matches NA-87's stated 4 — no drift)
+provenance: post-change, produced by this run (plan doc for this very story)
+interpretation: instrument defect, cause (1) only — positional matching cannot resynchronise past
+  this plan's own extra headings (## Global Constraints, ## File structure, etc.) inserted before
+  ## Execution order. C7's ordered-subsequence fix addresses this directly.
+
+--- row 3: adr ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/skills/writing-adrs/SKILL.md --section "## Template" --fence 1 --artifact docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md
+TEMPLATE=plugins/sdlc/skills/writing-adrs/SKILL.md
+ARTIFACT=docs/adr/0017-lean-pseudocode-encoding-for-procedural-instructions.md
+CONTRACT_TEMPLATE=8
+CONTRACT_ARTIFACT=1
+CONTRACT_MISSING=heading:# NNNN. [Decision title — a short noun phrase naming what was decided];;heading:## Status;;heading:## Decision;;heading:## Context;;heading:## Alternatives Considered;;heading:### [Alternative 2 name];;heading:## Consequences
+CONTRACT_MATCH=false
+exit=1
+CONTRACT_TEMPLATE re-derived from this run's output: 8 (matches NA-87's stated 8 — no drift)
+provenance: PRE-CHANGE merged instance (docs/adr/0017-...) — no ADR is authored during NA-88. Proves
+  the instrument and the no-section-drop property against a genuine ADR, NOT the post-change
+  template's own output.
+interpretation: instrument defect, cause (1) only — positional matching cannot resynchronise past
+  this ADR's own leading title-line mismatch (placeholder bracket normalisation is also cause (2)-
+  adjacent: the bracketed placeholders `[Decision title ...]` and `[Alternative 2 name]` are not
+  matched as wildcards by the pre-C7 is_placeholder() applied per-position after the very first
+  desync). C7's ordered-subsequence + placeholder-normalised fix addresses this.
+
+--- row 4: review-round ---
+4 review-round: DEFERRED to Task 3.1 (artifact not yet written by QA Step 5)
+
+--- row 5: rule entry ---
+command: bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/refs/domain-agent-handoff.md --section "## Memory write (before committing)" --fence 2 --artifact .claude/memories/agents/ai-enablement-engineer/worktree-scoped-git-config-immutable-marker.md
+TEMPLATE=plugins/sdlc/refs/domain-agent-handoff.md
+ARTIFACT=.claude/memories/agents/ai-enablement-engineer/worktree-scoped-git-config-immutable-marker.md
+CONTRACT_TEMPLATE=7
+CONTRACT_ARTIFACT=7
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+CONTRACT_TEMPLATE re-derived from this run's output: 7 (matches NA-87's stated 7 — no drift)
+provenance: named merged fallback (per spec/plan Task 1.1) unless this run admits a rule entry,
+  decided at Task 3.1
+interpretation: matches even under the pre-C7 matcher — the artifact is a flat 7-field YAML
+  frontmatter block with no extra structural headings inserted before it, so strict positional
+  matching happens to hold here. Not evidence the instrument is fine generally; rows 1-3 show
+  otherwise.
+
+fence ordinals re-confirmed against the files used above: all four commands ran to a clean
+CONTRACT_* report (no exit 2 / REASON=), so no ordinal correction was needed for rows 1, 2, 3, 5 at
+this as-found reading.
+
+=== after C7 + C8 ===
+(appended in Task 2.7 by ai-enablement-engineer)
+
+=== row 4 + row 5 final ===
+(appended in Task 3.1 by ai-enablement-engineer, after QA Step 5 writes this run's review-round file)

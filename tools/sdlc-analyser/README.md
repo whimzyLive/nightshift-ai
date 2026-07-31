@@ -1,10 +1,11 @@
 # sdlc-analyser
 
-Manual measurement tools for NA-86/NA-87 (instruction-load reduction, artifact-encoding
-reproducibility). Read-only: these scripts read the repo and `~/.claude/projects/**/*.jsonl`
-transcripts, and never write to either. Not wired into CI (`artifact-encoding.test.sh`, shipped
-under `plugins/sdlc/scripts/__tests__/`, is the one exception — see `artifact-contract.sh` below
-for why this tool set stays out of CI) — run them by hand and paste the output into a PR body.
+Manual measurement tools for NA-86/NA-87/NA-88 (instruction-load reduction, artifact-encoding
+reproducibility, duplicate-read classification). Read-only: these scripts read the repo and
+`~/.claude/projects/**/*.jsonl` transcripts, and never write to either. Not wired into CI
+(`artifact-encoding.test.sh`, shipped under `plugins/sdlc/scripts/__tests__/`, is the one exception —
+see `artifact-contract.sh` below for why this tool set stays out of CI) — run them by hand and paste
+the output into a PR body.
 
 ## `instruction-inventory.sh`
 
@@ -184,11 +185,44 @@ on the first two colons.
 ### `--template <t> --artifact <a>` diff mode
 
 The artifact side is always extracted **whole** — no selectors apply to `--artifact`. Comparison is
-**positional and order-sensitive**: item _i_ of the template's ordered item list is compared against
-item _i_ of the artifact's ordered item list (a direct zip, not a search/realignment). Item _i_
-matches when `kind` is equal **and** the values match, where a template value containing a
-placeholder — `[...]`, `<...>`, or the literal `NNNN` — matches **any** artifact value of the same
-kind at that position. A template item with no artifact counterpart at its position is **missing**.
+**ordered subsequence, placeholder-normalised** (NA-88 C7 — see "Why the matcher changed" below for
+the defect this replaced):
+
+1. **Ordered subsequence, not strict position.** A forward-only cursor over the artifact's ordered
+   item list. For each template item _j_, scan artifact items from the cursor upward for the first
+   match; on a match, advance the cursor to just past it. Artifact-side items the template does not
+   name are **skipped, not treated as a mismatch** — a produced artifact is legitimately a superset
+   of its template. A template item with no match found (scanning to the end of the artifact list
+   from the cursor) is **missing**.
+2. **Placeholder-normalised, whole-string match.** Item _i_ matches template item _j_ when `kind` is
+   equal **and** the artifact value matches the template value's placeholder-normalised regex: every
+   ERE metacharacter in the template value is escaped, then every placeholder run — bracketed
+   `[...]`, angled `<...>`, or the bare ordinal token `NNNN` or `N` — is replaced with `.*`, then the
+   whole pattern is anchored `^...$`. A bare `N`/`NNNN` run only counts as a placeholder when
+   delimited by a non-alphanumeric/non-underscore character (or a string boundary) on **both**
+   sides — so the `N` inside `NON` or `LEDGER_PHASE` is never wildcarded, and only a token that is
+   genuinely just `N` or `NNNN` on its own is. Escaping happens **before** wildcard substitution, so
+   a literal `[` or `1.` in a non-placeholder position is escaped, never treated as a regex opener.
+   `## Phase N — [Domain] [agent-name]` matches `## Phase 1 — Tooling / measurement instrument ·
+\`platform-engineer\``.
+
+### Why the matcher changed (NA-88 C7)
+
+NA-87's D12 tier-2 obligation — run the matcher against real, independently-produced artifacts
+rather than the reference artifacts the same template-authoring agent generated to match its own
+template — surfaced two independent causes of a near-total mismatch on real artifacts:
+**(1) positional matching could not resynchronise** past any artifact-side heading the template does
+not name (every real artifact has some — `## Scope map`, `## Global Constraints`, and so on), so one
+extra heading aborted every subsequent comparison; and **(2) the old `is_placeholder()` rule made
+any template value containing a placeholder marker match _any_ artifact value of the same kind at
+that position**, regardless of whether the non-placeholder text actually corresponded — a blanket
+match, not a real check. C7 replaces both: ordered-subsequence resynchronises past unnamed headings,
+and whole-string placeholder-normalised regex matching validates the literal portions of a value
+instead of waving the whole item through. **Regression proof:** all five NA-87 tier-1 reference
+artifacts still report `CONTRACT_MATCH=true` (subsequence matching is a strict superset of exact
+positional matching), and a deliberately dropped template heading still reports
+`CONTRACT_MATCH=false` naming it — both proven in
+`tools/sdlc-analyser/__tests__/artifact-contract.test.sh`.
 
 ```text
 TEMPLATE=plugins/sdlc/skills/writing-specs/SKILL.md
@@ -210,6 +244,71 @@ a `--section`/`--fence` selector does not resolve — in that case the report is
 `ARTIFACT=`, `CONTRACT_ARTIFACT=-1`, `REASON=<what failed>`, and the author supplies a manual count.
 **These non-zero exits are consumed by the author, never by CI** (D7) — `artifact-contract.sh` is
 not wired into any CI job, on this repo or any fork.
+
+## `duplicate-reads.py`
+
+```text
+python3 tools/sdlc-analyser/duplicate-reads.py <label> <transcript.jsonl>... [--per-story] [--json]
+```
+
+Python 3, stdlib only, read-only. Classifies every `Read` tool-use call in a transcript into one of
+four classes and reports the redundant share — the instrument NA-88's C target and AC-4 depend on.
+
+### The read-classification rule (verbatim — an unstated rule makes before/after non-reproducible,
+
+the same discipline as the padded-row and content-contract rules above)
+
+Within one transcript, for each `Read` tool-use in file order, with `whole := offset is None AND
+limit is None` and a window's extent `[offset or 1, (offset or 1) + (limit or 2000) - 1]`:
+
+```text
+no earlier read of this path -> first read
+any earlier read of this path was whole -> redundant                       # the whole file is already in the transcript
+this read is whole AND an earlier read of this path exists -> redundant     # supersedes the earlier window, re-bills it
+window intersects an earlier window of this path -> overlapping
+otherwise -> disjoint                                                      # legitimate: a new region of a file read in parts
+```
+
+first-match-wins, top to bottom.
+
+**Locating a `Read` call:** each transcript line is one JSON record; a `Read` tool-use is any item of
+`record["message"]["content"]` (when it is a list) with `type == "tool_use"` and `name == "Read"`.
+The path is `item["input"]["file_path"]` (after `os.path.expanduser` — no realpath resolution, so a
+symlink alias is not provably a duplicate), the window is `item["input"].get("offset")` /
+`item["input"].get("limit")`.
+
+**Transcript partition — `(file, isSidechain)`, not the spec's literal "separate files" wording
+(D9, gap fill).** The spec's unit is one `.jsonl` file per transcript. On this harness a subagent's
+records can share the _same_ `.jsonl` file as the orchestrator's, distinguished only by
+`isSidechain: true`. Classification state is therefore partitioned by **`(transcript path,
+bool(record["isSidechain"]))`**, not by file alone — this implements D9's binding rule (a subagent's
+context genuinely does not hold the orchestrator's reads) on this harness's actual record shape. A
+path read by the orchestrator and again by a subagent in the same `.jsonl` file is never counted as
+a duplicate of each other.
+
+**Categories — exactly four `DuplicateReadCategory` values, derived from the path, first-match-wins:**
+
+```text
+plugins/sdlc/ in path, or both /plugins/ and /sdlc/ in path (a resolved plugin-cache path) -> plugin-instruction
+docs/superpowers/ in path, or .claude/memories in path -> self-generated-artifact
+.claude/ in path, or basename is CLAUDE.md or AGENTS.md -> project-config
+otherwise -> source-other
+```
+
+`--per-story` groups by the story key parsed from each record's `gitBranch` (same `STORY_KEY_RE` /
+`story_key()` as `cache-analysis.py`; unmatched → `unlabeled`) and prints one report section per
+story.
+
+`--json` emits the `DuplicateReadReport` contract verbatim (`label`, `sessions`, `totalReads`,
+`firstRead`, `redundantAfterWhole`, `overlappingWindow`, `disjointWindow`, `redundantShare` —
+`redundantAfterWhole / totalReads`, `0` when `totalReads == 0` — `byCategory`, `topPaths` — the 10
+highest by `redundant`, ties broken by `reads` then `path`) plus `skippedLines`. Without `--json`, a
+human-readable table with the same numbers.
+
+**Fail-loud (`cache-analysis.py` precedent):** if no given path resolves to a readable file, prints
+the paths tried to stderr and **exits 1** — never a zeroed report that reads like a real empty
+result. **Unparseable line:** skipped, counted in `skippedLines`, and the scan continues — **exits
+0**, because a truncated last line is normal in a live transcript.
 
 ## `cache-analysis.py`
 
