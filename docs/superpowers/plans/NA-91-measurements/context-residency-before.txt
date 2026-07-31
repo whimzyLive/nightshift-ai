@@ -1,0 +1,32 @@
+# NA-91 baseline — context-residency.py over the pinned TOP-LEVEL corpus
+# base-ref: 4c3ad88
+# corpus:   docs/superpowers/plans/NA-91-measurements/corpus-list.txt
+# captured: 2026-07-31T14:55:08Z
+
+{
+  "label": "NA-91-before",
+  "topLevelTranscripts": 75,
+  "subagentTranscripts": 0,
+  "assistantTurns": 18978,
+  "toolResultExposure": 3008139995,
+  "boundaryTurn": null,
+  "boundaryCommand": null,
+  "transcriptsWithBoundary": 40,
+  "inheritedExposure": 1208566050,
+  "inheritedShare": 0.4017652276851563,
+  "cacheReadRatio": 0.9664223419981995,
+  "skippedLines": 0
+}
+
+# per-transcript inheritedShare, for the median the spec quotes (49.6%)
+# n=75  median=0.1174  p25=0.0000  p75=0.5279
+
+# DIVERGENCE: spec measured pooled inheritedShare 34.6% (n=86); this baseline measures 40.18%
+# (n=75, -11 sessions vs spec). +5.58pp, over the ±5pp band Task 1.5 Step 2a gates on. Per-
+# transcript median diverges further: spec 49.6% vs this baseline 11.74% (p25 0.0% vs 31.1%,
+# p75 52.79% vs 57.2%). transcriptsWithBoundary is 40 of 75 (53.3%) -- the other 35 sessions
+# never raised a PR (spec/plan/refine-only sessions) and score inheritedShare 0.0, pulling the
+# median down harder than the pooled figure (which weights by exposure, not by session count).
+# cacheReadRatio 96.64% matches the spec's cache-read figure almost exactly. The tool is not
+# adjusted to match either spec figure -- this is the corpus as it stands on this machine at
+# capture time, not a fit to a target.
