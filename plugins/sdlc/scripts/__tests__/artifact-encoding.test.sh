@@ -52,14 +52,42 @@ done
 # In-fence complement of instruction-inventory.sh --padding (which excludes fenced content by
 # design): a fenced table row is padded when a run of 2+ spaces sits between a `|` and cell
 # content, or when a delimiter-row cell's dash run is longer than the unpadded `---` form.
+#
+# Fence tracking is run-length-aware nesting (mirrors tools/sdlc-analyser/artifact-contract.sh's
+# backtick_run()/stack model, without modifying that file): a fence only closes on a bare
+# backtick-only line whose run length is >= the run length that opened it; a line with backticks
+# plus an info string always opens a new (possibly nested) fence, regardless of its run length
+# relative to the current top of stack. A naive "any 3+ backtick line toggles" model loses parity
+# inside a nested fence (e.g. a 4-backtick outer fence around a 3-backtick inner fence) and goes
+# blind to everything after — this is exactly the fence-parity bug this story's Task 2.2 repaired
+# in writing-specs/SKILL.md, so the guard must not itself use the naive model.
 check_fence_padding() {
   awk -v FILE="$1" '
     function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
-    BEGIN { fence = 0; fails = 0 }
+    function backtick_run(t,    i, c) {
+      c = 0
+      for (i = 1; i <= length(t); i++) {
+        if (substr(t, i, 1) == "`") c++
+        else break
+      }
+      return c
+    }
+    BEGIN { sp = 0; fails = 0 }
     {
       t = trim($0)
-      if (t ~ /^```/) { fence = !fence; next }
-      if (!fence) next
+      L = backtick_run(t)
+      if (L >= 3) {
+        bare = (length(t) == L)
+        if (sp > 0) {
+          topK = stack_k[sp]
+          if (bare && L >= topK) { sp--; next }
+          if (bare) { next }
+        }
+        sp++
+        stack_k[sp] = L
+        next
+      }
+      if (sp == 0) next
       if (t !~ /^\|.*\|$/) next
       inner = substr(t, 2, length(t) - 2)
       n = split(inner, cells, "|")
@@ -101,6 +129,35 @@ done
 if [ "$any_padding" -eq 0 ]; then
   echo "PASS: assertion 2 — no padded table row inside any fence across the five surfaces"
 fi
+
+# --- Assertion 2b (regression): nested-fence padding must still be caught -------------------
+# Fixture: a 4-backtick outer fence wrapping a 3-backtick inner fence that contains a padded
+# table row. A naive "any 3+ backtick line toggles" fence model loses parity on the inner
+# fence's open/close pair and goes blind to the padded row — this fixture pins the fix.
+nested_fixture="$(mktemp)"
+trap 'rm -f "$nested_fixture"' EXIT
+cat > "$nested_fixture" <<'FIXTURE'
+# Nested-fence regression fixture
+
+````markdown
+# Outer fence content
+
+```text
+| Field | Type           |
+| ----- | -------------- |
+| id    | uuid           |
+```
+````
+FIXTURE
+
+if check_fence_padding "$nested_fixture" 2>/dev/null; then
+  echo "FAIL: assertion 2b — nested-fence padded row not detected (fixture: $nested_fixture)" >&2
+  failures=$((failures + 1))
+else
+  echo "PASS: assertion 2b — nested-fence padded row detected (expected internal FAIL lines from the fixture scan suppressed above)"
+fi
+rm -f "$nested_fixture"
+trap - EXIT
 
 # --- Assertion 3: refs/artifact-encoding.md exists and stays pointer-only ------------------
 ref_file="plugins/sdlc/refs/artifact-encoding.md"
