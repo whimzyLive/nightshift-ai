@@ -215,7 +215,34 @@ def pct(part, whole):
     return round(100.0 * part / whole, 1) if whole else 0.0
 
 
+def wrapper_rewrites(wrapper_path, command):
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    try:
+        result = subprocess.run(
+            ["bash", wrapper_path],
+            input=payload.encode("utf-8"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError:
+        return 0
+    stdout = result.stdout.decode("utf-8", "ignore").strip()
+    if not stdout:
+        return 0
+    try:
+        updated = json.loads(stdout)["hookSpecificOutput"]["updatedInput"]["command"]
+    except (ValueError, KeyError, TypeError):
+        return 0
+    before = command.split("\n")
+    after = updated.split("\n")
+    if len(before) != len(after):
+        return 0
+    return sum(1 for a, b in zip(before, after) if a != b)
+
+
 def count_rewrites(opts, command, lines):
+    if opts["mode"] == "wrapper":
+        return wrapper_rewrites(opts["wrapper"], command)
     if "<<" in command:
         return 0
     first = lines[0]

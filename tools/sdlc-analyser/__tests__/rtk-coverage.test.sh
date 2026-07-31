@@ -23,4 +23,9 @@ assert_contains '"guardExclude": 1'         "$out" "subtracts the EXCLUDE-guarde
 assert_contains '"achievablePermitted": 3'  "$out" "permitted = raw - heredoc - EXCLUDE"
 assert_contains '"rewrites": 1'             "$out" "engine mode scans line 1 only"
 
+out="$(python3 "$tool" --wrapper "$fixtures/stub-wrapper.sh" --corpus-list "$fixtures/list.txt" --json 2>&1)"
+assert_contains '"rewrites": 3'           "$out" "wrapper mode counts every changed line"
+assert_contains '"lostPermitted": 0'      "$out" "stub loses nothing against the permitted denominator"
+assert_contains '"lostRaw": 2'            "$out" "raw denominator still shows the two guarded rewrites"
+
 exit "$fail"
