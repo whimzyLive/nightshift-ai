@@ -120,12 +120,137 @@ def main(argv):
     return 0
 
 
+EXCLUDE = ("tsc", "prettier", "nx", "eslint", "lint", "vitest", "jest", "pytest")
+RUNNER_PREFIXES = ("pnpm", "npm", "yarn", "bun", "npx", "bunx", "pnpx", "exec", "dlx", "run", "x")
+SEGMENT_SEPARATORS = ("&&", "||", ";", "|")
+
+_ORACLE_CACHE = {}
+
+
+def rtk_rewrites(line):
+    if line not in _ORACLE_CACHE:
+        try:
+            result = subprocess.run(
+                ["rtk", "hook", "check", "--", line],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            _ORACLE_CACHE[line] = result.returncode == 0
+        except OSError:
+            _ORACLE_CACHE[line] = False
+    return _ORACLE_CACHE[line]
+
+
+def split_segments(line):
+    segments = [line]
+    for separator in SEGMENT_SEPARATORS:
+        nxt = []
+        for segment in segments:
+            nxt.extend(segment.split(separator))
+        segments = nxt
+    return segments
+
+
+def resolve_head(segment):
+    words = segment.split()
+    while words:
+        word = words[0]
+        if "=" in word or word in RUNNER_PREFIXES:
+            words = words[1:]
+            continue
+        break
+    if not words:
+        return ""
+    return os.path.basename(words[0]).lower()
+
+
+def line_is_excluded(line):
+    return any(resolve_head(s) in EXCLUDE for s in split_segments(line))
+
+
 def build_report(opts, paths, commands):
-    return {"corpusFiles": len(paths), "bashCalls": len(commands)}
+    multi_line = 0
+    achievable_raw = 0
+    guard_heredoc = 0
+    guard_exclude = 0
+    rewrites = 0
+
+    for command in commands:
+        lines = command.split("\n")
+        if len(lines) > 1:
+            multi_line += 1
+        has_heredoc = "<<" in command
+        for line in lines:
+            if not line.strip() or not rtk_rewrites(line):
+                continue
+            achievable_raw += 1
+            if has_heredoc:
+                guard_heredoc += 1
+            elif line_is_excluded(line):
+                guard_exclude += 1
+        rewrites += count_rewrites(opts, command, lines)
+
+    permitted = achievable_raw - guard_heredoc - guard_exclude
+    lost_raw = achievable_raw - rewrites
+    lost_permitted = permitted - rewrites
+    return {
+        "mode": opts["mode"],
+        "wrapper": opts["wrapper"],
+        "corpusFiles": len(paths),
+        "bashCalls": len(commands),
+        "multiLine": multi_line,
+        "achievableRaw": achievable_raw,
+        "guardHeredoc": guard_heredoc,
+        "guardExclude": guard_exclude,
+        "achievablePermitted": permitted,
+        "rewrites": rewrites,
+        "lostRaw": lost_raw,
+        "lostRawPct": pct(lost_raw, achievable_raw),
+        "lostPermitted": lost_permitted,
+        "lostPermittedPct": pct(lost_permitted, permitted),
+    }
+
+
+def pct(part, whole):
+    return round(100.0 * part / whole, 1) if whole else 0.0
+
+
+def count_rewrites(opts, command, lines):
+    if "<<" in command:
+        return 0
+    first = lines[0]
+    if not first.strip() or line_is_excluded(first) or not rtk_rewrites(first):
+        return 0
+    return 1
 
 
 def print_report(report):
-    print(json.dumps(report, indent=2))
+    print("\n### rtk-coverage — %s" % report["mode"])
+    if report["wrapper"]:
+        print("wrapper: %s" % report["wrapper"])
+    print(
+        "corpus files %d  bash calls %d  multi-line %d (%.1f%%)"
+        % (
+            report["corpusFiles"],
+            report["bashCalls"],
+            report["multiLine"],
+            100.0 * report["multiLine"] / max(report["bashCalls"], 1),
+        )
+    )
+    print("achievable (raw)      %d" % report["achievableRaw"])
+    print("  guard: heredoc      -%d" % report["guardHeredoc"])
+    print("  guard: EXCLUDE      -%d" % report["guardExclude"])
+    print("achievable-permitted  %d" % report["achievablePermitted"])
+    print(
+        "rewrites %d   lost-vs-raw %d (%.1f%%)   lost-vs-permitted %d (%.1f%%)"
+        % (
+            report["rewrites"],
+            report["lostRaw"],
+            report["lostRawPct"],
+            report["lostPermitted"],
+            report["lostPermittedPct"],
+        )
+    )
 
 
 if __name__ == "__main__":
