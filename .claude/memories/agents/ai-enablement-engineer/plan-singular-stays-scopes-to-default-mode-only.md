@@ -2,7 +2,7 @@
 id: plan-singular-stays-scopes-to-default-mode-only
 agent: [ai-enablement-engineer]
 trigger: ['plan stays column names one decision table but new column spans two modes', 'splitting a command file with multiple REVIEW_AGENT-like modes into a fast path plus a ref', 'D7-style no-ref-load-on-a-cheap-pass requirement across multiple configurable modes']
-rule: When a plan's "stays in the fast path" column names a probe/decision-table in the singular but the "moves to the ref" column's line-range citation spans every configured mode's own probe+table, keep only the documented DEFAULT mode's mechanism native to the fast path and move every alternate mode's entire mechanism (probe, table, actions) to the ref — accept and document the ref-load cost for non-default configurations rather than duplicating every mode inline.
+rule: When a plan's singular "stays" column conflicts with a "moves" citation spanning every mode, keep only the default mode's mechanism in the fast path; move every other mode's mechanism to the ref.
 evidence: [NA-86]
 uses: 0
 status: active

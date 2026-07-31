@@ -3,8 +3,8 @@ id: ci-yml-unlisted-infra-ownership
 agent: [platform-engineer]
 trigger: [.github/workflows/ci.yml wiring, unlisted infra path, dispatch names an out-of-table path]
 rule: `.github/workflows/ci.yml` isn't a row in `project-context.md`'s workspace→agent table, but a dispatch's explicit "infrastructure" framing (or an ownership-split table in a spec) is a reasonable.
-evidence: [NA-25, NA-62]
-uses: 0
+evidence: [NA-25, NA-62, NA-86]
+uses: 1
 status: active
 ---
 

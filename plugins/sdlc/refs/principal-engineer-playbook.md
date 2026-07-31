@@ -6,13 +6,9 @@ The implementation-orchestration workflow for a Jira story. **This playbook is e
 INLINE by the top-level session** (via `/impl`, or `/auto`'s implementation phase) — it is
 NOT dispatched as a subagent.
 
-## Why inline (read this first)
+## Why inline
 
-Claude Code blocks subagent → subagent dispatch (nesting is one level deep, by design). The
-orchestrator's entire job is to dispatch domain agents with the `Agent` tool, so it MUST run
-where that tool works: the top-level session. If you dispatch `principal-engineer` as a
-subagent it will be unable to dispatch anyone and will return blocked. **Do not dispatch a
-`principal-engineer` subagent. Run these steps yourself in the main loop.**
+# rationale: refs/design-notes/inline-orchestration-rationale.md
 
 You (the top-level session) play the Principal Engineer role: you coordinate only. You never
 write feature code yourself — domain agents (`platform-engineer`, etc.) write code. You own

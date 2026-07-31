@@ -7,14 +7,9 @@ INLINE by the top-level session** — it is invoked by the Principal Engineer pl
 (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`, Step 6) once all domain-agent
 implementation phases are pushed to `<BRANCH_PREFIX>/<STORY-KEY>`. It is NOT dispatched as a subagent.
 
-## Why inline (read this first)
+## Why inline
 
-Claude Code blocks subagent → subagent dispatch (nesting is one level deep). The QA loop's
-whole job is to dispatch an `agent-skills:code-reviewer` subagent AND dispatch domain agents
-to fix what the review finds — both need the `Agent` tool, which only works at the top level.
-The Principal Engineer playbook already runs inline; when it reaches Step 6 it **continues
-running these QA steps in the same top-level session**. Do NOT dispatch a `qa-engineer`
-subagent — it would be unable to dispatch the reviewer or fixers and would return blocked.
+# rationale: refs/design-notes/inline-orchestration-rationale.md
 
 ## Role
 

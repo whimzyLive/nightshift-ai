@@ -82,3 +82,17 @@ naive `--check` misses.
   to the authoring agent/human rather than to an automated formatter. Revisit this decision if a
   Prettier/remark version ships that resolves the underlying parser ambiguities ADR 0002
   documented, or if `plugins/sdlc/**` moves to a different, non-Prettier formatting tool.
+- **Sibling rebase gate (cross-story obligation, ordering constraint 4).** The one-time unpad this
+  ADR ships rewrites nearly every `plugins/sdlc/**/*.md` file's table whitespace. Any sibling branch
+  open at the same time and also touching `plugins/sdlc/**/*.md` (e.g. NA-88, NA-90, NA-91) will
+  hit a table-shaped merge conflict on its next rebase past this change. After this ADR's commit
+  lands: **every such open sibling branch rebases onto it before its next push**, and any sibling PR
+  whose rebase produces a **table conflict** re-runs
+  `bash tools/sdlc-analyser/branch-inventory.sh <file> --base <merge-base>` on each conflicted file
+  and pastes the result in its own PR body — a hand-resolved conflict on a semantically-unchanged
+  table line is exactly how a decision-table row gets silently dropped, and this is the same AC-7
+  gate that catches it elsewhere in this story. `OUTCOMES_MATCH=false` blocks that sibling PR.
+  **Enforcement owner (per D12): the sibling PR's own author, checked at that PR's review** — NA-86
+  cannot gate a branch it does not own; its obligation is only to state this rule and ship the tool
+  (`tools/sdlc-analyser/branch-inventory.sh`, Phase 1). Mechanical CI enforcement on sibling
+  branches is explicitly out of scope for NA-86.

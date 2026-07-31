@@ -2,7 +2,7 @@
 id: branch-inventory-mismatch-expected-on-deliberate-relocation
 agent: [ai-enablement-engineer]
 trigger: ['branch-inventory.sh OUTCOMES_MATCH=false', 'ref split moves content to a sibling file', 'extracting bash into a new script', 'AC-7 gate on an A2/A3-converted file']
-rule: When branch-inventory.sh reports OUTCOMES_MATCH=false because content was deliberately relocated (not edited) to a sibling ref file or a new script, reconcile by summing the same outcome-class metric (decision-table rows, then if/elif/case lines) across every destination and require an exact match on at least one high-signal subclass before treating the mismatch as safe.
+rule: branch-inventory.sh OUTCOMES_MATCH=false from deliberate relocation (not an edit): reconcile by summing the outcome-class metric across every destination; require exact match on one subclass.
 evidence: [NA-86]
 uses: 0
 status: active
