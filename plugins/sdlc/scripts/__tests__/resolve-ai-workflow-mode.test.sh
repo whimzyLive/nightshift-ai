@@ -106,13 +106,88 @@ case "$SCENARIO" in
   all-error)
     exit 1
     ;;
+  rung2-transient-then-success)
+    # Rung-2 "is not EMPTY" probe: acli errors on attempts 1-2 (transient), succeeds on
+    # attempt 3 -> the real value is then read via `jira workitem view`.
+    if [ "$1 $2 $3" = "jira workitem search" ]; then
+      for a in "$@"; do
+        case "$a" in *'"AI Workflow" = "Full Auto"'*) exit 0 ;; esac  # rung 1: no match
+      done
+      for a in "$@"; do
+        case "$a" in
+          *'"AI Workflow" is not EMPTY'*)
+            n=0
+            [ -f "$MOCK_COUNTER_FILE" ] && n="$(cat "$MOCK_COUNTER_FILE")"
+            n=$((n + 1))
+            printf '%s' "$n" > "$MOCK_COUNTER_FILE"
+            if [ "$n" -lt 3 ]; then exit 1; fi  # simulated transient acli error
+            echo '{"key":"KEY-1"}'; exit 0
+            ;;
+        esac
+      done
+      exit 0
+    fi
+    if [ "$1 $2 $3" = "jira workitem view" ]; then
+      echo '{"fields":{"AI Workflow":{"value":"Assisted"}}}'
+      exit 0
+    fi
+    ;;
+  rung2-persistent-error)
+    # Rung-2 "is not EMPTY" probe: acli errors on all 3 attempts -> inconclusive ->
+    # falls through to the label rungs, which also don't match -> MODE=""/none.
+    if [ "$1 $2 $3" = "jira workitem search" ]; then
+      for a in "$@"; do
+        case "$a" in *'"AI Workflow" = "Full Auto"'*) exit 0 ;; esac  # rung 1: no match
+      done
+      for a in "$@"; do
+        case "$a" in
+          *'"AI Workflow" is not EMPTY'*)
+            n=0
+            [ -f "$MOCK_COUNTER_FILE" ] && n="$(cat "$MOCK_COUNTER_FILE")"
+            n=$((n + 1))
+            printf '%s' "$n" > "$MOCK_COUNTER_FILE"
+            exit 1  # simulated persistent acli error
+            ;;
+        esac
+      done
+      exit 0  # label rungs: no match either
+    fi
+    ;;
+  rung2-clean-empty-no-retry)
+    # Rung-2 "is not EMPTY" probe: acli succeeds but the field is genuinely unset (clean
+    # empty result) -> must NOT retry, must fall straight through to the label rungs.
+    if [ "$1 $2 $3" = "jira workitem search" ]; then
+      for a in "$@"; do
+        case "$a" in *'"AI Workflow" = "Full Auto"'*) exit 0 ;; esac  # rung 1: no match
+      done
+      for a in "$@"; do
+        case "$a" in
+          *'"AI Workflow" is not EMPTY'*)
+            n=0
+            [ -f "$MOCK_COUNTER_FILE" ] && n="$(cat "$MOCK_COUNTER_FILE")"
+            n=$((n + 1))
+            printf '%s' "$n" > "$MOCK_COUNTER_FILE"
+            exit 0  # clean call, no output -> no match, not an error
+            ;;
+        esac
+      done
+      exit 0  # label rungs: no match either
+    fi
+    ;;
 esac
 exit 0
 MOCK_ACLI
 chmod +x "$mockdir/acli"
 
 run_case() { # $1=scenario $2=issue-key
-  MOCK_SCENARIO="$1" PATH="$mockdir:$PATH" bash "$script" "$2"
+  # RETRY_SLEEP_SECS=0 keeps the rung-2 retry loop's back-off from slowing this test down —
+  # the loop's decision logic is exercised regardless of the sleep duration.
+  MOCK_SCENARIO="$1" RETRY_SLEEP_SECS=0 PATH="$mockdir:$PATH" bash "$script" "$2"
+}
+
+run_case_counted() { # $1=scenario $2=issue-key $3=counter-file -> sets $out, counter is at $3
+  rm -f "$3"
+  MOCK_SCENARIO="$1" RETRY_SLEEP_SECS=0 MOCK_COUNTER_FILE="$3" PATH="$mockdir:$PATH" bash "$script" "$2"
 }
 
 # --- Rung 1: field = Full Auto -------------------------------------------------------
@@ -175,6 +250,36 @@ if [ "$rc" -eq 0 ] && [ "$mode" = "" ] && [ "$src" = "none" ]; then
 else
   fail "rung 5 — got rc=$rc MODE=$mode MODE_SOURCE=$src"
 fi
+
+# --- Rung 2 retry loop: transient acli error on attempts 1-2, success on attempt 3 -----
+counter="$mockdir/counter-transient"
+out="$(run_case_counted rung2-transient-then-success KEY-1 "$counter")"
+mode="$(get_field "$out" MODE)"; src="$(get_field "$out" MODE_SOURCE)"
+attempts="$(cat "$counter" 2>/dev/null || echo 0)"
+[ "$mode" = "Assisted" ] && [ "$src" = "field" ] && [ "$attempts" -eq 3 ] \
+  && pass "rung 2 retry: transient error x2 then success on attempt 3 -> resolves real mode (MODE=Assisted), exit 0" \
+  || fail "rung 2 retry (transient-then-success) — got MODE=$mode MODE_SOURCE=$src attempts=$attempts"
+
+# --- Rung 2 retry loop: persistent acli error on all 3 attempts -----------------------
+counter="$mockdir/counter-persistent"
+rc=0
+out="$(run_case_counted rung2-persistent-error KEY-1 "$counter")" || rc=$?
+mode="$(get_field "$out" MODE)"; src="$(get_field "$out" MODE_SOURCE)"
+attempts="$(cat "$counter" 2>/dev/null || echo 0)"
+if [ "$rc" -eq 0 ] && [ "$mode" = "" ] && [ "$src" = "none" ] && [ "$attempts" -eq 3 ]; then
+  pass "rung 2 retry: persistent acli error on all 3 attempts -> MODE=\"\", MODE_SOURCE=none, exit 0"
+else
+  fail "rung 2 retry (persistent-error) — got rc=$rc MODE=$mode MODE_SOURCE=$src attempts=$attempts"
+fi
+
+# --- Rung 2 retry loop: a clean empty result must NOT trigger a retry -----------------
+counter="$mockdir/counter-clean-empty"
+out="$(run_case_counted rung2-clean-empty-no-retry KEY-1 "$counter")"
+mode="$(get_field "$out" MODE)"; src="$(get_field "$out" MODE_SOURCE)"
+attempts="$(cat "$counter" 2>/dev/null || echo 0)"
+[ "$mode" = "" ] && [ "$src" = "none" ] && [ "$attempts" -eq 1 ] \
+  && pass "rung 2 retry: clean empty result on first attempt -> no retry (probe invoked exactly once), falls through to labels" \
+  || fail "rung 2 retry (clean-empty-no-retry) — got MODE=$mode MODE_SOURCE=$src attempts=$attempts (want attempts=1)"
 
 echo
 if [ "$failures" -ne 0 ]; then

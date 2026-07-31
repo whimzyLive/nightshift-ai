@@ -38,6 +38,17 @@ set -uo pipefail
 # lag a just-written field, so a single empty/erroring probe is not proof the field is
 # unset. Retry a few times with a short back-off; only a clean, repeatable empty (or a
 # persistent error) falls through to the label rungs.
+#
+# This retry loop is a deliberate, jira-fetch.md-sanctioned addition beyond the ladder it
+# replaces — it does not alter any ladder outcome (rungs, precedence, or the final
+# MODE/MODE_SOURCE result are unchanged), only the number of attempts before a genuine
+# transient acli error is treated as terminal and falls through to the label rungs. A
+# clean, immediate empty result (rc=1) still falls through on the first attempt — the
+# retry fires only on rc=2 (acli errored), never on a clean empty.
+
+# RETRY_SLEEP_SECS: back-off between rung-2 retry attempts (default 2). Override to 0 in
+# tests so the retry-loop coverage runs instantly instead of paying the real back-off.
+RETRY_SLEEP_SECS="${RETRY_SLEEP_SECS:-2}"
 
 ISSUE_KEY="${1:-}"
 if [ -z "$ISSUE_KEY" ]; then
@@ -75,7 +86,7 @@ else
       break
     fi
     rung2_result=2
-    sleep 2
+    sleep "$RETRY_SLEEP_SECS"
   done
 
   if [ "$rung2_result" -eq 0 ]; then
