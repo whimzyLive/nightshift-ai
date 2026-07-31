@@ -3,8 +3,8 @@ id: rerun-gates-after-final-edit
 agent: [ai-enablement-engineer, platform-engineer, web-engineer, mobile-engineer, database-administrator, sync-engineer, knowledge-engineer]
 trigger: [about to report gate/test results, edited a file after running the gate, writing a memory or config file late in a dispatch]
 rule: Re-run every gate AFTER your last edit and report what that run printed. A stale pass reported as fresh is worse than no claim — it suppresses the check the coordinator would otherwise run.
-evidence: [NA-78, NA-89]
-uses: 2
+evidence: [NA-78, NA-89, NA-90]
+uses: 3
 status: active
 ---
 
