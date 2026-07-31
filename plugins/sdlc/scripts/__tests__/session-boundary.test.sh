@@ -53,7 +53,10 @@ fi
 if [ -f "$auto" ]; then
   body="$(block "$auto")"
   rows_ok=0
-  printf '%s\n' "$body" | grep -Fq -- 'SDLC_BOUNDARY_OFF' || rows_ok=1
+  # Match the ROW text, not the bare token — the block's trailing prose also names
+  # SDLC_BOUNDARY_OFF (the "set SDLC_BOUNDARY_OFF until it does not" sentence), so a bare-token
+  # grep would still pass after the row itself is deleted (proven by F-6's perturbation).
+  printf '%s\n' "$body" | grep -Fq -- 'SDLC_BOUNDARY_OFF set' || rows_ok=1
   printf '%s\n' "$body" | grep -Fq -- 'SDLC_SESSION_KEY set' || rows_ok=1
   printf '%s\n' "$body" | grep -Fq -- 'SDLC_SESSION_KEY unset' || rows_ok=1
   if [ "$rows_ok" -eq 0 ]; then
