@@ -6,8 +6,8 @@ inherited share, after:          NOT CAPTURED — see pilot-obligation.md
 cache-read ratio, before:        96.64%   (guardrail >= 94%; spec baseline 96.64%, headroom 2.64 pp)
 cache-read ratio, after:         NOT CAPTURED   (gate: >= 94%; modelled -0.06 pp for one boundary)
 static instruction delta:        276,634 -> 276,133 est tok (-501, instruction-inventory.sh --base 4c3ad88)
-always-loaded command bytes:     49,571 -> 47,720 bytes   (assertion (e) cap 49,571; -1,851, non-positive as required)
-session-boundary.test.sh:        PASS (6 assertions) — each proven capable of failing, Task 2.3
+always-loaded command bytes:     49,571 -> 48,394 bytes   (assertion (e) cap 49,571; -1,177, non-positive as required)
+session-boundary.test.sh:        PASS (7 assertions) — each proven capable of failing, Task 2.3
 context-residency.test.sh:       PASS — each metric proven capable of failing, Task 1.4
 Gate 2 falsifiability:           inheritedShare reaches 0.0 / 0.5 / 1.0 over the three fixed corpora
 avg / peak resident:             NOT CAPTURED   (gate: must not increase)
@@ -36,7 +36,10 @@ AMENDMENTS TO THE MERGED SPEC (see the plan's Amendments table for provenance):
   A1 F ships a CI-wired guard and two .github/workflows/ci.yml lines (spec said "F wires no CI").
   A2 A printed <<<SDLC_NEXT_INVOCATION:...>>> line is a NEW, additive harness protocol — the
      |PR= marker cannot carry --phase or the --on-clean auto-merge hook.
-  A3 SDLC_BOUNDARY_OFF is the runtime revert lever AC-2 demands.
+  A3 SDLC_BOUNDARY_ON is the runtime lever AC-2 demands — opt-in, unset by default, so the
+     unmodified path is byte-identical to today; corrected post-review from an initial opt-out
+     (SDLC_BOUNDARY_OFF) design that would have shipped the boundary ON by default under the
+     harness, silently unlooping every PR until an operator remembered to set the opt-out.
   A5 Interactive keeps today's inline tail; it only additionally prints the line.
 
 MECHANISM SUBSTITUTION (carried from the spec, restated for the reviewer):

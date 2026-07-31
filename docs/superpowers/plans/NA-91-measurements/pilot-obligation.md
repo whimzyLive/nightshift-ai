@@ -4,15 +4,24 @@ NA-91's own implementation run is NOT the pilot. It executed on the pre-change c
 `plugins/**` edits do not reach running agents at all — they read the plugin cache, not the repo.
 An after-number from this run would measure the old contract while reading as if it measured the new.
 
-Pilot selection rule — the first story satisfying ALL of:
+The boundary ships **opt-in** (`SDLC_BOUNDARY_ON`, unset by default) — the pilot cannot run until it
+is deliberately enabled, and enabling it is only safe once the harness satisfies its own
+precondition first. The two are strictly ordered: teach the harness, THEN flip the flag.
+
+Pilot selection rule — the first story satisfying ALL of, in this order:
 
 ```text
 ASSERT NA-91 has merged to develop
 ASSERT the sdlc plugin has been released AND the cache updated to that version   # else the run reads the OLD text
-ASSERT the harness re-invokes the printed <<<SDLC_NEXT_INVOCATION:...>>> line    # else set SDLC_BOUNDARY_OFF and defer
+ASSERT the harness re-invokes the printed <<<SDLC_NEXT_INVOCATION:...>>> line     # PRECONDITION 1
+ASSERT SDLC_BOUNDARY_ON is set for the pilot session, ONLY after PRECONDITION 1 holds   # PRECONDITION 2
 ASSERT it is a TRIAGE=full story run end-to-end through /sdlc:auto
 ASSERT NA-91 did not author it
 ```
+
+Do not set `SDLC_BOUNDARY_ON` to "see what happens" — with the harness precondition unmet, the
+pilot session's PR would raise, print a re-invocation line nothing reads, release, and never loop,
+review, or auto-merge, silently.
 
 The pilot MUST report, at minimum:
 
@@ -26,8 +35,9 @@ the corpus partition counts: subagentTranscripts must be 0
 ```
 
 Failure of any gate → **revert or re-sequence F. Never trade the guardrail for a smaller
-instruction surface** (AC-2, verbatim). `SDLC_BOUNDARY_OFF` is the runtime lever; a code revert is
-the fallback.
+instruction surface** (AC-2, verbatim). Unsetting `SDLC_BOUNDARY_ON` (the opt-in flag, off by
+default) is the runtime lever — it returns every session to today's inline-tail behaviour with no
+code change; a code revert is the fallback if the flag itself needs removing.
 
 One run cannot move AC-1's dollar figure (8-pt IQR $68.72). F's 7.0% cut-rate is NOT counted toward
 the programme's AC-1 until this pilot passes every gate (AC-5). Record the pilot's key in the merged
