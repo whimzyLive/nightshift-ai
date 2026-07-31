@@ -41,6 +41,24 @@ the earlier read happened in a DIFFERENT transcript -> read normally   # a dispa
 
 Precedence: correctness wins. Cannot establish the current content of a file you must edit -> read it. An unnecessary read is cheap; a wrong edit is not.
 
+## Bounded reads
+
+```text
+you need a named symbol/string, not the whole file -> Grep/Glob for it FIRST, then Read with offset around the hit
+file is over the threshold AND you are not executing it as instructions -> Read with limit; widen only if the window proves insufficient
+threshold := ~400 lines (limit=400)   # 2,000 est tok ~= 7,400 bytes ~= 400 lines; Read's own default cap is 2,000 lines
+```
+
+Carve-outs — a whole-file read here is correct, not a violation:
+
+```text
+the file IS the instruction you must execute (a playbook, a ref, your dispatch's plan/spec section) -> read whole   # executed end-to-end, not searched
+the file is under the threshold -> read whole   # 68.7% of candidate reads sit here; the window returns the file anyway, so the Grep is pure overhead
+you are about to Edit it and must establish its current content -> read whole
+```
+
+Precedence: correctness wins. A missing-context failure costs a QA round; an unnecessary whole read costs bytes. When in doubt, read more.
+
 ## Memory write (before committing)
 
 Memory is a set of small, self-describing rule files, not a diary. Collection at the start of your

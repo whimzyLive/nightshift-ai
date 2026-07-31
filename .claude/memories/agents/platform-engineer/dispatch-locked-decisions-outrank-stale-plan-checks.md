@@ -3,8 +3,8 @@ id: dispatch-locked-decisions-outrank-stale-plan-checks
 agent: [platform-engineer]
 trigger: [plan verify command conflicts with dispatch instruction, locked decision vs plan's stale check]
 rule: When a dispatch prompt's "locked decisions" conflict with a plan's own verify command, follow the dispatch instruction and treat the plan's check as stale.
-evidence: [NA-3]
-uses: 0
+evidence: [NA-3, NA-90]
+uses: 1
 status: active
 ---
 

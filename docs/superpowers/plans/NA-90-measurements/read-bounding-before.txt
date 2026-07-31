@@ -1,0 +1,107 @@
+{
+  "label": "NA-90-before",
+  "corpus": {
+    "topLevelTranscripts": 107,
+    "subagentTranscripts": 550
+  },
+  "totalReads": 6085,
+  "windowedReads": 1586,
+  "windowedShare": 0.2606409202958094,
+  "totalEstTokens": 12474626,
+  "windowedEstTokens": 2052799,
+  "p50EstTokens": 867,
+  "p95EstTokens": 9774,
+  "maxEstTokens": 25188,
+  "topDecileShare": 0.516806195231825,
+  "wholeReadsOverThreshold": 1338,
+  "thresholdEstTokens": 2000,
+  "byOrigin": [
+    {
+      "origin": "orchestrator",
+      "reads": 798
+    },
+    {
+      "origin": "subagent",
+      "reads": 5287
+    }
+  ],
+  "byCategory": [
+    {
+      "category": "plugin-instruction",
+      "reads": 1931
+    },
+    {
+      "category": "self-generated-artifact",
+      "reads": 805
+    },
+    {
+      "category": "project-config",
+      "reads": 1593
+    },
+    {
+      "category": "source-other",
+      "reads": 1756
+    }
+  ],
+  "topPaths": [
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/memories/agents/ai-enablement-engineer.md",
+      "reads": 29,
+      "estTokens": 322551
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/memories/agents/web-engineer.md",
+      "reads": 25,
+      "estTokens": 286562
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/project/project-context.md",
+      "reads": 283,
+      "estTokens": 220463
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/plugins/sdlc/refs/docs-pipeline.md",
+      "reads": 15,
+      "estTokens": 199761
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/docs/superpowers/specs/NA-53.md",
+      "reads": 11,
+      "estTokens": 181498
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/plugins/sdlc/commands/docs.md",
+      "reads": 14,
+      "estTokens": 136106
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.tmp/NA-52/pr115.diff",
+      "reads": 8,
+      "estTokens": 112728
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/plugins/sdlc/commands/init.md",
+      "reads": 7,
+      "estTokens": 99544
+    },
+    {
+      "path": "/Users/Rushi/.claude/plugins/cache/nightshift/sdlc/0.31.0/refs/principal-engineer-playbook.md",
+      "reads": 9,
+      "estTokens": 94050
+    },
+    {
+      "path": "/Users/Rushi/Development/EdgeTech/ai-workspace/nightshift/.claude/memories/agents/platform-engineer.md",
+      "reads": 11,
+      "estTokens": 88732
+    }
+  ],
+  "skippedLines": 0,
+  "unmatchedCalls": 0,
+  "windowLines": 400,
+  "carveOutEligibleReads": 5666,
+  "carveOutHits": 4113,
+  "carveOutMisses": 1553,
+  "carveOutHitRate": 0.7259089304624073,
+  "storiesObserved": 57,
+  "estTokensPerStory": 218853.08771929826
+}

@@ -1,0 +1,5 @@
+{"gitBranch":"feat/NA-555","message":{"content":[{"type":"tool_use","id":"e1","name":"Read","input":{"file_path":"/repo/src/edge-a.ts"}}]}}
+{"gitBranch":"feat/NA-555","message":{"content":[{"type":"tool_use","id":"e2","name":"Read","input":{"file_path":"/repo/src/edge-b.ts"}}]}}
+{"gitBranch":"feat/NA-555","message":{"content":[{"type":"tool_use","id":"e3","name":"Bash","input":{"command":"ls"}}]}}
+{"message":{"content":[
+{"gitBranch":"feat/NA-555","message":{"content":[{"type":"tool_result","tool_use_id":"e1","content":"hello"}]}}

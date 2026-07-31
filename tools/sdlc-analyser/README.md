@@ -1,12 +1,13 @@
 # sdlc-analyser
 
-Manual measurement tools for NA-86/NA-87/NA-88/NA-89 (instruction-load reduction, artifact-encoding
-reproducibility, duplicate-read classification, rtk rewrite-coverage replay). Read-only: these
-scripts read the repo and
-`~/.claude/projects/**/*.jsonl` transcripts, and never write to either. Not wired into CI
-(`artifact-encoding.test.sh`, shipped under `plugins/sdlc/scripts/__tests__/`, is the one exception —
-see `artifact-contract.sh` below for why this tool set stays out of CI) — run them by hand and paste
-the output into a PR body.
+Manual measurement tools for NA-86/NA-87/NA-88/NA-89/NA-90 (instruction-load reduction,
+artifact-encoding reproducibility, duplicate-read classification, rtk rewrite-coverage replay,
+read-bounding/carve-out volume). Read-only: these scripts read the repo and
+`~/.claude/projects/**/*.jsonl` transcripts, and never write to either. Mostly not wired into CI
+(`artifact-encoding.test.sh`, shipped under `plugins/sdlc/scripts/__tests__/`, was the original
+exception — see `artifact-contract.sh` below for why that tool stays out of CI; `read-bounding.py`
+below is a second exception, CI-wired because it needs no local binary, only stdlib Python and
+in-repo fixtures) — run the rest by hand and paste the output into a PR body.
 
 ## `instruction-inventory.sh`
 
@@ -310,6 +311,124 @@ human-readable table with the same numbers.
 the paths tried to stderr and **exits 1** — never a zeroed report that reads like a real empty
 result. **Unparseable line:** skipped, counted in `skippedLines`, and the scan continues — **exits
 0**, because a truncated last line is normal in a live transcript.
+
+## `read-bounding.py`
+
+```text
+python3 tools/sdlc-analyser/read-bounding.py <label> (<transcript.jsonl>... | --corpus-list <file>) [--threshold N] [--window-lines N] [--per-story] [--json]
+```
+
+Python 3, stdlib only (3.9-compatible), read-only. Classifies every `Read` tool-use call in a
+transcript corpus by size and windowing, and reports the under-threshold carve-out — the
+instrument NA-90's workstream-E gate (Global Constraint Decision 2, `>= 9,020 est tok/story`) is
+scored against.
+
+**CI wiring (NA-90 orchestrator decision, overriding the plan's Open item #3 default).** The plan
+originally left this test author-run only, following the spec's Out-of-Scope line and the
+`rtk-coverage.test.sh` precedent. That precedent does not transfer here: `rtk-coverage.test.sh`
+needs a locally-installed `rtk` binary; `read-bounding.test.sh` needs only stdlib Python and
+in-repo fixtures, so wiring it costs nothing and stops Gate-2 falsifiability rotting silently.
+`.github/workflows/ci.yml` now runs `bash tools/sdlc-analyser/__tests__/read-bounding.test.sh`
+directly.
+
+### The read-sizing rule (verbatim — an unstated rule makes before/after non-reproducible)
+
+```text
+a Read call := an item of record["message"]["content"] with type == "tool_use" and name == "Read"
+its result  := the item with type == "tool_result" and tool_use_id == that call's id
+estTokens   := floor(len(result text) / 3.7)          # the bytes actually billed, not a file-size estimate
+lines       := result text newline count + 1          # drives the windowed-cost model in Decision 2
+windowed    := input.offset is not None OR input.limit is not None
+whole       := NOT windowed
+a call with no matched result -> excluded from every volume figure, counted in unmatchedCalls
+```
+
+### The corpus rule (verbatim)
+
+```text
+origin := subagent   IF the transcript path contains "/subagents/"
+origin := orchestrator OTHERWISE
+# isSidechain is NOT usable on this harness: 0 of 69,092 records carry it. Do not partition on it.
+ASSERT corpus.subagentTranscripts > 0 ELSE print a loud one-line WARNING naming the
+       */subagents/*.jsonl glob and that ~88% of read volume is likely missing
+       # a warning, never exit 1 — a deliberately orchestrator-only run is legitimate
+```
+
+`isSidechain` is `0` across all 69,092 records on this harness. A non-recursive
+`~/.claude/projects/*/*.jsonl` glob drops ~88% of read volume — it reduced NA-88's recorded
+baseline to 798 of 6,793 reads (11.7%). Always glob `*/subagents/*.jsonl` explicitly. **This
+story's own baseline (`docs/superpowers/plans/NA-90-measurements/read-bounding-before.txt`) uses
+the RECURSIVE corpus rule** — `corpus-list.txt` is built from `<project>/*.jsonl` (top-level,
+107 files) **union** `<project>/*/subagents/agent-*.jsonl` (550 files), generated via Python's
+`glob.glob` rather than a shell `ls` (a local shell-hook rewrite was observed to append trailing
+byte-size text to `ls` output on this machine, corrupting a naive corpus list — `glob.glob` sidesteps it
+entirely). The resulting baseline shows `topLevelTranscripts: 107`, `subagentTranscripts: 550`,
+`totalReads: 6085` — reproducing the spec's published figures within the expected drift from
+corpus growth (`windowedShare` 26.06% vs spec's 26.1%; `topDecileShare` 51.68% vs 51.6%; `max`
+25,188 matches exactly).
+
+### The carve-out rule (verbatim)
+
+```text
+carveOutEligible := a read whose result is <= windowLines lines   # a windowed read here returns the whole file anyway
+carveOutHits     := eligible reads taken WHOLE      # the carve-out was honoured
+carveOutMisses   := eligible reads taken WINDOWED   # net LOSS: the Grep bought nothing
+carveOutHitRate  := carveOutHits / carveOutEligible
+# 468 of 681 addressable reads (68.7%) are eligible. An aggregate win with a low hit rate is
+# a systematic loss on the majority, hidden by the mean — report both, always.
+```
+
+`--window-lines N` (default `400`) sets the carve-out line cap; `--threshold N` (default `2000`
+est tok) is a separate, independently-settable unit — a windowed-read line cap and a whole-read
+token cap measure different things and both must be re-derivable. `storiesObserved` is the count
+of distinct story keys parsed from `gitBranch` across sized reads; `estTokensPerStory :=
+totalEstTokens / storiesObserved` (`0` when `storiesObserved == 0`) is the exact unit Decision 2's
+`9,020` gate is stated in, computed by the tool rather than by hand.
+
+**Prefer `--corpus-list` over positional paths for any before/after comparison** — the
+`rtk-coverage.py` reasoning: a sliding "most-recent-N" window is not the same bytes on both sides
+of a delta.
+
+**`--json` emits the full `ReadBoundingReport` contract**: `label`, `corpus`
+(`topLevelTranscripts`, `subagentTranscripts`), `totalReads`, `windowedReads`, `windowedShare`,
+`totalEstTokens`, `windowedEstTokens`, `p50EstTokens`, `p95EstTokens`, `maxEstTokens`,
+`topDecileShare`, `wholeReadsOverThreshold`, `thresholdEstTokens`, `byOrigin` (both
+`ORIGIN_ORDER` rows, always), `byCategory` (all four `CATEGORY_ORDER` rows, always), `topPaths`
+(10 highest by whole-read volume, ties broken by reads then path), `skippedLines`,
+`unmatchedCalls`, `windowLines`, `carveOutEligibleReads`, `carveOutHits`, `carveOutMisses`,
+`carveOutHitRate`, `storiesObserved`, `estTokensPerStory`. Without `--json`, a human-readable
+table carrying the same numbers.
+
+**Error handling:** no given path resolves to a readable file -> every path tried is printed to
+stderr, exit 1 (never a zeroed report that reads like a real empty result). Unparseable transcript
+line -> skipped, `skippedLines += 1`, exit 0 (a truncated last line is normal in a live
+transcript). `Read` call with no matching `tool_result` -> excluded from volume, `unmatchedCalls
++= 1`, exit 0. Non-numeric `--threshold` / `--window-lines` -> error naming the flag and the
+value, exit 2.
+
+### Gate 2 — falsifiability
+
+| Corpus                                                                | `windowedShare` |
+| --------------------------------------------------------------------- | --------------- |
+| `all-windowed.jsonl` (synthetic, every read carries `offset`/`limit`) | `1.0`           |
+| `all-whole.jsonl` (synthetic, no read carries either)                 | `0.0`           |
+| real corpus (`NA-90-measurements/corpus-list.txt`, recursive)         | `~0.261`        |
+
+A tool that returned the same number against all three would be incapable of measuring anything.
+The 22-assertion harness (`tools/sdlc-analyser/__tests__/read-bounding.test.sh`) also exercises
+the carve-out fields against a hand-checkable fixture (2 eligible reads, 1 hit, 1 miss ->
+`carveOutHitRate: 0.5`) and confirms it can fail: disabling the carve-out computation drops 6
+assertions to `FAIL` (verified during this story, tree restored byte-identical after).
+
+### NA-88 D11 — this instrument is self-confirming, not independent evidence
+
+`read-bounding.py` and its fixtures are authored by the same story that ships the `## Bounded
+reads` clause this tool measures compliance with. A PASS on `read-bounding.test.sh` proves only
+that the tool does what its own author designed — it proves **nothing** about whether any domain
+agent obeys the clause, or that any token was actually saved by it. This is a smoke test, never a
+gate on agent behaviour. The tool's own `--json` output repeats this note. Gate 3 — a pilot run on
+an independent story after this PR merges (`docs/superpowers/plans/NA-90-measurements/pilot-obligation.md`,
+written by Phase 2) — is the only evidence about the contract itself.
 
 ## `cache-analysis.py`
 

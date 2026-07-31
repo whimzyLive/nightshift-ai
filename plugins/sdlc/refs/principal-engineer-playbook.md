@@ -355,6 +355,7 @@ Agent({
 11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 13. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md." Also carries this phase's ledger row — `LEDGER_PHASE`, `LEDGER_AGENT`, `LEDGER_PLAN_SECTION`, `LEDGER_START_SHA`, `LEDGER_END_SHA`, `LEDGER_FILES_CHANGED`, `LEDGER_FILES_READ` (shape computed in Step 5), real values substituted — it names paths, not content.
+14. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
 Never send just a task title.
 
