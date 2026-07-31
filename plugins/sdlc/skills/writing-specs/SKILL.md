@@ -103,7 +103,6 @@ interface [Entity]Response {
   createdAt: string;
 }
 ```
-````
 
 All TypeScript interfaces must be fully typed. No `any`.
 
@@ -190,7 +189,7 @@ Define these using the project's offline-sync technology and config location (se
 
 - [ ] [Question] — Suggested default: [answer]
 
-```
+````
 
 ---
 
@@ -242,4 +241,3 @@ Always derive from the project's permission source (see project-context) — nev
 | TBD without a suggested default | Add "Suggested default: X" so impl can proceed |
 | Spec contains implementation code | Move to agent instructions, not spec |
 | Offline Sync section absent for an offline-synced entity | Add the section — the sync implementer needs it |
-```
