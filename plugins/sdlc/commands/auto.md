@@ -220,16 +220,22 @@ posted — so the tail runs as a NEW session instead of inheriting this one. `<N
 re-invocation line, including `--phase <GATE_PHASE>` and the `--on-clean` hook when one applies.
 
 ```text
-SDLC_BOUNDARY_OFF set  -> run <NEXT> inline as today's tail; the loop owns the release   # revert lever
-SDLC_SESSION_KEY set   -> print `<<<SDLC_NEXT_INVOCATION:<NEXT>>>>`, run
-                          `session-complete.sh <PR_URL>`, STOP   # harness re-invokes <NEXT> fresh
-SDLC_SESSION_KEY unset -> interactive: print <NEXT>, then run it inline as the tail; the loop releases
+SDLC_BOUNDARY_ON unset                        -> run <NEXT> inline as today's tail; the loop owns
+                                                  the release   # DEFAULT: unchanged behaviour
+SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY set   -> print `<<<SDLC_NEXT_INVOCATION:<NEXT>>>>`, run
+                                                  `session-complete.sh <PR_URL>`, STOP   # harness
+                                                  re-invokes <NEXT> fresh
+SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY unset -> interactive: print <NEXT>, then run it inline as
+                                                  the tail; the loop releases
 ```
 
-first-match-wins. The harness re-invokes the printed line **verbatim**: `session-complete.sh` is
-unchanged and its `|PR=` marker cannot carry `--phase` or an `--on-clean` hook, so the line is
-printed, never reconstructed. A harness that ignores `SDLC_NEXT_INVOCATION` leaves the PR unlooped —
-set `SDLC_BOUNDARY_OFF` until it does not.
+first-match-wins, and the boundary is **opt-in**: the default row (`SDLC_BOUNDARY_ON` unset) is
+byte-identical to today's behaviour, because the harness protocol it depends on does not ship itself.
+The harness re-invokes the printed line **verbatim**: `session-complete.sh` is unchanged and its
+`|PR=` marker cannot carry `--phase` or an `--on-clean` hook, so the line is printed, never
+reconstructed. **A harness must adopt `SDLC_NEXT_INVOCATION` before `SDLC_BOUNDARY_ON` is ever set**
+— setting it against a harness that ignores the line leaves every PR raised under the boundary
+unlooped, unreviewed, and never auto-merged, silently.
 
 ---
 
@@ -464,10 +470,11 @@ the missing path; never continue on a half-loaded contract.
 ## Final action — release the session
 
 ```text
-harness (SDLC_SESSION_KEY set)   -> the PHASE releases at PR raise (Session boundary at PR raise);
-                                     the re-invoked loop session releases its own slot
-SDLC_BOUNDARY_OFF or interactive -> the tail loop owns the single release, exactly as before
-no PR was raised at all          -> run session-complete.sh directly here
+SDLC_BOUNDARY_ON unset (default)     -> the tail loop owns the single release, exactly as before
+SDLC_BOUNDARY_ON set + harness       -> the PHASE releases at PR raise (Session boundary at PR
+                                         raise); the re-invoked loop session releases its own slot
+SDLC_BOUNDARY_ON set + interactive   -> the tail loop owns the single release, exactly as before
+no PR was raised at all              -> run session-complete.sh directly here
 ```
 
 **Direct release whenever no tail loop ran.** In every case below, run `session-complete.sh` directly

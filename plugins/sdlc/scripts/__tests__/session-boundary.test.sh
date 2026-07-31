@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # session-boundary.test.sh — NA-91 CI guard for the F session-boundary contract: the canonical
-# block in commands/auto.md, its three gate rows, the three standalone-command pointers, the
-# always-loaded byte cap, and the two byte-pinned sections F must never touch.
+# block in commands/auto.md, its three gate rows (opt-in default FIRST), the three
+# standalone-command pointers, the always-loaded byte cap, and the two byte-pinned sections F
+# must never touch.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/session-boundary.test.sh
@@ -47,22 +48,39 @@ else
   fi
 fi
 
-# --- Assertion (b): all three gate rows survive ------------------------------------
-# Deleting a row silently changes WHICH sessions take the boundary. SDLC_BOUNDARY_OFF is the
-# revert lever AC-2 demands; without it a cache regression needs a code revert + re-release.
+# --- Assertion (b): all three gate rows survive, default row present --------------
+# Deleting a row silently changes WHICH sessions take the boundary. The default row
+# (SDLC_BOUNDARY_ON unset) is what makes the boundary opt-in — without it, or with the wrong
+# row first (assertion g), the boundary would be on by default under the automation harness,
+# breaking unattended review/merge for every harness that has not yet adopted
+# SDLC_NEXT_INVOCATION.
 if [ -f "$auto" ]; then
   body="$(block "$auto")"
   rows_ok=0
-  # Match the ROW text, not the bare token — the block's trailing prose also names
-  # SDLC_BOUNDARY_OFF (the "set SDLC_BOUNDARY_OFF until it does not" sentence), so a bare-token
-  # grep would still pass after the row itself is deleted (proven by F-6's perturbation).
-  printf '%s\n' "$body" | grep -Fq -- 'SDLC_BOUNDARY_OFF set' || rows_ok=1
-  printf '%s\n' "$body" | grep -Fq -- 'SDLC_SESSION_KEY set' || rows_ok=1
-  printf '%s\n' "$body" | grep -Fq -- 'SDLC_SESSION_KEY unset' || rows_ok=1
+  # Match the ROW text, not a bare token — a bare-token grep can still pass after the row itself
+  # is deleted if the same token survives elsewhere in the block's prose (proven by F-6).
+  printf '%s\n' "$body" | grep -Fq -- 'SDLC_BOUNDARY_ON unset' || rows_ok=1
+  printf '%s\n' "$body" | grep -Fq -- 'SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY set' || rows_ok=1
+  printf '%s\n' "$body" | grep -Fq -- 'SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY unset' || rows_ok=1
   if [ "$rows_ok" -eq 0 ]; then
-    echo "PASS: assertion b — all three gate rows present (OFF / harness / interactive)"
+    echo "PASS: assertion b — all three gate rows present (default-unset / harness-on / interactive-on)"
   else
-    echo "FAIL: assertion b — the block must carry all three rows: SDLC_BOUNDARY_OFF, SDLC_SESSION_KEY set, SDLC_SESSION_KEY unset" >&2
+    echo "FAIL: assertion b — the block must carry all three rows: SDLC_BOUNDARY_ON unset, SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY set, SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY unset" >&2
+    failures=$((failures + 1))
+  fi
+fi
+
+# --- Assertion (g): the default (unset) row is FIRST — first-match-wins makes it the default --
+# A correct set of rows in the wrong order silently flips the default: first-match-wins means
+# whichever row is FIRST is what an operator gets with no env vars set at all.
+if [ -f "$auto" ]; then
+  body="$(block "$auto")"
+  default_line="$(printf '%s\n' "$body" | grep -n -F -- 'SDLC_BOUNDARY_ON unset' | head -1 | cut -d: -f1)"
+  other_line="$(printf '%s\n' "$body" | grep -n -F -- 'SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY set' | head -1 | cut -d: -f1)"
+  if [ -n "$default_line" ] && [ -n "$other_line" ] && [ "$default_line" -lt "$other_line" ]; then
+    echo "PASS: assertion g — the default (SDLC_BOUNDARY_ON unset) row is first in the block"
+  else
+    echo "FAIL: assertion g — the SDLC_BOUNDARY_ON unset row must be the FIRST row in the block; found at line ${default_line:-<absent>}, the harness-on row at ${other_line:-<absent>}. First-match-wins means row order IS the default." >&2
     failures=$((failures + 1))
   fi
 fi
@@ -134,5 +152,5 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 echo
-echo "session-boundary.test.sh: PASS — all 6 assertions passed"
+echo "session-boundary.test.sh: PASS — all 7 assertions passed"
 exit 0
