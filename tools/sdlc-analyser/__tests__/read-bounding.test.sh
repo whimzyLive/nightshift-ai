@@ -38,4 +38,34 @@ assert_contains '"windowedShare": 0.0' "$out" "all-whole: windowedShare reaches 
 assert_contains '"topLevelTranscripts": 1' "$out" "corpus: top-level partition count emitted"
 assert_contains '"subagentTranscripts": 0' "$out" "corpus: subagent partition count emitted"
 
+# --- The carve-out is load-bearing: 68.7% of addressable reads are under the cap ---
+out="$(python3 "$tool" carve-out --corpus-list "$fixtures/list-carve-out.txt" --json 2>&1)"
+assert_contains '"windowLines": 400'          "$out" "carve-out: window cap defaults to 400 lines"
+assert_contains '"carveOutEligibleReads": 2'  "$out" "carve-out: both under-cap reads are eligible"
+assert_contains '"carveOutHits": 1'           "$out" "carve-out: the whole under-cap read is a hit"
+assert_contains '"carveOutMisses": 1'         "$out" "carve-out: the windowed under-cap read is a miss"
+assert_contains '"carveOutHitRate": 0.5'      "$out" "carve-out: hit rate is hits / eligible"
+assert_contains '"unmatchedCalls": 0'         "$out" "carve-out: every call matched a result"
+assert_contains '"storiesObserved": 1'        "$out" "per-story: one story key observed"
+
+out="$(python3 "$tool" carve-out --corpus-list "$fixtures/list-carve-out.txt" --window-lines 1000 --json 2>&1)"
+assert_contains '"carveOutEligibleReads": 4'  "$out" "--window-lines widens the eligible set"
+
+# --- Error handling: every row of the spec's table, exercised --------------------
+out="$(python3 "$tool" edge --corpus-list "$fixtures/list-edge-cases.txt" --json 2>&1)"
+assert_contains '"skippedLines": 1'  "$out" "unparseable line is skipped and counted"
+assert_contains '"unmatchedCalls": 1' "$out" "a Read with no tool_result is excluded from volume"
+assert_contains '"totalReads": 1'    "$out" "non-Read tool_use is ignored"
+
+python3 "$tool" nope /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
+[ "$?" -eq 1 ] && printf 'ok   %s\n' "unresolvable corpus exits 1" \
+  || { printf 'FAIL %s\n' "unresolvable corpus must exit 1"; fail=1; }
+
+python3 "$tool" bad --corpus-list "$fixtures/list-all-whole.txt" --threshold abc >/dev/null 2>&1
+[ "$?" -eq 2 ] && printf 'ok   %s\n' "non-numeric --threshold exits 2" \
+  || { printf 'FAIL %s\n' "non-numeric --threshold must exit 2"; fail=1; }
+
+err="$(python3 "$tool" nosub --corpus-list "$fixtures/list-all-whole.txt" --json 2>&1 >/dev/null)"
+assert_contains 'subagents' "$err" "zero subagent transcripts prints the loud glob WARNING"
+
 exit "$fail"
