@@ -23,6 +23,24 @@ If either check fails → return immediately (full 5-line blocked shape — see 
 
 The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Your responsibility is to add commits on this branch — nothing else.
 
+## Context reuse
+
+```text
+path already read in full in this transcript -> never read it again
+Edit/Write returned success -> no confirming read   # Edit/Write fail loudly; a read after a successful edit verifies nothing
+earlier read was windowed AND another region is needed -> read ONLY the missing region with offset/limit
+```
+
+Carve-outs — a re-read here is correct, not a violation:
+
+```text
+a git op (checkout, merge --ff-only, fetch+reset) changed the tree since the read -> re-read
+the earlier read was reported truncated -> re-read
+the earlier read happened in a DIFFERENT transcript -> read normally   # a dispatched agent's context is empty; a ledger names paths, it never supplies their content
+```
+
+Precedence: correctness wins. Cannot establish the current content of a file you must edit -> read it. An unnecessary read is cheap; a wrong edit is not.
+
 ## Memory write (before committing)
 
 Memory is a set of small, self-describing rule files, not a diary. Collection at the start of your

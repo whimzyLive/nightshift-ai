@@ -47,6 +47,8 @@ You return a single verdict (`clean` or `blocked`) to the Principal Engineer.
   > `WORK_KIND` (see `commands/review-fix.md`) — a defect has no plan doc, so that verification is
   > correctly skipped. The defect regression-evidence contract is enforced on the `/auto`/`/impl` and
   > `/review` paths, which do supply `WORK_KIND`.
+- The phase ledger — **optional**; a cache Step 3 resolves (git-reconstruction fallback) before
+  dispatching each fix agent, never a STOP when absent (D3).
 
 ## Modes
 
@@ -249,6 +251,27 @@ agent reuse` token** (`.claude/project/project-context.md` Tooling):
   fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
   frontmatter skill injection (harness bug #76337) — wasted tokens, not a correctness risk.
 
+Record the reuse decision (AC-3, rolled into Step 8's verdict):
+
+```text
+SDLC agent reuse = disabled -> fresh Agent(...), REUSE=false, reason=disabled-by-config
+reused instance available -> SendMessage resume, REUSE=true, reason=reused
+reused instance unavailable, session boundary -> fresh Agent(...), REUSE=false, reason=fallback-session-boundary
+reused instance already returned/terminated -> fresh Agent(...), REUSE=false, reason=fallback-instance-terminated
+```
+
+**Resolve the phase ledger row before building the prompt** (a cache, never required):
+
+```text
+ledger_file := $(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/phase-ledger.txt
+ledger_file readable -> select the row whose LEDGER_AGENT matches the dispatch target
+ledger_file absent -> reconstruct: git -C "$WORKTREE" diff --name-only BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>, group by the project-context workspace->agent table   # a fresh session after Step-7 teardown has no temp dir
+reconstruction fails -> dispatch without a ledger   # never a STOP: the ledger is an optimisation, not a contract input
+no row matches the dispatched domain -> dispatch without a ledger row
+```
+
+A resolved row is placed before item 4's findings below.
+
 Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST include:
 
 1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
@@ -272,6 +295,7 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
    test in `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`) and stage them with your commit."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+10. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md."
 
 **Before dispatching**, snapshot the primary checkout's state (spec §5, same machine guard as
 principal playbook Step 5) — a snapshot to diff against later, not an assertion; the primary may
@@ -508,6 +532,7 @@ Return exactly this block (the caller creates the PR only on `clean`):
 ## QA verdict: <STORY-KEY>
 Status: clean | blocked
 Review rounds: <N>
+Fix dispatch: reuse <N> / fresh <N>
 Fixed (Critical/Important): <list, or "none">
 Minor noted (not fixed): <list, or "none">
 AC check: <met — all N ACs evidenced | UNMET: <which> >
