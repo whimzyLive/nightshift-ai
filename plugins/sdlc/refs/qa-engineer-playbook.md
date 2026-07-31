@@ -1,5 +1,7 @@
 # QA Engineer Playbook (post-implementation quality loop)
 
+<!-- notation: `:=` define, `->` leads-to, `⊆` drawn-from-set, ASSERT/ELSE guard, first-match-wins ordering. Full legend: refs/pseudocode-notation.md -->
+
 The code-quality lifecycle for a Jira story implementation. **This playbook is executed
 INLINE by the top-level session** — it is invoked by the Principal Engineer playbook
 (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`, Step 6) once all domain-agent
@@ -276,20 +278,19 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 
-**Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
-principal playbook Step 5) — a **snapshot to diff against later, not an assertion**; the primary
-may already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a
-violation:
+**Before dispatching**, snapshot the primary checkout's state (spec §5, same machine guard as
+principal playbook Step 5) — a snapshot to diff against later, not an assertion; the primary may
+already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a violation:
 
-```bash
-PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
-PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
+```text
+snap := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh snapshot <primary-root>
+# -> PRIMARY_HEAD, PRIMARY_STATE_FILE, PRIMARY_PRE_DIRTY (keep PRIMARY_STATE_FILE for the assert call below)
+PRIMARY_PRE_DIRTY == 'true' -> print the one-line warning below, then proceed  # never a blocked
 ```
 
-If `PRIMARY_CLEAN_BEFORE` is non-empty the first time you capture it in this run, proceed anyway
-with a one-line warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated
-to this story — snapshotting and comparing, not blocking`); do not return `blocked` on pre-existing
-dirt you didn't cause.
+`WARNING: primary checkout has pre-existing uncommitted changes unrelated to this story —
+snapshotting and comparing, not blocking`. Do not return `blocked` on pre-existing dirt you didn't
+cause — that consequence stays here, not in the script.
 
 After the agent returns, push and confirm from the worktree:
 
@@ -299,19 +300,21 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
-Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
-status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
-stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
+Then assert the primary checkout matches its pre-dispatch snapshot exactly:
 
-```bash
-[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
-  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
-  || echo "BLOCKED: fix agent wrote to the primary checkout instead of \$WORKTREE"
+```text
+assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
+# -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+WORKSPACE_INTEGRITY == 'VIOLATED' -> BLOCKED: fix agent wrote to the primary checkout instead of $WORKTREE
 ```
 
-If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
-snapshot → **return `blocked`** immediately with that reason (same detectable-failure shape as the
-principal playbook's Step-5 guard) — do not attempt to fix or revert it yourself.
+The script's OK/none is exact-match against the snapshot (NOT asserted empty) — a pre-dirty
+primary that stays at the same dirt still passes; only a *change* from the captured snapshot is a
+violation.
+
+If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason (same
+detectable-failure shape as the principal playbook's Step-5 guard) — do not attempt to fix or
+revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.

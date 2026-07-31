@@ -33,8 +33,10 @@ The file is a regenerated per-session cache — **gitignore it**.
 - **superpowers plugin** — **auto-installed.** Declared as a cross-marketplace dependency
   (`superpowers@claude-plugins-official`), so `/plugin install sdlc@nightshift` reuses an existing
   superpowers install or pulls it from the official marketplace. Agents invoke its skills:
-  executing-plans, subagent-driven-development, test-driven-development,
-  verification-before-completion, requesting-code-review, receiving-code-review, writing-plans.
+  executing-plans, test-driven-development, verification-before-completion, requesting-code-review,
+  receiving-code-review, writing-plans. (`subagent-driven-development` was dropped from the
+  Principal Engineer playbook's Step-0 preload — NA-86 A8 — since the playbook dispatches domain
+  agents directly via its own Step-4 prompt contract.)
 - **claude-mem plugin** — **auto-installed.** Declared as a cross-marketplace dependency
   (`claude-mem@thedotmack`). The `knowledge-engineer` agent's `/sdlc:docs distill` mode uses its
   `observation_search` / `get_observations` MCP tools to mine claude-mem's persistent cross-session
