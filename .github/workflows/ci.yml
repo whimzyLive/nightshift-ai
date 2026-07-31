@@ -41,3 +41,4 @@ jobs:
       - run: bash plugins/sdlc/scripts/__tests__/loop-budget.test.sh
       - run: bash plugins/sdlc/scripts/__tests__/resolve-ai-workflow-mode.test.sh
       - run: bash plugins/sdlc/scripts/__tests__/assert-workspace-clean.test.sh
+      - run: bash plugins/sdlc/scripts/__tests__/artifact-encoding.test.sh
