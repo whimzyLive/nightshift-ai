@@ -4,12 +4,12 @@ template inventory:    21535 -> 20783 est tok   (instruction-inventory.sh, 5 tar
 artifact inventory:    622464 -> 635820 est tok (instruction-inventory.sh --root docs/superpowers; includes the spec/plan docs already committed on this branch plus the five new NA-87-measurements/ reference artifacts — not isolated to this workstream's edits alone)
 padded rows, in-fence: 11 -> 0                       (artifact-encoding.test.sh assertion 2 — PASS)
 encoding pointer cost: +5 x ~50 tok = ~250 tok added (D9 — recorded, not netted out)
-runtime instruction load, one real story run: <not available to this domain-agent dispatch — no session-level transcript visibility; orchestrator to fill from the completed pipeline run>
-cache hit rate:        <not available to this domain-agent dispatch> (gate: >= 94%)
-requests per story:    <not available to this domain-agent dispatch> (gate: must not increase)
-avg / peak resident:   <not available to this domain-agent dispatch> (gate: must not increase)
-QA rounds:              <not available to this domain-agent dispatch> (gate: must not increase)
-loop passes per PR:    <not available to this domain-agent dispatch> (gate: must not increase)
+runtime instruction load, one real story run: not captured — see "Runtime rows" note below
+cache hit rate:        not captured (gate: >= 94%)
+requests per story:    not captured (gate: must not increase)
+avg / peak resident:   not captured (gate: must not increase)
+QA rounds:             1 (verdict clean on round 1, zero fix rounds) (gate: must not increase)
+loop passes per PR:    2 (spec PR #208: review -> fix -> re-review clean) (gate: must not increase)
 contract diff, tier 1: spec: template 18 / artifact 18 / match true; plan: template 4 / artifact 4 / match true; adr: template 8 / artifact 8 / match true; review-round: template 8 / artifact 8 / match true; rule-entry: template 7 / artifact 7 / match true   (5 rows, pre-merge — see contract-diff.txt)
 contract diff, tier 2: spec doc + plan doc — recorded post-merge on the D12 follow-up (NA-88)
 
@@ -32,3 +32,24 @@ Deviations/gap fills recorded (per Task 2.11 instruction):
 
 AC-1 (dollar cost) is not a gate on this story (8-point cost distribution IQR $68.72; confirmed
 once at end of programme, per spec).
+
+Runtime rows (orchestrator note, filled post-implementation):
+  QA rounds and loop passes are real counts from this pipeline run. The remaining runtime rows
+  (instruction load, cache hit rate, requests/story, resident tokens) are recorded as NOT CAPTURED
+  rather than estimated. This story's own run is not a valid sample for them: the templates changed
+  mid-run, so the spec doc (PR #208) was produced by the PRE-change templates and only artifacts
+  generated after merge exercise the new encoding. Quoting a number from this run would measure the
+  old templates and read as if it measured the new ones. Same reasoning as the S1/S2 precedent on
+  NA-86, where runtime cache-hit figures were also not capturable from the implementing branch.
+  These rows are the substance of tier 2 (D12) and are filled from NA-88's run, post-merge.
+
+Honest read of the template-side result (do not skim this):
+  Net template inventory is -752 est tok, but three of the five templates got LARGER
+  (tech-lead +64, qa-engineer-playbook +33, domain-agent-handoff +44) and -875 of the saving comes
+  from writing-adrs alone. Roughly -250 of the net is consumed by the D9 pointer lines. This is the
+  outcome the spec predicted in D1 — the template is the smaller half of workstream B, and the
+  lever is the ENCODING CONTRACT binding the artifacts the templates produce, which is why the
+  contract ref exists at all. It does mean the token case for this story is currently unproven:
+  tier 2 (D12) against NA-88's real spec + plan docs is what confirms or refutes it. If tier 2
+  shows no artifact-side reduction, this story bought a CI guard and a fence repair, and workstream
+  B's 5.2% allocation should be re-argued at the epic level rather than defended here.
