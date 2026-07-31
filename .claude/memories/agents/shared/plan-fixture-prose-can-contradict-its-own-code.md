@@ -4,7 +4,7 @@ agent: [platform-engineer, ai-enablement-engineer, web-engineer]
 trigger: [plan gives verbatim fixture content next to verbatim code, TDD red phase fails for an unexpected reason, path resolution mismatch in a plan-supplied fixture]
 rule: When a plan's illustrative fixture-content prose conflicts with the verbatim code it specifies for the same feature, trust the code contract (verify via the RED-phase test failure) over the prose, and fix the fixture — do not paste the prose literally.
 evidence: [NA-89]
-uses: 1
+uses: 2
 status: active
 ---
 
