@@ -244,6 +244,38 @@ Validation gates — measured before and after, the programme's definition of "d
 | Review findings per round               | code-reviewer output        | per story | must not increase                                                                                                 |
 | Loop passes per PR                      | `pass_count` in budget file | per story | must not increase                                                                                                 |
 
+### Story Dependency Graph (NA-76 stories)
+
+Canonical build order for the stories under `NA-76`. Jira `Blocks` / `is blocked by` links are kept in sync with this graph.
+
+**Completion order:**
+
+- **L0 (Phase 1 — parallel-safe):** `NA-86` (A), `NA-87` (B), `NA-88` (C), `NA-89` (D)
+- **L1 (Phase 3 — parallel-safe, blocked by all of L0):** `NA-90` (E), `NA-91` (F), `NA-92` (G), `NA-93` (H)
+
+`NA-86` (A) is the one story that spans phases internally (A1 in Phase 1; A2/A3, A5–A9 in Phase 2; A10 closing last) — see its description. Its L0 placement above reflects when the *story* can start, not that its Phase-2 sub-items ship on day one. `NA-86` (A5) is also H's (`NA-93`) direct technical prerequisite (H routes loop passes to Haiku only after the loop fast-path split lands), which the blanket A→H edge below already encodes.
+
+**Dependency edges:**
+
+| Blocker       | Blocks        | Rationale                                                                                     |
+| ------------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| NA-86 (A)     | NA-90 (E)     | Phase 1 must complete before Phase 3 (bounded reads) begins                                     |
+| NA-86 (A)     | NA-91 (F)     | Phase 1 must complete before Phase 3 (context editing) begins                                    |
+| NA-86 (A)     | NA-92 (G)     | Phase 1 must complete before Phase 3 (subagent offload) begins                                   |
+| NA-86 (A)     | NA-93 (H)     | Phase 1 must complete before Phase 3; A5 (loop fast-path split, part of A) is H's direct prerequisite |
+| NA-87 (B)     | NA-90 (E)     | Phase 1 must complete before Phase 3 (bounded reads) begins                                      |
+| NA-87 (B)     | NA-91 (F)     | Phase 1 must complete before Phase 3 (context editing) begins                                    |
+| NA-87 (B)     | NA-92 (G)     | Phase 1 must complete before Phase 3 (subagent offload) begins                                   |
+| NA-87 (B)     | NA-93 (H)     | Phase 1 must complete before Phase 3 (Haiku routing) begins                                       |
+| NA-88 (C)     | NA-90 (E)     | Phase 1 must complete before Phase 3 (bounded reads) begins                                      |
+| NA-88 (C)     | NA-91 (F)     | Phase 1 must complete before Phase 3 (context editing) begins                                    |
+| NA-88 (C)     | NA-92 (G)     | Phase 1 must complete before Phase 3 (subagent offload) begins                                   |
+| NA-88 (C)     | NA-93 (H)     | Phase 1 must complete before Phase 3 (Haiku routing) begins                                       |
+| NA-89 (D)     | NA-90 (E)     | Phase 1 must complete before Phase 3 (bounded reads) begins                                      |
+| NA-89 (D)     | NA-91 (F)     | Phase 1 must complete before Phase 3 (context editing) begins                                    |
+| NA-89 (D)     | NA-92 (G)     | Phase 1 must complete before Phase 3 (subagent offload) begins                                   |
+| NA-89 (D)     | NA-93 (H)     | Phase 1 must complete before Phase 3 (Haiku routing) begins                                       |
+
 ## Product Checks
 
 | Check              | Answer                                                                                                                                                     |
