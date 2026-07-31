@@ -29,12 +29,15 @@ Memory is a set of small, self-describing rule files, not a diary. Collection at
 dispatch (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh <your-agent-name>`) already surfaced
 every rule and ADR that binds you — this section is about what you write back, not what you read.
 
-**Where a rule file lives.** A rule that binds only your own domain goes at
-`.claude/memories/agents/<your-name>/<rule-id>.md`. A rule that binds more than one agent (a
-cross-domain finding) goes at `.claude/memories/agents/shared/<rule-id>.md`, with every agent it
-binds listed in `agent`. `<rule-id>` is kebab-case and MUST equal the filename stem.
+```text
+own-domain rule -> .claude/memories/agents/<your-name>/<rule-id>.md
+cross-domain rule (binds more than one agent) -> .claude/memories/agents/shared/<rule-id>.md   # list every agent it binds in `agent`
+<rule-id> := kebab-case, MUST equal the filename stem
+```
 
 **The 7-field schema** (YAML frontmatter, all fields required):
+
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 ```yaml
 ---
@@ -53,18 +56,24 @@ it yourself only when the one-line `rule` isn't enough context.
 
 **Admission test.** Write a candidate rule file only if ALL four hold:
 
-1. **Generalized** — a condition + action that constrains future work, not a narrative of one story.
-2. **Non-obvious** — not already derivable from the agent definition, the project override, or a repo `CLAUDE.md`.
-3. **Falsifiable trigger** — you can name the concrete situation it fires in (this populates `trigger`).
-4. **Not already an accepted ADR** — no `status: accepted` ADR covers the same decision (T2 wins; write nothing).
+```text
+ASSERT generalized — a condition + action that constrains future work, not a narrative of one story
+ASSERT non-obvious — not already derivable from the agent definition, the project override, or a repo `CLAUDE.md`
+ASSERT falsifiable trigger — you can name the concrete situation it fires in (populates `trigger`)
+ASSERT not already an accepted ADR — no `status: accepted` ADR covers the same decision (T2 wins)
+all four hold -> write the candidate rule file
+any fail -> write nothing
+```
 
 Rejected by construction: story diaries, `Learnings`/`Pitfalls`/`Patterns` prose blocks, restatements
 of existing config, and any entry that only makes sense with the originating story in mind.
 **Skipping is normal, not a failure** — most dispatches write nothing new.
 
-**Counter-only updates.** For every rule you cited in `trigger` and actually applied this dispatch —
-your own, or a `shared/` one — increment its `uses` and append the current story key to its
-`evidence`. This is the only edit you make to a rule file you did not just create.
+**Counter-only updates.**
+
+```text
+rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> increment its `uses`, append the current story key to its `evidence`   # the only edit made to a rule file not just created this dispatch
+```
 
 ## Domain verification
 

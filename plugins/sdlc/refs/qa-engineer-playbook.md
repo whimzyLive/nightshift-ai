@@ -344,10 +344,18 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Review round file** — write `$WORKTREE/.claude/memories/reviews/${DATE}-<STORY-KEY>.md`, one
-file per round, **unconditionally, every round**: a second or third round reviewed on the same date
-takes the `-r2`, `-r3`, … suffix (`${DATE}-<STORY-KEY>-r2.md`). Frontmatter is the 5-field review
-schema:
+**1. Review round file**
+
+```text
+review_file := $WORKTREE/.claude/memories/reviews/${DATE}-<STORY-KEY>.md
+write review_file unconditionally, every round
+second/third round, same date -> append -r2, -r3, ... suffix (${DATE}-<STORY-KEY>-r2.md)
+issue_count: 0 -> frontmatter only, no body   # the file exists purely as the "this story was reviewed" marker the analyze finding and the maintenance-op GC key on
+issue_count > 0 -> frontmatter + body (## Issues / ## Preventions / ## Rules written)
+never soft-skip this file — a finding that repeats something an `accepted` ADR already documents is itself recurrence evidence `/sdlc:docs distill` needs to see (adr-pipeline.md §6 Recurrence)
+```
+
+Frontmatter is the 5-field review schema:
 
 ```yaml
 ---
@@ -359,11 +367,9 @@ issue_count: <N> # count of Critical + Important findings this round
 ---
 ```
 
-**A clean round (`issue_count: 0`) writes the frontmatter above and nothing else** — no body — the
-file exists purely as the "this story was reviewed" marker that the analyze finding and the
-maintenance-op GC key on.
+A round with findings adds this body:
 
-**A round with findings** adds a body:
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 ```
 ## Issues
@@ -375,10 +381,6 @@ maintenance-op GC key on.
 ## Rules written
 <list of rule ids created from this round, or "none">
 ```
-
-This round file is never soft-skipped, even when a finding repeats something an `accepted` ADR
-already documents — a repeat violation of an accepted convention is itself recurrence evidence that
-`/sdlc:docs distill` needs to see (per `adr-pipeline.md` §6's Recurrence criterion).
 
 **2. Rule entries** — for each agent that fixed something this round, write rule entries under
 `$WORKTREE/.claude/memories/agents/<fixing-agent>/<rule-id>.md` (cross-cutting → `agents/shared/`)

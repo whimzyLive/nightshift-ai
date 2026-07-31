@@ -1,0 +1,67 @@
+NA-87 — D12 tier-1 content-contract gate (pre-merge, blocking)
+
+Ordinal correction note (per the plan's own warning: "--fence ordinals were counted BEFORE
+conversion, re-confirm against the converted file"):
+  - tech-lead.md "## Output: implementation plan": plan specified --fence 2, corrected to --fence 3
+    (Task 2.4 inserted a new leading ```text pseudocode fence before the ```bash jira-site-guard
+    fence, shifting the plan-format ```markdown fence from ordinal 2 to ordinal 3).
+  - qa-engineer-playbook.md "## Step 5 — Write learnings to memory": plan specified --fence 2,3,
+    corrected to --fence 3,4 (Task 2.6 inserted a new ```text pseudocode fence between the
+    worktree-setup ```bash fence and the 5-field ```yaml fence, shifting the yaml fence from
+    ordinal 2 to 3, and the body-schema fence from 3 to 4).
+  - writing-specs/SKILL.md --fence 1, writing-adrs/SKILL.md --fence 1, and
+    domain-agent-handoff.md --fence 2 were already correct; no correction needed.
+
+=== ref-spec ===
+bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/skills/writing-specs/SKILL.md --section "## Spec Template" --fence 1 --artifact docs/superpowers/plans/NA-87-measurements/ref-spec.md
+TEMPLATE=plugins/sdlc/skills/writing-specs/SKILL.md
+ARTIFACT=docs/superpowers/plans/NA-87-measurements/ref-spec.md
+CONTRACT_TEMPLATE=18
+CONTRACT_ARTIFACT=18
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+
+=== ref-plan ===
+bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/agents/tech-lead.md --section "## Output: implementation plan" --fence 3 --artifact docs/superpowers/plans/NA-87-measurements/ref-plan.md
+TEMPLATE=plugins/sdlc/agents/tech-lead.md
+ARTIFACT=docs/superpowers/plans/NA-87-measurements/ref-plan.md
+CONTRACT_TEMPLATE=4
+CONTRACT_ARTIFACT=4
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+
+=== ref-adr ===
+bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/skills/writing-adrs/SKILL.md --section "## Template" --fence 1 --artifact docs/superpowers/plans/NA-87-measurements/ref-adr.md
+TEMPLATE=plugins/sdlc/skills/writing-adrs/SKILL.md
+ARTIFACT=docs/superpowers/plans/NA-87-measurements/ref-adr.md
+CONTRACT_TEMPLATE=8
+CONTRACT_ARTIFACT=8
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+
+=== ref-review-round ===
+bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/refs/qa-engineer-playbook.md --section "## Step 5 — Write learnings to memory" --fence 3,4 --artifact docs/superpowers/plans/NA-87-measurements/ref-review-round.md
+TEMPLATE=plugins/sdlc/refs/qa-engineer-playbook.md
+ARTIFACT=docs/superpowers/plans/NA-87-measurements/ref-review-round.md
+CONTRACT_TEMPLATE=8
+CONTRACT_ARTIFACT=8
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+
+=== ref-rule-entry ===
+bash tools/sdlc-analyser/artifact-contract.sh --template plugins/sdlc/refs/domain-agent-handoff.md --section "## Memory write (before committing)" --fence 2 --artifact docs/superpowers/plans/NA-87-measurements/ref-rule-entry.md
+TEMPLATE=plugins/sdlc/refs/domain-agent-handoff.md
+ARTIFACT=docs/superpowers/plans/NA-87-measurements/ref-rule-entry.md
+CONTRACT_TEMPLATE=7
+CONTRACT_ARTIFACT=7
+CONTRACT_MISSING=
+CONTRACT_MATCH=true
+exit=0
+
+Result: 5/5 CONTRACT_MATCH=true. Merge gate satisfied (D12 tier 1).
+Tier 2 (post-merge, non-blocking): the first real story run after merge (NA-88) must re-run
+artifact-contract.sh against a genuine spec doc and plan doc; record the result on NA-87.

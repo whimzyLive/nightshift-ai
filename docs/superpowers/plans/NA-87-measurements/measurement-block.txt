@@ -1,0 +1,34 @@
+### Instruction-load measurement (NA-87 / workstream B)
+base-ref:              62e1b84
+template inventory:    21535 -> 20783 est tok   (instruction-inventory.sh, 5 target files; whole-file bytes for the 3 extent-limited files, matching the spec's own baseline table)
+artifact inventory:    622464 -> 635820 est tok (instruction-inventory.sh --root docs/superpowers; includes the spec/plan docs already committed on this branch plus the five new NA-87-measurements/ reference artifacts — not isolated to this workstream's edits alone)
+padded rows, in-fence: 11 -> 0                       (artifact-encoding.test.sh assertion 2 — PASS)
+encoding pointer cost: +5 x ~50 tok = ~250 tok added (D9 — recorded, not netted out)
+runtime instruction load, one real story run: <not available to this domain-agent dispatch — no session-level transcript visibility; orchestrator to fill from the completed pipeline run>
+cache hit rate:        <not available to this domain-agent dispatch> (gate: >= 94%)
+requests per story:    <not available to this domain-agent dispatch> (gate: must not increase)
+avg / peak resident:   <not available to this domain-agent dispatch> (gate: must not increase)
+QA rounds:              <not available to this domain-agent dispatch> (gate: must not increase)
+loop passes per PR:    <not available to this domain-agent dispatch> (gate: must not increase)
+contract diff, tier 1: spec: template 18 / artifact 18 / match true; plan: template 4 / artifact 4 / match true; adr: template 8 / artifact 8 / match true; review-round: template 8 / artifact 8 / match true; rule-entry: template 7 / artifact 7 / match true   (5 rows, pre-merge — see contract-diff.txt)
+contract diff, tier 2: spec doc + plan doc — recorded post-merge on the D12 follow-up (NA-88)
+
+Per-file template inventory detail (before -> after est tok, base 62e1b84):
+  plugins/sdlc/skills/writing-specs/SKILL.md      3010 -> 2992
+  plugins/sdlc/agents/tech-lead.md                2152 -> 2216   (extent-limited edit; +64 net, whole file)
+  plugins/sdlc/skills/writing-adrs/SKILL.md       5371 -> 4496
+  plugins/sdlc/refs/qa-engineer-playbook.md       8630 -> 8663   (extent-limited edit; +33 net, whole file — Step 5 §1 only touched)
+  plugins/sdlc/refs/domain-agent-handoff.md       2372 -> 2416   (extent-limited edit; +44 net, whole file — ## Memory write only touched)
+
+Deviations/gap fills recorded (per Task 2.11 instruction):
+  1. --section/--fence selectors added to artifact-contract.sh (Task 1.1, platform-engineer) — the
+     spec's one-template-one-artifact contract was unsatisfiable as stated for 4 of 5 surfaces.
+  2. writing-adrs "## Why ADRs Look the Way They Do" had 8 rationale bullets, not the spec's stated
+     7 (Task 2.5) — all eight were mapped to an annotation home; none dropped.
+  3. Two --fence ordinals shifted between the plan's pre-conversion count and the post-conversion
+     file and were corrected (Task 2.10, see contract-diff.txt for detail):
+       - tech-lead.md "## Output: implementation plan": plan said --fence 2, corrected to --fence 3.
+       - qa-engineer-playbook.md "## Step 5": plan said --fence 2,3, corrected to --fence 3,4.
+
+AC-1 (dollar cost) is not a gate on this story (8-point cost distribution IQR $68.72; confirmed
+once at end of programme, per spec).
