@@ -1,0 +1,6 @@
+{"gitBranch":"feat/NA-89","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"git status"}}]}}
+{"gitBranch":"feat/NA-89","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"cd /repo\ngit status\ngrep -n a b.md"}}]}}
+{"gitBranch":"feat/NA-89","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"echo hi\necho there"}}]}}
+{"gitBranch":"feat/NA-89","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"cat <<EOF\ngit status\nEOF"}}]}}
+{"gitBranch":"feat/NA-89","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"cd /r && pnpm exec tsc --noEmit"}}]}}
+{"gitBranch":"feat/NA-89","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/x"}}]}}
