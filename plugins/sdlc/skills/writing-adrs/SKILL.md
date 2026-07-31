@@ -325,13 +325,13 @@ throughput that would justify a distributed database's added operational cost.
 
 ## Anti-Patterns
 
-| Anti-pattern                                                              | Fix                                                                                                                 |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Editing an `accepted` ADR's Decision/Context/Consequences in place        | Write a new ADR, link both ways, mark the old one `superseded`                                                      |
-| Bundling several decisions into one record                                | Split into separate ADRs, one decision each                                                                         |
-| Alternatives section that only lists the option that "lost," no pros      | Give every alternative real pros AND cons — a one-sided list reads as rationalization                               |
-| Consequences section that only states positives                           | List negative and neutral consequences too — never leave them implied                                               |
-| Multi-page document covering a whole subsystem's design                   | Cut to the single decision; link to supporting material instead of inlining it                                      |
-| Writing with false certainty about a decision made under real doubt       | State the uncertainty and the revisit trigger honestly                                                              |
-| Filename without a monotonic number, or reusing a superseded ADR's number | Always take the highest existing number in `docs/adr/` + 1                                                          |
-| Hand-editing a pipeline-generated `docs/adr/index.md` directly            | Fix the source ADR's frontmatter and regenerate instead (fine to hand-maintain the index until the pipeline exists) |
+| Anti-pattern | Fix |
+| --- | --- |
+| Editing an `accepted` ADR's Decision/Context/Consequences in place | Write a new ADR, link both ways, mark the old one `superseded` |
+| Bundling several decisions into one record | Split into separate ADRs, one decision each |
+| Alternatives section that only lists the option that "lost," no pros | Give every alternative real pros AND cons — a one-sided list reads as rationalization |
+| Consequences section that only states positives | List negative and neutral consequences too — never leave them implied |
+| Multi-page document covering a whole subsystem's design | Cut to the single decision; link to supporting material instead of inlining it |
+| Writing with false certainty about a decision made under real doubt | State the uncertainty and the revisit trigger honestly |
+| Filename without a monotonic number, or reusing a superseded ADR's number | Always take the highest existing number in `docs/adr/` + 1 |
+| Hand-editing a pipeline-generated `docs/adr/index.md` directly | Fix the source ADR's frontmatter and regenerate instead (fine to hand-maintain the index until the pipeline exists) |

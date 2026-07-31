@@ -34,15 +34,15 @@ The quality gate (Mode 3) and the rewrite (Mode 2) apply these classes. **REQUIR
 present (synthesised from available input if missing — their absence triages the ticket);
 **best-effort** sections never hard-block — record them as "not provided" when absent.
 
-| #   | Section             | Gate class   | Behaviour when absent                          |
-| --- | ------------------- | ------------ | ---------------------------------------------- |
-| 1   | Summary / Title     | **REQUIRED** | must be synthesised → `QUALITY=triaged`        |
-| 3   | Steps to Reproduce  | **REQUIRED** | `QUALITY=triaged`                              |
-| 4   | Actual Result       | **REQUIRED** | `QUALITY=triaged`                              |
-| 5   | Expected Result     | **REQUIRED** | `QUALITY=triaged`                              |
-| 6   | Severity / Impact   | **REQUIRED** | `QUALITY=triaged`                              |
-| 2   | Environment         | best-effort  | recorded as "not provided" — never hard-blocks |
-| 7   | Attachments / Proof | best-effort  | recorded as "not provided" — never hard-blocks |
+| # | Section | Gate class | Behaviour when absent |
+| --- | --- | --- | --- |
+| 1 | Summary / Title | **REQUIRED** | must be synthesised → `QUALITY=triaged` |
+| 3 | Steps to Reproduce | **REQUIRED** | `QUALITY=triaged` |
+| 4 | Actual Result | **REQUIRED** | `QUALITY=triaged` |
+| 5 | Expected Result | **REQUIRED** | `QUALITY=triaged` |
+| 6 | Severity / Impact | **REQUIRED** | `QUALITY=triaged` |
+| 2 | Environment | best-effort | recorded as "not provided" — never hard-blocks |
+| 7 | Attachments / Proof | best-effort | recorded as "not provided" — never hard-blocks |
 
 - **Well-formed bug** (all 5 REQUIRED sections present) → `QUALITY=ok`.
 - **Malformed bug** (any REQUIRED section missing) → triage in-place into this template, synthesising

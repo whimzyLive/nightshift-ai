@@ -56,12 +56,12 @@ be identifiable, from its first paragraph, as belonging to exactly one of the fo
 
 ## The Four Quadrants
 
-| Quadrant         | Serves           | Oriented toward               | Reader is…                             |
-| ---------------- | ---------------- | ----------------------------- | -------------------------------------- |
-| **Tutorial**     | Learning (study) | Action + skill acquisition    | A student, guided step by step         |
-| **How-to guide** | Doing (work)     | Action + skill application    | A competent practitioner with a goal   |
-| **Reference**    | Looking up       | Cognition + skill application | Someone who needs a fact, fast         |
-| **Explanation**  | Understanding    | Cognition + skill acquisition | Someone reflecting, away from the task |
+| Quadrant | Serves | Oriented toward | Reader is… |
+| --- | --- | --- | --- |
+| **Tutorial** | Learning (study) | Action + skill acquisition | A student, guided step by step |
+| **How-to guide** | Doing (work) | Action + skill application | A competent practitioner with a goal |
+| **Reference** | Looking up | Cognition + skill application | Someone who needs a fact, fast |
+| **Explanation** | Understanding | Cognition + skill acquisition | Someone reflecting, away from the task |
 
 ### Tutorial
 
@@ -109,12 +109,12 @@ trusting a first instinct (per Diátaxis's own compass — a genuine decision to
 2. Does it serve **acquisition** (the reader is studying, building a skill) or **application** (the
    reader already has the skill and is using it)?
 
-| Informs…  | Serves…     | → Quadrant   |
-| --------- | ----------- | ------------ |
-| Action    | Acquisition | Tutorial     |
-| Action    | Application | How-to guide |
-| Cognition | Application | Reference    |
-| Cognition | Acquisition | Explanation  |
+| Informs… | Serves… | → Quadrant |
+| --- | --- | --- |
+| Action | Acquisition | Tutorial |
+| Action | Application | How-to guide |
+| Cognition | Application | Reference |
+| Cognition | Acquisition | Explanation |
 
 Apply the compass at the level of a whole page when deciding where new content belongs, and at
 the level of a paragraph or sentence when a page feels like it's drifting — a single sentence of
@@ -126,12 +126,12 @@ compass catches that a first read-through can miss.
 Every one of these is the same underlying failure — a document doing the job of a different
 quadrant — expressed four different ways. Catch these before publishing:
 
-| Anti-pattern                                                                                                                               | Why it fails                                                                                                              | Fix                                                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Tutorial drifting into reference** — the lesson pauses to enumerate every option, flag, or edge case at the step where one is first used | Breaks the guided-lesson flow; the learner didn't ask for completeness, they asked to be shown one path                   | Use the one path the tutorial needs; link to the reference page for the full option list                      |
-| **How-to guide explaining theory** — steps are interrupted by "this works because…" or a design-rationale digression                       | Distracts from the action the competent reader came to perform; if they wanted why, they'd be reading explanation         | State the action plainly; link out to an explanation page for the "why," don't inline it                      |
-| **Reference containing narrative or opinion** — a field's doc says "you should probably set this to…" or defends why a default was chosen  | Undermines the neutrality reference exists to provide — a reader consulting reference wants facts, not a case being made  | Strip to neutral fact ("Default: `false`."); move any judgement or rationale to a how-to guide or explanation |
-| **Explanation giving step-by-step instructions** — a conceptual/background page turns into a numbered procedure partway through            | Conflates two registers a reader can't hold at once — reflective reading and procedural following require different modes | Keep explanation discursive; link to the how-to guide or tutorial that has the actual steps                   |
+| Anti-pattern | Why it fails | Fix |
+| --- | --- | --- |
+| **Tutorial drifting into reference** — the lesson pauses to enumerate every option, flag, or edge case at the step where one is first used | Breaks the guided-lesson flow; the learner didn't ask for completeness, they asked to be shown one path | Use the one path the tutorial needs; link to the reference page for the full option list |
+| **How-to guide explaining theory** — steps are interrupted by "this works because…" or a design-rationale digression | Distracts from the action the competent reader came to perform; if they wanted why, they'd be reading explanation | State the action plainly; link out to an explanation page for the "why," don't inline it |
+| **Reference containing narrative or opinion** — a field's doc says "you should probably set this to…" or defends why a default was chosen | Undermines the neutrality reference exists to provide — a reader consulting reference wants facts, not a case being made | Strip to neutral fact ("Default: `false`."); move any judgement or rationale to a how-to guide or explanation |
+| **Explanation giving step-by-step instructions** — a conceptual/background page turns into a numbered procedure partway through | Conflates two registers a reader can't hold at once — reflective reading and procedural following require different modes | Keep explanation discursive; link to the how-to guide or tutorial that has the actual steps |
 
 ## Per-Quadrant Structure Templates
 

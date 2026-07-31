@@ -1,18 +1,15 @@
 # QA Engineer Playbook (post-implementation quality loop)
 
+<!-- notation: `:=` define, `->` leads-to, `⊆` drawn-from-set, ASSERT/ELSE guard, first-match-wins ordering. Full legend: refs/pseudocode-notation.md -->
+
 The code-quality lifecycle for a Jira story implementation. **This playbook is executed
 INLINE by the top-level session** — it is invoked by the Principal Engineer playbook
 (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`, Step 6) once all domain-agent
 implementation phases are pushed to `<BRANCH_PREFIX>/<STORY-KEY>`. It is NOT dispatched as a subagent.
 
-## Why inline (read this first)
+## Why inline
 
-Claude Code blocks subagent → subagent dispatch (nesting is one level deep). The QA loop's
-whole job is to dispatch an `agent-skills:code-reviewer` subagent AND dispatch domain agents
-to fix what the review finds — both need the `Agent` tool, which only works at the top level.
-The Principal Engineer playbook already runs inline; when it reaches Step 6 it **continues
-running these QA steps in the same top-level session**. Do NOT dispatch a `qa-engineer`
-subagent — it would be unable to dispatch the reviewer or fixers and would return blocked.
+# rationale: refs/design-notes/inline-orchestration-rationale.md
 
 ## Role
 
@@ -58,15 +55,15 @@ The loop runs in one of two modes. The caller picks the mode; the steps below ar
 lean ad-hoc variant used by `/review` with no story key — it reviews the current change set with
 no Jira ticket, plan, or PR.
 
-|                                         | Story mode                                                                    | Diff mode (ad-hoc, no story key)                                                                                                                                                                                                                     |
-| --------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trigger                                 | `<STORY-KEY>` provided                                                        | no story key — review the current diff                                                                                                                                                                                                               |
-| Review target                           | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>`                   | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
-| Requirements given to reviewer (Step 1) | plan + acceptance criteria                                                    | the change's own intent (commit subjects + changed-file summary) — there are no ACs                                                                                                                                                                  |
-| Fix commits (Step 3)                    | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user                                                                                                                       |
-| Review file + rule entries (Step 5)     | required                                                                      | **skip** — no story to key the entry to                                                                                                                                                                                                              |
-| AC + plan verification (Step 7)         | required                                                                      | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green                                                                                                                                               |
-| Verdict (Step 8)                        | full block incl. AC + learnings lines                                         | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)`                                                                                                                                                         |
+|  | Story mode | Diff mode (ad-hoc, no story key) |
+| --- | --- | --- |
+| Trigger | `<STORY-KEY>` provided | no story key — review the current diff |
+| Review target | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>` | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
+| Requirements given to reviewer (Step 1) | plan + acceptance criteria | the change's own intent (commit subjects + changed-file summary) — there are no ACs |
+| Fix commits (Step 3) | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user |
+| Review file + rule entries (Step 5) | required | **skip** — no story to key the entry to |
+| AC + plan verification (Step 7) | required | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green |
+| Verdict (Step 8) | full block incl. AC + learnings lines | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)` |
 
 Everything else (request review → triage → fix → re-review → quality gate → return verdict) is
 identical. In Diff mode, wherever a step says `<BRANCH_PREFIX>/<STORY-KEY>`, operate on the current branch /
@@ -276,20 +273,19 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 
-**Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
-principal playbook Step 5) — a **snapshot to diff against later, not an assertion**; the primary
-may already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a
-violation:
+**Before dispatching**, snapshot the primary checkout's state (spec §5, same machine guard as
+principal playbook Step 5) — a snapshot to diff against later, not an assertion; the primary may
+already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a violation:
 
-```bash
-PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
-PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
+```text
+snap := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh snapshot <primary-root>
+# -> PRIMARY_HEAD, PRIMARY_STATE_FILE, PRIMARY_PRE_DIRTY (keep PRIMARY_STATE_FILE for the assert call below)
+PRIMARY_PRE_DIRTY == 'true' -> print the one-line warning below, then proceed  # never a blocked
 ```
 
-If `PRIMARY_CLEAN_BEFORE` is non-empty the first time you capture it in this run, proceed anyway
-with a one-line warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated
-to this story — snapshotting and comparing, not blocking`); do not return `blocked` on pre-existing
-dirt you didn't cause.
+`WARNING: primary checkout has pre-existing uncommitted changes unrelated to this story —
+snapshotting and comparing, not blocking`. Do not return `blocked` on pre-existing dirt you didn't
+cause — that consequence stays here, not in the script.
 
 After the agent returns, push and confirm from the worktree:
 
@@ -299,19 +295,21 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
-Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
-status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
-stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
+Then assert the primary checkout matches its pre-dispatch snapshot exactly:
 
-```bash
-[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
-  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
-  || echo "BLOCKED: fix agent wrote to the primary checkout instead of \$WORKTREE"
+```text
+assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
+# -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+WORKSPACE_INTEGRITY == 'VIOLATED' -> BLOCKED: fix agent wrote to the primary checkout instead of $WORKTREE
 ```
 
-If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
-snapshot → **return `blocked`** immediately with that reason (same detectable-failure shape as the
-principal playbook's Step-5 guard) — do not attempt to fix or revert it yourself.
+The script's OK/none is exact-match against the snapshot (NOT asserted empty) — a pre-dirty
+primary that stays at the same dirt still passes; only a *change* from the captured snapshot is a
+violation.
+
+If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason (same
+detectable-failure shape as the principal playbook's Step-5 guard) — do not attempt to fix or
+revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.

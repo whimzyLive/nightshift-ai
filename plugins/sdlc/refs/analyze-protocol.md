@@ -73,23 +73,23 @@ write-scope above.
 
 ## Drift / gap table
 
-| Check                                                                         | Drift/gap detected                                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Skills on disk vs skills-lock (`.claude/project/skills.json` and/or lockfile) | Skill dir present but not in manifest, or manifest entry with no dir                                                                                                                                                                                                                                   |
-| Agent overrides vs skills                                                     | Override lists a skill that resolves to no installed/bundled/project skill                                                                                                                                                                                                                             |
-| Override directory guides vs disk                                             | Override references a `CLAUDE.md` guide that does not exist                                                                                                                                                                                                                                            |
-| Dangling refs/scripts                                                         | A `refs/*.md` or `scripts/*` path referenced by an agent/command resolves to no file                                                                                                                                                                                                                   |
-| Workspace→agent table vs disk                                                 | Table lists a path that no longer exists, or an area with no owner                                                                                                                                                                                                                                     |
-| AI-config-file freshness                                                      | Documented structure in any owned AI-config convention diverges from disk                                                                                                                                                                                                                              |
-| Plugin/skill metadata                                                         | `SKILL.md` missing required front-matter; `plugin.json`/`marketplace.json` referencing a missing plugin path                                                                                                                                                                                           |
-| **Config-vs-memory semantic conflict**                                        | An owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/etc.) asserts one semantic while agent-learning memory (`.claude/memories/agents/**`) records a contradictory one — see [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution)                                       |
-| Vendored-skill staleness (advisory)                                           | Recorded pinned ref (README) older than reachable upstream — advisory only; refresh is manual                                                                                                                                                                                                          |
-| **Skill gaps (AC-6)**                                                         | For gaps, run `find-skills` to surface candidates (see [Skill usage guardrails](#skill-usage-guardrails)); if none fit, note `skill-creator` can scaffold one                                                                                                                                          |
-| ~~**Memory bloat (recommendation-only)**~~                                    | **SUPERSEDED by `memory-gc-overdue` below** (NA-73) — the old recommendation-only "run `/sdlc:docs distill`" finding is replaced by a real gated apply path (the maintenance op) keyed on the retention window, rather than a size/duplication heuristic                                               |
-| **`legacy-memory-layout`**                                                    | `.claude/memories/agents/<name>.md` exists as a regular file, and/or `.claude/memories/reviews/patterns.md` exists — v1 flat-diary layout not yet migrated (NA-74). Gated apply path, with the migration instructions inline in the finding                                                            |
-| **`malformed-memory-frontmatter`**                                            | `bash plugins/sdlc/scripts/check-frontmatter.sh` exits non-zero against this repo's `.claude/memories/**`. Gated apply — fix the offending frontmatter the script names                                                                                                                                |
-| **`memory-gc-overdue`**                                                       | Any review round file, `deprecated` rule, or `active` rule with `uses: 0` is older than the project's `Review retention window` (`.claude/project/project-context.md` Memory section; dual-form `<n> months` \| `<n> stories`, see `refs/memory-maintenance.md`). Gated apply — run the maintenance op |
-| **`story-merged-without-review-entry`**                                       | A story key merged into `<BASE-BRANCH>` has no matching `.claude/memories/reviews/*-<KEY>*.md` review round file. Report-only (no write) — surfaces a QA-loop gap, never auto-fabricates a review record                                                                                               |
+| Check | Drift/gap detected |
+| --- | --- |
+| Skills on disk vs skills-lock (`.claude/project/skills.json` and/or lockfile) | Skill dir present but not in manifest, or manifest entry with no dir |
+| Agent overrides vs skills | Override lists a skill that resolves to no installed/bundled/project skill |
+| Override directory guides vs disk | Override references a `CLAUDE.md` guide that does not exist |
+| Dangling refs/scripts | A `refs/*.md` or `scripts/*` path referenced by an agent/command resolves to no file |
+| Workspace→agent table vs disk | Table lists a path that no longer exists, or an area with no owner |
+| AI-config-file freshness | Documented structure in any owned AI-config convention diverges from disk |
+| Plugin/skill metadata | `SKILL.md` missing required front-matter; `plugin.json`/`marketplace.json` referencing a missing plugin path |
+| **Config-vs-memory semantic conflict** | An owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/etc.) asserts one semantic while agent-learning memory (`.claude/memories/agents/**`) records a contradictory one — see [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution) |
+| Vendored-skill staleness (advisory) | Recorded pinned ref (README) older than reachable upstream — advisory only; refresh is manual |
+| **Skill gaps (AC-6)** | For gaps, run `find-skills` to surface candidates (see [Skill usage guardrails](#skill-usage-guardrails)); if none fit, note `skill-creator` can scaffold one |
+| ~~**Memory bloat (recommendation-only)**~~ | **SUPERSEDED by `memory-gc-overdue` below** (NA-73) — the old recommendation-only "run `/sdlc:docs distill`" finding is replaced by a real gated apply path (the maintenance op) keyed on the retention window, rather than a size/duplication heuristic |
+| **`legacy-memory-layout`** | `.claude/memories/agents/<name>.md` exists as a regular file, and/or `.claude/memories/reviews/patterns.md` exists — v1 flat-diary layout not yet migrated (NA-74). Gated apply path, with the migration instructions inline in the finding |
+| **`malformed-memory-frontmatter`** | `bash plugins/sdlc/scripts/check-frontmatter.sh` exits non-zero against this repo's `.claude/memories/**`. Gated apply — fix the offending frontmatter the script names |
+| **`memory-gc-overdue`** | Any review round file, `deprecated` rule, or `active` rule with `uses: 0` is older than the project's `Review retention window` (`.claude/project/project-context.md` Memory section; dual-form `<n> months` \| `<n> stories`, see `refs/memory-maintenance.md`). Gated apply — run the maintenance op |
+| **`story-merged-without-review-entry`** | A story key merged into `<BASE-BRANCH>` has no matching `.claude/memories/reviews/*-<KEY>*.md` review round file. Report-only (no write) — surfaces a QA-loop gap, never auto-fabricates a review record |
 
 ## Skill usage guardrails
 
@@ -200,12 +200,12 @@ never without human confirmation.
 
 Per finding, report exactly these fields:
 
-| Field            | Description                                                                         |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `area`           | The AI-config surface area or table-assigned area the finding belongs to            |
-| `kind`           | One of `drift`, `gap`, or `conflict`                                                |
-| `detail`         | What was found and why it's a finding                                               |
-| `proposed fix`   | The concrete edit that would resolve it                                             |
+| Field | Description |
+| --- | --- |
+| `area` | The AI-config surface area or table-assigned area the finding belongs to |
+| `kind` | One of `drift`, `gap`, or `conflict` |
+| `detail` | What was found and why it's a finding |
+| `proposed fix` | The concrete edit that would resolve it |
 | `target path(s)` | Each path flagged `W` (inside resolved write-scope) or `R` (read-only/scanned only) |
 
 The **`story-merged-without-review-entry`** row's finding is always `kind: gap`, and its
@@ -222,14 +222,14 @@ an apply via the [Apply flow](#apply-flow).
 Canonical error-handling table for both the `ai-enablement-engineer` agent and the `/sdlc:analyze`
 command — defined exactly once here; each references this anchor instead of restating the rows.
 
-| Scenario                                                                                                                                                             | Behavior                                                                                                                                                                                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repo not opted in / `project-context.md` missing or malformed table (agent not Active — see [Active (definition)](#ownership-resolution-rules))                      | **STOP** — report-only: "repo not opted in or project-context unreadable — run `/sdlc:init`." Write nothing. Do not scan.                                                                                                               |
-| Scan finds no drift/gaps/conflicts                                                                                                                                   | Report "no drift detected" and exit cleanly.                                                                                                                                                                                            |
-| Apply attempted without human confirmation                                                                                                                           | Refuse — confirmation is mandatory (never auto-apply).                                                                                                                                                                                  |
-| Apply target outside resolved write-scope                                                                                                                            | Refuse and abort; print the offending path(s); make no writes (AC-5).                                                                                                                                                                   |
-| Memory conflict with no human decision (deferred)                                                                                                                    | Report only; reset nothing.                                                                                                                                                                                                             |
+| Scenario | Behavior |
+| --- | --- |
+| Repo not opted in / `project-context.md` missing or malformed table (agent not Active — see [Active (definition)](#ownership-resolution-rules)) | **STOP** — report-only: "repo not opted in or project-context unreadable — run `/sdlc:init`." Write nothing. Do not scan. |
+| Scan finds no drift/gaps/conflicts | Report "no drift detected" and exit cleanly. |
+| Apply attempted without human confirmation | Refuse — confirmation is mandatory (never auto-apply). |
+| Apply target outside resolved write-scope | Refuse and abort; print the offending path(s); make no writes (AC-5). |
+| Memory conflict with no human decision (deferred) | Report only; reset nothing. |
 | Cross-agent memory write attempted outside the two named exceptions and the two no-gate carve-outs (see [Memory-ownership exceptions](#memory-ownership-exceptions)) | Refuse — a reset must be human-arbitrated (Exception 1) and a maintenance-op promotion-and-deletion must be founder-gated (Exception 2); a write that isn't a counter-only edit or QA's Step-5 fixing-agent rule authorship is refused. |
-| `find-skills` / `skill-creator` unavailable or offline                                                                                                               | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip.                                                                                                                                        |
-| `find-skills` install/update commands would run                                                                                                                      | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only.                                                                                                                                              |
-| `raise-pr.sh` fails during standalone apply                                                                                                                          | Surface the failure; leave branch + local commit for manual recovery; do not retry silently.                                                                                                                                            |
+| `find-skills` / `skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
+| `find-skills` install/update commands would run | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only. |
+| `raise-pr.sh` fails during standalone apply | Surface the failure; leave branch + local commit for manual recovery; do not retry silently. |

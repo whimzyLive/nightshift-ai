@@ -159,14 +159,14 @@ for use as pre-filled defaults in Step 3:
 
 After the scan, you will have (or empty strings for inconclusive signals):
 
-| Variable                 | Detected value                                                      |
-| ------------------------ | ------------------------------------------------------------------- |
-| `DETECTED_LANG`          | e.g. `TypeScript`                                                   |
-| `DETECTED_FRAMEWORK`     | e.g. `Hono`                                                         |
-| `DETECTED_PM`            | e.g. `pnpm`                                                         |
-| `DETECTED_TEST`          | e.g. `pnpm test`                                                    |
-| `DETECTED_TYPECHECK`     | e.g. `pnpm typecheck`                                               |
-| `DETECTED_RUNTIME`       | e.g. `Node 20` (empty if no version declaration found)              |
+| Variable | Detected value |
+| --- | --- |
+| `DETECTED_LANG` | e.g. `TypeScript` |
+| `DETECTED_FRAMEWORK` | e.g. `Hono` |
+| `DETECTED_PM` | e.g. `pnpm` |
+| `DETECTED_TEST` | e.g. `pnpm test` |
+| `DETECTED_TYPECHECK` | e.g. `pnpm typecheck` |
+| `DETECTED_RUNTIME` | e.g. `Node 20` (empty if no version declaration found) |
 | `DETECTED_COMMIT_SCOPES` | e.g. `functions, config, web` (empty if no `packages/`/`apps/` dir) |
 
 These values **pre-fill the matching Step-3 prompts** (the package-manager picker pre-selects the
@@ -187,21 +187,21 @@ Prompt the user for each value **individually** — one question at a time, neve
 of prompts. Each field is **either** a picker **or** free text; the mechanics are mandatory, not a
 suggestion (see _Prompt mechanics_ below). Collect:
 
-| Value                   | Notes                                                                                                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Project name            | repo/display name, e.g. `acme-api`                                                                                                                                                                                                          |
-| Jira project key        | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`)                                                                                                                                                                       |
-| Jira site               | the authenticated host from Step 2 (offer it as the default)                                                                                                                                                                                |
-| Base branch             | the integration branch PRs target, e.g. `main` or `develop`                                                                                                                                                                                 |
-| Package manager         | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`**                                                                                                                                                                      |
-| Typecheck command       | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none)                                                                                                                                                                 |
-| Test command            | the project's test runner — **default: `DETECTED_TEST`** (blank if none)                                                                                                                                                                    |
-| Lightweight threshold   | story points at/under which `/auto` skips spec+plan; default `3`                                                                                                                                                                            |
-| Active agents           | the **domain** agents whose code lives in this repo (see below)                                                                                                                                                                             |
-| Review agent            | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers`                                                                                                                              |
-| Review trigger          | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none`                                                                                                                                                      |
-| Review gate             | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
-| Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one.                                                   |
+| Value | Notes |
+| --- | --- |
+| Project name | repo/display name, e.g. `acme-api` |
+| Jira project key | uppercase, e.g. `ACME` (validate with `acli jira project view <KEY>`) |
+| Jira site | the authenticated host from Step 2 (offer it as the default) |
+| Base branch | the integration branch PRs target, e.g. `main` or `develop` |
+| Package manager | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`** |
+| Typecheck command | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none) |
+| Test command | the project's test runner — **default: `DETECTED_TEST`** (blank if none) |
+| Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
+| Active agents | the **domain** agents whose code lives in this repo (see below) |
+| Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
+| Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
+| Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl` controlling which phases trigger automated review; default (omitted) = all phases. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
+| Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
 
@@ -281,13 +281,13 @@ Three categories exist; only the domain tier is a multi-select pick:
 **Selection guide — which domain agents does this repo need?** Present the options with this decision
 aid (multi-select), so the user picks by what the repo actually contains, not by guessing:
 
-| Agent                    | Select it when the repo has…                                      | Typical owned paths                             |
-| ------------------------ | ----------------------------------------------------------------- | ----------------------------------------------- |
-| `platform-engineer`      | a backend, API, serverless handlers, or infra/IaC                 | `services/`, `src/api/`, `functions/`, `infra/` |
-| `web-engineer`           | a web frontend (React/Vue/Svelte/etc.)                            | `apps/web/`, `src/web/`, `web/`                 |
-| `mobile-engineer`        | a mobile app (React Native / native iOS-Android)                  | `apps/mobile/`, `mobile/`                       |
-| `database-administrator` | a relational schema you migrate (SQL, Prisma, Drizzle, TypeORM)   | `db/`, `migrations/`, `prisma/`                 |
-| `sync-engineer`          | an **offline-sync** layer (sync rules, transaction builders, DLQ) | `sync/`, `src/sync/`                            |
+| Agent | Select it when the repo has… | Typical owned paths |
+| --- | --- | --- |
+| `platform-engineer` | a backend, API, serverless handlers, or infra/IaC | `services/`, `src/api/`, `functions/`, `infra/` |
+| `web-engineer` | a web frontend (React/Vue/Svelte/etc.) | `apps/web/`, `src/web/`, `web/` |
+| `mobile-engineer` | a mobile app (React Native / native iOS-Android) | `apps/mobile/`, `mobile/` |
+| `database-administrator` | a relational schema you migrate (SQL, Prisma, Drizzle, TypeORM) | `db/`, `migrations/`, `prisma/` |
+| `sync-engineer` | an **offline-sync** layer (sync rules, transaction builders, DLQ) | `sync/`, `src/sync/` |
 
 Guidance to apply while prompting:
 
@@ -506,24 +506,24 @@ the value detected and confirmed in the steps above — when you finish, **no pl
 from the collected and detected values. Replace every token slot with an actual value; the fill rules
 are documented in that template file. Token slots to substitute:
 
-| Token                            | Source                                                                                                                                                                                                |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<project name>`                 | user input (Step 3)                                                                                                                                                                                   |
-| `<KEY>`                          | Jira project key (Step 3)                                                                                                                                                                             |
-| `<site>`                         | Jira site (Step 3)                                                                                                                                                                                    |
-| `<base branch>`                  | base branch (Step 3)                                                                                                                                                                                  |
-| `<pm>`                           | confirmed package manager (Step 3)                                                                                                                                                                    |
-| `<typecheck>` / `<test>`         | confirmed commands (Step 3)                                                                                                                                                                           |
-| `<DETECTED_LANG>`                | `DETECTED_LANG` (Step 2.5)                                                                                                                                                                            |
-| `<DETECTED_FRAMEWORK>`           | `DETECTED_FRAMEWORK` (Step 2.5)                                                                                                                                                                       |
-| `<DETECTED_PM>`                  | `DETECTED_PM` (Step 2.5)                                                                                                                                                                              |
-| `<DETECTED_TEST>`                | `DETECTED_TEST` (Step 2.5)                                                                                                                                                                            |
-| `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3)                                                                                                                                                                           |
-| `<threshold>`                    | lightweight threshold (Step 3)                                                                                                                                                                        |
-| `<review-agent>`                 | Review agent picker (Step 3) — `claude-inline` default                                                                                                                                                |
-| `<review-mode>`                  | Review trigger picker (Step 3) — `on-update` default                                                                                                                                                  |
-| `<review-retention-window>`      | Review retention window (Step 3) — `6 months` default unless the founder requests otherwise; accepted formats are exactly `<n> months` or `<n> stories`                                               |
-| workspace→agent rows             | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
+| Token | Source |
+| --- | --- |
+| `<project name>` | user input (Step 3) |
+| `<KEY>` | Jira project key (Step 3) |
+| `<site>` | Jira site (Step 3) |
+| `<base branch>` | base branch (Step 3) |
+| `<pm>` | confirmed package manager (Step 3) |
+| `<typecheck>` / `<test>` | confirmed commands (Step 3) |
+| `<DETECTED_LANG>` | `DETECTED_LANG` (Step 2.5) |
+| `<DETECTED_FRAMEWORK>` | `DETECTED_FRAMEWORK` (Step 2.5) |
+| `<DETECTED_PM>` | `DETECTED_PM` (Step 2.5) |
+| `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
+| `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
+| `<threshold>` | lightweight threshold (Step 3) |
+| `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
+| `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
+| `<review-retention-window>` | Review retention window (Step 3) — `6 months` default unless the founder requests otherwise; accepted formats are exactly `<n> months` or `<n> stories` |
+| workspace→agent rows | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
 
 > **On the Merge-new-findings path** (Step 0): do **not** regenerate the file from scratch — preserve
 > the existing `.claude/project/project-context.md` verbatim and only **inject the tokens/sections
@@ -779,14 +779,14 @@ only the Step 0 "Merge new findings" path:
 
 Error / no-op branches:
 
-| Scenario                                                                   | Behaviour                                                                                                                                             |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Docs opt-in declined (or never asked) and no manifest exists yet           | Write no manifest file. No error — re-prompted on the next (re-)init or merge run per the Docs opt-in section's Re-init semantics.                    |
-| Docs opt-in declined (or not asked) this run but a manifest already exists | Step 4g still runs its existing-manifest merge behaviour (see the rows below) — an existing manifest is never gated on this run's opt-in answer.      |
-| Manifest absent, opt-in accepted                                           | Fill from `refs/docs-manifest-template.md` per the "If absent" branch above.                                                                          |
-| Manifest present, new non-declined matching rows exist                     | Offer to append them per-row (merge/confirm); keep existing rows verbatim; record any decline in the `<!-- declined: … -->` comment. Never overwrite. |
-| Manifest present, no new (non-declined) rows                               | No-op on the manifest; print it as unchanged.                                                                                                         |
-| `refs/doc-types.md` unreadable or malformed at scaffold time               | Surface the failure and **skip** the manifest write — never write a half-filled manifest.                                                             |
+| Scenario | Behaviour |
+| --- | --- |
+| Docs opt-in declined (or never asked) and no manifest exists yet | Write no manifest file. No error — re-prompted on the next (re-)init or merge run per the Docs opt-in section's Re-init semantics. |
+| Docs opt-in declined (or not asked) this run but a manifest already exists | Step 4g still runs its existing-manifest merge behaviour (see the rows below) — an existing manifest is never gated on this run's opt-in answer. |
+| Manifest absent, opt-in accepted | Fill from `refs/docs-manifest-template.md` per the "If absent" branch above. |
+| Manifest present, new non-declined matching rows exist | Offer to append them per-row (merge/confirm); keep existing rows verbatim; record any decline in the `<!-- declined: … -->` comment. Never overwrite. |
+| Manifest present, no new (non-declined) rows | No-op on the manifest; print it as unchanged. |
+| `refs/doc-types.md` unreadable or malformed at scaffold time | Surface the failure and **skip** the manifest write — never write a half-filled manifest. |
 
 **4h. Scaffold the memory v2 layout.** Create, if not already present:
 

@@ -119,11 +119,11 @@ Progressive disclosure reference for common UI terminology and adjective palette
 
 ## Shape Descriptions
 
-| Technical      | Natural Language           |
-| -------------- | -------------------------- |
-| `rounded-none` | sharp, squared-off edges   |
-| `rounded-sm`   | slightly softened corners  |
-| `rounded-md`   | gently rounded corners     |
-| `rounded-lg`   | generously rounded corners |
-| `rounded-xl`   | very rounded, pillow-like  |
-| `rounded-full` | pill-shaped, circular      |
+| Technical | Natural Language |
+| --- | --- |
+| `rounded-none` | sharp, squared-off edges |
+| `rounded-sm` | slightly softened corners |
+| `rounded-md` | gently rounded corners |
+| `rounded-lg` | generously rounded corners |
+| `rounded-xl` | very rounded, pillow-like |
+| `rounded-full` | pill-shaped, circular |

@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
 # check-plugin-docs-format.sh — all-files Prettier fixed-point gate for plugin docs (NA-62).
 #
-# WHY THIS EXISTS (NA-62)
-#   Prettier 3.6.2 is non-idempotent on certain fenced command blocks: a well-formed committed
-#   plugins/**/*.md file can satisfy `format(X) != X` (state 1 — well-formed but UNSTABLE), so the
-#   next unguarded `prettier --write` (a pre-commit hook, editor-on-save, or any PR touching it)
-#   shatters runnable command blocks into broken four-backtick fences (the NA-56 corruption). CI's
-#   line-34 format check is affected-only (`--base`-scoped), so a latent state-1 file not in the
-#   current diff ships green. This gate runs the SAME native `prettier --check` predicate over ALL
-#   plugins/**/*.md on every PR, closing that scope hole.
-#
-# WHY plain `prettier`, not `nx format:check` (deliberate CLAUDE.md nx-first deviation)
-#   nx format:check is project-graph-based; plugins/**/*.md belong to no nx project, so no nx form
-#   checks every plugin markdown file BY PATH. `prettier --check` over the path glob is the correct
-#   (and only) tool for an all-files check of these non-project files. See NA-62 spec Decision 3.
+# rationale: refs/design-notes/check-plugin-docs-format-history.md
+#   (why this gate exists (NA-62/NA-56), and why plain `prettier` rather than `nx format:check`)
 #
 # USAGE
 #   bash plugins/sdlc/scripts/check-plugin-docs-format.sh
 #   Exit 0 + "OK" when every plugins/**/*.md is a Prettier fixed point.
 #   Exit 1 + prettier's native [warn] offender list when one or more are not (or on an empty glob /
 #   missing prettier).
+#
+# SCOPE NARROWED BY NA-86 / ADR 0016
+#   .prettierignore now ignores all plugins/sdlc/**/*.md, so plugins/gtm/** is the SOLE remaining
+#   non-ignored tree this script's plugins/**/*.md glob actually checks — one more .prettierignore
+#   entry away from this gate silently checking zero files and reporting a vacuous pass (see the
+#   "bare directory-level .prettierignore" limitation noted above: this script cannot detect that
+#   case itself). plugins/sdlc/scripts/__tests__/prettier-ignore.test.sh assertion 3
+#   (plugins/gtm/README.md must still report ignored:false) is the only thing that would catch it.
 
 set -uo pipefail
 

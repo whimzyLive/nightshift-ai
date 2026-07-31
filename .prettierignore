@@ -20,3 +20,9 @@ docs/features
 # output; reformatting them would desync the committed golden files from what the generator
 # actually writes and break docs-sync-fixtures.test.sh's diff assertion.
 plugins/sdlc/scripts/__tests__/fixtures/*/expected/
+
+# NA-86 / ADR 0016 — Prettier's remark-based Markdown parser has repeatedly corrupted plugin
+# markdown that a pre-commit `--check` reported clean (the NA-56 corruption class); ignoring
+# plugins/sdlc/**/*.md removes that corruption risk outright and lets a one-time manual table
+# unpad (padded-row cost: 40,225 static / 54,161 per-story tokens) stay stable going forward.
+plugins/sdlc/**/*.md

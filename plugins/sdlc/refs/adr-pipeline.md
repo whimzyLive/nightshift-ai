@@ -163,13 +163,13 @@ directly.
 
 Evidence sources (cluster across all of these):
 
-| Source                                                                                     | Access                                                  |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| The `ai-enablement-engineer` maintenance-op nomination list (`refs/memory-maintenance.md`) | Read (mechanically-nominated rule candidates)           |
-| `.claude/memories/reviews/*.md`                                                            | Read (per-round review files, corroborating evidence)   |
-| PR review threads                                                                          | `gh` (e.g. `gh pr list` / `gh api` for review comments) |
-| Commit history                                                                             | `git log`                                               |
-| claude-mem observations                                                                    | `observation_search` / `get_observations` MCP tools     |
+| Source | Access |
+| --- | --- |
+| The `ai-enablement-engineer` maintenance-op nomination list (`refs/memory-maintenance.md`) | Read (mechanically-nominated rule candidates) |
+| `.claude/memories/reviews/*.md` | Read (per-round review files, corroborating evidence) |
+| PR review threads | `gh` (e.g. `gh pr list` / `gh api` for review comments) |
+| Commit history | `git log` |
+| claude-mem observations | `observation_search` / `get_observations` MCP tools |
 
 Distill **consumes** the maintenance op's nomination list — it does not re-derive candidates by
 mining `.claude/memories/agents/**` itself. The nomination list already applied the promotion
@@ -219,10 +219,10 @@ repo-native evidence alone).
 
 A clustered learning is promoted to an ADR candidate iff it meets at least one of:
 
-| Criterion          | Definition                                                                                                       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Recurrence         | Recurs across ≥ 2 cited occurrences, each backed by a citation of the appropriate kind.                          |
-| Cross-agent        | The pattern spans more than one sdlc agent's domain.                                                             |
+| Criterion | Definition |
+| --- | --- |
+| Recurrence | Recurs across ≥ 2 cited occurrences, each backed by a citation of the appropriate kind. |
+| Cross-agent | The pattern spans more than one sdlc agent's domain. |
 | Durable convention | A stable convention future work must follow, even if seen once, because it is expensive to reverse or re-derive. |
 
 Candidates failing all three are NOT promoted — report them as "below threshold" and leave them in
