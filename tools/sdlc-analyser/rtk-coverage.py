@@ -278,6 +278,17 @@ def print_report(report):
             report["lostPermittedPct"],
         )
     )
+    print(
+        "\nNOTE (NA-88 D11, self-confirming): this instrument and the wrapper it scores were "
+        "authored by the same story. A pass proves only that the wrapper does what its own "
+        "author designed -- it does not prove rewritten commands still execute correctly or "
+        "that any token was saved."
+    )
+    print(
+        "Falsifiability: the same corpus through --engine (unwrapped) returns ~72-79% lost; "
+        "through --wrapper it returns near-0%. A gate returning the same number either way "
+        "would be evidence about nothing."
+    )
 
 
 if __name__ == "__main__":
