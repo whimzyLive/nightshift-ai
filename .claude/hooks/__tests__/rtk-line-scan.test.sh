@@ -5,6 +5,24 @@ here="$(cd "$(dirname "$0")" && pwd)"
 hook="$here/../rtk-line-scan.sh"
 fail=0
 
+# Real rtk is a locally-installed tool, not present on the CI runner (NA-89 QA finding). Prepend
+# the stub `rtk` so every assertion below exercises the hook's own guard/scan logic against known
+# rewrite outcomes deterministically, on any machine — with or without real rtk on PATH.
+PATH="$here/fixtures/bin:$PATH"
+
+# A PATH with every directory containing an `rtk` executable (stub or real) removed. Used by the
+# one assertion below that must observe the hook's actual "no rtk at all" passthrough — the path
+# every CI machine runs today.
+no_rtk_path() {
+  local out="" d
+  local IFS=':'
+  for d in $PATH; do
+    [ -x "$d/rtk" ] && continue
+    out="${out:+$out:}$d"
+  done
+  printf '%s' "$out"
+}
+
 # The hook's passthrough path emits nothing (exit 0, empty stdout) by design (spec: "emit
 # nothing, exit 0"). `jq -r '... // "(none)"'` on completely empty stdin produces zero output
 # lines rather than substituting the default, so every assertion normalises through this helper
@@ -105,5 +123,13 @@ assert_eq "allow" "$(run "$(printf 'git status\ngit log --oneline -3')" \
 cont_in=$'foo \\\ngit status'
 assert_eq "(none)" "$(result_command "$cont_in")" \
   "G2: a backslash-continuation line is not rewritten into the previous command"
+
+# The path every CI machine runs today: no `rtk` anywhere on PATH (real or stub). The hook's own
+# `command -v rtk >/dev/null 2>&1 || emit_nothing` guard must degrade to passthrough — this line
+# would otherwise be rewritten, per the stub mapping above, so a failure here means the guard
+# regressed, not that the case is untestable.
+assert_eq "(none)" \
+  "$(PATH="$(no_rtk_path)" result_command "$(printf 'git status\ngit log --oneline -3')")" \
+  "missing rtk entirely: hook degrades to passthrough and exits 0"
 
 exit "$fail"
