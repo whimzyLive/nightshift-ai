@@ -2,7 +2,7 @@
 id: plan-fixture-prose-can-contradict-its-own-code
 agent: [platform-engineer, ai-enablement-engineer, web-engineer]
 trigger: [plan gives verbatim fixture content next to verbatim code, TDD red phase fails for an unexpected reason, path resolution mismatch in a plan-supplied fixture]
-rule: When a plan's illustrative fixture-content prose conflicts with the verbatim code it specifies for the same feature, trust the code contract (verify via the RED-phase test failure) over the prose, and fix the fixture — do not paste the prose literally.
+rule: When a plan's fixture-content prose conflicts with its own verbatim code, trust the code (verify via the RED-phase failure) and fix the fixture, not the prose.
 evidence: [NA-89]
 uses: 2
 status: active
@@ -18,4 +18,6 @@ prose's literal string produced a doubled path and a RED failure that read as "m
 file", not "script doesn't exist" — the expected RED reason for that step. TDD's mandate to verify
 the failure reason (not just that it failed) is what surfaces this class of plan bug: a plan author
 writing English and code in the same task can let them drift, and the code — being the thing
-actually executed and unit-tested — is the more reliable of the two to trust.
+actually executed and unit-tested — is the more reliable of the two to trust. Do not paste the
+prose's literal fixture content when it conflicts with the code — write the fixture the code
+actually needs.

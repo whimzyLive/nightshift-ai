@@ -2,7 +2,7 @@
 id: jq-default-operator-needs-nonempty-stdin
 agent: [ai-enablement-engineer]
 trigger: [testing a PreToolUse hook passthrough path, jq -r default operator on hook stdout, bash hook test asserting "(none)"]
-rule: When piping a hook's intentionally-empty passthrough stdout into `jq -r '... // "default"'`, jq emits zero output lines instead of the default — normalise empty stdout to `{}` (or another valid JSON value) before the filter.
+rule: A hook that emits nothing on passthrough breaks `jq -r '... // "default"'` — empty stdin yields zero output lines, not the default. Normalise empty stdout to a valid JSON value first.
 evidence: [NA-89]
 uses: 1
 status: active
