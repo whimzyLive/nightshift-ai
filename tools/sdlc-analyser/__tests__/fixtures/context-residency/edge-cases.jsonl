@@ -1,0 +1,4 @@
+{ this line is not json
+{"type":"assistant","gitBranch":"feat/NA-91","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":100,"cache_read_input_tokens":900},"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/x.md"}}]}}
+{"type":"user","gitBranch":"feat/NA-91","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"AB"}]}}
+{"type":"assistant","gitBranch":"feat/NA-91","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":100,"cache_read_input_tokens":900},"content":[{"type":"tool_use","id":"t9","name":"Read","input":{"file_path":"/never-answered.md"}}]}}
