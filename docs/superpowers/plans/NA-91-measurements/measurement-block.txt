@@ -1,0 +1,44 @@
+### Session-boundary measurement (NA-91 / workstream F)
+base-ref:                        4c3ad88
+corpus:                          75 top-level / 0 subagent transcripts   (TOP-LEVEL ONLY — F's population)
+inherited share, before:         40.18% pooled   (per-transcript median 11.74%, p25 0.00%, p75 52.79%; spec 34.6% pooled / 49.6% median)
+inherited share, after:          NOT CAPTURED — see pilot-obligation.md
+cache-read ratio, before:        96.64%   (guardrail >= 94%; spec baseline 96.64%, headroom 2.64 pp)
+cache-read ratio, after:         NOT CAPTURED   (gate: >= 94%; modelled -0.06 pp for one boundary)
+static instruction delta:        276,634 -> 276,133 est tok (-501, instruction-inventory.sh --base 4c3ad88)
+always-loaded command bytes:     49,571 -> 47,720 bytes   (assertion (e) cap 49,571; -1,851, non-positive as required)
+session-boundary.test.sh:        PASS (6 assertions) — each proven capable of failing, Task 2.3
+context-residency.test.sh:       PASS — each metric proven capable of failing, Task 1.4
+Gate 2 falsifiability:           inheritedShare reaches 0.0 / 0.5 / 1.0 over the three fixed corpora
+avg / peak resident:             NOT CAPTURED   (gate: must not increase)
+requests per story:              NOT CAPTURED   (gate: must not increase)
+QA rounds / blocked rate:        NOT CAPTURED   (gate: must not increase)
+review findings / loop passes:   NOT CAPTURED   (gate: must not increase)
+F's 7.0% cut-rate:               NOT COUNTED toward AC-1 until the pilot passes every gate (AC-5)
+
+BASELINE DIVERGENCE FROM THE SPEC (carried forward from Task 1.5, unaltered):
+  Pooled inheritedShare measures 40.18% (n=75) against the spec's 34.6% (n=86) — +5.58pp, outside
+  the spec's stated ±5pp band. Per-transcript median diverges further: 11.74% here vs the spec's
+  49.6% (p25 0.00% vs 31.1%, p75 52.79% vs 57.2%). transcriptsWithBoundary is 40 of 75 (53.3%) — the
+  other 35 sessions never raised a PR (spec/plan/refine-only sessions) and score inheritedShare 0.0,
+  pulling the per-transcript median down harder than the pooled figure (which weights by exposure,
+  not by session count). cacheReadRatio 96.64% matches the spec's figure almost exactly. The
+  numbers above are the corpus as it stands on this machine at capture time — the tool is not
+  adjusted to match either the spec's pooled or median figure.
+
+WHY EVERY RUNTIME ROW IS "NOT CAPTURED", NOT ESTIMATED:
+  1. F changes the orchestrator's own session model — this run executed on the PRE-change contract.
+  2. plugins/** edits do not affect running agents; they read CLAUDE_PLUGIN_ROOT (the cache), not
+     the repo. Nothing in this run could have honoured the boundary even in principle.
+  An estimate in these rows would read as a measurement. There is no number here to soften.
+
+AMENDMENTS TO THE MERGED SPEC (see the plan's Amendments table for provenance):
+  A1 F ships a CI-wired guard and two .github/workflows/ci.yml lines (spec said "F wires no CI").
+  A2 A printed <<<SDLC_NEXT_INVOCATION:...>>> line is a NEW, additive harness protocol — the
+     |PR= marker cannot carry --phase or the --on-clean auto-merge hook.
+  A3 SDLC_BOUNDARY_OFF is the runtime revert lever AC-2 demands.
+  A5 Interactive keeps today's inline tail; it only additionally prints the line.
+
+MECHANISM SUBSTITUTION (carried from the spec, restated for the reviewer):
+  The ticket says "context editing". That surface does not exist in this harness. What ships is a
+  session-boundary reset at PR raise — the only repo-owned mechanism that actually evicts.
