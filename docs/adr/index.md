@@ -18,6 +18,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0017. Lean pseudocode encoding for procedural instructions](0017-lean-pseudocode-encoding-for-procedural-instructions.md) — accepted
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
 - [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
+- [0020. Loop decision table as a deterministic script, not a Haiku subagent](0020-loop-decision-table-as-a-script.md) — accepted
 
 ## knowledge-engineer
 
@@ -33,6 +34,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — accepted
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
 - [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
+- [0020. Loop decision table as a deterministic script, not a Haiku subagent](0020-loop-decision-table-as-a-script.md) — accepted
 
 ## qa-engineer
 
