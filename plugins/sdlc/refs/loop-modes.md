@@ -131,54 +131,24 @@ signal: it comes straight from `/code-review`'s own report, so the fix/clean dec
 on GitHub's eventually-consistent inline-comment indexing (a freshly-posted thread that the GraphQL
 read has not yet surfaced cannot cause a premature clean exit).
 
-### CI-1. Probe state (every pass)
+## In-session actions
 
-```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
-REVIEW_MARK="$dir/loop-review-mark"        # format: "<reviewed-head-oid> <clean 0|1>"
-read LAST_REVIEWED_HEAD LAST_REVIEW_CLEAN < "$REVIEW_MARK" 2>/dev/null || { LAST_REVIEWED_HEAD=-; LAST_REVIEW_CLEAN=-; }
-[ -n "${LAST_REVIEWED_HEAD:-}" ] || LAST_REVIEWED_HEAD=-
-# Validate the clean flag is exactly 0 or 1 (a half-written marker — CI-b's printf interrupted —
-# would otherwise feed a partial token into the CI-2 tests and fall through to CI-f HALT). Any
-# non-{0,1} value ⇒ treat this head as NOT cleanly reviewed: force a re-review via CI-b rather than
-# guess. Pair it with a head reset so reviewed-head==0 holds.
-case "$LAST_REVIEW_CLEAN" in 0|1) ;; *) LAST_REVIEW_CLEAN=-; LAST_REVIEWED_HEAD=- ;; esac
-CUR_HEAD=$(gh pr view <PR> --json headRefOid -q .headRefOid 2>/dev/null || echo -)
+`commands/loop.md` Step 3 now owns the probe + table for BOTH agents; this section carries
+only the CI-b/CI-c action bodies its `review`/`fix` rows point at.
 
-# Unresolved inline review threads — the SAME agent-agnostic query the Copilot path's fixer uses.
-# One NDJSON object per unresolved comment; count the lines. `grep -c` already PRINTS 0 on a
-# no-match and exits 1; use `|| true` to swallow that exit — NOT `|| echo 0`, which would print a
-# SECOND "0" and make CUR_UNRESOLVED the multi-line string "0\n0" that breaks every numeric test.
-CUR_UNRESOLVED=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-unresolved-comments.sh <PR> 2>/dev/null | grep -c . || true)
-CUR_UNRESOLVED=${CUR_UNRESOLVED:-0}
-
-# CI checks: reuse pr-loop-status.sh ONLY for its checks-* fields (its Copilot review
-# fields are 0/irrelevant on this path and are ignored). Read checks-pending and checks-failing
-# from the `loop-status:` line.
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR> "$dir/loop-checks.json"
+```text
+DECISION=review (was CI-b) -> run REVIEW_CMD INLINE on this HEAD
+  claude-inline      -> /code-review --comment <PR>
+  claude-superpowers -> superpowers `requesting-code-review` skill; post findings inline
+  FOUND := 1 iff review REPORTS >=1 finding (summary count, not "did a thread appear" —
+           summary-only still records non-clean)
+  printf '%s %s\n' "$CUR_HEAD" "$([ "$FOUND" = 1 ] && echo 0 || echo 1)" > "$REVIEW_MARK"
+  loop-budget.sh check "$CUR_HEAD" "$CUR_UNRESOLVED"   # a review IS progress
+  on-create -> STOP after this review+fix; on-update -> schedule next
+DECISION=fix (was CI-c) -> /review-fix <PR> INLINE, identical to the Copilot path's fix action
+RULE=CI-c2 (halt) -> print "<N> unresolved non-loop comment(s) on <HEAD> — review found
+  nothing; leaving the PR open for a human." Do NOT run --on-clean.
 ```
-
-**Print progress to stdout:** pass number, head oid (first 8 chars),
-`reviewed-head` (1 if `CUR_HEAD == LAST_REVIEWED_HEAD` else 0),
-`review-clean=<LAST_REVIEW_CLEAN>`, `unresolved=<CUR_UNRESOLVED>`,
-`checks-pending`, `checks-failing`.
-Persist the printed status line to `$dir/loop-status-last` for budget messages.
-
-### CI-2. Decision table (in-session review path)
-
-Evaluate in order; the FIRST matching rule wins. `reviewed-head` below means
-`CUR_HEAD == LAST_REVIEWED_HEAD` (the loop already ran `/code-review` on this oid).
-`review-clean` is the marker's clean flag for that reviewed head.
-
-| # | Condition | Action |
-| --- | --- | --- |
-| CI-a | `checks-pending > 0` | CI still running. **WAIT** — set `BLOCKED_BY="checks still pending: P=<checks-pending>"`, run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-budget.sh check <head> <unresolved>` (STOP on exit 1, else schedule next iteration). |
-| CI-b | `reviewed-head == 0` (`CUR_HEAD != LAST_REVIEWED_HEAD`) | Current HEAD not yet reviewed. Run **`REVIEW_CMD` INLINE** in this session — for `claude-inline`: `/code-review --comment <PR>` (no subagent); for `claude-superpowers`: the superpowers `requesting-code-review` skill (its `code-reviewer` subagent runs; post the findings it returns as inline PR comments on this HEAD). Either way the findings land as inline PR comments on this HEAD. Set `FOUND=1` if the review **reports ≥1 finding** (read its own summary/report count — NOT merely "did an inline thread appear", so a finding reported summary-only still records non-clean and cannot slip through as clean), else `0`. Record the marker — head **and** clean flag: `printf '%s %s\n' "$CUR_HEAD" "$([ "$FOUND" = 1 ] && echo 0 \|\| echo 1)" > "$REVIEW_MARK"`. Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-budget.sh check "$CUR_HEAD" "$CUR_UNRESOLVED"` (pass-count backstop) — a review IS progress even when head/unresolved are unchanged, so pass `$CUR_HEAD`/`$CUR_UNRESOLVED` unchanged and let the script's own pass-count increment cover it; if the check returns CONTINUE, schedule the next iteration. This is the review action — the synchronous analogue of waiting for Copilot. |
-| CI-c | `reviewed-head == 1 && review-clean == 0` | The loop's OWN review (`/code-review`) reported findings on this HEAD (authoritative marker flag — NOT the raw unresolved count, so the loop never chases threads it didn't raise). Run **`/review-fix <PR>` INLINE** (identical to github-copilot rule 3 — fixes, resolves accepted threads; do NOT let `/review-fix` run its own session-complete — this loop owns the slot release). On success the fix pushes a new HEAD → next pass re-enters CI-b and re-reviews (**`on-update`**); in **`on-create`** STOP after this single fix (do not re-review — see modifiers). On error or `Status: blocked` → **HALT** (Step 5, GitHub Copilot path section above — the halt text is agent-agnostic). |
-| CI-c2 | `reviewed-head == 1 && review-clean == 1 && unresolved > 0` | **NON-LOOP COMMENTS — STOP for a human.** The loop's review found nothing on this HEAD, yet unresolved inline threads remain — they were authored by someone other than the loop (a human reviewer, or threads `/review-fix` declined to resolve). The claude-inline loop does NOT process non-loop review comments (mirroring the github-copilot path, which counts only its reviewer's threads), and must NOT auto-merge over open human feedback. Print "<N> unresolved non-loop comment(s) on <head-oid> — review found nothing; leaving the PR open for a human." and do NOT schedule a next iteration (do NOT run `--on-clean`). This avoids burning the budget re-running `/review-fix` against comments it cannot resolve. |
-| CI-d | `reviewed-head == 1 && review-clean == 1 && unresolved == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — current HEAD reviewed, the review found nothing, no unresolved comments, checks green. If `--on-clean "<command>"` was provided, run it **exactly once now**; then **STOP** the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
-| CI-e | `reviewed-head == 1 && review-clean == 1 && unresolved == 0 && checks-failing > 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there is nothing left for `/review-fix` to do. Print "Required check(s) failing (F=<checks-failing>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. |
-| CI-f | _(catch-all)_ | **UNEXPECTED STATE — HALT.** Print the status line and "unexpected loop state — stopping to avoid a silent hang." Do NOT schedule a next iteration. |
 
 > **Budget.** The claude-inline path reuses the SAME `loop-budget.sh` script. Run it before
 > scheduling any next iteration (CI-a wait, and after the CI-b review and CI-c fix), so both the

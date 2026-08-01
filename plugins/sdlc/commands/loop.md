@@ -180,63 +180,37 @@ to loop on" and do NOT schedule a next iteration.
 
 ## GitHub Copilot path (`REVIEW_AGENT=github-copilot`)
 
-### 3. Probe current status (AC-2, AC-5)
+### 3. Decide (probe + apply the decision table)
 
-```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-loop-status.sh <PR> "$dir/loop-copilot.json"
+Probe + decision table now live in `scripts/loop-decide.sh` (NA-93); golden pins all 1,458
+cases against this file's PRE-change text. Call it, act on the answer — never improvise inline.
+
+```text
+decide := eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-decide.sh <PR> "$REVIEW_PATH" "$dir" "$REVIEW_MARK")"
+       -> DECISION⊆{wait,fix,review,clean,halt}; RULE; REVIEW_PATH; HEAD; UNRESOLVED; FIELDS;
+          GRACE; RE_REQUEST; BLOCKED_BY.  9 lines, <=600 B, exit 0 ALWAYS.
+print (AC-5) := pass #, HEAD (8), RULE, FIELDS
+persist       := printf '%s\n' "$FIELDS" > "$dir/loop-status-last"
+
+DECISION=wait   -> loop-budget.sh check "$HEAD" "$UNRESOLVED" [--grace iff GRACE=yes]
+                   RE_REQUEST=yes && on-update -> gh pr edit <PR> --add-reviewer @copilot
+                   exit 0 -> schedule next; exit 1 -> STOP, print BUDGET_REASON + BLOCKED_BY
+DECISION=fix    -> /review-fix <PR> INLINE (session model; loop owns slot release)
+                   error/blocked -> HALT (Step 5, loop-modes.md)
+                   on-create -> STOP after fix; on-update -> schedule next
+DECISION=review -> REVIEW_CMD INLINE; write REVIEW_MARK; loop-budget.sh check; schedule next
+                   (loop-modes.md `## In-session actions`)
+DECISION=clean  -> ASSERT clean-guard ELSE treat as halt; run --on-clean once, then STOP
+DECISION=halt   -> print RULE, FIELDS, BLOCKED_BY; do NOT schedule next
+absent/outside enum/non-zero exit -> re-run ONCE; 2nd failure -> HALT, raw stdout printed.
+                   NEVER infer a decision from prose or improvise the table here.
+
+clean-guard := reviewed-head==1 && unresolved==0 && checks-failing==0 && checks-pending==0
+               && (copilot: changes-requested==0 | in-session: review-clean==1)
+parse each field OUT OF FIELDS -> never a substring match. guard fails, or a field
+absent/non-numeric -> halt; print "clean guard rejected a clean decision on <HEAD> -
+<FIELDS>"; STOP; never fall through to --on-clean.
 ```
-
-Read the `loop-status:` line — it contains eight fields (in order):
-`copilot-reviewed-head`, `copilot-changes-requested`, `copilot-pending`,
-`unresolved-copilot`, `checks-pending`, `checks-failing`, `checks-passing`,
-`copilot-reviewed-any`.
-`copilot-changes-requested=1` means Copilot's **latest review on the current
-head is `CHANGES_REQUESTED`** — the PR is NOT clean even if `unresolved-copilot=0`
-(e.g. a summary-only changes-requested review with no inline threads).
-`copilot-reviewed-any=1` means Copilot has reviewed **at least one** commit on this
-PR (any head) — used by rules 2a/2b to tell an unstarted initial review (wait fully)
-from a stalled re-review that may never arrive (short grace, then stop).
-
-**Print progress to stdout (AC-5):** pass number, head oid (first 8 chars),
-all eight field values.
-
-**Persist the status line** for budget-exceeded messages:
-
-```bash
-# Replace <loop-status-line> with the actual line read from the script output
-printf '%s\n' "<loop-status-line>" > "$dir/loop-status-last"
-```
-
-**Capture the progress signals for the idle budget.**
-
-```bash
-CUR_HEAD=$(gh pr view <PR> --json headRefOid -q .headRefOid 2>/dev/null || echo -)
-CUR_UNRESOLVED=<the unresolved-copilot field from the loop-status line>
-```
-
-Export both before running `loop-budget.sh check` in any WAIT branch (rules 1, 2a, 2b, 5).
-
-### 4. Apply the decision table
-
-Evaluate the fields in the order below; the FIRST matching rule wins (first-match-wins).
-
-| # | Condition | Action |
-| --- | --- | --- |
-| 1 | `copilot-pending == 1` | Copilot is actively reviewing now (best-effort signal — detail in `refs/loop-modes.md`). **WAIT** — set `BLOCKED_BY="copilot-review-pending (copilot-pending=1, head=<head-oid>)"`, run `loop-budget.sh check` (above), then schedule next iteration on CONTINUE. No fix. |
-| 2a | `copilot-reviewed-head == 0 && copilot-pending == 0 && copilot-reviewed-any == 0` | Copilot has not reviewed ANY head of this PR yet — the **initial** review has not started. Re-request reviewer best-effort — detail in `refs/loop-modes.md` Step 2 (`gh pr edit <PR> --add-reviewer @copilot`, `on-update` only). **WAIT with full patience** (leave `BUDGET_SECS` at its default — no `--grace`), set `BLOCKED_BY="Copilot has not started the initial review of <head-oid>"`, run `loop-budget.sh check`, then schedule next iteration on CONTINUE. |
-| 2b | `copilot-reviewed-head == 0 && copilot-pending == 0 && copilot-reviewed-any == 1` | Copilot reviewed an **earlier** head but is NOT re-reviewing the current head and nothing is queued — a re-review **may never arrive**. Re-request reviewer best-effort (same command as 2a). **WAIT only a SHORT grace** — run `loop-budget.sh check ... --grace`, set `BLOCKED_BY="Copilot has not queued a re-review of HEAD <head-oid> (it reviewed an earlier head) — review-on-push may be limited; merge/resolve manually or re-trigger"`, then schedule next iteration on CONTINUE. Full rationale for this rule's grace bound: `refs/loop-modes.md`. |
-| 3 | `copilot-reviewed-head == 1 && (unresolved-copilot > 0 \|\| copilot-changes-requested == 1)` | Copilot has actionable feedback on current HEAD — either unresolved inline threads **or** a `CHANGES_REQUESTED` review (including a summary-only one with no inline threads). Run `/review-fix <PR>` **INLINE** (in this session — do NOT dispatch a subagent; do NOT let review-fix run its own session-complete — this loop owns the single slot release); `/review-fix` reads the review-summary body too, so a summary-only request is addressed. On success, schedule next iteration **in `on-update` mode** (the push moves HEAD, so next pass naturally re-enters rule 2a/2b while Copilot re-reviews); **in `on-create` mode STOP after this single fix** (do not schedule a next iteration — modifiers in `refs/loop-modes.md`). On error or `Status: blocked` → **HALT** (Step 5, `refs/loop-modes.md`). |
-| 4 | `copilot-reviewed-head == 1 && copilot-changes-requested == 0 && unresolved-copilot == 0 && checks-failing == 0 && checks-pending == 0` | **GENUINE CLEAN** — Copilot's latest head review is NOT `CHANGES_REQUESTED`, no unresolved comments, checks green. If an `--on-clean "<command>"` was provided, run it **exactly once now** (this rule is the ONLY place it runs); if it exits non-zero, surface the error in the report (the PR is still raised — the caller decides whether that is terminal). Then STOP the loop (success). This is the ONLY valid clean exit. Budget is NOT checked here. |
-| 5 | `checks-pending > 0` (and rules 1–4 did not trigger) | CI still running. **WAIT** — set `BLOCKED_BY="checks still pending: P=<checks-pending value>"`, run `loop-budget.sh check`, then schedule next iteration on CONTINUE. |
-| 6 | `copilot-reviewed-head == 1 && copilot-changes-requested == 0 && unresolved-copilot == 0 && checks-failing > 0 && checks-pending == 0` | **FAILING CHECKS — HALT.** Required check(s) are red and there are no unresolved Copilot comments left to fix. `/loop` cannot repair CI failures. Print: "Required check(s) failing (F=<checks-failing value>) on <head-oid> — /loop cannot fix CI; stopping." and do NOT schedule a next iteration. Budget is NOT checked here — immediate terminal halt. Ordering rationale (why this sits after rule 3): `refs/loop-modes.md`. |
-| 7 | _(catch-all — no rule above matched)_ | **UNEXPECTED STATE — HALT.** Print the current `loop-status:` line and "unexpected loop state — stopping to avoid a silent hang." Do NOT schedule a next iteration. No state may fall off the table silently. |
-
-`BUDGET_SECS` / `REREVIEW_GRACE_SECS` / `BUDGET_PASSES` and their defaults are
-owned by `scripts/loop-budget.sh` (see **Global loop budget** above). Rules 1, 4,
-and 7 are fully self-contained above — the rest of this file's action rows point
-at `refs/loop-modes.md` for extra Step 2 / Step 5 / rationale detail, which is
-never required to correctly execute rules 1, 4, or 7.
 
 ---
 

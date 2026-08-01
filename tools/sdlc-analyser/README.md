@@ -1,14 +1,16 @@
 # sdlc-analyser
 
-Manual measurement tools for NA-86/NA-87/NA-88/NA-89/NA-90 (instruction-load reduction,
-artifact-encoding reproducibility, duplicate-read classification, rtk rewrite-coverage replay,
-read-bounding/carve-out volume). Read-only: these scripts read the repo and
-`~/.claude/projects/**/*.jsonl` transcripts, and never write to either. Mostly not wired into CI
-(`artifact-encoding.test.sh`, shipped under `plugins/sdlc/scripts/__tests__/`, was the original
-exception — see `artifact-contract.sh` below for why that tool stays out of CI; `read-bounding.py`,
-`context-residency.py` and `work-placement.py` below are the other exceptions, CI-wired because
-each needs no local binary, only stdlib Python and in-repo fixtures) — run the rest by hand and
-paste the output into a PR body.
+Manual measurement tools for NA-86/NA-87/NA-88/NA-89/NA-90/NA-92/NA-93 (instruction-load
+reduction, artifact-encoding reproducibility, duplicate-read classification, rtk rewrite-coverage
+replay, read-bounding/carve-out volume, subagent offload placement, loop-decision equivalence).
+Read-only: these scripts read the repo and `~/.claude/projects/**/*.jsonl` transcripts, and never
+write to either, except `loop-decision.py --enumerate --golden <path>`, which writes only the
+golden fixture named by `--golden`. Mostly not wired into CI (`artifact-encoding.test.sh`, shipped
+under `plugins/sdlc/scripts/__tests__/`, was the original exception — see `artifact-contract.sh`
+below for why that tool stays out of CI; `read-bounding.py`, `context-residency.py`,
+`work-placement.py` and `loop-decision.py` below are the other exceptions, CI-wired because each
+needs no local binary, only stdlib Python and in-repo fixtures) — run the rest by hand and paste
+the output into a PR body.
 
 ## `instruction-inventory.sh`
 
@@ -667,6 +669,126 @@ proves **nothing** about whether any real session obeys the offload contract, or
 byte was actually relocated. This is a smoke test, never a gate on agent behaviour. The
 pilot (`docs/superpowers/plans/NA-92-measurements/pilot-obligation.md`, a story NA-92
 does not author) is the only evidence about the contract itself.
+
+## `loop-decision.py`
+
+```text
+python3 tools/sdlc-analyser/loop-decision.py --extract <loop.md> <loop-modes.md> [--json]
+python3 tools/sdlc-analyser/loop-decision.py --enumerate --golden <path> [--extract-from <loop.md> <loop-modes.md>] [--json]
+python3 tools/sdlc-analyser/loop-decision.py --replay <label> (<transcript.jsonl>... | --corpus-list <file>) [--json]
+```
+
+Python 3, stdlib only (3.9-compatible). NA-93 (workstream H) moves the `sdlc:loop`
+probe-and-decide body — `commands/loop.md` Step 3+4 and `refs/loop-modes.md` CI-1+CI-2 — into a
+deterministic script, `plugins/sdlc/scripts/loop-decide.sh`. This tool parses the two markdown
+decision tables **per field** (never as a whole-cell string match), enumerates the domain those
+tables define, pins the pre-change extraction as a golden fixture, and replays the real corpus
+against that golden.
+
+### The decision domain (verbatim — only the 0/1/>1 distinction is load-bearing)
+
+```text
+copilot    := rh∈{0,1} × cr∈{0,1} × cp∈{0,1} × ra∈{0,1} × un∈{0,1,2} × pend∈{0,1,2}
+              × fail∈{0,1,2} × pass∈{0,1,2}                      = 2^4 · 3^4 = 1,296
+in-session := rh∈{0,1} × rc∈{0,1,'-'} × un∈{0,1,2} × pend∈{0,1,2} × fail∈{0,1,2} = 162
+total      := 1,458 cases
+```
+
+Field names are exactly what `pr-loop-status.sh:130`'s `loop-status:` line and the in-session
+CI-1 progress print use: copilot (8) `copilot-reviewed-head`, `copilot-changes-requested`,
+`copilot-pending`, `unresolved-copilot`, `checks-pending`, `checks-failing`, `checks-passing`,
+`copilot-reviewed-any`; in-session (5) `reviewed-head`, `review-clean`, `unresolved`,
+`checks-pending`, `checks-failing`.
+
+`review-clean='-'` is a **legitimate value, not a parse failure** — CI-1 sets it when the review
+marker is absent or half-written. No rule in the in-session table ever compares `review-clean` to
+anything but the literals `0`/`1`, so the generic comparator already does the right thing without
+a special case: `'-'` never equals `0` or `1`, so every rule testing `review-clean` fails for it,
+and `(reviewed-head=1, review-clean='-')` falls through to the catch-all `CI-f` exactly as
+required. Treating any non-numeric field as unresolvable instead would collapse 54 of the 162
+in-session cases and make the equivalence gate measure nothing (this epic's F-11).
+
+### The extraction rule (verbatim — per field, never a whole-cell match)
+
+```text
+condition cell := a `&&`-joined list of comparisons over the named fields
+comparison     := <field> <op> <literal>            # op ⊆ {==, !=, >, <, >=, <=}
+`||` inside a cell (rule 3) -> a disjunction group; preserved, never flattened
+_(catch-all)_ -> conditions := []                    # rules 7 and CI-f
+```
+
+The Rule → DECISION mapping is a fixed 16-row table taken verbatim from the plan, not inferred
+from either table's prose column. `--extract` asserts the copilot table yields exactly 8 rules
+(1, 2a, 2b, 3, 4, 5, 6, 7) and the in-session table exactly 7 (CI-a..CI-f); a wrong count means
+the extractor is misparsing and the tool exits non-zero rather than emitting a golden.
+
+### The golden's provenance (amendment A3)
+
+`--enumerate --golden <path>` writes `sourceSha` (`git rev-parse HEAD`, captured by the tool
+itself) and `sourceBytes` (measured by the tool from the files it just read, never passed in)
+alongside `domain` and all 1,458 `cases[]`. At `433120d` (the pre-H sha) `sourceBytes` is
+`{"plugins/sdlc/commands/loop.md": 17544, "plugins/sdlc/refs/loop-modes.md": 18851}` — a
+regenerated golden after Phase 2's rewrite would carry different bytes at a different sha, and
+`plugins/sdlc/scripts/__tests__/loop-decide.test.sh` asserts `git show <sourceSha>:loop.md | wc -c
+== 17544` so the mistake is mechanically caught, not merely discouraged (NA-88 D11 — the golden is
+the one artifact in this story extracted by a different phase from text its own author did not
+write).
+
+### Why `--replay` classifies against the golden, not a fresh parse
+
+By the time Phase 3 runs `--replay` against the real corpus, Phase 2 has already replaced both
+markdown tables with a script call — there is no table left to parse. `--replay` therefore loads
+the **committed golden**'s `cases[]` as a direct `(bucketed fields) -> rule` lookup and classifies
+every real `loop-status:` snapshot against it. `refs/loop-modes.md` CI-1 calls `pr-loop-status.sh`
+"only for its checks-\* fields", but that script always prints the full 8-field `loop-status:` line
+regardless of caller, so every real snapshot in this repo's corpus is Copilot-shaped even though
+`Review agent: claude-inline` is configured — `--replay` only ever classifies the 8-field shape.
+
+```text
+bucket(v) := v   IF v ∈ {0, 1}
+bucket(v) := 2   OTHERWISE   # collapses any raw count >= 2 (e.g. un=3, un=4) into the domain's un=2
+```
+
+The three-tier corpus rule is identical to `work-placement.py`'s (T1 `*.jsonl`, T2
+`*/subagents/agent-*.jsonl`, T3 `*/subagents/workflows/wf_*/agent-*.jsonl`, `rglob` required for
+T2+T3). `observed.rulesWithZeroEvidence` lists every one of the 8 copilot rule ids the resolved
+corpus never selected — at the real 186-snapshot / 9-distinct-tuple corpus this is exactly
+`["1", "5", "6", "7"]`. **This assertion exists so a 1,458/1,458 enumeration pass can never be read
+as production coverage** — enumeration proves the script matches the table; it does not prove the
+table was ever right for the four unexercised rules.
+
+**`--json` emits**: `label`, `corpus` (`topLevelTranscripts`, `subagentTranscripts`), `domain`
+(`copilotCases`/`inSessionCases`/`totalCases`), `observed` (`snapshots`, `distinct`, `byRule`,
+`rulesWithZeroEvidence`), `skippedLines`, `missingCorpusPaths`. Error handling mirrors
+`work-placement.py`: no resolved transcript at all → every path/root tried, exit 1; a partial
+`--corpus-list` miss → loud stderr WARNING, `--corpus-list` exits 1; an unparseable transcript line
+→ skipped, `skippedLines += 1`; 0 T3 transcripts resolved → loud stderr WARNING naming the count.
+
+### Falsifiability harness
+
+`tools/sdlc-analyser/__tests__/loop-decision.test.sh` (11 assertions, CI-wired) proves: `--extract`
+reads per field (`fixtures/loop-decision/tables-perturbed/` widens rule 4 by deleting its
+`checks-pending == 0` clause — the clean and perturbed extractions of rule 4 must differ); the
+domain is exactly 1,296/162/1,458; rule selection is invariant in `checks-passing`; `--replay`
+reaches the T3 tier over a three-tier fixture corpus (`observed/root.jsonl` T1,
+`observed/root/subagents/agent-a.jsonl` T2, `observed/root/subagents/workflows/wf_x/agent-b.jsonl`
+T3 — the T3 file carries a raw tuple, `unresolved-copilot=4`, that appears in no other tier, so a
+non-recursive corpus build would under-count `observed.distinct` and `observed.snapshots`, exactly
+NA-90's shipped bug); `rulesWithZeroEvidence` reports the fixture's own known-unexercised rules;
+and `skippedLines` counts the fixture's one deliberately-malformed JSONL line. All six
+falsifiability assertions (F-1 through F-6) were proven to flip to FAIL under their named
+perturbation and restored byte-identical (`git checkout --`) before this story shipped.
+
+### NA-88 D11 — this instrument is self-confirming, not independent evidence
+
+`loop-decision.py` and its fixtures are authored by the same story that ships
+`plugins/sdlc/scripts/loop-decide.sh`, the script it later validates. A PASS on
+`loop-decision.test.sh` proves only that the tool does what its own author designed — it proves
+**nothing** about whether rules 1, 5, 6 or 7 are correct, because no real PR has ever exercised
+them (`observed.rulesWithZeroEvidence` exists precisely to keep that limitation visible on every
+run). The one place this story escapes D11 is the golden itself: it is extracted by
+`platform-engineer` in Phase 1, before `ai-enablement-engineer` rewrites either table in Phase 2 —
+an extract of text its own author did not write.
 
 ## `cache-analysis.py`
 

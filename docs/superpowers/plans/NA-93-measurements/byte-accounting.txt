@@ -1,0 +1,73 @@
+== per-pass top-level surface, after ==
+   13421 plugins/sdlc/commands/loop.md
+   13534 plugins/sdlc/refs/loop-modes.md
+   26955 total
+== before (develop @ 46d59d5): loop.md=17544 loop-modes.md=18851 combined=36395 ==
+== caps: loop.md<=13500  combined<=27000  playbooks<=73704 ==
+== playbook pair (must be UNCHANGED at 73386) ==
+   30192 plugins/sdlc/refs/qa-engineer-playbook.md
+   43194 plugins/sdlc/refs/principal-engineer-playbook.md
+   73386 total
+== byte pins ==
+     868 ## Context reuse
+    1005 ## Bounded reads
+== arithmetic ==
+17544 - 13421 = 4123 cut on loop.md (required >= 4044; achieved 4123; 79 B slack against the 13500 cap)
+36395 - 26955 = 9440 cut on combined (required >= 9395; achieved 9440; 45 B slack against the 27000 cap)
+73704 - 73386 = 318 slack against the playbook-pair cap, UNCHANGED — this is G's slack, not H's; H's own
+   delta on the pair is +0 (confirmed: git diff --stat develop -- plugins/sdlc/refs/qa-engineer-playbook.md
+   plugins/sdlc/refs/principal-engineer-playbook.md is empty)
+fallback ladder (plan Global Constraints): NOT USED — both caps reached inside the plan's own
+   movable-inventory arithmetic, no rung applied.
+domain-agent-handoff.md diff vs develop: EMPTY (git diff develop -- plugins/sdlc/refs/domain-agent-handoff.md
+   produces zero changed lines). Both byte pins above match their required values exactly
+   (## Context reuse == 868, hard equality; ## Bounded reads == 1005, cap 1005) — H touched neither.
+
+== golden provenance (A3), re-verified in this worktree ==
+sourceSha   = 433120dafa2929048a740f427a5e82fe7f802760
+sourceBytes = {"plugins/sdlc/commands/loop.md": 17544, "plugins/sdlc/refs/loop-modes.md": 18851}
+git show 433120d:plugins/sdlc/commands/loop.md   | wc -c  -> 17544  (matches)
+git show 433120d:plugins/sdlc/refs/loop-modes.md | wc -c  -> 18851  (matches)
+
+== decision-domain equivalence (H-Gate-2), re-run live in this worktree ==
+H-Gate-2: evaluated=1458 mismatches=0
+domain: copilotCases=1296 inSessionCases=162 totalCases=1458
+decisions: wait=1116 fix=279 halt=29 review=27 clean=7 (sum=1458, unresolvable=0)
+review-clean='-' cases: 54, all resolve to a non-unresolvable rule (none collapse to unresolvable)
+
+== quality gates (this dispatch, re-run after the final edit per rerun-gates-after-final-edit) ==
+plugins/sdlc/scripts/__tests__/*.test.sh: all files PASS, zero FAIL/FAILED
+tools/sdlc-analyser/__tests__/*.test.sh: all files PASS, zero FAIL/FAILED
+check-frontmatter.sh: OK
+check-agent-skill-preloads.sh: OK
+check-plugin-docs-format.sh: OK
+tools/portability-lint.sh: clean (both plugins, shared manifest)
+
+== Falsifiability register (F-1..F-18) ==
+Recorded from Tasks 1.4 (platform-engineer, Phase 1) and 2.6 (ai-enablement-engineer, Phase 2) —
+each row is the perturb -> observe FAIL -> restore -> observe PASS cycle those tasks executed against
+the as-shipped Phase 1/2 artifacts. NA-88 D11 applies: a green suite proves the author wrote what the
+author intended and that every assertion is wired to something that can move — it proves nothing about
+whether rules 1, 5, 6 and 7 are correct in production (see live-input-evidence.txt).
+
+F-1  | --extract per-field parsing | perturbation: whole-cell string match keyed on rule id | restore: git checkout -- tools/sdlc-analyser/loop-decision.py | register status: PASS (baseline green) -> FAIL under perturbation -> restored -> PASS
+F-2  | domain.copilotCases==1296 / inSessionCases==162 / totalCases==1458 | perturbation: drop checks-passing from the copilot product (-> 432 cases) | restore: same | PASS -> FAIL -> restored -> PASS
+F-3  | rule selection invariant in checks-passing | perturbation: rule 4 additionally requires pass>0 | restore: same | PASS -> FAIL -> restored -> PASS
+F-4  | --replay observed.snapshots/.distinct/.byRule match the fixture | perturbation: non-recursive glob("*/subagents/agent-*.jsonl") replacing rglob (NA-90's exact bug) | restore: same | PASS -> FAIL -> restored -> PASS
+F-5  | observed.rulesWithZeroEvidence lists every unexercised rule | perturbation: hard-code rulesWithZeroEvidence: [] | restore: same | PASS -> FAIL -> restored -> PASS
+F-6  | skippedLines counts unparseable JSONL lines | perturbation: delete the skippedLines += 1 increment | restore: same | PASS -> FAIL -> restored -> PASS
+F-7  | H-Smoke-1: nine contract keys, one key per assertion, parsed from real stdout | perturbation: drop the GRACE= line from emit() | restore: git checkout -- plugins/sdlc/scripts/loop-decide.sh | PASS -> FAIL (names GRACE) -> restored -> PASS
+F-8  | H-Smoke-2: exit 0 on well-formed/garbage/empty/no-argument input | perturbation: add set -e, let the empty-line path fall through a failing command | restore: same | PASS -> FAIL -> restored -> PASS
+F-9  | exactly nine lines, <=600 B | perturbation: append a tenth diagnostic line to stdout | restore: same | PASS -> FAIL (both assertions) -> restored -> PASS
+F-10 | fail-safe: unresolvable -> DECISION=wait, never clean, never halt | perturbation: change the unresolvable branch to DECISION=halt (and separately to DECISION=clean) | restore: same | PASS -> FAIL (both perturbations) -> restored -> PASS
+F-11 | review-clean=- is not a parse failure -> RULE=CI-b | perturbation: treat any non-numeric field as unresolvable | restore: same | PASS -> FAIL (54 cases collapse, H-Gate-2 reports 54 mismatches) -> restored -> PASS
+F-12 | H-Gate-1a: bytes(loop.md)<=13500 | perturbation: append (13500-actual+1) bytes of filler, computed at ship time | restore: git checkout -- plugins/sdlc/commands/loop.md | PASS -> FAIL -> restored -> PASS
+F-13 | H-Gate-1b: bytes(loop.md)+bytes(loop-modes.md)<=27000 | perturbation: append (27000-actual_total+1) bytes to loop-modes.md, computed at ship time | restore: git checkout -- plugins/sdlc/refs/loop-modes.md | PASS -> FAIL -> restored -> PASS
+F-14 | H-Gate-1c + pins: playbook pair<=73704; Context reuse==868; Bounded reads<=1005 | perturbation: insert one space into '## Context reuse' (868->869) | restore: git checkout -- plugins/sdlc/refs/domain-agent-handoff.md | PASS -> FAIL -> restored -> PASS
+F-15 | absence not duplication: loop-copilot.json/copilot-reviewed-any/LAST_REVIEWED_HEAD/loop-checks.json all at 0 occurrences | perturbation: paste the deleted Step-3 probe block back into loop.md (real re-inline) | restore: git checkout -- plugins/sdlc/commands/loop.md plugins/sdlc/refs/loop-modes.md | PASS -> FAIL (loop-copilot.json count becomes 1) -> restored -> PASS
+F-16 | H-Gate-2 (THE GATE): all 1458 cases match the golden, mismatches[] empty | perturbation: remap rule 3's DECISION token (fix->wait) while keeping its rule id '3' | restore: git checkout -- plugins/sdlc/scripts/loop-decide.sh | PASS -> FAIL (0 mismatches on a RULE-only compare; caught only once the gate was fixed to compare DECISION too — see commit d08fb4e) -> restored -> PASS
+F-17 | golden provenance (A3): bytes(git show sourceSha:loop.md)==17544, ...loop-modes.md==18851 | perturbation: regenerate the golden from the post-change tables and update sourceSha | restore: git checkout -- tools/sdlc-analyser/__tests__/fixtures/loop-decision-golden.json | PASS -> FAIL (loop.md at that sha is ~13,001 B) -> restored -> PASS
+F-18 | H-Gate-2b (convergence): probe path and --from-status path return an identical nine-line block modulo HEAD= across the 9 real snapshots | perturbation: implement --from-status as a second table, changing one row's condition in that branch only | restore: git checkout -- plugins/sdlc/scripts/loop-decide.sh | PASS -> FAIL (at least one of the 9 blocks differs) -> restored -> PASS
+
+== restore verification ==
+git status --porcelain: (empty) — no perturbation left in the shipped tree.

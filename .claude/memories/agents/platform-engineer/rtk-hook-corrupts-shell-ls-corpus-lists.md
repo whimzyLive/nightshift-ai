@@ -3,8 +3,8 @@ id: rtk-hook-corrupts-shell-ls-corpus-lists
 agent: [platform-engineer]
 trigger: [building a corpus-list.txt, pinning a transcript file list, shell ls glob under rtk hook, corpus list path corrupted]
 rule: When generating a corpus/path-list file via shell `ls`, use Python `glob.glob` instead — the local rtk hook can rewrite `ls` to append trailing size text, corrupting paths.
-evidence: [NA-90, NA-91]
-uses: 2
+evidence: [NA-90, NA-91, NA-93]
+uses: 3
 status: active
 ---
 
