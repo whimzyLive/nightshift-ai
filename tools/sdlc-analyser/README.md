@@ -479,6 +479,25 @@ ASSERT corpus.subagentTranscripts == 0 ELSE print a loud one-line WARNING naming
        # a warning, never exit 1 — a deliberately mixed run is the caller's business to explain
 ```
 
+### The corpus-completeness rule (verbatim)
+
+```text
+missing := a raw path that resolve_paths() could not resolve to a readable file
+any missing path -> print a loud one-line WARNING to stderr naming the count and listing
+                     every missing path, same register as the subagentTranscripts WARNING
+--corpus-list AND missing non-empty -> exit 1  # a pinned corpus list is a deliberate
+                     artifact; measuring a silent subset of it is a measurement error, not
+                     a convenience
+bare positional paths AND missing non-empty -> WARNING only, exit unaffected  # an ad-hoc
+                     path list on the command line is already the caller's own choice of
+                     what to include; there is no pinned artifact to fall short of
+```
+
+A partial corpus that reports clean is worse than one that fails loud — this epic has already
+under-captured its own corpus three times (NA-88's 11.7%, NA-90's shallow glob, NA-91's own
+missed `workflows/` tier). A dropped file is never silent, and a dropped file from a pinned
+`--corpus-list` is a hard failure, not a warning the caller can miss.
+
 **Prefer `--corpus-list` over positional paths for any before/after comparison** — the
 `rtk-coverage.py` reasoning: a sliding "most-recent-N" window is not the same bytes on both sides
 of a delta. Path lists must be built with Python `pathlib`/`glob`, never parsed `ls` — the local
@@ -493,11 +512,13 @@ per transcript (blank-line separated) instead of one pooled report — this is t
 per-session median in NA-91's measurement block is computed from.
 
 **Error handling:** no given path resolves to a readable file -> every path tried is printed to
-stderr, exit 1 (never a zeroed report that reads like a real empty result). Unparseable transcript
-line -> skipped, `skippedLines += 1`, exit 0 (a truncated last line is normal in a live
-transcript). A transcript path containing `/subagents/` -> counted in `subagentTranscripts` and a
-loud WARNING to stderr, never silently pooled with the top-level population. Invalid `--boundary`
-value -> error naming the flag and the value, exit 2.
+stderr, exit 1 (never a zeroed report that reads like a real empty result). A partial miss (some
+paths resolve, some don't) -> loud stderr WARNING naming the count and every dropped path;
+`--corpus-list` additionally exits 1, bare positional paths exit 0 (see the corpus-completeness
+rule above). Unparseable transcript line -> skipped, `skippedLines += 1`, exit 0 (a truncated
+last line is normal in a live transcript). A transcript path containing `/subagents/` -> counted
+in `subagentTranscripts` and a loud WARNING to stderr, never silently pooled with the top-level
+population. Invalid `--boundary` value -> error naming the flag and the value, exit 2.
 
 ### Gate 2 — falsifiability
 
@@ -508,13 +529,16 @@ value -> error naming the flag and the value, exit 2.
 | `full-inherit.jsonl` (synthetic, every result enters at the boundary) | `1.0`            |
 
 A tool that returned the same number against all three would be incapable of measuring anything.
-The 22-assertion harness (`tools/sdlc-analyser/__tests__/context-residency.test.sh`) exercises
+The 28-assertion harness (`tools/sdlc-analyser/__tests__/context-residency.test.sh`) exercises
 these three fixtures plus the `--boundary none` control arm, the corpus partition, the subagent
-WARNING, and every error-handling row in the table above. Falsifiability was proven during this
-story by perturbing four assertions in turn (boundary-marker detection, the exposure formula, the
-cache-read numerator, the skipped-line counter) — each perturbation flipped the expected
-assertions to FAIL, and the tree was restored byte-identical (`git checkout --`) and re-verified
-green after each.
+WARNING, the corpus-completeness WARNING/exit-code pair (both the `--corpus-list` and bare-path
+variants), the docstring's stated `cacheReadRatio` formula, and every error-handling row in the
+table above. Falsifiability was proven during this story by perturbing seven assertions in turn
+(boundary-marker detection, the exposure formula, the cache-read numerator, the skipped-line
+counter, the corpus-completeness WARNING print, the `--corpus-list` non-zero exit, and the
+docstring's `cacheReadRatio` formula line) — each perturbation flipped the expected assertions to
+FAIL, and the tree was restored byte-identical (`git checkout --`) and re-verified green after
+each.
 
 ### NA-88 D11 — this instrument is self-confirming, not independent evidence
 
