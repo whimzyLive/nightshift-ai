@@ -67,30 +67,19 @@ The agent should:
    ```
 9. Return: story key, spec file path, PR URL
 
-## Final action — loop the PR to Copilot-clean, then release (when run standalone)
+## Final action — release at PR raise (when run standalone)
 
-This step applies only when `/spec` is the **top-level** command. When `/auto` generates the spec as
-part of Workflow A (it dispatches the `solutions-architect` agent for this work), `/auto` owns the
-loop **and** the single session release at the very end — do **not** run this final action nested.
+Applies only when `/spec` is the **top-level** command. Nested under `/auto`, `/auto` owns the
+terminal action — do **not** run this final action nested.
 
-After **everything above is complete** (the spec PR is raised and the Jira comment posted), the
-standalone command's final action is to drive the Copilot review-fix loop on the just-raised PR to
-convergence, **then** release — the loop is the session's **tail**:
+The phase closed at PR raise: the spec is on a branch and the Jira comment is posted, so nothing
+resident is still load-bearing. Apply the **Session boundary at PR raise** block in
+`${CLAUDE_PLUGIN_ROOT}/commands/auto.md` with `<NEXT>` = `/loop /sdlc:loop <PR_URL>` (`<PR_URL>` =
+the spec PR from step 9). It decides: harness → emit `<NEXT>` and release here; interactive →
+run `<NEXT>` inline as the tail, which owns the release.
 
-```bash
-# PR_URL is the spec PR captured from the agent (step 9). Drive the review-fix loop on it.
-/loop /sdlc:loop <PR_URL>
-```
-
-The native `/loop` re-invokes `sdlc:loop` each pass: it polls Copilot's review of the PR head, runs
-`/review-fix` inline on each round of comments, and exits when the head is Copilot-reviewed with no
-unresolved comments and checks pass (or it halts / hits the idle budget). Because the loop is the
-**tail**, its own "Final action — release the session" emits the single `session-complete` — do
-**NOT** call `session-complete.sh` separately here.
-
-> - If the harness cannot invoke the native `/loop` from inside a command, drive `sdlc:loop`'s
->   pass-cycle via `ScheduleWakeup` instead (same effect — the loop is the last thing the session
->   does), then let its final pass release.
+> - If the harness cannot invoke the native `/loop`, drive `sdlc:loop`'s pass-cycle via
+>   `ScheduleWakeup` instead — same effect.
 > - If the command hit a terminal STOP **before** a PR was raised (nothing to loop on), run
 >   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` directly to release.
 

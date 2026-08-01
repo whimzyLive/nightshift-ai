@@ -154,12 +154,7 @@ fallback's target case. The label tokens deliberately mirror the mode values the
 trigger service resolves from the same labels, so webhook-side triggering and `/auto`-side gating
 agree.)
 
-### The procedure (the loop is the tail — it owns the release)
-
-The loop is the phase's **tail**, exactly like the standalone commands: hand it to the native
-`/loop` driving `sdlc:loop`. For a **Full Auto** story, inject the auto-merge as the loop's
-`--on-clean` hook so it runs at the loop's rule-4 clean exit — the loop stays mode-agnostic and just
-runs the hook. The loop owns the single `session-complete`; `/auto` does **not** release separately.
+### The procedure (release at PR raise; the loop is a NEW session)
 
 1. **Resolve `MODE`** (see above) — this decides whether an `--on-clean` hook is attached.
 2. **Resolve `DONE_STATUS`** — read the **`Pipeline done status`** row from this repo's
@@ -169,8 +164,8 @@ runs the hook. The loop owns the single `session-complete`; `/auto` does **not**
    unused otherwise.
 3. **Post the phase's Jira comment FIRST** (the loop is the session's last act, so the comment is
    posted before it — see A1/A3/B2 for the per-phase, mode-aware text).
-4. **Run the loop as the tail:**
-   - **`MODE` = `Full Auto`** → attach the auto-merge hook; on the loop's clean exit it auto-merges
+4. **Build `<NEXT>`, the full re-invocation line:**
+   - **`MODE` = `Full Auto`** → attach the auto-merge hook; on `<NEXT>`'s clean exit it auto-merges
      `<PR_URL>`, whose merge event advances the pipeline (`<PHASE>=spec` → resumes Phase 2;
      `plan+impl`/`impl` → completes the story and also best-effort transitions it to
      `<DONE_STATUS>`). Whether the hook also transitions the story depends on **whether `<PHASE>` is
@@ -186,21 +181,17 @@ runs the hook. The loop owns the single `session-complete`; `/auto` does **not**
        ```bash
        /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
        ```
-   - **Any other mode** → no hook; the loop just drives the PR to Copilot-clean and stops for a human
+   - **Any other mode** → no hook; `<NEXT>` just drives the PR to Copilot-clean and stops for a human
      merge:
      ```bash
      /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE>
      ```
-
-The loop drives review-fix to convergence (or halts on review-fix-blocked / CI-red / idle-budget),
-then releases via its own Final action. On a non-clean halt the `--on-clean` hook does **not** run
-(no merge) — the PR stays open and the halt reason is surfaced. If the hook itself fails (branch
-protection, conflict), the loop surfaces it and the PR stays open.
+   Then apply **Session boundary at PR raise** (below) to `<NEXT>`.
 
 > **Fallback** — if the harness cannot self-invoke the native `/loop` from inside `/auto`: drive
 > `sdlc:loop`'s pass-cycle via `ScheduleWakeup` yourself and run the resolved `--on-clean` command at
-> the rule-4 clean exit, before the single release. Same effect — the loop is the last thing the
-> session does, and `/auto` adds no separate release.
+> the rule-4 clean exit, then apply **Session boundary at PR raise** to the assembled `<NEXT>` exactly
+> as the harness path would.
 
 `sdlc:loop` stays mode-agnostic — it only drives review-fix and runs whatever `--on-clean` hook it
 was handed; `/auto` decides (via `MODE`) whether to attach the auto-merge hook.
@@ -219,6 +210,32 @@ subset of `spec,plan,impl` listing which phases trigger the configured automated
   `/auto`); the spec PR is gated by `spec`.
 - The phase is passed per-invocation as `--phase <GATE_PHASE>`, so each PR is gated independently and
   there is no cross-phase state bleed.
+
+### Session boundary at PR raise
+
+The top-level session re-bills every resident tool result on every later turn; 34.6% of top-level
+tool-result exposure is the post-PR-raise tail inheriting context produced before the PR existed
+(NA-91). The phase **closes** at PR raise — the work is durable on a branch and the Jira comment is
+posted — so the tail runs as a NEW session instead of inheriting this one. `<NEXT>` is the FULL
+re-invocation line, including `--phase <GATE_PHASE>` and the `--on-clean` hook when one applies.
+
+```text
+SDLC_BOUNDARY_ON unset                        -> run <NEXT> inline as today's tail; the loop owns
+                                                  the release   # DEFAULT: unchanged behaviour
+SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY set   -> print `<<<SDLC_NEXT_INVOCATION:<NEXT>>>>`, run
+                                                  `session-complete.sh <PR_URL>`, STOP   # harness
+                                                  re-invokes <NEXT> fresh
+SDLC_BOUNDARY_ON set + SDLC_SESSION_KEY unset -> interactive: print <NEXT>, then run it inline as
+                                                  the tail; the loop releases
+```
+
+first-match-wins, and the boundary is **opt-in**: the default row (`SDLC_BOUNDARY_ON` unset) is
+byte-identical to today's behaviour, because the harness protocol it depends on does not ship itself.
+The harness re-invokes the printed line **verbatim**: `session-complete.sh` is unchanged and its
+`|PR=` marker cannot carry `--phase` or an `--on-clean` hook, so the line is printed, never
+reconstructed. **A harness must adopt `SDLC_NEXT_INVOCATION` before `SDLC_BOUNDARY_ON` is ever set**
+— setting it against a harness that ignores the line leaves every PR raised under the boundary
+unlooped, unreviewed, and never auto-merged, silently.
 
 ---
 
@@ -293,7 +310,7 @@ Tell the user:
 
 > Spec PR raised; driving it to Copilot-clean as the session tail. Review and merge it to `develop`, then re-run `/auto STORY_KEY`.
 
-The **tail loop owns the release** — do not run `session-complete.sh` here. Do **not** proceed to A2
+Terminal action: apply **Session boundary at PR raise**. Do **not** proceed to A2
 in this run; Phase 2 is resumed by the spec-PR merge (human, or the Full-Auto auto-merge) as a fresh
 `/auto STORY_KEY` invocation (A0 detects the merged spec).
 
@@ -324,7 +341,7 @@ curl -s --retry 3 -X POST http://localhost:9001 \
    (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`plan+impl`): `Full Auto` → tail loop **with** the auto-merge
    hook (auto-merges on clean → the plan+impl PR landing on `develop` **completes** the story, then
    best-effort transitions it to the pipeline done status); any other mode → tail loop **without** a
-   hook (leave open for human merge). The tail loop owns the release.
+   hook (leave open for human merge). Terminal action: apply **Session boundary at PR raise**.
 
 ### A3 — Complete (comment posted BEFORE the tail loop)
 
@@ -396,8 +413,8 @@ Then resolve `MODE`, post the mode-aware Jira comment (B2 below) **before** the 
 **Loop-after-raise** procedure (above) for the impl PR as the session **tail**
 (`<PR_URL>`=`IMPL_PR_URL`, `<PHASE>`=`impl`): `Full Auto` → tail loop **with** the auto-merge hook
 (auto-merges on clean → completes the story, then best-effort transitions it to the pipeline done
-status); any other mode → tail loop **without** a hook (leave the PR open for human merge). The tail
-loop owns the release.
+status); any other mode → tail loop **without** a hook (leave the PR open for human merge). Terminal
+action: apply **Session boundary at PR raise**.
 
 ### B2 — Complete (comment posted BEFORE the tail loop)
 
@@ -452,19 +469,16 @@ the missing path; never continue on a half-loaded contract.
 
 ## Final action — release the session
 
-> **In the normal path the TAIL LOOP owns the single release.** Each routed phase ends by running
-> `/loop /sdlc:loop <PR> [--on-clean …]` as its tail (the shared procedure); that loop's own Final
-> action emits the single `session-complete`. So every phase `/auto` delegates — triage (inline from
-> `refs/triage.md`), spec/plan (the agents), impl (the playbook inline), and the loop-after-raise
-> itself — must NOT emit its own `session-complete`. After a phase has handed off to the tail loop,
-> `/auto` runs **nothing** further — running `session-complete.sh` again would be a double release.
-> (A Full-Auto auto-merge of the spec PR resumes Phase 2 as a _separate_ `/auto` invocation with its
-> own tail-loop release — not a nested one.)
+```text
+SDLC_BOUNDARY_ON unset (default)     -> the tail loop owns the single release, exactly as before
+SDLC_BOUNDARY_ON set + harness       -> the PHASE releases at PR raise (Session boundary at PR
+                                         raise); the re-invoked loop session releases its own slot
+SDLC_BOUNDARY_ON set + interactive   -> the tail loop owns the single release, exactly as before
+no PR was raised at all              -> run session-complete.sh directly here
+```
 
-**Direct release whenever no tail loop ran.** The tail loop owns the release only on the paths that
-actually run it (the `ASYNC_REVIEW=false` phase paths above). In **every other case where no tail
-loop executed**, run `session-complete.sh` directly as the very last action, or the slot leaks until
-the idle timeout:
+**Direct release whenever no tail loop ran.** In every case below, run `session-complete.sh` directly
+as the very last action, or the slot leaks until the idle timeout:
 
 - the Step 0 unsupported-input-type stop (no session spawned); **and**
 - the **epic path** when the epic session itself ends (E0 unset-Epic reject, E1 `GATE=STOP`, E3

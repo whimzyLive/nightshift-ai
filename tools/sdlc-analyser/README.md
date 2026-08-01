@@ -430,6 +430,126 @@ gate on agent behaviour. The tool's own `--json` output repeats this note. Gate 
 an independent story after this PR merges (`docs/superpowers/plans/NA-90-measurements/pilot-obligation.md`,
 written by Phase 2) — is the only evidence about the contract itself.
 
+## `context-residency.py`
+
+```text
+python3 tools/sdlc-analyser/context-residency.py <label> (<transcript.jsonl>... | --corpus-list <file>) [--boundary pr-raise|none] [--per-transcript] [--json]
+```
+
+Python 3, stdlib only (3.9-compatible), read-only. Measures byte-turn residency of tool results in
+a TOP-LEVEL orchestrator transcript, locates the PR-raise boundary, and reports how much resident
+context the post-boundary tail inherits — the instrument NA-91's workstream-F guardrail (AC-2,
+cache-read ratio >= 94%) is scored against.
+
+**F's population is the TOP-LEVEL orchestrator transcript only** — never a subagent's. Subagent
+transcripts (`<session>/subagents/**/agent-*.jsonl`, recursive) are `read-bounding.py`'s and
+`duplicate-reads.py`'s population, not this tool's.
+
+### The residency rule (verbatim — an unstated rule makes before/after non-reproducible)
+
+```text
+turn        := a record with type == "assistant"; turns are indexed 1..T in file order
+T           := assistantTurns, the count of such records in the transcript
+result(r)   := an item of record["message"]["content"] with type == "tool_result"
+bytes(r)    := len(result text)                     # the bytes actually resident
+turn(r)     := the index of the most recent assistant turn at or before r's record
+exposure(r) := bytes(r) * (T - turn(r))             # re-billed on every turn after it entered
+toolResultExposure := sum of exposure(r) over all r
+```
+
+### The boundary rule (verbatim)
+
+```text
+boundaryTurn := index of the FIRST assistant turn carrying a tool_use with name == "Bash" whose
+                input.command contains "raise-pr.sh" or "gh pr create"; null when absent
+inheritedExposure := sum over r with turn(r) <= boundaryTurn of bytes(r) * (T - boundaryTurn)
+inheritedShare    := inheritedExposure / toolResultExposure ; 0.0 when boundaryTurn is null
+--boundary none -> boundaryTurn forced to null      # the control arm
+boundaryTurn is reported only for a SINGLE-transcript run; a pooled corpus reports null and
+  transcriptsWithBoundary instead
+```
+
+### The corpus rule (verbatim)
+
+```text
+origin := subagent   IF the transcript path contains "/subagents/"
+origin := orchestrator OTHERWISE
+ASSERT corpus.subagentTranscripts == 0 ELSE print a loud one-line WARNING naming the count
+       # F's population is the TOP-LEVEL session ONLY; never silently pool the two populations
+       # a warning, never exit 1 — a deliberately mixed run is the caller's business to explain
+```
+
+### The corpus-completeness rule (verbatim)
+
+```text
+missing := a raw path that resolve_paths() could not resolve to a readable file
+any missing path -> print a loud one-line WARNING to stderr naming the count and listing
+                     every missing path, same register as the subagentTranscripts WARNING
+--corpus-list AND missing non-empty -> exit 1  # a pinned corpus list is a deliberate
+                     artifact; measuring a silent subset of it is a measurement error, not
+                     a convenience
+bare positional paths AND missing non-empty -> WARNING only, exit unaffected  # an ad-hoc
+                     path list on the command line is already the caller's own choice of
+                     what to include; there is no pinned artifact to fall short of
+```
+
+A partial corpus that reports clean is worse than one that fails loud — this epic has already
+under-captured its own corpus three times (NA-88's 11.7%, NA-90's shallow glob, NA-91's own
+missed `workflows/` tier). A dropped file is never silent, and a dropped file from a pinned
+`--corpus-list` is a hard failure, not a warning the caller can miss.
+
+**Prefer `--corpus-list` over positional paths for any before/after comparison** — the
+`rtk-coverage.py` reasoning: a sliding "most-recent-N" window is not the same bytes on both sides
+of a delta. Path lists must be built with Python `pathlib`/`glob`, never parsed `ls` — the local
+rtk shell hook size-annotates `ls` output, silently corrupting a naive corpus list.
+
+**`--json` emits the full `ContextResidencyReport` contract**: `label`, `topLevelTranscripts`,
+`subagentTranscripts`, `assistantTurns`, `toolResultExposure`, `boundaryTurn`, `boundaryCommand`,
+`transcriptsWithBoundary`, `inheritedExposure`, `inheritedShare`, `cacheReadRatio` (the AC-2
+guardrail — `cache_read / (cache_read + cache_creation + input)`), `skippedLines`. Without
+`--json`, a human-readable table carrying the same numbers. `--per-transcript` emits one report
+per transcript (blank-line separated) instead of one pooled report — this is the shape the
+per-session median in NA-91's measurement block is computed from.
+
+**Error handling:** no given path resolves to a readable file -> every path tried is printed to
+stderr, exit 1 (never a zeroed report that reads like a real empty result). A partial miss (some
+paths resolve, some don't) -> loud stderr WARNING naming the count and every dropped path;
+`--corpus-list` additionally exits 1, bare positional paths exit 0 (see the corpus-completeness
+rule above). Unparseable transcript line -> skipped, `skippedLines += 1`, exit 0 (a truncated
+last line is normal in a live transcript). A transcript path containing `/subagents/` -> counted
+in `subagentTranscripts` and a loud WARNING to stderr, never silently pooled with the top-level
+population. Invalid `--boundary` value -> error naming the flag and the value, exit 2.
+
+### Gate 2 — falsifiability
+
+| Corpus                                                                | `inheritedShare` |
+| --------------------------------------------------------------------- | ---------------- |
+| `no-boundary.jsonl` (synthetic, no PR raise)                          | `0.0`            |
+| `partial.jsonl` (synthetic, half the exposure pre-boundary)           | `0.5`            |
+| `full-inherit.jsonl` (synthetic, every result enters at the boundary) | `1.0`            |
+
+A tool that returned the same number against all three would be incapable of measuring anything.
+The 28-assertion harness (`tools/sdlc-analyser/__tests__/context-residency.test.sh`) exercises
+these three fixtures plus the `--boundary none` control arm, the corpus partition, the subagent
+WARNING, the corpus-completeness WARNING/exit-code pair (both the `--corpus-list` and bare-path
+variants), the docstring's stated `cacheReadRatio` formula, and every error-handling row in the
+table above. Falsifiability was proven during this story by perturbing seven assertions in turn
+(boundary-marker detection, the exposure formula, the cache-read numerator, the skipped-line
+counter, the corpus-completeness WARNING print, the `--corpus-list` non-zero exit, and the
+docstring's `cacheReadRatio` formula line) — each perturbation flipped the expected assertions to
+FAIL, and the tree was restored byte-identical (`git checkout --`) and re-verified green after
+each.
+
+### NA-88 D11 — this instrument is self-confirming, not independent evidence
+
+`context-residency.py` and its fixtures are authored by the same story that ships the
+session-boundary contract this tool measures. A PASS on `context-residency.test.sh` proves only
+that the tool does what its own author designed — it proves **nothing** about whether any real
+session obeys the boundary, or that any token was actually saved by it. This is a smoke test,
+never a gate on session behaviour. Gate 3 — a pilot run on an independent story after the
+session-boundary PR merges and the sdlc plugin is released — is the only evidence about the
+contract itself.
+
 ## `cache-analysis.py`
 
 ```text
