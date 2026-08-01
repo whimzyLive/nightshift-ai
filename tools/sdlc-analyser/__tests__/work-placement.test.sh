@@ -96,4 +96,18 @@ python3 "$tool" nope /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
 err="$(python3 "$tool" not3 --corpus-list "$fixtures/list-all-top-level.txt" --json 2>&1 >/dev/null)"
 assert_contains 'workflows' "$err" "zero T3 transcripts prints the loud rglob WARNING"
 
+# --- NA-81: unit P1 plan-slice fires on its own, isolated from G1/G2/G3 -------------
+out="$(python3 "$tool" p1only --corpus-list "$fixtures/list-p1-only.txt" --json 2>/dev/null)"
+assert_eq "p1-only: P1 orchestratorBytes non-zero" \
+  "$([ "$(unit_field "$out" P1 orchestratorBytes)" -gt 0 ] && echo yes || echo no)" "yes"
+assert_eq "p1-only: G1 never fired (subagentShare null)" "$(unit_field "$out" G1 subagentShare)" "None"
+assert_eq "p1-only: G2 never fired (subagentShare null)" "$(unit_field "$out" G2 subagentShare)" "None"
+assert_eq "p1-only: G3 never fired (subagentShare null)" "$(unit_field "$out" G3 subagentShare)" "None"
+
+# --- NA-81: the same probe event in message.content AND toolUseResult.stdout is -----
+# --- counted once, never twice (NA-93's own shipped bug: 97 -> reported 186) --------
+out="$(python3 "$tool" dcount --corpus-list "$fixtures/list-double-count.txt" --json 2>/dev/null)"
+assert_eq "double-count: P1 orchestratorBytes counted once, not twice" \
+  "$(unit_field "$out" P1 orchestratorBytes)" "36"
+
 exit "$fail"

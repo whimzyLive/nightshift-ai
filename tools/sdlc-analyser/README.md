@@ -559,11 +559,13 @@ contract itself.
 python3 tools/sdlc-analyser/work-placement.py <label> (<transcript.jsonl>... | --corpus-list <file>) [--json]
 ```
 
-Python 3, stdlib only (3.9-compatible), read-only. Measures, per unit of work (G1/G2/G3),
+Python 3, stdlib only (3.9-compatible), read-only. Measures, per unit of work (G1/G2/G3/P1),
 what share of that unit's direct-execution tool-result bytes landed in a subagent rather
 than the orchestrator, and whether the unit's dispatch return exceeded its stated
 round-trip cap — the instrument NA-92's workstream-G pilot gate (AC-2/AC-3/AC-4) is
-scored against.
+scored against. Unit `P1` (NA-81 Phase 4) extends this same instrument to score the
+`plan-slice.sh` contract's named successor pilot (see "The unit signatures" and "The `P1`
+overlap and double-count caveats" below).
 
 ### The three-tier corpus rule (verbatim)
 
@@ -593,11 +595,32 @@ G1 qa-gate-run      := Bash matching nx run-many|affected|run … test|lint|type
 G2 ac-verification  := input naming docs/superpowers/plans/, a `git log <range> --oneline`,
                         verification-before-completion, or ac-verification.md
 G3 docs-sync-gate   := input naming docs-manifest.md, docs-pipeline, or docs-sync-gate.sh
+P1 plan-slice       := any input naming plan-slice.sh or docs/superpowers/plans/
 ```
 
 Attribution counts only **direct-execution** tool results — `Bash`, `Read`, `Grep`,
 `Glob`. `Agent` and `SendMessage` returns are excluded from this count on purpose: that
 traffic is already inside a subagent, and counting it would inflate G's own claim.
+
+### The `P1` overlap and double-count caveats
+
+**Overlap with `G2`, intended, not silently resolved.** `P1`'s signature partly overlaps
+`G2 ac-verification` — both name `docs/superpowers/plans/`. `UNITS` is scanned in
+declared order (`G1`, `G2`, `G3`, `P1`) and the per-call match loop breaks on the first
+hit, so a call whose text satisfies both `G2` and `P1` (a literal
+`docs/superpowers/plans/<file>.md` path passed directly rather than via a shell variable)
+attributes to `G2`. `P1` fires on its own only when the call names `plan-slice.sh` without
+independently satisfying one of `G2`'s own patterns — exactly the real dispatch shape
+(`bash .../plan-slice.sh "$PLAN" phase <agent>`, where `$PLAN` is unexpanded in the
+recorded command text). A second instrument was rejected for this reason: it would
+duplicate the three-tier corpus rule a third time to measure a signature that already
+shares `G2`'s population.
+
+**The double-count warning (verbatim — NA-93's own shipped bug).** When measuring the
+named successor pilot's real transcripts by hand, each probe event is stored **twice per
+JSONL record**: once in `message.content` (a `tool_result` item — the only place
+`work-placement.py` reads from) and again in a sibling `toolUseResult.stdout` field this
+script never touches. Counting both inflated NA-93's own baseline from 97 to a reported 186. **Count one, not both.**
 
 ### The placement and return-cap rules (verbatim)
 
@@ -612,10 +635,10 @@ subagentShare(unit)     := subagentBytes / (orchestratorBytes + subagentBytes)
 returnBytes(unit)       := bytes the unit's dispatch return contributed at the top level —
                             for G1/G2, the tool_result of an `Agent` call whose joined input
                             text names that unit's ref (qa-gate-runner.md / ac-verification.md);
-                            for G3, the tool_result of a `Bash` call naming docs-sync-gate.sh
-                            (G3 is a script, not a dispatch — the same call is both its
-                            execution and its return)
-returnCapBytes          := 2000 (G1) / 4000 (G2) / 200 (G3) — stated caps, never derived
+                            for G3 and P1, the tool_result of a `Bash` call naming
+                            docs-sync-gate.sh / plan-slice.sh respectively (both are scripts,
+                            not dispatches — the same call is both execution and return)
+returnCapBytes          := 2000 (G1) / 4000 (G2) / 200 (G3) / 200 (P1) — stated caps, never derived
 returnCapExceeded(unit) := returnBytes(unit) > returnCapBytes(unit)     # the round-trip detector
 ```
 
@@ -643,9 +666,9 @@ shipped bug) the three-tier corpus rule exists to catch.
 
 ### Falsifiability harness
 
-`tools/sdlc-analyser/__tests__/work-placement.test.sh` (21 assertions, CI-wired) proves
+`tools/sdlc-analyser/__tests__/work-placement.test.sh` (26 assertions, CI-wired) proves
 `subagentShare` reaches 0.0, 0.5 **and** 1.0 and `returnCapExceeded` reaches both `true`
-and `false`, over five hand-authored fixture corpora
+and `false`, over seven hand-authored fixture corpora
 (`__tests__/fixtures/work-placement/`). Every per-unit field is read via a `python3` JSON
 extraction, never a whole-blob substring grep — a substring check on `"subagentShare":
 1.0` stays green as long as **any** unit reports 1.0, so it cannot catch a regression
@@ -659,6 +682,18 @@ dropped to `null`. The rewritten per-unit assertion catches it. F-12 (hard-codin
 assertion to FAIL and restored byte-identical (`git checkout --` / a saved copy) before
 this story shipped.
 
+**NA-81 Phase 4 adds `P1`'s two fixtures and proves each falsifiable the same way.**
+`p1-only.jsonl` (a Bash call naming `plan-slice.sh` with `$PLAN` unexpanded, so it does
+not also satisfy `G2`'s pattern) proves `P1` fires in isolation. Its three `G1`/`G2`/`G3`
+"never fired" assertions hold unconditionally (they assert on units that never match this
+fixture regardless of `P1`); its `P1 orchestratorBytes non-zero` assertion is the one that
+depends on `match_p1()` — disabling `match_p1()` flips it to FAIL, restored byte-identical.
+`double-count.jsonl` (one record carrying the identical probe text in both
+`message.content` and a sibling `toolUseResult.stdout`) proves the double-count rule
+holds — adding `toolUseResult.stdout` bytes into the count doubles `P1`'s
+`orchestratorBytes` from 36 to 72, flipping its owning assertion to FAIL, restored
+byte-identical.
+
 ### NA-88 D11 — this instrument is self-confirming, not independent evidence
 
 `work-placement.py` and its fixtures are authored by the same story that ships the
@@ -668,7 +703,13 @@ scripts/docs-sync-gate.sh) this tool measures compliance with. A PASS on
 proves **nothing** about whether any real session obeys the offload contract, or that any
 byte was actually relocated. This is a smoke test, never a gate on agent behaviour. The
 pilot (`docs/superpowers/plans/NA-92-measurements/pilot-obligation.md`, a story NA-92
-does not author) is the only evidence about the contract itself.
+does not author) is the only evidence about the contract itself. **Unit `P1` carries the
+identical caveat for NA-81's `plan-slice.sh` contract**: this run executed the pre-NA-81
+dispatch contract (the script did not exist yet to be called), so a `P1` PASS here proves
+only that the tool measures its own designed signature correctly — it proves nothing about
+whether any real dispatch calls `plan-slice.sh`. The named successor pilot (the first
+`full`-triaged story run end-to-end through `/sdlc:auto` after NA-81 merges and the sdlc
+plugin is released) is the only evidence about that.
 
 ## `loop-decision.py`
 
