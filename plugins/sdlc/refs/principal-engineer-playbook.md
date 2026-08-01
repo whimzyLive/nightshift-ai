@@ -514,28 +514,15 @@ the existing `sync` in via its **inline post-QA dispatch variant**
 (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-postqa.md` §25); the diff source is **story-branch-vs-base**
 (§26), passed explicitly.
 
-**Manifest gate (AC4).** Resolve `.claude/project/docs-manifest.md` checkout-independently
-(`git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md`). If **absent** → **clean no-op**:
-do not dispatch, no warning, no report line — the repo opted out of docs. Proceed to Step 7
-unchanged. This is a no-op, **not** a failure.
+**Manifest + change-size gate (AC4).** Deterministic, judgment-free — a script, not a dispatch:
 
-**Change-size gate (second no-op, after the manifest gate passes).** A manifest can exist while this
-particular story touches nothing it tracks — dispatching `knowledge-engineer` in that case is pure
-overhead for a run that was always going to no-op. After the manifest gate passes, resolve the
-story-branch-vs-base changed-file set
-(`git diff --name-only "origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>"`, after
-`git fetch origin --quiet`) and compare it against the activated manifest rows' tracked source
-scopes (each enabled row's `reference-roots`/`source:`/`contract:` path, or a `how-to` row's
-`source:` glob list — the same scopes the docs-sync dispatch itself would resolve, per
-`docs-pipeline-core.md` §3's source resolver). If **no** changed
-file falls inside any activated row's scope → clean no-op: do **not** dispatch the
-`knowledge-engineer` at all, no warning, Step 8's report still notes `Docs sync: no manifest-tracked
-files touched — skipped`, and proceed to Step 7 unchanged. **Fail safe, not silent-skip:** if either
-the changed-file set or the activated rows' scopes cannot be resolved (a `git fetch`/diff failure, an
-unreadable manifest row, an unresolvable registry lookup), **dispatch anyway** — this is today's
-behaviour, unchanged. A gate that silently skipped docs regeneration on an unreadable probe would be
-a worse defect than the context-overhead this gate exists to close; when in doubt, this gate always
-resolves toward dispatching, never toward skipping.
+```text
+gate := bash ${CLAUDE_PLUGIN_ROOT}/scripts/docs-sync-gate.sh <STORY-KEY> <BRANCH_PREFIX> <BASE-BRANCH>
+-> DOCS_GATE=skip-no-manifest|skip-no-tracked-files|dispatch|dispatch-unresolvable
+bad exit/stdout/value -> dispatch-unresolvable
+skip-* -> no-op rows below
+dispatch* -> guard + dispatch below
+```
 
 **Primary-checkout guard — reuse Step 5's machine check verbatim.** Before dispatching, snapshot the
 primary checkout (`PRIMARY_HEAD` + `PRIMARY_CLEAN_BEFORE`, exactly as Step 5). Dispatch the

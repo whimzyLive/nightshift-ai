@@ -17,6 +17,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0016. Prettier-ignored plugin markdown](0016-prettier-ignored-plugin-markdown.md) — accepted
 - [0017. Lean pseudocode encoding for procedural instructions](0017-lean-pseudocode-encoding-for-procedural-instructions.md) — accepted
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
+- [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
 
 ## knowledge-engineer
 
@@ -31,6 +32,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0014. Clean Nx "no tasks were run" result is accepted as a pass for plugins-only changes](0014-clean-nx-no-tasks-pass-for-plugins-only-change.md) — accepted
 - [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — accepted
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
+- [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
 
 ## qa-engineer
 

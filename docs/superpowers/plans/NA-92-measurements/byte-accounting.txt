@@ -1,0 +1,124 @@
+== combined playbooks, after ==
+   30192 plugins/sdlc/refs/qa-engineer-playbook.md
+   43194 plugins/sdlc/refs/principal-engineer-playbook.md
+   73386 total
+== before (develop @ 49489bf): qa=33826 pe=44628 total=78454, cap=73704 ==
+== byte pins ==
+     868
+    1005
+== arithmetic ==
+78454 - 73386 = 5068 cut (required >= 4750; achieved 5068)
+73704 - 73386 = 318 slack against the CI cap
+fallback ladder (plan Global Constraints): NOT USED — the cap was reached inside the plan's
+own movable-inventory arithmetic, no rung applied.
+domain-agent-handoff.md diff vs develop: EMPTY (git diff develop -- plugins/sdlc/refs/domain-agent-handoff.md
+produces zero changed lines). Both byte pins above match their required values exactly
+(## Context reuse == 868, hard equality; ## Bounded reads == 1005, cap 1005) — G touched neither.
+
+== work-placement.py real-corpus mechanism-validation run ==
+NOTE — this is NOT the pilot. It is a mechanism-validation run of the instrument itself against
+the PRE-NA-92 corpus (transcripts produced under the OLD inline QA-Step-6/7 and PE-Step-6.5
+contracts, since plugins/** edits do not reach running agents and G had not yet shipped when
+these sessions ran). It proves the tool resolves a real, large corpus without silently dropping
+a tier — it is not evidence that any session obeyed the new offload contract.
+  T1 (top-level, *.jsonl)                         : 107
+  T2 (subagents/agent-*.jsonl)                     : 560
+  T3 (subagents/workflows/wf_*/agent-*.jsonl)      : 890
+  rglob("agent-*.jsonl") union (T2+T3)             : 1450  (matches 560 + 890, zero unaccounted)
+  missing (unreadable roots)                       : 0
+  skippedLines (unparseable JSONL)                 : 0
+Every subagentShare on this pre-change corpus is expected at/near 0.0 for units that ever fire
+at the top level, because the corpus predates the refs/scripts that would move that work into a
+subagent — that is the mechanism-validation result, not a behaviour claim. See
+measurement-block.txt and pilot-obligation.md for what this run can and cannot decide.
+
+== quality gates ==
+21/21 assertions in tools/sdlc-analyser/__tests__/work-placement.test.sh pass.
+6/6 checks in plugins/sdlc/scripts/__tests__/docs-sync-gate.test.sh pass.
+26/26 assertions (a)-(g) in plugins/sdlc/scripts/__tests__/work-offload-budget.test.sh pass.
+3 lines added to .github/workflows/ci.yml (platform-engineer, Phase 2) wiring all three suites.
+
+== Falsifiability register (F-1..F-14) — re-executed in this worktree, Phase 3 ==
+Every row below is the actual perturb -> observe FAIL -> restore -> observe PASS cycle, run live
+in this worktree against the as-shipped Phase 1/2 artifacts (not re-derived from the plan's
+predicted output). NA-88 D11 applies: a green suite proves the author wrote what the author
+intended and that every assertion is wired to something that can move — it proves nothing about
+whether any session obeys the offload contract.
+
+== F-1: delete 'Stray files:' from qa-gate-runner.md ==
+FAIL (a) runner carries key Stray files:
+restored: git checkout -- plugins/sdlc/refs/qa-gate-runner.md
+
+== F-2: delete 'Owner:' from ac-verification.md ==
+FAIL (b) verifier carries key Owner:
+restored: git checkout -- plugins/sdlc/refs/ac-verification.md
+
+== F-3: append filler bytes to qa-engineer-playbook.md (byte-cap perturbation, computed at ship
+   time as 73704 - actual_total + 1, per NA-91 F-9's precedent against a stock constant) ==
+FAIL (c) combined playbooks <= 73704
+restored: git checkout -- plugins/sdlc/refs/qa-engineer-playbook.md
+
+== F-4: delete the literal 'refs/qa-gate-runner.md' from the QA Step 6 stub ==
+FAIL (d) QA Step 6 names the runner ref
+restored: git checkout -- plugins/sdlc/refs/qa-engineer-playbook.md
+
+== F-5: re-inline the actual moved defect-contract block (a real re-inline copied verbatim from
+   ac-verification.md, not a synthetic token) into QA Step 7 ==
+grep -c -- 'phase-3-sha' plugins/sdlc/refs/qa-engineer-playbook.md -> 1 (post-perturbation)
+FAIL (e) QA no longer contains 'phase-3-sha'
+restored: git checkout -- plugins/sdlc/refs/qa-engineer-playbook.md
+
+== F-6: append (7373 - actual_three_section_total + 1) = 319 bytes of filler inside QA Step 6 ==
+three=7055 (pre-perturbation, <= 7373); fill=319
+FAIL (f) three offloaded sections <= 7373
+restored: git checkout -- plugins/sdlc/refs/qa-engineer-playbook.md
+
+== F-7: insert one space into the '## Context reuse' body (868 -> 869) ==
+FAIL (g) ## Context reuse == 868 (NA-88, hard equality)
+restored: git checkout -- plugins/sdlc/refs/domain-agent-handoff.md
+
+== F-8: hard-code DOCS_GATE=dispatch as the only output ==
+FAIL no manifest emits exactly 2 lines (got 3)
+FAIL manifest, no tracked emits exactly 2 lines (got 3)
+FAIL manifest, tracked emits exactly 2 lines (got 3)
+FAIL unexpandable scope emits exactly 2 lines (got 3)
+restored: cp of the pre-perturbation script (verified byte-identical to git HEAD after)
+
+== F-9: unresolvable-scope branch emits skip-no-tracked-files instead of dispatch-unresolvable ==
+FAIL unexpandable scope
+   (expected DOCS_GATE=dispatch-unresolvable, got DOCS_GATE=skip-no-tracked-files)
+restored: git checkout -- plugins/sdlc/scripts/docs-sync-gate.sh
+
+== F-10: unexpandable-scope branch exits 1 instead of the always-0 contract ==
+(first attempt appended '; exit 1' after the shared emit() call, which itself always calls
+`exit 0` before the appended statement is reached — a no-op perturbation. Corrected by replacing
+the emit() call on that one branch with a raw printf + exit 1, which is the perturbation that
+actually reaches the assertion.)
+FAIL unexpandable scope exits 0 (got 1)
+restored: git checkout -- plugins/sdlc/scripts/docs-sync-gate.sh
+
+== F-11: replace the T2+T3 corpus build's rglob("agent-*.jsonl") with a non-recursive
+   glob("*/subagents/agent-*.jsonl") ==
+FAIL all-subagent: G3 share == 1.0
+   (G1 and G2 still resolved to 1.0 under the shallower one-level pattern — only G3, whose
+   fixture signature the plan deliberately placed in the T3-only tier, exposed the regression.
+   This is NA-90's exact shipped bug, reproduced live.)
+restored: git checkout -- tools/sdlc-analyser/work-placement.py
+
+== F-12: replace `returnBytes(unit) > returnCapBytes(unit)` with the literal False ==
+FAIL oversize: G1 returnCapExceeded == True
+restored: git checkout -- tools/sdlc-analyser/work-placement.py
+
+== F-13: delete the `state["skippedLines"] += 1` increment ==
+FAIL edge-cases: skippedLines == 1 (unparseable line skipped and counted)
+restored: git checkout -- tools/sdlc-analyser/work-placement.py
+
+== F-14: delete the T3-completeness loud-WARNING branch ==
+FAIL zero T3 transcripts prints the loud rglob WARNING
+restored: git checkout -- tools/sdlc-analyser/work-placement.py
+
+== restore verification: all three suites clean again ==
+work-offload-budget.test.sh exit=0
+docs-sync-gate.test.sh exit=0
+work-placement.test.sh exit=0
+git status --porcelain: (empty)

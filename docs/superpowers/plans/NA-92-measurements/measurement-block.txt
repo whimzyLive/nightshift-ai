@@ -1,0 +1,36 @@
+Measurement block for the NA-92 PR body — verbatim, every row present, no row omitted.
+
+Only the last row is decidable by this run. This story does not prove a behavioural cut; it
+proves a byte cut on the impl-path instruction surface, plus that the offload artifacts are
+correctly shaped and falsifiable. What the story DOES claim, stated plainly and with no dollar
+figure: 6.92% of top-level tool-result bytes / 6.14% of top-level exposure relocated to a tier
+costing 1/3.01x (per the merged spec's corpus), plus the measured -5,068 B (>= the required
+-4,750 B) reduction of the impl-path instruction surface, achieved without touching either byte
+pin in refs/domain-agent-handoff.md and without using any rung of the fallback ladder.
+
+| Metric | Baseline (spec corpus) | This run | Guardrail | Verdict |
+| --- | --- | --- | --- | --- |
+| `subagentShare` G1 / G2 / G3 | 0.0 / 0.0 / 0.0 | not measured — see NOT CAPTURED register | == 1.0 | NOT CAPTURED — pre-change contract; `plugins/**` edits do not reach running agents |
+| `returnCapExceeded` G1 / G2 / G3 | n/a | not measured | all `false` | NOT CAPTURED — same |
+| Top-level tool-result bytes | 6,876,370 pooled / 229,212 per impl session | not measured | not increased | UNDECIDABLE (n=1, no matched control) |
+| Top-level exposure (byte-turns) | 2,236,689,522 pooled | not measured | not increased | UNDECIDABLE |
+| Avg resident / turn | 152,571 | not measured | not increased | UNDECIDABLE |
+| Peak resident | 249,233 | not measured | not increased | UNDECIDABLE |
+| `cacheReadRatio` | >= 0.94 required | not measured | >= 0.94 | NOT CAPTURED — pilot only |
+| Requests per story | — | not measured | not increased | UNDECIDABLE |
+| QA rounds | — | not measured | not increased | UNDECIDABLE |
+| Blocked rate | — | not measured | not increased | UNDECIDABLE |
+| Review findings per round | — | not measured | not increased | UNDECIDABLE |
+| Loop passes per PR | — | not measured | not increased | UNDECIDABLE |
+| Combined playbook bytes | 78,454 | **73,386** | <= 73,704 | **PASS — the one row this run decides** (cut 5,068 >= required 4,750; slack 318 B; no fallback-ladder rung used) |
+
+Supplementary, decided by this run (not part of the pilot's binding ASSERT set, but real and
+directly measured):
+
+| Check | Result |
+| --- | --- |
+| `domain-agent-handoff.md` diff vs `develop` | Empty. Both byte pins untouched: `## Context reuse` == 868 (hard equality), `## Bounded reads` == 1,005 (<= 1,005 cap) |
+| Falsifiability register F-1..F-14 | All 14 re-executed live in this worktree: every perturbation flips its assertion to FAIL, every restore returns it to PASS. Evidence: `byte-accounting.txt` |
+| Mechanism-validation corpus (work-placement.py, real corpus) | T1=107, T2=560, T3=890, rglob union=1,450, 0 missing, 0 skipped — proves the instrument resolves a real, large, three-tier corpus without silently dropping T3. This is NOT the pilot; see pilot-obligation.md |
+| Test suites | 21/21 (work-placement.test.sh) + 6/6 (docs-sync-gate.test.sh) + 26/26 assertions a-g (work-offload-budget.test.sh) pass |
+| CI wiring | 3 lines added to `.github/workflows/ci.yml` (Phase 2, platform-engineer) |
