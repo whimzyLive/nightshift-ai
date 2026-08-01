@@ -4,7 +4,7 @@ agent: [platform-engineer, ai-enablement-engineer, web-engineer]
 trigger: [pnpm nx run-many --base, eslint invalid option --base, next build unknown option --base, verification gate false failure]
 rule: Never pass --base to `pnpm nx run-many`; it is `nx affected`-only and run-many forwards it unrecognised to eslint/next build, failing every project.
 evidence: [NA-93]
-uses: 0
+uses: 1
 status: active
 ---
 
