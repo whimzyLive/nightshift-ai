@@ -1,0 +1,7 @@
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"tool_use","id":"g1","name":"Bash","input":{"command":"pnpm nx run-many -t test --projects=sdlc-analyser"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"g1","content":"Test Suites: 3 passed, 3 total"}]}}
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"tool_use","id":"g2","name":"Read","input":{"file_path":"docs/superpowers/plans/NA-1.md"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"g2","content":"plan body text goes here in full"}]}}
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"tool_use","id":"g3","name":"Bash","input":{"command":"git show origin/develop:.claude/project/docs-manifest.md"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"g3","content":"| type | enabled | target-path |"}]}}
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"text","text":"done"}]}}

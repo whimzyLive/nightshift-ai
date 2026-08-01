@@ -1,0 +1,6 @@
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"tool_use","id":"m1","name":"Bash","input":{"command":"pnpm nx run-many -t test --projects=sdlc-analyser"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"m1","content":"RESULTAAAAAAAAAA"}]}}
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"tool_use","id":"m2","name":"Read","input":{"file_path":"docs/superpowers/plans/NA-2.md"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"m2","content":"RESULTBBBBBBBBBB"}]}}
+{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":0,"cache_creation_input_tokens":10,"cache_read_input_tokens":90},"content":[{"type":"tool_use","id":"m3","name":"Bash","input":{"command":"cat plugins/sdlc/refs/docs-pipeline-core.md"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"m3","content":"RESULTCCCCCCCCCC"}]}}
