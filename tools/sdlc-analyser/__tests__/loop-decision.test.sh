@@ -19,12 +19,29 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$here/../../.."
 tool="$here/../loop-decision.py"
 fixtures="$here/fixtures/loop-decision"
-loop="$root/plugins/sdlc/commands/loop.md"
-modes="$root/plugins/sdlc/refs/loop-modes.md"
 fail=0
 
 ok()  { printf 'ok   %s\n' "$1"; }
 bad() { printf 'FAIL %s\n     %s\n' "$1" "$2"; fail=1; }
+
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+# The extractor's job is to parse the PRE-change decision tables (H removed them from the
+# live files in Phase 2), so every --extract / --enumerate call below reads the sha-pinned
+# content the golden itself was extracted from — never the live plugins/sdlc/** files, which
+# no longer contain a table to parse.
+sourceSha="433120dafa2929048a740f427a5e82fe7f802760"
+loop="$scratch/loop.md"
+modes="$scratch/loop-modes.md"
+git -C "$root" show "$sourceSha:plugins/sdlc/commands/loop.md" > "$loop"
+git -C "$root" show "$sourceSha:plugins/sdlc/refs/loop-modes.md" > "$modes"
+loop_bytes="$(wc -c < "$loop" | tr -d ' ')"
+modes_bytes="$(wc -c < "$modes" | tr -d ' ')"
+[ "$loop_bytes" = "17544" ] && ok "(provenance) pinned loop.md@$sourceSha is 17544 B" \
+  || bad "(provenance) pinned loop.md@$sourceSha is 17544 B" "got $loop_bytes"
+[ "$modes_bytes" = "18851" ] && ok "(provenance) pinned loop-modes.md@$sourceSha is 18851 B" \
+  || bad "(provenance) pinned loop-modes.md@$sourceSha is 18851 B" "got $modes_bytes"
 
 rule_conditions() { # <json> <rule-id>
   printf '%s' "$1" | python3 -c "
@@ -111,8 +128,6 @@ skipped="$(top_field "$replay" skippedLines)"
 [ "$skipped" = "1" ] && ok "(F-6) skippedLines == 1" || bad "(F-6) skippedLines == 1" "got $skipped"
 
 # --- Corpus-completeness: a bogus --corpus-list entry is reported and exits non-zero --
-scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
 printf '%s\n' "does-not-exist" > "$scratch/bogus-list.txt"
 python3 "$tool" --replay bogus --corpus-list "$scratch/bogus-list.txt" >/dev/null 2>"$scratch/bogus-err.txt"
 bogus_exit=$?
