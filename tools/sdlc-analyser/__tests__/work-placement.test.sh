@@ -12,12 +12,40 @@
 #
 # Falsifiability: subagentShare must reach 0.0, 0.5 AND 1.0, and returnCapExceeded must reach
 # BOTH true and false. A metric that can only report one value is not evidence.
+#
+# Per-unit fields are read via python3 JSON extraction, never a whole-blob substring grep —
+# a substring check like `assert_contains '"subagentShare": 1.0'` passes as long as ANY unit
+# reports 1.0, so it cannot catch a regression isolated to one unit (e.g. G3 resolving via a
+# non-recursive glob while G1/G2 still resolve via a shallower pattern). This was caught while
+# authoring this harness: the original substring form stayed green under the F-11 perturbation.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 tool="$here/../work-placement.py"
 fixtures="$here/fixtures/work-placement"
 fail=0
+
+unit_field() { # <json> <unit-id> <field>
+  printf '%s' "$1" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+u = next((x for x in d['units'] if x['id'] == '$2'), None)
+print('MISSING-UNIT' if u is None else u['$3'])
+"
+}
+
+top_field() { # <json> <field>
+  printf '%s' "$1" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(d['$2'])
+"
+}
+
+assert_eq() { # <label> <actual> <expected>
+  [ "$2" = "$3" ] && printf 'ok   %s\n' "$1" \
+    || { printf 'FAIL %s\n     expected: %s\n     got:      %s\n' "$1" "$3" "$2"; fail=1; }
+}
 
 assert_contains() {
   case "$2" in
@@ -26,32 +54,40 @@ assert_contains() {
   esac
 }
 
-# --- The metric must reach 0.0 -------------------------------------------------------
-out="$(python3 "$tool" all-top --corpus-list "$fixtures/list-all-top-level.txt" --json 2>&1)"
-for u in G1 G2 G3; do assert_contains '"subagentShare": 0.0' "$out" "all-top-level: $u share 0.0"; done
-assert_contains '"returnCapExceeded": false' "$out" "all-top-level: cap not exceeded"
+# --- The metric must reach 0.0, per unit -------------------------------------------
+out="$(python3 "$tool" all-top --corpus-list "$fixtures/list-all-top-level.txt" --json 2>/dev/null)"
+for u in G1 G2 G3; do
+  assert_eq "all-top-level: $u share == 0.0" "$(unit_field "$out" "$u" subagentShare)" "0.0"
+  assert_eq "all-top-level: $u returnCapExceeded == False" "$(unit_field "$out" "$u" returnCapExceeded)" "False"
+done
 
-# --- ...and 1.0, including the T3 tier a non-recursive glob would miss ---------------
-out="$(python3 "$tool" all-sub --corpus-list "$fixtures/list-all-subagent.txt" --json 2>&1)"
-assert_contains '"subagentShare": 1.0' "$out" "all-subagent: share reaches 1.0"
-assert_contains '"id": "G3"' "$out" "all-subagent: the T3-only G3 signature is resolved (rglob)"
+# --- ...and 1.0, per unit, including the T3-only G3 signature -----------------------
+out="$(python3 "$tool" all-sub --corpus-list "$fixtures/list-all-subagent.txt" --json 2>/dev/null)"
+for u in G1 G2 G3; do
+  assert_eq "all-subagent: $u share == 1.0" "$(unit_field "$out" "$u" subagentShare)" "1.0"
+done
 
-# --- ...and a middle value ----------------------------------------------------------
-out="$(python3 "$tool" mixed --corpus-list "$fixtures/list-mixed.txt" --json 2>&1)"
-assert_contains '"subagentShare": 0.5' "$out" "mixed: share reaches 0.5"
+# --- ...and a middle value, per unit -------------------------------------------------
+out="$(python3 "$tool" mixed --corpus-list "$fixtures/list-mixed.txt" --json 2>/dev/null)"
+for u in G1 G2 G3; do
+  assert_eq "mixed: $u share == 0.5" "$(unit_field "$out" "$u" subagentShare)" "0.5"
+done
 
-# --- The round-trip detector must reach BOTH values ---------------------------------
-out="$(python3 "$tool" over --corpus-list "$fixtures/list-oversize-return.txt" --json 2>&1)"
-assert_contains '"returnCapExceeded": true' "$out" "oversize: the round-trip detector fires"
-assert_contains '"returnCapBytes": 2000' "$out" "oversize: G1 cap is 2000"
+# --- The round-trip detector must reach BOTH values, per unit -----------------------
+out="$(python3 "$tool" over --corpus-list "$fixtures/list-oversize-return.txt" --json 2>/dev/null)"
+assert_eq "oversize: G1 returnCapExceeded == True" "$(unit_field "$out" G1 returnCapExceeded)" "True"
+assert_eq "oversize: G1 returnCapBytes == 2000" "$(unit_field "$out" G1 returnCapBytes)" "2000"
+assert_eq "oversize: G2 returnCapExceeded == False" "$(unit_field "$out" G2 returnCapExceeded)" "False"
+assert_eq "oversize: G3 returnCapExceeded == False" "$(unit_field "$out" G3 returnCapExceeded)" "False"
 
 # --- The corpus partition is always printed, both counts, always --------------------
 assert_contains '"topLevelTranscripts"' "$out" "corpus: top-level partition count emitted"
 assert_contains '"subagentTranscripts"' "$out" "corpus: subagent partition count emitted"
 
 # --- Error handling: every row of the spec's table, exercised -----------------------
-out="$(python3 "$tool" edge --corpus-list "$fixtures/list-edge-cases.txt" --json 2>&1)"
-assert_contains '"skippedLines": 1' "$out" "unparseable line is skipped and counted"
+out="$(python3 "$tool" edge --corpus-list "$fixtures/list-edge-cases.txt" --json 2>/dev/null)"
+assert_eq "edge-cases: skippedLines == 1 (unparseable line skipped and counted)" \
+  "$(top_field "$out" skippedLines)" "1"
 
 python3 "$tool" nope /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
 [ "$?" -eq 1 ] && printf 'ok   %s\n' "unresolvable corpus exits 1" \
