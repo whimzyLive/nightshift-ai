@@ -24,8 +24,8 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
   || { echo "STOP: \$WORKTREE has stray uncommitted/untracked files before the quality gate — $(git -C "$WORKTREE" status --porcelain)"; exit 1; }
 ```
 
-A non-empty result is NOT a stop here — capture it verbatim into `Stray files:` below and let the
-orchestrator STOP; never silently clean it yourself.
+A non-empty result is NOT a stop here — capture it verbatim into the stray-files field of the
+return below and let the orchestrator STOP; never silently clean it yourself.
 
 3. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality
    Gate) **inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the
@@ -69,5 +69,5 @@ never -> paste a full log, a full test run, or any file's contents into the retu
 never -> dispatch an agent from here                       # one-level nesting limit, ADR-0012
 never -> assert a pass without Evidence                    # verification-before-completion
 Evidence over 1,200 B -> truncate and append "…[truncated]" ; do NOT split across return fields
-whole block over 2,000 B -> truncate `Commands:` first, then `Evidence:`; never drop a key
+whole block over 2,000 B -> truncate the `Commands` field first, then `Evidence`; never drop a key
 ```

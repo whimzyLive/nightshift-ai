@@ -80,5 +80,5 @@ never -> paste the plan doc, a test log, or a diff into the return; name the pat
 never -> dispatch an agent from here
 never -> mark an AC `met` on assertion; every `met` names a path, a test, or a sha
 a line over 250 B -> shorten the evidence pointer, never drop the line
-whole block over 4,000 B -> shorten evidence pointers; never drop an AC line, never drop `Unmet:`
+whole block over 4,000 B -> shorten evidence pointers; never drop an AC line, never drop the `Unmet` field
 ```
