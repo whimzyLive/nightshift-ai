@@ -28,22 +28,29 @@ field() { printf '%s\n' "$1" | grep -o "^${2}=[^[:space:]]*" | sed "s/^${2}=//" 
 nlines() { printf '%s' "$1" | grep -c '^' ; }
 
 # --- (a)-(c) H-Smoke-2: exit 0, exactly 9 lines, <= 600 B on 4 input classes ---------
+# IMPORTANT: run_case must NEVER be invoked via `$(...)` — its ok()/bad() diagnostics print to
+# real stdout; capturing the whole function's stdout in a variable would swallow those lines
+# into the "captured invocation output" and corrupt every downstream field() extraction. It
+# hands the real invocation's own stdout back via the global RC_OUT instead.
 run_case() { # <label> <args...>
   local label="$1"; shift
-  local out ec n b
-  out="$(bash "$decide" "$@" 2>/dev/null)"; ec=$?
-  n="$(nlines "$out")"
-  b="$(printf '%s' "$out" | wc -c | tr -d ' ')"
+  local ec n b
+  RC_OUT="$(bash "$decide" "$@" 2>/dev/null)"; ec=$?
+  n="$(nlines "$RC_OUT")"
+  b="$(printf '%s' "$RC_OUT" | wc -c | tr -d ' ')"
   [ "$ec" -eq 0 ] && ok "(a) $label exits 0" || bad "(a) $label exits 0" "got exit=$ec"
   [ "$n" -eq 9 ]  && ok "(b) $label emits exactly 9 lines" || bad "(b) $label emits exactly 9 lines" "got $n"
   [ "$b" -le 600 ] && ok "(c) $label <= 600 B" || bad "(c) $label <= 600 B" "got $b B"
-  printf '%s' "$out"
 }
 
-wellformed_out="$(run_case 'well-formed status line' --from-status 'loop-status: copilot-reviewed-head=1 copilot-changes-requested=0 copilot-pending=0 unresolved-copilot=0 checks-pending=0 checks-failing=0 checks-passing=1 copilot-reviewed-any=1')"
-garbage_out="$(run_case 'garbage line' --from-status 'garbage')"
-empty_out="$(run_case 'empty line' --from-status '')"
-noargs_out="$(run_case 'no arguments' )"
+run_case 'well-formed status line' --from-status 'loop-status: copilot-reviewed-head=1 copilot-changes-requested=0 copilot-pending=0 unresolved-copilot=0 checks-pending=0 checks-failing=0 checks-passing=1 copilot-reviewed-any=1'
+wellformed_out="$RC_OUT"
+run_case 'garbage line' --from-status 'garbage'
+garbage_out="$RC_OUT"
+run_case 'empty line' --from-status ''
+empty_out="$RC_OUT"
+run_case 'no arguments'
+noargs_out="$RC_OUT"
 
 # --- (d) F-10 fail safe: garbage / empty / no-args each -> RULE=unresolvable, DECISION=wait --
 for pair in "garbage:$garbage_out" "empty:$empty_out" "noargs:$noargs_out"; do
