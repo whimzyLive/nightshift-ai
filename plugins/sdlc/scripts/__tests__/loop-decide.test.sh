@@ -116,13 +116,18 @@ for c in cases:
 
     out = subprocess.run(["bash"] + args, capture_output=True, text=True).stdout
     actual_rule = None
+    actual_decision = None
     for l in out.splitlines():
         if l.startswith("RULE="):
             actual_rule = l[len("RULE="):].strip("'")
-            break
+        elif l.startswith("DECISION="):
+            actual_decision = l[len("DECISION="):].strip("'")
     evaluated += 1
-    if actual_rule != c["rule"]:
-        mismatches.append({"case": f, "path": c["path"], "goldenRule": c["rule"], "actualRule": actual_rule})
+    # Compare BOTH fields: RULE alone would miss a perturbation that keeps the rule id but
+    # remaps its DECISION token (F-16 names exactly this: map rule 3 to a different token).
+    if actual_rule != c["rule"] or actual_decision != c["decision"]:
+        mismatches.append({"case": f, "path": c["path"], "goldenRule": c["rule"], "actualRule": actual_rule,
+                            "goldenDecision": c["decision"], "actualDecision": actual_decision})
 
 print(json.dumps({"evaluated": evaluated, "mismatches": mismatches[:10], "mismatchCount": len(mismatches)}))
 PY
