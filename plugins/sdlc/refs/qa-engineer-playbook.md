@@ -129,8 +129,8 @@ skill pattern. The prompt MUST include:
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
 - `PLAN_OR_REQUIREMENTS`: Story mode — the story's **acceptance criteria verbatim** (the reviewer
-  must check the code against the ACs, not just internal consistency), **plus** the full content of
-  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists** (the full path). On the
+  must check the code against the ACs, not just internal consistency), **plus** the path to
+  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists** — the reviewer reads it itself. On the
   **lightweight** path there is no plan doc — use the Jira story **description + acceptance criteria**
   as the requirement source (the ACs are the contract). Diff mode — there are no ACs/plan; the
   requirement is the change's stated intent.
