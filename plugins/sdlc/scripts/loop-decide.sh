@@ -102,12 +102,16 @@ decide_copilot() {
   trace "rule 7: catch-all"; printf '7 halt no no\n'
 }
 
-blocked_by_copilot() { # <rule> <head> <cp> <un> <pend>
+# Deliberately head-oid-FREE: HEAD is already its own top-level stdout key, and H-Gate-2b
+# compares the probe path against the --from-status injection path (which never has a real
+# head). Embedding the oid here would make BLOCKED_BY differ between the two paths for a
+# reason that has nothing to do with decide() — a false convergence failure.
+blocked_by_copilot() { # <rule> <pend>
   case "$1" in
-    1)  printf 'copilot-review-pending (copilot-pending=1, head=%s)' "$2" ;;
-    2a) printf 'Copilot has not started the initial review of %s' "$2" ;;
-    2b) printf 'Copilot has not queued a re-review of HEAD %s (it reviewed an earlier head) - review-on-push may be limited; merge/resolve manually or re-trigger' "$2" ;;
-    5)  printf 'checks still pending: P=%s' "$5" ;;
+    1)  printf 'copilot-review-pending (copilot-pending=1)' ;;
+    2a) printf 'Copilot has not started the initial review of the current head' ;;
+    2b) printf 'Copilot has not queued a re-review of the current head (it reviewed an earlier head) - review-on-push may be limited; merge/resolve manually or re-trigger' ;;
+    5)  printf 'checks still pending: P=%s' "$2" ;;
     *)  printf 'none' ;;
   esac
 }
@@ -198,7 +202,7 @@ probe_copilot() {
   read -r rule decision grace re_request <<<"$result"
   fields="copilot-reviewed-head=$G_RH copilot-changes-requested=$G_CR copilot-pending=$G_CP unresolved-copilot=$G_UN checks-pending=$G_PEND checks-failing=$G_FAIL checks-passing=$G_PASS copilot-reviewed-any=$G_RA"
   emit "$decision" "$rule" copilot "$head" "$G_UN" "$fields" "$grace" "$re_request" \
-    "$(blocked_by_copilot "$rule" "$head" "$G_CP" "$G_UN" "$G_PEND")"
+    "$(blocked_by_copilot "$rule" "$G_PEND")"
 }
 
 # --- probe_insession <PR> <DIR> <REVIEW_MARK> -> emits and exits
@@ -241,7 +245,7 @@ case "${1:-}" in
       read -r rule decision grace re_request <<<"$result"
       fields="copilot-reviewed-head=$G_RH copilot-changes-requested=$G_CR copilot-pending=$G_CP unresolved-copilot=$G_UN checks-pending=$G_PEND checks-failing=$G_FAIL checks-passing=$G_PASS copilot-reviewed-any=$G_RA"
       emit "$decision" "$rule" copilot - "$G_UN" "$fields" "$grace" "$re_request" \
-        "$(blocked_by_copilot "$rule" - "$G_CP" "$G_UN" "$G_PEND")"
+        "$(blocked_by_copilot "$rule" "$G_PEND")"
     else
       emit wait unresolvable copilot - - - no no "$G_ERR"
     fi
