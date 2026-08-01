@@ -445,55 +445,22 @@ actual gate output — never claim a pass without it (`verification-before-compl
 
 ## Step 7 — Verification before completion (AC + plan check)
 
-Apply `verification-before-completion`. Produce line-by-line checklists, each item confirmed
-with evidence (git log, file existence, or test output) — no item checked off on assertion alone:
+Follow `${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md` — the plan-task checklist, the AC
+checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live there.
 
-1. **Every plan task** in `docs/superpowers/plans/<STORY-KEY>.md` → has a corresponding commit/file/test.
-   _(Full path only. On the lightweight path there is no plan doc — skip this checklist; the AC
-   checklist below is the completion contract.)_
-2. **Every acceptance criterion** on the Jira story → is met by code that exists on the branch,
-   with the specific evidence (handler/test/file) named. _(Always — and the primary gate on the
-   lightweight path.)_
-
-**On the defect path (`WORK_KIND=defect`) — ALSO require the systematic-debugging completion
-contract (AC17).** A defect has **no plan doc**, so checklist 1 is skipped (as on any lightweight
-path); the AC checklist (2) still applies, and **in addition** the following regression-evidence
-contract MUST hold — without it, return `blocked` (never `clean`):
-
-1. **A regression test that FAILED before the fix and PASSES after.** Take the evidence from the
-   branch's **own commit sequence**, NOT a `BASE_SHA` checkout:
-   - at the **phase-3 commit** (regression test added, phase-4 fix not yet applied) the test **fails
-     as an assertion** against the still-buggy behaviour;
-   - at **HEAD** (fix applied) it **passes**.
-
-   > Why not `BASE_SHA`: at develop's merge-base the test file does not yet exist, so running it
-   > there fails to _compile/resolve_ rather than _assert_ — it cannot distinguish "failed because
-   > the bug is present" from "failed to build". The **phase-3 commit** is the correct pre-fix point:
-   > the test exists there and exercises code that compiles, failing only on the assertion the fix
-   > later satisfies.
-
-   ```bash
-   # Identify the phase-3 commit (regression test added, before the fix), then show fail→pass.
-   # Always inside $WORKTREE (the same one captured in Step 5) — never the primary checkout.
-   git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-   git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
-   git -C "$WORKTREE" checkout <phase-3-sha>          # detached, inside $WORKTREE only
-   # run the regression test here: FAILS (assertion) against the still-buggy behaviour — paste output.
-   git -C "$WORKTREE" checkout <BRANCH_PREFIX>/<STORY-KEY>   # back to HEAD, inside $WORKTREE
-   # run the regression test here again: PASSES — paste output.
-   ```
-
-2. **The full test suite passes with no regressions** (the Step-6 gate output covers this).
-
-This is **in addition** to the existing lightweight ACs-as-contract fallback — the defect path
-_adds_ the failing→passing regression-test requirement. (No double-verify: systematic-debugging
-phase-4 is the _implementer's_ inner check that the fix works; this Step-7 contract is QA's _outer_
-gate proving the regression evidence + clean suite.)
-
-```bash
-git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
+```text
+offload := Agent("general-purpose", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
+  "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
+Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
+WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
+no Verification: -> re-offload once, fallback
+fallback := Read ac-verification.md INLINE; offload=inline-fallback
+never -> clean while Unmet non-empty
+carry result -> Step-8 AC check:
 ```
+
+**The full test suite passing with no regressions is covered by the Step-6 gate output** — the
+verifier's regression-evidence contract does not re-run it.
 
 Any plan task or AC with no corresponding evidence → dispatch the owning domain agent to
 complete it (Step 3 protocol), then re-run Steps 6–7. On the defect path, a regression test that
