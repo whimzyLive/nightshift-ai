@@ -14,7 +14,11 @@ set -uo pipefail
 # Exit 0 means a mode line was emitted — this script never fails loudly; a probe error
 # resolves to the safe MODE=""/MODE_SOURCE=none row (rung 5), never a non-zero exit.
 #
-# Stdout (AiWorkflowModeResult) — two KEY=value lines, eval-able:
+# Stdout (AiWorkflowModeResult) — two KEY=value lines, eval-able. Every value is emitted
+# SINGLE-QUOTED, because `Full Auto` contains a space: unquoted, `eval` assigns MODE=Full and
+# then executes `Auto` as a command, leaving MODE unset in the caller. That broke `Full Auto`
+# and only `Full Auto` — the sole value that enables auto-merge — so every story silently took
+# the human-merge path. Quote at emission; never widen a value without re-checking this.
 #   MODE        in {'Full Auto', 'Auto', 'Assisted', ''}   (''  only when neither field nor label is set)
 #   MODE_SOURCE in {'field', 'label', 'default-unreadable', 'none'}
 #
@@ -50,10 +54,14 @@ set -uo pipefail
 # tests so the retry-loop coverage runs instantly instead of paying the real back-off.
 RETRY_SLEEP_SECS="${RETRY_SLEEP_SECS:-2}"
 
+# shq <value> -> single-quoted, embedded ' escaped as '\'' . Mirrors scripts/loop-decide.sh
+# so the plugin has one quoting convention, not two.
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
 ISSUE_KEY="${1:-}"
 if [ -z "$ISSUE_KEY" ]; then
-  printf 'MODE=%s\n' ""
-  printf 'MODE_SOURCE=%s\n' "none"
+  printf 'MODE=%s\n' "$(shq "")"
+  printf 'MODE_SOURCE=%s\n' "$(shq "none")"
   exit 0
 fi
 
@@ -114,6 +122,6 @@ else
   fi
 fi
 
-printf 'MODE=%s\n' "$MODE"
-printf 'MODE_SOURCE=%s\n' "$MODE_SOURCE"
+printf 'MODE=%s\n' "$(shq "$MODE")"
+printf 'MODE_SOURCE=%s\n' "$(shq "$MODE_SOURCE")"
 exit 0
