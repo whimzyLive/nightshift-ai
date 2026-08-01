@@ -32,10 +32,10 @@ parens+backtick, bare parens, backticked-brackets), and the current-era plans (N
 fail the pinned form because they write the owner after a middle dot, not in brackets. The
 grammar this story ships is `^##[ ]+Phase\b` plus an AGENT_SET token found anywhere in the
 heading line, decoration-insensitive, ordinal optional. `principal-engineer` is deliberately
-excluded from AGENT_SET: an orchestrator-owned phase (e.g. `## Phase 4 — Merge-gate
-transcription · orchestrator (\`principal-engineer\`)`in NA-88/NA-89) is never a domain agent's
-to receive.`agents/tech-lead.md`'s own template is unchanged by this story — the slicer is made
-tolerant of what plans actually look like, not the other way round.
+excluded from AGENT_SET: an orchestrator-owned phase, such as NA-88/NA-89's
+"## Phase 4 — Merge-gate transcription · orchestrator (`principal-engineer`)", is never a domain
+agent's to receive. `agents/tech-lead.md`'s own template is unchanged by this story — the slicer
+is made tolerant of what plans actually look like, not the other way round.
 
 **Fail-safe direction: always widen, never empty.** Any plan doc the slicer cannot resolve to an
 agent-owned phase returns `SLICE=<the plan path itself>` at exit 0 — the agent reads the whole
@@ -108,12 +108,10 @@ does not name, three of which the current epic's own plans use.
   mis-extracted slice silently truncates a domain agent's own instructions — introduces a failure
   mode a script cannot have.
 
-### Keep the narrow, template-pinned grammar (`agents/tech-lead.md:138`, bracket-only, ordinal
+### Keep the narrow, template-pinned grammar from `agents/tech-lead.md:138`
 
-required)
-
-- Pros: exactly matches the one template the plan-writing skill emits going forward; smallest
-  possible grammar surface.
+- Pros: exactly matches the one bracket-only, ordinal-required template the plan-writing skill
+  emits going forward; smallest possible grammar surface.
 - Cons: measured against the real 41-plan corpus, it matches only 11 of 41 (27%) — 73% of real
   plans, including every plan this epic itself has produced (NA-86, NA-88, NA-89, all
   backtick-after-· form), would silently degrade to the whole-plan fallback. A grammar that fails
