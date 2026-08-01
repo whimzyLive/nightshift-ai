@@ -66,13 +66,19 @@ printf '%s' "$plan_slice_block" | grep -qF -- 'Status: blocked' \
   || bad "(G-17e) ## Plan slice block contains Status: blocked" "token not found in extracted block"
 
 # --- G-18: ac-verification.md checklist item 1, extracted --------------------------
-item1="$(awk '/^1\. /{f=1} f&&/^2\. /{exit} f' "$ac")"
+# Bound to the ## Procedure section FIRST — ac-verification.md has a second, unrelated
+# numbered-list item 1 inside ## Defect regression-evidence contract further down the file.
+# Without this bound, a renumbering perturbation on the Procedure's item 1 does not produce an
+# empty extraction (the falsifiable case) — it silently falls through to the wrong section's
+# item 1 instead, which still looks non-empty and masks the regression.
+proc_section="$(awk '/^## Procedure$/{f=1;next} f&&/^## /{exit} f' "$ac")"
+item1="$(printf '%s\n' "$proc_section" | awk '/^1\. /{f=1} f&&/^2\. /{exit} f')"
 [ -n "$item1" ] && ok "(G-18a) checklist item 1 found" \
   || bad "(G-18a) checklist item 1 found" "empty extraction — item numbering or boundary drifted"
 
-printf '%s' "$item1" | grep -qF -- 'checklist' \
+printf '%s' "$item1" | grep -qF -- 'checklist`-mode slice' \
   && ok "(G-18b) item 1 sources the checklist-mode slice" \
-  || bad "(G-18b) item 1 sources the checklist-mode slice" "'checklist' token not found in item 1"
+  || bad "(G-18b) item 1 sources the checklist-mode slice" "'checklist\`-mode slice' token not found in item 1 — plain 'checklist' also appears in the unrelated trailing parenthetical, so it is not falsifiable on its own"
 
 printf '%s' "$item1" | grep -qF -- 'GRAMMAR=unmatched' \
   && ok "(G-18c) item 1 falls back to whole plan on GRAMMAR=unmatched" \
