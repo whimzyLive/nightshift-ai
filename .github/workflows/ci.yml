@@ -53,4 +53,7 @@ jobs:
       - run: bash plugins/sdlc/scripts/__tests__/loop-decide.test.sh
       - run: bash plugins/sdlc/scripts/__tests__/loop-decision-budget.test.sh
       - run: bash tools/sdlc-analyser/__tests__/loop-decision.test.sh
+      - run: bash plugins/sdlc/scripts/__tests__/plan-slice.test.sh
+      - run: bash plugins/sdlc/scripts/__tests__/plan-slice-budget.test.sh
+      - run: bash plugins/sdlc/scripts/__tests__/plan-slice-contract.test.sh
       - run: bash .claude/hooks/__tests__/rtk-line-scan.test.sh
