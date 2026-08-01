@@ -1,0 +1,15 @@
+# Fenced fixture — NA-81 plan-slice.sh test fixture (G-5: fence-aware scan)
+
+## Phase 1 — Web [web-engineer]
+
+- [ ] Real task inside phase 1
+
+Here is a fenced block quoting the tech-lead template, which must NOT be parsed as a real heading
+or a real task line:
+
+```text
+## Phase 2 — x [web-engineer]
+- [ ] fake
+```
+
+- [ ] Another real task after the fence, still inside phase 1
