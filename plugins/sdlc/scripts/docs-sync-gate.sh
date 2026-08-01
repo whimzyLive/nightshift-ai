@@ -21,6 +21,58 @@ emit() { printf 'DOCS_GATE=%s\nREASON=%s\n' "$1" "$2"; exit 0; }
 [ -n "$key" ] && [ -n "$prefix" ] && [ -n "$base" ] \
   || emit dispatch-unresolvable "usage: docs-sync-gate.sh <STORY-KEY> <BRANCH_PREFIX> <BASE-BRANCH>"
 
+# expand_token <token> — flat, non-nested {a,b,...} brace alternation only. Repeats until no
+# brace remains, so multiple SEPARATE groups in one token (e.g. plugins/{a,b}/{c,d}/x) each
+# expand — the cartesian product of both groups. Prints one expanded token per line and returns
+# 0 on success. Returns 1 (prints nothing) on anything it cannot fully resolve — a nested brace,
+# an unmatched brace, or a brace with no comma inside — the caller reads that as unresolvable.
+# NEVER guess: an ambiguous shape stays unresolvable, per this script's fail-safe contract.
+expand_token() {
+  local results
+  results="$1"
+  local pass=0
+  while :; do
+    pass=$((pass + 1))
+    [ "$pass" -gt 8 ] && return 1
+    local any=0
+    local next=""
+    local cand
+    while IFS= read -r cand; do
+      [ -z "$cand" ] && continue
+      case "$cand" in
+        *'{'*)
+          any=1
+          case "$cand" in *'{'*'}'*) : ;; *) return 1 ;; esac
+          pre="${cand%%\{*}"
+          rest="${cand#*\{}"
+          group="${rest%%\}*}"
+          suf="${rest#*\}}"
+          case "$group" in *'{'*) return 1 ;; esac
+          case "$group" in *,*) : ;; *) return 1 ;; esac
+          local old_ifs="$IFS"
+          IFS=','
+          local alt
+          for alt in $group; do
+            next="${next}${pre}${alt}${suf}
+"
+          done
+          IFS="$old_ifs"
+          ;;
+        *)
+          next="${next}${cand}
+"
+          ;;
+      esac
+    done <<BRACEEOF
+$results
+BRACEEOF
+    results="$next"
+    [ "$any" -eq 0 ] && break
+  done
+  printf '%s' "$results"
+  return 0
+}
+
 # 1. Manifest, resolved checkout-independently from the base branch.
 manifest="$(git show "origin/$base:.claude/project/docs-manifest.md" 2>/dev/null)" \
   || emit skip-no-manifest "no .claude/project/docs-manifest.md at origin/$base — repo opted out of docs"
@@ -48,11 +100,19 @@ while IFS= read -r line; do
     [ "$en" = "true" ] || continue
     case "$t" in *-reference|llms-txt) enabled_ref=1 ;; esac
     for s in $src $con; do
+      case "$s" in scan:) continue ;; esac
       case "$s" in
-        scan:) continue ;;
-        *'{'*) emit dispatch-unresolvable "unexpandable scope '$s' on row '$t' — dispatching (fail safe)" ;;
+        *'{'*)
+          expanded="$(expand_token "$s")" || \
+            emit dispatch-unresolvable "unexpandable scope '$s' on row '$t' — dispatching (fail safe)"
+          while IFS= read -r ex; do
+            [ -n "$ex" ] && scopes="${scopes:+$scopes }$ex"
+          done <<EXPEOF
+$expanded
+EXPEOF
+          ;;
+        *) scopes="${scopes:+$scopes }$s" ;;
       esac
-      scopes="${scopes:+$scopes }$s"
     done
   ;; esac
 done <<EOF

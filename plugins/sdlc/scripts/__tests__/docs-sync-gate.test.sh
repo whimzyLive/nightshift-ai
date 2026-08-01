@@ -35,9 +35,25 @@ mkrepo() {
 MANIFEST='| type | enabled | target-path | source | contract |
 | --- | --- | --- | --- | --- |
 | how-to | true | docs/how-to/ | src | |'
-BADMANIFEST='| type | enabled | target-path | source | contract |
+# One brace group, flat comma alternation — expandable.
+BRACE1='| type | enabled | target-path | source | contract |
 | --- | --- | --- | --- | --- |
-| config-reference | true | docs/reference/config/ | plugins/{a,b}/refs/x.md | |'
+| how-to | true | docs/how-to/ | plugins/{sdlc,gtm}/refs/x.md | |'
+# Two SEPARATE brace groups in one scope token — the real error-reference row's shape.
+BRACE2='| type | enabled | target-path | source | contract |
+| --- | --- | --- | --- | --- |
+| how-to | true | docs/how-to/ | plugins/{sdlc,gtm}/{refs,scripts}/x.md | |'
+# A brace nested inside another brace, nested group FIRST — not flat alternation, must stay
+# unresolvable. (Nested-group-first is the shape that specifically exercises the standalone
+# nested-brace guard: nested-group-last shapes are also caught downstream by the no-comma guard,
+# which would mask a regression in the nested-brace guard alone.)
+NESTEDBRACE='| type | enabled | target-path | source | contract |
+| --- | --- | --- | --- | --- |
+| how-to | true | docs/how-to/ | plugins/{{sdlc,gtm},x}/refs/x.md | |'
+# An unmatched opening brace with no closing "}" anywhere — malformed, must stay unresolvable.
+BADBRACE='| type | enabled | target-path | source | contract |
+| --- | --- | --- | --- | --- |
+| how-to | true | docs/how-to/ | plugins/{sdlc,gtm/refs/x.md | |'
 
 check() { # <label> <repo> <expected-gate>
   out="$(cd "$2" && bash "$gate" NA-1 feat develop 2>&1)"; rc=$?
@@ -52,7 +68,21 @@ check() { # <label> <repo> <expected-gate>
 check "no manifest"          "$(mkrepo nomani "-"           src/a.ts)"  skip-no-manifest
 check "manifest, no tracked" "$(mkrepo untrk  "$MANIFEST"   README2.md)" skip-no-tracked-files
 check "manifest, tracked"    "$(mkrepo trk    "$MANIFEST"   src/a.ts)"  dispatch
-check "unexpandable scope"   "$(mkrepo unres  "$BADMANIFEST" src/a.ts)" dispatch-unresolvable
+
+# Single brace group — must reach BOTH dispatch and skip-no-tracked-files, proving the group
+# actually expands into real per-alternative scopes rather than being dropped or wildcarded away.
+check "1 brace group, tracked"   "$(mkrepo b1trk "$BRACE1" plugins/sdlc/refs/x.md)" dispatch
+check "1 brace group, untracked" "$(mkrepo b1unt "$BRACE1" src/unrelated.ts)"       skip-no-tracked-files
+
+# Two SEPARATE brace groups in one token — full cartesian expansion (4 combinations); a changed
+# file matching only the LAST combination (gtm x scripts) proves every combination was generated,
+# not just the first.
+check "2 brace groups, tracked" "$(mkrepo b2trk "$BRACE2" plugins/gtm/scripts/x.md)" dispatch
+
+# Nested / malformed braces are NOT flat alternation — the fail-safe must hold: never guess,
+# always resolve toward dispatching rather than silently ignoring the scope or mis-expanding it.
+check "nested brace stays unresolvable"    "$(mkrepo nest  "$NESTEDBRACE" src/a.ts)" dispatch-unresolvable
+check "unmatched brace stays unresolvable" "$(mkrepo badbr "$BADBRACE"    src/a.ts)" dispatch-unresolvable
 
 # A nonexistent branch is unresolvable — and must NEVER resolve to a skip.
 out="$(cd "$(mkrepo nobr "$MANIFEST" src/a.ts)" && bash "$gate" NA-9 feat develop 2>&1)"
