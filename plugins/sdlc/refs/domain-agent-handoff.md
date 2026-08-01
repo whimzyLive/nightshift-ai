@@ -174,3 +174,10 @@ Large outputs are dropped at the dispatch boundary — keep it to the 4 lines (c
 - Never run any agent or skill from outside your declared domain — escalate by returning `Status: blocked` with a one-line note instead.
 - Never update the package lockfile or modify dependency versions without explicit instruction.
 - Never run cloud deploys — those are manual ops actions outside agent scope.
+
+## Plan slice
+
+```text
+SLICE names a path -> Read it before Task 1; it is this phase's contract
+unreadable | empty -> Status: blocked, Note: plan slice unreadable   # never improvise the phase
+```

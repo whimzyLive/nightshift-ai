@@ -19,6 +19,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
 - [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
 - [0020. Loop decision table as a deterministic script, not a Haiku subagent](0020-loop-decision-table-as-a-script.md) — accepted
+- [0021. Plan-doc slicing as a deterministic script, not a pasted-content instruction](0021-plan-slice-as-a-script.md) — accepted
 
 ## knowledge-engineer
 
@@ -35,6 +36,7 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
 - [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
 - [0020. Loop decision table as a deterministic script, not a Haiku subagent](0020-loop-decision-table-as-a-script.md) — accepted
+- [0021. Plan-doc slicing as a deterministic script, not a pasted-content instruction](0021-plan-slice-as-a-script.md) — accepted
 
 ## qa-engineer
 

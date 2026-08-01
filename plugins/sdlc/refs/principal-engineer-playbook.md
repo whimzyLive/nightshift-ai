@@ -138,8 +138,6 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
    (`[ai-enablement-engineer]` is dependency-free — it may be dispatched at any point in the ladder,
    but still runs alone, one domain agent at a time, like every other phase — see Step 4).
 3. Cross-reference Active agents in project-context — drop Standby phases with no tasks.
-4. Note any "grounding corrections" / "open items" the plan flagged — pass them verbatim into
-   the relevant domain-agent prompt so the implementer honors them.
 
 **Lightweight path (`LIGHTWEIGHT=true`, no plan doc):** there is no plan file to read — derive the
 task list **inline from the Jira story**:
@@ -309,6 +307,11 @@ with the normal commit cadence (today's behaviour, unchanged).
 Dispatch with the `Agent` tool. The harness's **`isolation: "worktree"` param is NOT set** — the
 orchestrator now owns isolation via the single per-story worktree provisioned in Step 3:
 
+```text
+slice := bash ${CLAUDE_PLUGIN_ROOT}/scripts/plan-slice.sh "$PLAN" phase <agent-name>
+capture status first; STOP on exit 2; unset 5 keys; eval; STOP if TASKS==0
+```
+
 ```
 Agent({
   subagent_type: "<agent-name>",
@@ -325,7 +328,7 @@ Agent({
    "Before running any `nx` command (build/test/quality gate), export
    `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache."
 3. Story key, e.g. `<STORY-KEY>`.
-4. The full phase section from the plan, verbatim.
+4. The `SLICE=` path from Step 4 — see `## Plan slice` in `refs/domain-agent-handoff.md`.
 5. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
    from the target agent's override, `.claude/project/agents/<agent-name>.md`, the override's skills
    section — whatever heading it uses, the section listing skills to invoke via the Skill tool)

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-work-placement.py — NA-92 offload-placement analyser (workstream G, Epic NA-76).
+work-placement.py — NA-92 offload-placement analyser (workstream G, Epic NA-76),
+extended by NA-81 Phase 4 with unit P1 (the plan-slice.sh instrument).
 
-Measures, per unit of work (G1/G2/G3), what share of that unit's direct-execution
+Measures, per unit of work (G1/G2/G3/P1), what share of that unit's direct-execution
 tool-result bytes landed in a subagent rather than the orchestrator, and whether the
 unit's dispatch return exceeded its stated round-trip cap — the instrument NA-92's
 AC-2/AC-3/AC-4 pilot gate is scored against.
@@ -53,17 +54,36 @@ Unit signatures (echoed verbatim into `units[].signature`):
     G2 ac-verification  := input naming docs/superpowers/plans/, a `git log <range> --oneline`,
                             verification-before-completion, or ac-verification.md
     G3 docs-sync-gate   := input naming docs-manifest.md, docs-pipeline, or docs-sync-gate.sh
+    P1 plan-slice       := any input naming plan-slice.sh or docs/superpowers/plans/
+
+P1's signature partly overlaps G2's (both name `docs/superpowers/plans/`) — INTENDED, not
+silently resolved. UNITS is scanned in declared order (G1, G2, G3, P1) and the per-call
+match loop breaks on the first hit, so a call whose text satisfies both G2 and P1 (a
+literal `docs/superpowers/plans/<file>.md` path passed directly, rather than via a shell
+variable) attributes to G2. P1 fires on its own only when the call names `plan-slice.sh`
+without independently satisfying G2's own patterns — exactly the real dispatch shape
+(`bash .../plan-slice.sh "$PLAN" phase <agent>`, `$PLAN` unexpanded in the recorded command
+text). A second instrument was rejected for this reason: it would duplicate the three-tier
+corpus rule a third time to measure a signature that already shares G2's population.
 
 The return-cap rule (verbatim — the round-trip detector). A unit's "return" is the bytes
 its dispatch mechanism contributes back to the ORCHESTRATOR transcript only: for G1/G2, the
 tool_result of an `Agent` tool_use whose joined input text names that unit's ref
-(`qa-gate-runner.md` / `ac-verification.md`); for G3, the tool_result of a `Bash` tool_use
-whose command names `docs-sync-gate.sh` (G3 is a script, not a dispatch — the same call is
-both its execution and its return).
+(`qa-gate-runner.md` / `ac-verification.md`); for G3 and P1, the tool_result of a `Bash`
+tool_use whose command names `docs-sync-gate.sh` / `plan-slice.sh` respectively (both are
+scripts, not dispatches — the same call is both execution and return).
 
     returnBytes(unit)       := sum of the unit's dispatch-return tool_result bytes, orchestrator only
-    returnCapBytes          := 2000 (G1) / 4000 (G2) / 200 (G3)  — stated caps, never derived
+    returnCapBytes          := 2000 (G1) / 4000 (G2) / 200 (G3) / 200 (P1)  — stated caps, never derived
     returnCapExceeded(unit) := returnBytes(unit) > returnCapBytes(unit)
+
+The event double-count rule (verbatim — P1's real-corpus caveat, NA-93's own shipped bug).
+On a live transcript, each probe event is stored TWICE per JSONL record: once in
+`record["message"]["content"]` (a `tool_result` item — the only place this script reads
+from) and again in a sibling `record["toolUseResult"]["stdout"]` field this script never
+touches. Counting both would double every byte figure — this inflated NA-93's own baseline
+from 97 to a reported 186. `result_text()` below reads only `message.content`; count one,
+not both, when measuring the named successor pilot's transcripts by hand.
 
 The residency rule (verbatim — reused unchanged from context-residency.py, but pooled over
 the WHOLE resolved corpus — both tiers — because this instrument's population spans both,
@@ -151,6 +171,10 @@ def match_g3(name, text):
     return "docs-manifest.md" in text or "docs-pipeline" in text or "docs-sync-gate.sh" in text
 
 
+def match_p1(name, text):
+    return "plan-slice.sh" in text or "docs/superpowers/plans/" in text
+
+
 UNITS = [
     {
         "id": "G1",
@@ -177,6 +201,13 @@ UNITS = [
         "signature": "input naming docs-manifest.md, docs-pipeline, or docs-sync-gate.sh",
         "match": match_g3,
         "dispatch_marker": "docs-sync-gate.sh",
+        "returnCapBytes": 200,
+    },
+    {
+        "id": "P1",
+        "signature": "any input naming plan-slice.sh or docs/superpowers/plans/",
+        "match": match_p1,
+        "dispatch_marker": "plan-slice.sh",
         "returnCapBytes": 200,
     },
 ]
@@ -262,7 +293,7 @@ def is_return_dispatch(unit, name, text):
         return False
     if name == "Agent":
         return True
-    if unit["id"] == "G3" and name == "Bash":
+    if unit["id"] in ("G3", "P1") and name == "Bash":
         return True
     return False
 
