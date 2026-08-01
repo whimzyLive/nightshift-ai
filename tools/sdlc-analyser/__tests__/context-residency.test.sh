@@ -70,4 +70,23 @@ python3 "$tool" bad --corpus-list "$fixtures/list-partial.txt" --boundary bogus 
 [ "$?" -eq 2 ] && printf 'ok   %s\n' "invalid --boundary exits 2" \
   || { printf 'FAIL %s\n' "invalid --boundary must exit 2"; fail=1; }
 
+# --- Review finding 1: a partial corpus-list miss warns loud and exits non-zero ----
+err="$(python3 "$tool" partial-miss --corpus-list "$fixtures/list-partial-miss.txt" --json 2>&1 >/dev/null)"
+assert_contains 'WARNING'              "$err" "partial-miss: a dropped corpus-list path prints a loud WARNING"
+assert_contains 'does-not-exist.jsonl' "$err" "partial-miss: the WARNING names the missing path"
+python3 "$tool" partial-miss --corpus-list "$fixtures/list-partial-miss.txt" >/dev/null 2>&1
+[ "$?" -ne 0 ] && printf 'ok   %s\n' "partial-miss: --corpus-list with a dropped path exits non-zero" \
+  || { printf 'FAIL %s\n' "partial-miss: --corpus-list with a dropped path must exit non-zero"; fail=1; }
+
+# --- Review finding 1: the same miss on BARE positional paths still warns, exit unaffected --
+err="$(python3 "$tool" bare-miss "$fixtures/no-boundary.jsonl" /nonexistent/does-not-exist.jsonl --json 2>&1 >/dev/null)"
+assert_contains 'WARNING' "$err" "bare-miss: a dropped positional path still prints the loud WARNING"
+python3 "$tool" bare-miss "$fixtures/no-boundary.jsonl" /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
+[ "$?" -eq 0 ] && printf 'ok   %s\n' "bare-miss: positional paths with a dropped entry still exit 0" \
+  || { printf 'FAIL %s\n' "bare-miss: positional paths with a dropped entry must still exit 0"; fail=1; }
+
+# --- Review finding 2: cacheReadRatio's formula is stated verbatim in the docstring ---
+assert_contains 'cacheReadRatio := cacheRead / (cacheRead + cacheCreation + input)' \
+  "$(cat "$tool")" "docstring states the cacheReadRatio formula verbatim"
+
 exit "$fail"

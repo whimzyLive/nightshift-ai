@@ -30,6 +30,29 @@ The corpus rule (verbatim):
            # F's population is the TOP-LEVEL session ONLY; never silently pool the two populations
            # a warning, never exit 1 — a deliberately mixed run is the caller's business to explain
 
+The corpus-completeness rule (verbatim — a partial corpus that reports clean is worse than one
+that fails loud; this epic has already under-captured its own corpus three times):
+
+    missing := a raw path that resolve_paths() could not resolve to a readable file
+    any missing path -> print a loud one-line WARNING to stderr naming the count and listing
+                         every missing path, same register as the subagentTranscripts WARNING
+    --corpus-list AND missing non-empty -> exit 1  # a pinned corpus list is a deliberate
+                         artifact; measuring a silent subset of it is a measurement error, not
+                         a convenience
+    bare positional paths AND missing non-empty -> WARNING only, exit unaffected  # an ad-hoc
+                         path list on the command line is already the caller's own choice of
+                         what to include; there is no pinned artifact to fall short of
+
+The cache-read-ratio rule (verbatim — this is the one metric AC-2's >= 94% guardrail is scored
+against, so its formula is stated with the same discipline as the three rules above):
+
+    cacheReadRatio := cacheRead / (cacheRead + cacheCreation + input)
+                       # summed across every assistant-turn usage block in the corpus;
+                       # 0.0 when the denominator is 0. input_tokens IS included in the
+                       # denominator — a real choice that moves the number away from a
+                       # cache-read-only ratio; stated here so a before/after comparison
+                       # never has to re-derive it from source.
+
 NA-88 D11 — this instrument is self-confirming, not independent evidence. Its fixtures and its
 code are authored by the same story; a PASS proves only that the tool does what its author
 intended. It proves nothing about whether any session obeys the boundary. Gate 3 (a pilot on an
@@ -277,6 +300,17 @@ def main(argv):
         )
         return 1
 
+    exit_code = 0
+    if missing_paths:
+        print(
+            "context-residency: WARNING — %d of %d corpus paths did not resolve to a readable "
+            "file and were dropped:\n  " % (len(missing_paths), len(raw_paths))
+            + "\n  ".join(missing_paths),
+            file=sys.stderr,
+        )
+        if opts["corpus_list"]:
+            exit_code = 1
+
     top_level = sum(1 for p in resolved_paths if origin_of(p) == "orchestrator")
     subagent = sum(1 for p in resolved_paths if origin_of(p) == "subagent")
     if subagent:
@@ -314,7 +348,7 @@ def main(argv):
         else:
             print_report(report)
 
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":
