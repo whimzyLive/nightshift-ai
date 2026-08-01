@@ -18,7 +18,12 @@ fail() { echo "FAIL: $1" >&2; failures=$((failures + 1)); }
 pass() { echo "PASS: $1"; }
 
 get_field() { # $1=output $2=key
-  printf '%s\n' "$1" | sed -n "s/^$2=//p" | head -1
+  # Consume the block the way every real caller does — `eval` it — rather than string-stripping
+  # the prefix. Values are emitted single-quoted (a bare `MODE=Full Auto` makes `eval` run `Auto`
+  # as a command and leave MODE unset), so a sed-based reader would assert on the quoted text and
+  # pass even if the eval contract were broken. Evaluating here is what makes these assertions
+  # able to fail on that bug.
+  ( eval "$1" >/dev/null 2>&1; eval "printf '%s' \"\${$2-}\"" )
 }
 
 # Write a mock `acli` driven entirely by env vars, so each case can select a scenario
@@ -280,6 +285,30 @@ attempts="$(cat "$counter" 2>/dev/null || echo 0)"
 [ "$mode" = "" ] && [ "$src" = "none" ] && [ "$attempts" -eq 1 ] \
   && pass "rung 2 retry: clean empty result on first attempt -> no retry (probe invoked exactly once), falls through to labels" \
   || fail "rung 2 retry (clean-empty-no-retry) — got MODE=$mode MODE_SOURCE=$src attempts=$attempts (want attempts=1)"
+
+# --- eval-safety of the emitted block -------------------------------------------------
+# Regression guard. `Full Auto` is the only mode value containing a space and the only one
+# that enables auto-merge. Emitted unquoted, `eval` assigns MODE=Full, executes `Auto` as a
+# command, and leaves MODE unset — so every Full Auto story silently took the human-merge
+# path with no error. Assert on the POST-eval variable, and on stderr being clean.
+out="$(MOCK_SCENARIO=field-full-auto PATH="$mockdir:$PATH" bash "$script" KEY-1 2>/dev/null)"
+
+evalerr="$( ( eval "$out" ) 2>&1 >/dev/null )"
+[ -z "$evalerr" ] \
+  && pass "eval-safety: evaluating the emitted block produces no stderr (no word-split command execution)" \
+  || fail "eval-safety: eval of the emitted block wrote to stderr: $evalerr"
+
+mode="$(get_field "$out" MODE)"
+[ "$mode" = "Full Auto" ] \
+  && pass "eval-safety: 'Full Auto' survives eval intact (space not word-split)" \
+  || fail "eval-safety: 'Full Auto' did not survive eval — got [$mode]"
+
+# Every emitted value must be single-quoted at the source, so a future value containing a
+# space, ';' or '\$' cannot reintroduce this class.
+unquoted="$(printf '%s\n' "$out" | grep -cE "^[A-Z_]+=[^']" || true)"
+[ "$unquoted" -eq 0 ] \
+  && pass "eval-safety: every emitted value is single-quoted at the source" \
+  || fail "eval-safety: $unquoted emitted line(s) carry an unquoted value"
 
 echo
 if [ "$failures" -ne 0 ]; then
