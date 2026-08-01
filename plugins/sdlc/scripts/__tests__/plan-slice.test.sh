@@ -237,15 +237,19 @@ unset MODE SLICE TASKS PHASES GRAMMAR
 rm -rf "$scratch"
 
 # --- G-13: eval safety, adversarial — a space AND an embedded single quote --------
+# Uses the zero-phase (fallback) fixture deliberately: on the fallback path SLICE is the
+# resolved PLAN PATH ITSELF (unchanged), so this is the one case where the adversarial
+# characters actually flow into the eval'd value. A "matched" fixture would return an
+# auto-generated tmp-file SLICE containing none of the adversarial characters, proving
+# nothing about shq()'s quoting.
 scratch2="$(mktemp -d)"
 adv_plan="$scratch2/plan with space and ' quote.md"
-cp "$plans/bracket.md" "$adv_plan"
+cp "$plans/zero-phase.md" "$adv_plan"
 canary="$scratch2/CANARY_SHOULD_NOT_EXIST"
 adv_out="$(run "$adv_plan" phase platform-engineer)"
 (
   eval "$adv_out"
-  if [ "$SLICE" != "$(cd "$(dirname "$SLICE")" && pwd)/$(basename "$SLICE")" ]; then :; fi
-  if [ -n "${SLICE:-}" ] && [ -r "$SLICE" ]; then
+  if [ -n "${SLICE:-}" ] && [ "$SLICE" = "$adv_plan" ]; then
     ok_inner=1
   else
     ok_inner=0
@@ -253,8 +257,8 @@ adv_out="$(run "$adv_plan" phase platform-engineer)"
   printf '%s\n' "$ok_inner" > "$scratch2/inner-ok"
 )
 inner_ok="$(cat "$scratch2/inner-ok" 2>/dev/null || echo 0)"
-[ "$inner_ok" = "1" ] && ok "(G-13) SLICE survives eval intact (path with space + embedded quote)" \
-  || bad "(G-13) SLICE survives eval intact" "post-eval SLICE was empty or unreadable"
+[ "$inner_ok" = "1" ] && ok "(G-13) SLICE survives eval byte-equal to the adversarial path (space + embedded quote)" \
+  || bad "(G-13) SLICE survives eval byte-equal to the adversarial path" "post-eval SLICE did not match '$adv_plan'"
 [ ! -e "$canary" ] && ok "(G-13) no stray file/command side effect from the adversarial path" \
   || bad "(G-13) no stray side effect" "$canary was created"
 rm -rf "$scratch2"
