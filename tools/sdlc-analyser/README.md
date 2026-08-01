@@ -5,9 +5,10 @@ artifact-encoding reproducibility, duplicate-read classification, rtk rewrite-co
 read-bounding/carve-out volume). Read-only: these scripts read the repo and
 `~/.claude/projects/**/*.jsonl` transcripts, and never write to either. Mostly not wired into CI
 (`artifact-encoding.test.sh`, shipped under `plugins/sdlc/scripts/__tests__/`, was the original
-exception — see `artifact-contract.sh` below for why that tool stays out of CI; `read-bounding.py`
-below is a second exception, CI-wired because it needs no local binary, only stdlib Python and
-in-repo fixtures) — run the rest by hand and paste the output into a PR body.
+exception — see `artifact-contract.sh` below for why that tool stays out of CI; `read-bounding.py`,
+`context-residency.py` and `work-placement.py` below are the other exceptions, CI-wired because
+each needs no local binary, only stdlib Python and in-repo fixtures) — run the rest by hand and
+paste the output into a PR body.
 
 ## `instruction-inventory.sh`
 
@@ -549,6 +550,123 @@ session obeys the boundary, or that any token was actually saved by it. This is 
 never a gate on session behaviour. Gate 3 — a pilot run on an independent story after the
 session-boundary PR merges and the sdlc plugin is released — is the only evidence about the
 contract itself.
+
+## `work-placement.py`
+
+```text
+python3 tools/sdlc-analyser/work-placement.py <label> (<transcript.jsonl>... | --corpus-list <file>) [--json]
+```
+
+Python 3, stdlib only (3.9-compatible), read-only. Measures, per unit of work (G1/G2/G3),
+what share of that unit's direct-execution tool-result bytes landed in a subagent rather
+than the orchestrator, and whether the unit's dispatch return exceeded its stated
+round-trip cap — the instrument NA-92's workstream-G pilot gate (AC-2/AC-3/AC-4) is
+scored against.
+
+### The three-tier corpus rule (verbatim)
+
+```text
+project := ~/.claude/projects/<encoded-repo-path>
+T1 top-level := <project>/*.jsonl
+T2 subagent  := <project>/*/subagents/agent-*.jsonl
+T3 wf agent  := <project>/*/subagents/workflows/wf_*/agent-*.jsonl
+```
+
+Measured on this repo's corpus (NA-92): T1 **107**, T2 **557**, T3 **890** — T3 alone is
+61.5% of all subagent transcripts and is invisible to any non-recursive glob (NA-90's
+shipped bug). Every corpus-list / positional entry is treated as a **root**: a directory
+root expands to `root.glob("*.jsonl")` for T1 (non-recursive, direct children only) plus
+`root.rglob("agent-*.jsonl")` for T2+T3 (recursive — **required**); a `.jsonl` file entry
+is used as-is, tiered by `origin_of(path)` (`"subagent"` if `/subagents/` appears in the
+path, `"orchestrator"` otherwise — same convention as `read-bounding.py` and
+`context-residency.py`). Path lists are built with Python `pathlib`, never parsed `ls` —
+the local rtk shell hook rewrites and size-annotates `ls` output, silently corrupting a
+naive corpus list.
+
+### The unit signatures (verbatim, echoed into `units[].signature`)
+
+```text
+G1 qa-gate-run      := Bash matching nx run-many|affected|run … test|lint|typecheck|build,
+                        pnpm test|lint, vitest, jest; OR any input naming qa-gate-runner.md
+G2 ac-verification  := input naming docs/superpowers/plans/, a `git log <range> --oneline`,
+                        verification-before-completion, or ac-verification.md
+G3 docs-sync-gate   := input naming docs-manifest.md, docs-pipeline, or docs-sync-gate.sh
+```
+
+Attribution counts only **direct-execution** tool results — `Bash`, `Read`, `Grep`,
+`Glob`. `Agent` and `SendMessage` returns are excluded from this count on purpose: that
+traffic is already inside a subagent, and counting it would inflate G's own claim.
+
+### The placement and return-cap rules (verbatim)
+
+```text
+orchestratorBytes(unit) := sum of matched direct-execution result bytes, origin == orchestrator
+subagentBytes(unit)     := sum of matched direct-execution result bytes, origin == subagent
+subagentShare(unit)     := subagentBytes / (orchestratorBytes + subagentBytes)
+                            null WHEN the unit never fired (no matched call at all) — never
+                            0.0, which would be indistinguishable from "fired entirely at
+                            top level"
+
+returnBytes(unit)       := bytes the unit's dispatch return contributed at the top level —
+                            for G1/G2, the tool_result of an `Agent` call whose joined input
+                            text names that unit's ref (qa-gate-runner.md / ac-verification.md);
+                            for G3, the tool_result of a `Bash` call naming docs-sync-gate.sh
+                            (G3 is a script, not a dispatch — the same call is both its
+                            execution and its return)
+returnCapBytes          := 2000 (G1) / 4000 (G2) / 200 (G3) — stated caps, never derived
+returnCapExceeded(unit) := returnBytes(unit) > returnCapBytes(unit)     # the round-trip detector
+```
+
+`toolResultBytes` / `toolResultExposure` reuse `context-residency.py`'s residency rule
+(`exposure(r) := bytes(r) * (T - turn(r))`, per-transcript turn indexing) but pooled over
+the **whole resolved corpus, both tiers** — unlike `context-residency.py`'s top-level-only
+population, because this instrument's job spans both. `cacheReadRatio` is the same
+`cacheRead / (cacheRead + cacheCreation + input)` formula as `context-residency.py`'s AC-2
+guardrail, pooled the same way, included here as a convenience cross-check.
+
+**`--json` emits the full contract**: `label`, `corpus` (`topLevelTranscripts`,
+`subagentTranscripts`), `units[]` (`id`, `signature`, `orchestratorBytes`,
+`subagentBytes`, `subagentShare`, `returnBytes`, `returnCapBytes`, `returnCapExceeded`),
+`toolResultBytes`, `toolResultExposure`, `cacheReadRatio`, `skippedLines`,
+`missingCorpusPaths`. Without `--json`, a human-readable table.
+
+**Error handling.** No resolved transcript file at all -> every path/root tried is
+printed to stderr, exit 1. A partial corpus-list miss -> loud stderr WARNING naming the
+count and every dropped root; `--corpus-list` exits 1, bare positional paths exit 0
+(same corpus-completeness rule as `context-residency.py`). Unparseable transcript line ->
+skipped, `skippedLines += 1`, exit 0. **0 T3 (`workflows/wf_*`) transcripts resolved
+against a real corpus** -> loud stderr WARNING naming the count, same register as
+`read-bounding.py`'s non-recursive-glob warning — this is the exact defect (NA-90's
+shipped bug) the three-tier corpus rule exists to catch.
+
+### Falsifiability harness
+
+`tools/sdlc-analyser/__tests__/work-placement.test.sh` (21 assertions, CI-wired) proves
+`subagentShare` reaches 0.0, 0.5 **and** 1.0 and `returnCapExceeded` reaches both `true`
+and `false`, over five hand-authored fixture corpora
+(`__tests__/fixtures/work-placement/`). Every per-unit field is read via a `python3` JSON
+extraction, never a whole-blob substring grep — a substring check on `"subagentShare":
+1.0` stays green as long as **any** unit reports 1.0, so it cannot catch a regression
+isolated to one unit. This was caught live while proving F-11 (swap the corpus's `rglob`
+for a non-recursive `glob("*/subagents/agent-*.jsonl")`): G1/G2 still resolved via the
+shallower one-level pattern, so the original substring assertion stayed green even though
+G3 — whose fixture signature lives **only** in the `workflows/wf_x/` tier — had silently
+dropped to `null`. The rewritten per-unit assertion catches it. F-12 (hard-coding
+`returnCapExceeded` to `False`) and F-13 (dropping the `skippedLines` increment) and F-14
+(deleting the T3-completeness WARNING branch) were each proven to flip their owning
+assertion to FAIL and restored byte-identical (`git checkout --` / a saved copy) before
+this story shipped.
+
+### NA-88 D11 — this instrument is self-confirming, not independent evidence
+
+`work-placement.py` and its fixtures are authored by the same story that ships the
+offload contract (refs/qa-gate-runner.md, refs/ac-verification.md,
+scripts/docs-sync-gate.sh) this tool measures compliance with. A PASS on
+`work-placement.test.sh` proves only that the tool does what its own author designed — it
+proves **nothing** about whether any real session obeys the offload contract, or that any
+byte was actually relocated. This is a smoke test, never a gate on agent behaviour. The
+pilot (`docs/superpowers/plans/NA-92-measurements/pilot-obligation.md`, a story NA-92
+does not author) is the only evidence about the contract itself.
 
 ## `cache-analysis.py`
 
