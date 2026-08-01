@@ -1,0 +1,115 @@
+== Task 2.5 — loop-decide.sh run against REAL, LIVE input (not fixtures) ==
+Captured live in this Phase 4 dispatch (2026-08-01), reproducing Task 2.5's own command exactly —
+Phase 2's console output was not persisted to a file, so this run is the verbatim record.
+Command (per the plan, Task 2.5 Step 3):
+  gh pr list --state merged --limit 2 --json number -q '.[].number'
+  bash plugins/sdlc/scripts/loop-decide.sh "$p" copilot "$dir"
+  bash plugins/sdlc/scripts/loop-decide.sh "$p" in-session "$dir"
+
+=== PR 220 / copilot ===
+DECISION='wait'
+RULE='2a'
+REVIEW_PATH='copilot'
+HEAD='cb8a9b9cb879d0e97357bd7fd202d50b2b9fbce1'
+UNRESOLVED='0'
+FIELDS='copilot-reviewed-head=0 copilot-changes-requested=0 copilot-pending=0 unresolved-copilot=0 checks-pending=0 checks-failing=0 checks-passing=0 copilot-reviewed-any=0'
+GRACE='no'
+RE_REQUEST='yes'
+BLOCKED_BY='Copilot has not started the initial review of the current head'
+exit=0, bytes=169, lines=9
+
+=== PR 220 / in-session ===
+DECISION='review'
+RULE='CI-b'
+REVIEW_PATH='in-session'
+HEAD='cb8a9b9cb879d0e97357bd7fd202d50b2b9fbce1'
+UNRESOLVED='0'
+FIELDS='reviewed-head=0 review-clean=- unresolved=0 checks-pending=0 checks-failing=0'
+GRACE='no'
+RE_REQUEST='no'
+BLOCKED_BY='none'
+exit=0, bytes=169, lines=9
+(stderr, benign — no REVIEW_MARK path passed: "loop-decide.sh: line 215: .../loop-review-mark:
+No such file or directory"; the script degrades to review-clean=- and still resolves via CI-b,
+proving F-11 live, not only against a fixture)
+
+=== PR 219 / copilot ===
+DECISION='wait'
+RULE='2a'
+REVIEW_PATH='copilot'
+HEAD='1958e717eb7a8e9f9a61176a6f02fb38ae2d37fd'
+UNRESOLVED='0'
+FIELDS='copilot-reviewed-head=0 copilot-changes-requested=0 copilot-pending=0 unresolved-copilot=0 checks-pending=0 checks-failing=0 checks-passing=0 copilot-reviewed-any=0'
+GRACE='no'
+RE_REQUEST='yes'
+BLOCKED_BY='Copilot has not started the initial review of the current head'
+exit=0, bytes=169, lines=9
+
+=== PR 219 / in-session ===
+DECISION='review'
+RULE='CI-b'
+REVIEW_PATH='in-session'
+HEAD='1958e717eb7a8e9f9a61176a6f02fb38ae2d37fd'
+UNRESOLVED='0'
+FIELDS='reviewed-head=0 review-clean=- unresolved=0 checks-pending=0 checks-failing=0'
+GRACE='no'
+RE_REQUEST='no'
+BLOCKED_BY='none'
+exit=0, bytes=169, lines=9
+
+== Assertions from Task 2.5 Step 3, checked against the four blocks above ==
+ASSERT every invocation printed exactly 9 lines and exited 0                -> PASS (all four)
+ASSERT every block is <= 600 B                                              -> PASS (169 B each)
+ASSERT DECISION subset-of {wait, fix, review, clean, halt}                  -> PASS (wait, review)
+ASSERT RULE subset-of its enum                                             -> PASS (2a, CI-b)
+ASSERT at least ONE invocation returned RULE != 'unresolvable'              -> PASS — ALL FOUR did.
+   THE key assertion: a script that always returns `unresolvable` passes every fixture and is
+   completely inert in production (NA-92's docs-sync-gate.sh shape). These four live invocations
+   against real merged PRs (#219, #220) each resolved to a concrete rule (2a or CI-b), so the
+   script is demonstrably not inert.
+ASSERT FIELDS carries the probe's own integers verbatim                     -> PASS (spot-checked
+   against copilot-reviewed-head=0 / reviewed-head=0, matching each PR's actual un-reviewed state
+   at the time of this run)
+
+== Phase 3 — real-corpus --replay (H-Gate-3), re-run live in this Phase 4 dispatch ==
+Command (per the plan, Task 3.2):
+  python3 tools/sdlc-analyser/loop-decision.py --replay na93 --corpus-list <pinned list> --json
+Pinned corpus root: ~/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift
+
+corpus  : {'topLevelTranscripts': 107, 'subagentTranscripts': 1457}
+domain  : {'copilotCases': 1296, 'inSessionCases': 162, 'totalCases': 1458}
+observed: {'snapshots': 97, 'distinct': 10, 'byRule': {'1': 0, '2a': 64, '2b': 19, '3': 4, '4': 10, '5': 0, '6': 0, '7': 0}, 'rulesWithZeroEvidence': ['1', '5', '6', '7']}
+skippedLines: 0
+
+T1/T2/T3 partition (independently re-derived with pathlib, rglob mandatory per plan):
+  T1 (top-level, *.jsonl)                                : 107
+  T2 (subagents/agent-*.jsonl, non-workflow)              : 567
+  T3 (subagents/workflows/wf_*/agent-*.jsonl)             : 890
+  T2+T3 (rglob("agent-*.jsonl") union)                    : 1457  (matches subagentTranscripts)
+
+== THE CORRECTION — "186 snapshots / 9 distinct tuples" is a superseded, un-deduplicated figure ==
+The spec and plan both cite 186 real `loop-status:` snapshots / 9 distinct tuples as the corpus
+baseline (Global Constraints, Task 3.2 Step 3). That figure is an UN-DEDUPLICATED grep estimate:
+each `loop-status:` probe event is stored TWICE in the same JSONL record — once in
+`message.content`, once in `toolUseResult.stdout`, byte-identical — so a naive `grep -c
+loop-status:` over the corpus counts every event twice. This was independently confirmed: 98
+records in this corpus carry the marker in BOTH fields.
+
+The tool's own deduplicated output (the `--replay` run above, which reads one JSONL record as one
+event regardless of how many fields within it repeat the marker) is 97 snapshots / 10 distinct
+tuples — the extra distinct tuple beyond the spec's 9 is corpus growth since the spec's baseline
+was measured, which the plan (Task 3.2 Step 3) explicitly allows: "A count that has GROWN is not
+automatically a failure ... Record the actual numbers verbatim."
+
+State plainly: `rulesWithZeroEvidence = ["1","5","6","7"]` is UNCHANGED by this correction — that
+is the load-bearing conclusion, and it holds identically whether the snapshot count is read as 186
+(un-deduplicated) or 97 (deduplicated). Do not repeat 186 as if it were a measured, deduplicated
+figure in any future artifact derived from this one.
+
+Corpus-size note: the T2 count above (567) is one higher than the figure independently recorded
+elsewhere for this same story (566) — expected corpus growth between that check and this one
+(this session's own transcripts are part of the corpus it reads), not a discrepancy in the
+underlying finding.
+
+Mismatch check (H-Gate-2, re-run live in this dispatch):
+  H-Gate-2: evaluated=1458 mismatches=0
