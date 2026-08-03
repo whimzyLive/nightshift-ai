@@ -122,9 +122,9 @@ acli jira workitem comment create --key <STORY-KEY> \
 
 Format — include only phases for agents active in this project; end each phase with a concrete verification step:
 
-```markdown
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
+```markdown
 # [Feature Name] — Implementation Plan
 
 **Spec:** [link to docs/superpowers/specs/*.md]

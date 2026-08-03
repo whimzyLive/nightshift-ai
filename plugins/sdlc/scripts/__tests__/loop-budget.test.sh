@@ -17,8 +17,10 @@ trap 'rm -rf "$work"' EXIT
 fail() { echo "FAIL: $1" >&2; failures=$((failures + 1)); }
 pass() { echo "PASS: $1"; }
 
-get_field() { # $1=output $2=key
-  printf '%s\n' "$1" | sed -n "s/^$2=//p" | head -1
+get_field() { # $1=output $2=key -- strips the single-quote eval-safety wrapper (shq()) loop-budget.sh
+  # emits every value with, e.g. BUDGET_DECISION='CONTINUE' -> CONTINUE. Mirrors loop-decide.test.sh's
+  # own field() unquoting.
+  printf '%s\n' "$1" | sed -n "s/^$2=//p" | head -1 | sed "s/^'//;s/'\$//"
 }
 
 # Run loop-budget.sh in an isolated scratch dir (own ./.tmp) so cases never collide.
@@ -71,6 +73,32 @@ if [ "$rc" -eq 1 ] && [ "$decision" = "STOP_IDLE" ]; then
 else
   fail "STOP_IDLE at BUDGET_SECS — got rc=$rc decision=$decision"
 fi
+
+# --- Case 3b: BUDGET_REASON must survive a REAL `eval` (the documented caller pattern) -----
+# BUDGET_REASON contains spaces, parens, and `>=` (e.g. "1200s idle (no progress) >= budget
+# 1200s") — unquoted, `eval "$(...)"` would hit a syntax error on `(` / a redirect on `>=`.
+# This is the same class of bug fixed in 3bd10b0 for resolve-ai-workflow-mode.sh's `Full Auto`.
+# NOTE: deliberately NOT a `case` inside `$(...)` — bash 3.2 (macOS's shipped /bin/bash)
+# misparses a `)` that closes a case-pattern arm as the closing paren of the command
+# substitution, corrupting everything after it. Redirect a real subshell to a file instead.
+eval_stderr="$work/eval-stderr"
+eval_result_file="$work/eval-result"
+(
+  unset BUDGET_DECISION BUDGET_PASS_COUNT BUDGET_IDLE_SECS BUDGET_PROGRESS BUDGET_REASON
+  eval "$out" 2>"$eval_stderr"
+  case "$BUDGET_REASON" in
+    *'idle (no progress) >= budget'*) reason_ok=1 ;;
+    *) reason_ok=0 ;;
+  esac
+  if [ "$reason_ok" = "1" ] && [ ! -s "$eval_stderr" ]; then
+    echo "OK_MARK" > "$eval_result_file"
+  else
+    printf 'FAIL_MARK: BUDGET_REASON=[%s] stderr=[%s]\n' "$BUDGET_REASON" "$(cat "$eval_stderr" 2>/dev/null)" > "$eval_result_file"
+  fi
+)
+eval_result="$(cat "$eval_result_file")"
+[ "$eval_result" = "OK_MARK" ] && pass "BUDGET_REASON survives a real eval intact, no stderr" \
+  || fail "BUDGET_REASON eval-safety — $eval_result"
 
 # --- Case 4: STOP_IDLE at REREVIEW_GRACE_SECS with --grace ---------------------------
 c4="$work/c4"; mkdir -p "$c4"

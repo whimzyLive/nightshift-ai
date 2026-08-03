@@ -182,4 +182,41 @@ EOF2
   fi
 done <<<"$snapshots"
 
+# --- (j) C1 regression: a failing in-session unresolved-comments probe must resolve to
+# RULE=unresolvable / DECISION=wait, NEVER DECISION=clean. Drives the in-session probe path
+# end-to-end (probe_insession) — no prior case in this file exercises it at all, let alone a
+# failing one, which is exactly how a `pr-unresolved-comments.sh` auth/network failure could
+# have been silently swallowed into a false "clean" (auto-merge under --on-clean).
+isdir="$(mktemp -d)"
+trap 'rm -rf "$shim" "$isdir"' EXIT
+cat > "$isdir/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "deadbeefcafefeed00000000000000000000000"
+EOF
+chmod +x "$isdir/gh"
+cat > "$isdir/pr-loop-status.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "loop-status: checks-pending=0 checks-failing=0"
+EOF
+chmod +x "$isdir/pr-loop-status.sh"
+cat > "$isdir/pr-unresolved-comments.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$isdir/pr-unresolved-comments.sh"
+j_out="$(SDLC_LOOP_PROBE_DIR="$isdir" SDLC_LOOP_GH="$isdir/gh" bash "$decide" 999 in-session "$isdir" 2>/dev/null)"
+j_rule="$(field "$j_out" RULE)"; j_dec="$(field "$j_out" DECISION)"
+[ "$j_rule" = "unresolvable" ] && ok "(j) failing in-session unresolved-comments probe -> RULE=unresolvable" \
+  || bad "(j) failing in-session unresolved-comments probe -> RULE=unresolvable" "got RULE=$j_rule"
+[ "$j_dec" = "wait" ] && ok "(j) failing in-session unresolved-comments probe -> DECISION=wait" \
+  || bad "(j) failing in-session unresolved-comments probe -> DECISION=wait" "got DECISION=$j_dec"
+[ "$j_dec" != "clean" ] && ok "(j) failing in-session unresolved-comments probe -> DECISION != clean" \
+  || bad "(j) failing in-session unresolved-comments probe -> DECISION != clean" "got clean (C1 regression)"
+# BLOCKED_BY is multi-word — field() only extracts up to the first whitespace, so check the
+# raw block for the substring instead of round-tripping it through field().
+case "$j_out" in
+  *'pr-unresolved-comments.sh failed'*) ok "(j) BLOCKED_BY names the failing probe" ;;
+  *) bad "(j) BLOCKED_BY names the failing probe" "got: $j_out" ;;
+esac
+
 exit "$fail"

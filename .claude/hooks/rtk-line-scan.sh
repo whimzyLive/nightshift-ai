@@ -153,6 +153,16 @@ COMMAND
 [ "$changed" -eq 1 ] || emit_nothing
 [ "$out_lines" != "$cmd" ] || emit_nothing
 
+# `permissionDecision: "allow"` is DELIBERATE, not an oversight (NA-89 spec D3) — the harness
+# was independently observed to honour `updatedInput` even with no `permissionDecision` field
+# (upstream `rtk hook claude`, live end-to-end test), so it is not required to make the rewrite
+# take effect. It is emitted anyway because the upstream engine's own hook output was observed
+# to include it inconsistently across code paths; always emitting it here removes this wrapper's
+# behaviour from that undocumented harness leniency. Pinned by
+# `.claude/hooks/__tests__/rtk-line-scan.test.sh` ("permissionDecision is always emitted on a
+# rewrite") — do not drop this field without updating that test and re-verifying the harness
+# still applies `updatedInput` for every caller-configured permission mode (not just the
+# already-allowed case this hook has been exercised under).
 printf '%s' "$payload" | jq -c --arg c "$out_lines" '{
   hookSpecificOutput: {
     hookEventName: "PreToolUse",

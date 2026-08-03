@@ -144,9 +144,9 @@ the file consistent with every other record in the directory.
 
 ## Template
 
-```markdown
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
+```markdown
 ---
 status: proposed
 agents: []

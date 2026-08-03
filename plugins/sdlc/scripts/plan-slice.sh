@@ -113,6 +113,17 @@ case "$mode" in
 esac
 [ -n "$plan" ] || err bad-args
 
+# `phase` mode interpolates $agent into the content-file name below (line ~135) — validate it
+# against AGENT_SET first so an unrecognised/hostile agent string never reaches that
+# interpolation (path-safety, not just correctness: AGENT_SET tokens are the only values this
+# script's callers ever pass).
+if [ "$mode" = "phase" ]; then
+  case " $AGENT_SET " in
+    *" $agent "*) : ;;
+    *) err bad-args ;;
+  esac
+fi
+
 # --- resolution -----------------------------------------------------------------------
 if [ -r "$plan" ]; then
   resolved="$plan"
@@ -196,7 +207,16 @@ END {
 }
 '
 
-ctl="$(awk -v mode="$mode" -v agent="$agent" -v outfile="$content_file" -v agentset="$AGENT_SET" "$scan_awk" "$resolved")"
+if ! ctl="$(awk -v mode="$mode" -v agent="$agent" -v outfile="$content_file" -v agentset="$AGENT_SET" "$scan_awk" "$resolved")"; then
+  # awk itself failed (crash / unsupported syntax on some awk implementation) — its output, if
+  # any, is not trustworthy control data. Fail-safe direction from the top of this file: always
+  # widen, never empty. Widen to the WHOLE resolved plan, with TASKS counted independently of
+  # awk (plain grep) so a total awk failure can never silently degrade to TASKS=0 and trip the
+  # documented consumer contract `[ "$TASKS" -gt 0 ] || STOP`.
+  fallback_tasks="$(grep -cE '^[[:space:]]*[-*] \[[ xX]\][[:space:]]' "$resolved" 2>/dev/null || true)"
+  fallback_tasks="${fallback_tasks:-0}"
+  emit "$mode" "$resolved" "$fallback_tasks" 0 unmatched
+fi
 
 phases_n="$(printf '%s\n' "$ctl" | sed -n 's/^PHASES_CTL=//p')"
 doc_tasks_n="$(printf '%s\n' "$ctl" | sed -n 's/^DOC_TASKS_CTL=//p')"

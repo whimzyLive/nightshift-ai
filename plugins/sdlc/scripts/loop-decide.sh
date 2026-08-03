@@ -209,7 +209,7 @@ probe_copilot() {
 # Ported verbatim in meaning from refs/loop-modes.md CI-1.
 probe_insession() {
   local pr="$1" dir="$2" mark="$3" last_head last_clean cur_head cur_unresolved
-  local checks_out checks_line checks_pending checks_failing
+  local un_out checks_out checks_line checks_pending checks_failing
   local reviewed_head result rule decision grace re_request fields
   [ -n "$mark" ] || mark="$dir/loop-review-mark"
   read -r last_head last_clean < "$mark" 2>/dev/null || { last_head=-; last_clean=-; }
@@ -218,7 +218,9 @@ probe_insession() {
   cur_head="$("$GH" pr view "$pr" --json headRefOid -q .headRefOid 2>/dev/null)"; [ -n "$cur_head" ] || cur_head="-"
   reviewed_head=0
   [ "$cur_head" = "$last_head" ] && reviewed_head=1
-  cur_unresolved="$("$PROBE_DIR/pr-unresolved-comments.sh" "$pr" 2>/dev/null | grep -c . || true)"
+  un_out="$("$PROBE_DIR/pr-unresolved-comments.sh" "$pr" 2>/dev/null)" || \
+    emit wait unresolvable in-session "$cur_head" - - no no "pr-unresolved-comments.sh failed"
+  cur_unresolved="$(printf '%s\n' "$un_out" | grep -c . || true)"
   cur_unresolved="${cur_unresolved:-0}"
   is_numeric "$cur_unresolved" || cur_unresolved=0
   checks_out="$("$PROBE_DIR/pr-loop-status.sh" "$pr" "$dir/loop-checks.json" 2>/dev/null)"

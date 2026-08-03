@@ -36,9 +36,9 @@ acli jira workitem comment create --key <STORY-KEY> \
 
 ## Spec Template
 
-````markdown
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
+````markdown
 # [Feature Name] — Technical Spec
 
 **Story:** [JIRA-KEY — link or key]

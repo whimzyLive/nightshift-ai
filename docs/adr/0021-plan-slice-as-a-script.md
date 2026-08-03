@@ -1,12 +1,10 @@
-Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
-
 ---
-
 status: accepted
 agents: [ai-enablement-engineer, platform-engineer]
 source-stories: [NA-81]
-
 ---
+
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 # 0021. Plan-doc slicing as a deterministic script, not a pasted-content instruction
 

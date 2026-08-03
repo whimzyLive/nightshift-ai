@@ -28,6 +28,13 @@ set -uo pipefail
 
 here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 
+# shq <value> -> single-quoted, embedded ' escaped as '\'' . Mirrors scripts/loop-decide.sh
+# so the plugin has one quoting convention, not two. BUDGET_REASON contains spaces and
+# parens/`>=` (e.g. "1200s idle (no progress) >= budget 1200s") — unquoted, the caller's
+# documented `eval "$(...)"` pattern would split it into a syntax error on `(` / a redirect on
+# `>=`, exactly the class of bug fixed in 3bd10b0 for resolve-ai-workflow-mode.sh's `Full Auto`.
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
 SUBCOMMAND="${1:-}"
 shift || true
 
@@ -110,11 +117,11 @@ case "$SUBCOMMAND" in
       BUDGET_REASON="${pass_count} passes >= backstop ${BUDGET_PASSES}"
     fi
 
-    printf 'BUDGET_DECISION=%s\n' "$BUDGET_DECISION"
-    printf 'BUDGET_PASS_COUNT=%s\n' "$pass_count"
-    printf 'BUDGET_IDLE_SECS=%s\n' "$elapsed"
-    printf 'BUDGET_PROGRESS=%s\n' "$BUDGET_PROGRESS"
-    printf 'BUDGET_REASON=%s\n' "$BUDGET_REASON"
+    printf 'BUDGET_DECISION=%s\n' "$(shq "$BUDGET_DECISION")"
+    printf 'BUDGET_PASS_COUNT=%s\n' "$(shq "$pass_count")"
+    printf 'BUDGET_IDLE_SECS=%s\n' "$(shq "$elapsed")"
+    printf 'BUDGET_PROGRESS=%s\n' "$(shq "$BUDGET_PROGRESS")"
+    printf 'BUDGET_REASON=%s\n' "$(shq "$BUDGET_REASON")"
 
     [ "$BUDGET_DECISION" = "CONTINUE" ] && exit 0
     exit 1

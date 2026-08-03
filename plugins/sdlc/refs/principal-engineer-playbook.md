@@ -70,11 +70,9 @@ Invoke, in order, before dispatching anything:
 
 1. `executing-plans`
 
-(**`subagent-driven-development` is deliberately NOT preloaded here (NA-86 A8, ≈7,588 tok/story
-removed).** This playbook dispatches domain agents directly with its own Step 4 prompt contract —
-the skill's dispatch guidance is never the operative instruction for how a phase is dispatched, so
-loading it bought no behaviour, only tokens. `executing-plans` stays: it IS the operative guidance
-for reading and following the plan doc in Step 2.)
+(**`subagent-driven-development` is deliberately NOT preloaded here (NA-86 A8).** This playbook
+dispatches domain agents directly via its own Step 4 prompt contract, so the skill's dispatch
+guidance is never operative here — only `executing-plans`, for reading the plan doc in Step 2.)
 
 (The review/quality skills — `requesting-code-review`, `receiving-code-review`,
 `verification-before-completion` — are owned and invoked by the QA Engineer at Step 6, not here.)
@@ -308,8 +306,11 @@ Dispatch with the `Agent` tool. The harness's **`isolation: "worktree"` param is
 orchestrator now owns isolation via the single per-story worktree provisioned in Step 3:
 
 ```text
-slice := bash ${CLAUDE_PLUGIN_ROOT}/scripts/plan-slice.sh "$PLAN" phase <agent-name>
-capture status first; STOP on exit 2; unset 5 keys; eval; STOP if TASKS==0
+PLAN := docs/superpowers/plans/<STORY-KEY>.md   # full path only
+LIGHTWEIGHT=true  -> skip the slice (no plan doc — plan-slice.sh would STOP on a missing one).
+                     Item 4 carries the story's ACs verbatim instead.
+LIGHTWEIGHT=false -> slice := bash ${CLAUDE_PLUGIN_ROOT}/scripts/plan-slice.sh "$PLAN" phase <agent-name>
+                     capture status first; STOP on exit 2; unset 5 keys; eval; STOP if TASKS==0
 ```
 
 ```
@@ -328,7 +329,9 @@ Agent({
    "Before running any `nx` command (build/test/quality gate), export
    `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache."
 3. Story key, e.g. `<STORY-KEY>`.
-4. The `SLICE=` path from Step 4 — see `## Plan slice` in `refs/domain-agent-handoff.md`.
+4. `LIGHTWEIGHT=false`: `SLICE=` path from Step 4 (`## Plan slice`,
+   `refs/domain-agent-handoff.md`). `LIGHTWEIGHT=true`: the story's ACs, verbatim (no plan
+   doc, no `SLICE=`).
 5. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
    from the target agent's override, `.claude/project/agents/<agent-name>.md`, the override's skills
    section — whatever heading it uses, the section listing skills to invoke via the Skill tool)

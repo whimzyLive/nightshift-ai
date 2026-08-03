@@ -1,12 +1,10 @@
-Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
-
 ---
-
 status: accepted
 agents: [ai-enablement-engineer, platform-engineer]
 source-stories: [NA-92]
-
 ---
+
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 # 0019. Offload gate and verification steps to subagents
 

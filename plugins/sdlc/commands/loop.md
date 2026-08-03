@@ -67,8 +67,8 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
 **Default: a 20-minute (1200-second) IDLE / no-progress timeout, also bounded
 by an absolute 30-pass runaway backstop**, plus a SHORTER `REREVIEW_GRACE_SECS`
 (default 600s) bound used only by rule 2b. Budget bookkeeping lives in
-`scripts/loop-budget.sh` (D8 — the script owns only the budget; this file's own
-decision table still decides WAIT vs fix vs exit). Two call sites:
+`scripts/loop-budget.sh` (D8 — the script owns only the budget; `loop-decide.sh`'s decision
+table decides WAIT vs fix vs exit, applied in Step 3). Two call sites:
 
 ```bash
 # First pass only — idempotent, safe to call every pass.
@@ -120,19 +120,17 @@ new decision-table rule).
 unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reader):
 
 - **`github-copilot`** — the GitHub Copilot bot is assigned as a PR reviewer and
-  reviews **asynchronously**; the loop waits for it. This is the full behaviour
-  the **GitHub Copilot path** below (this file's own probe + decision table)
-  describes.
+  reviews **asynchronously**; the loop waits for it. Step 3's shared probe +
+  decision table describes the full behaviour.
 - **`claude-inline`** — there is no bot; the loop runs **`/code-review`
   in-session** to produce the review, then fixes via the same `/review-fix`
-  machinery. Follow **Pass routing** below instead — it hands off to
-  `refs/loop-modes.md`'s In-session review path for the rest of this pass.
+  machinery. **Pass routing** binds `REVIEW_PATH := in-session` and continues to
+  the same shared Step 3; `refs/loop-modes.md` loads only for the CI-b/CI-c body.
 - **`claude-superpowers`** — there is no bot; the loop runs the **superpowers
   `requesting-code-review` skill in-session** (a focused reviewer subagent over
   the PR diff) to produce the review, posts its findings as inline PR comments,
-  then fixes via the same `/review-fix` machinery. Shares the same **Pass
-  routing** hand-off as `claude-inline`; only the review command (`REVIEW_CMD`)
-  differs, inside the ref.
+  then fixes via the same `/review-fix` machinery. Same `REVIEW_PATH := in-session`
+  routing as `claude-inline`; only `REVIEW_CMD` differs, inside the ref.
 
 **`REVIEW_MODE`** selects the cadence (orthogonal to the agent):
 
@@ -150,7 +148,7 @@ unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reade
 - **`on-update`** — review on every update: `github-copilot` re-requests each
   pass; the in-session agents (`claude-inline`/`claude-superpowers`) re-run
   `REVIEW_CMD` on each new HEAD. Keep fixing and re-reviewing until clean. This is
-  the full behaviour the decision table below describes, and the default.
+  the full behaviour Step 3's decision table describes, and the default.
 
 ### 1. Resolve the target PR (first pass only, or always as a guard)
 
@@ -163,29 +161,27 @@ to loop on" and do NOT schedule a next iteration.
 
 ### 2. Pass routing (every pass)
 
-`REVIEW_AGENT` (from Step 0) selects the rest of this pass's body:
+`REVIEW_AGENT` (from Step 0) binds `REVIEW_PATH` for the SHARED Step 3 probe below:
 
-- `REVIEW_AGENT = github-copilot -> continue below` — the probe and decision
-  table in this file are the entire GitHub Copilot path. `refs/loop-modes.md` is
-  loaded ONLY when the matched decision-table row is an action row (2a, 2b, 3, 5,
-  or 6) that needs Step 2/Step 5 detail or the row rationale — **never** for rule
-  1 (pending-wait), rule 4 (clean exit), or rule 7 (catch-all halt), which are
-  fully self-contained in the table below (D7).
-- `REVIEW_AGENT ⊆ {claude-inline, claude-superpowers} -> read
-  ${CLAUDE_PLUGIN_ROOT}/refs/loop-modes.md (explicit path) now` and follow its
-  **In-session review path** section (CI-1 through CI-f) for the remainder of
-  this pass — that section owns its own probe, decision table, and budget calls.
-  ELSE (ref unreadable) → **STOP** with the missing path; never continue on a
-  half-loaded contract.
+- `github-copilot -> REVIEW_PATH := copilot`
+- `claude-inline | claude-superpowers -> REVIEW_PATH := in-session`
 
-## GitHub Copilot path (`REVIEW_AGENT=github-copilot`)
+Step 3 is shared for BOTH paths — `loop-decide.sh` owns the probe + table for both values
+(NA-93). `refs/loop-modes.md` loads ONLY for an action row's extra detail: copilot rows
+2a/2b/3/5/6 → its **GitHub Copilot path — additional detail** section; in-session RULE=CI-b/
+CI-c → its **In-session actions** section. Never for rule 1/4/7 or CI-a/CI-d/CI-c2/CI-e/CI-f —
+those are self-contained below (D7). ELSE (ref needed and unreadable) → **STOP**; never
+continue on a half-loaded contract.
 
-### 3. Decide (probe + apply the decision table)
+### 3. Decide (probe + apply the decision table — shared)
 
-Probe + decision table now live in `scripts/loop-decide.sh` (NA-93); golden pins all 1,458
-cases against this file's PRE-change text. Call it, act on the answer — never improvise inline.
+Probe + table live in `scripts/loop-decide.sh` (NA-93); golden pins all 1,458 cases against
+this file's PRE-change text. Call it, act on the answer — never improvise inline.
 
 ```text
+dir         := $(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
+REVIEW_MARK := "$dir/loop-review-mark"   # loop-decide.sh's own default
+
 decide := eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-decide.sh <PR> "$REVIEW_PATH" "$dir" "$REVIEW_MARK")"
        -> DECISION⊆{wait,fix,review,clean,halt}; RULE; REVIEW_PATH; HEAD; UNRESOLVED; FIELDS;
           GRACE; RE_REQUEST; BLOCKED_BY.  9 lines, <=600 B, exit 0 ALWAYS.
@@ -200,16 +196,19 @@ DECISION=fix    -> /review-fix <PR> INLINE (session model; loop owns slot releas
                    on-create -> STOP after fix; on-update -> schedule next
 DECISION=review -> REVIEW_CMD INLINE; write REVIEW_MARK; loop-budget.sh check; schedule next
                    (loop-modes.md `## In-session actions`)
-DECISION=clean  -> ASSERT clean-guard ELSE treat as halt; run --on-clean once, then STOP
+DECISION=clean  -> ASSERT clean-guard[REVIEW_PATH] ELSE halt; run --on-clean once, then STOP
 DECISION=halt   -> print RULE, FIELDS, BLOCKED_BY; do NOT schedule next
 absent/outside enum/non-zero exit -> re-run ONCE; 2nd failure -> HALT, raw stdout printed.
                    NEVER infer a decision from prose or improvise the table here.
 
-clean-guard := reviewed-head==1 && unresolved==0 && checks-failing==0 && checks-pending==0
-               && (copilot: changes-requested==0 | in-session: review-clean==1)
-parse each field OUT OF FIELDS -> never a substring match. guard fails, or a field
-absent/non-numeric -> halt; print "clean guard rejected a clean decision on <HEAD> -
-<FIELDS>"; STOP; never fall through to --on-clean.
+clean-guard[copilot]    := copilot-reviewed-head==1 && unresolved-copilot==0 &&
+                            copilot-changes-requested==0 && checks-failing==0 && checks-pending==0
+clean-guard[in-session] := reviewed-head==1 && unresolved==0 && review-clean==1 &&
+                            checks-failing==0 && checks-pending==0
+parse each field OUT OF FIELDS by ITS PATH's exact keys -> never a substring match
+(`copilot-reviewed-head` != `reviewed-head`). guard fails, or a field absent/non-numeric ->
+halt; print "clean guard rejected a clean decision on <HEAD> - <FIELDS>"; STOP; never
+fall through to --on-clean.
 ```
 
 ---
