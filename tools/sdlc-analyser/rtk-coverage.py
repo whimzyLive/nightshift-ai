@@ -2,10 +2,27 @@
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 
 DEFAULT_COUNT = 12
+
+
+def require_rtk():
+    """`rtk_rewrites()` scores every line against the `rtk` oracle; with no `rtk` on PATH every
+    line silently counts as "not rewritable", achievableRaw collapses to 0, and pct() returns 0.0
+    for a zero denominator -- a machine missing the tool produces a better-than-real passing
+    score instead of an error. Distinguish "rtk missing" (fatal, this check) from "rtk declined
+    to rewrite a given line" (a real, countable result from the oracle itself)."""
+    if shutil.which("rtk") is None:
+        print(
+            "rtk-coverage: 'rtk' not found on PATH -- this instrument scores achievable/rewritten "
+            "lines against the live `rtk hook check` oracle and cannot run without it",
+            file=sys.stderr,
+        )
+        return False
+    return True
 
 
 def default_project_dir():
@@ -114,6 +131,8 @@ def main(argv):
             file=sys.stderr,
         )
         return 2
+    if not require_rtk():
+        return 1
     paths = resolve_corpus(opts)
     commands = load_corpus(paths)
     if not commands:
@@ -135,6 +154,10 @@ _ORACLE_CACHE = {}
 
 
 def rtk_rewrites(line):
+    """Mirrors .claude/hooks/rtk-line-scan.sh's `rewrite_line`: exit 0 alone is not enough -- a
+    command where `rtk hook check` exits 0 with empty stdout can never actually be rewritten by
+    the wrapper, and counting it toward achievableRaw/achievablePermitted would inflate
+    lostPermitted, the number NA-89's Gate 1 is scored against."""
     if line not in _ORACLE_CACHE:
         try:
             result = subprocess.run(
@@ -142,7 +165,7 @@ def rtk_rewrites(line):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            _ORACLE_CACHE[line] = result.returncode == 0
+            _ORACLE_CACHE[line] = result.returncode == 0 and bool(result.stdout.strip())
         except OSError:
             _ORACLE_CACHE[line] = False
     return _ORACLE_CACHE[line]

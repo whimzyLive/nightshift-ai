@@ -484,6 +484,11 @@ def replay_corpus(resolved_paths, lookup):
         "snapshots": snapshots,
         "distinct": len(distinct_raw),
         "byRule": by_rule,
+        # `by_rule` can grow an "unresolvable" key (a snapshot whose bucketed fields matched no
+        # golden rule) that COPILOT_RULE_IDS never enumerates. Surface it as its own field so a
+        # corpus where EVERY snapshot fails to classify is distinguishable from an empty corpus
+        # instead of printing eight zeros and looking identical to "no evidence at all".
+        "unresolvable": by_rule.get("unresolvable", 0),
         "rulesWithZeroEvidence": rules_with_zero,
     }
     return observed, skipped
@@ -656,6 +661,17 @@ def cmd_replay(rest):
         "missingCorpusPaths": len(missing),
     }
 
+    # A corpus where every snapshot fails to classify prints eight zeros and lists all eight
+    # rules as zero-evidence -- indistinguishable from an empty corpus unless `unresolvable`
+    # itself is surfaced loudly.
+    if observed["snapshots"] and observed["unresolvable"] == observed["snapshots"]:
+        print(
+            "loop-decision: WARNING — all %d observed snapshot(s) were unresolvable against the "
+            "golden fixture; this replay is evidence about nothing" % observed["snapshots"],
+            file=sys.stderr,
+        )
+        exit_code = 1
+
     if json_out:
         print(json.dumps(report, indent=2))
     else:
@@ -664,6 +680,7 @@ def cmd_replay(rest):
         print("observed.snapshots %d  distinct %d" % (observed["snapshots"], observed["distinct"]))
         for rid in COPILOT_RULE_IDS:
             print("  rule %-4s %d" % (rid, observed["byRule"].get(rid, 0)))
+        print("  rule %-4s %d" % ("unresolvable", observed["unresolvable"]))
         print("rulesWithZeroEvidence %s" % observed["rulesWithZeroEvidence"])
         print("skippedLines %d" % skipped)
         print(

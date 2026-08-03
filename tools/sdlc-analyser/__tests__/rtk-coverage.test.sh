@@ -6,6 +6,11 @@ tool="$here/../rtk-coverage.py"
 fixtures="$here/fixtures/rtk-coverage"
 fail=0
 
+# Real rtk is a locally-installed tool, not present on the CI runner (NA-89 QA finding). Prepend
+# the stub `rtk` so achievable/rewritten classification is deterministic on any machine, with or
+# without real rtk on PATH (mirrors .claude/hooks/__tests__/rtk-line-scan.test.sh).
+PATH="$fixtures/bin:$PATH"
+
 assert_contains() {
   case "$2" in
     *"$1"*) printf 'ok   %s\n' "$3" ;;

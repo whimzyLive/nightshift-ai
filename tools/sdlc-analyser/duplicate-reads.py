@@ -204,6 +204,18 @@ def main(argv):
         )
         return 1
 
+    # This tool has no --corpus-list flag (bare positional paths only), so there is no "pinned
+    # list" distinction to key a fatal exit on — sibling tools (context-residency.py,
+    # work-placement.py, read-bounding.py) only exit non-zero here when the miss came from a
+    # pinned --corpus-list; a bare positional miss is loud but non-fatal in all of them too.
+    if missing_paths:
+        print(
+            "duplicate-reads: WARNING — %d of %d corpus paths did not resolve to a readable "
+            "file and were dropped:\n  " % (len(missing_paths), len(raw_paths))
+            + "\n  ".join(missing_paths),
+            file=sys.stderr,
+        )
+
     partitions = defaultdict(lambda: defaultdict(new_partition_state))
     events = []
     story_of_path = defaultdict(set)

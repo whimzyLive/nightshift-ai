@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# Deterministic stub `rtk` for rtk-coverage.test.sh. Real rtk is a locally-installed tool absent
+# from CI (NA-89 QA finding, same gap fixed for .claude/hooks/__tests__/rtk-line-scan.test.sh) --
+# this stub implements only `hook check -- <line>` and `--version`, returning the exact
+# achievable/not-achievable classification this suite's assertions were verified against real rtk
+# for the six lines in fixtures/rtk-coverage/corpus.jsonl, so the suite runs deterministically on
+# any machine, with or without real rtk present.
+set -u
+
+if [ "${1:-}" = "--version" ]; then
+  echo "rtk 0.0.0-stub"
+  exit 0
+fi
+
+if [ "${1:-}" != "hook" ] || [ "${2:-}" != "check" ] || [ "${3:-}" != "--" ]; then
+  echo "stub-rtk: unsupported invocation: $*" >&2
+  exit 2
+fi
+line="$4"
+
+case "$line" in
+  "git status") printf 'rtk git status'; exit 0 ;;
+  "grep -n a b.md") printf 'rtk grep -n a b.md'; exit 0 ;;
+  "cd /r && pnpm exec tsc --noEmit") printf 'cd /r && rtk tsc --noEmit'; exit 0 ;;
+  *)
+    echo "No rewrite for: $line" >&2
+    exit 1
+    ;;
+esac

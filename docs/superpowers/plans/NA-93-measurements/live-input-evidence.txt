@@ -74,7 +74,7 @@ ASSERT FIELDS carries the probe's own integers verbatim                     -> P
 == Phase 3 — real-corpus --replay (H-Gate-3), re-run live in this Phase 4 dispatch ==
 Command (per the plan, Task 3.2):
   python3 tools/sdlc-analyser/loop-decision.py --replay na93 --corpus-list <pinned list> --json
-Pinned corpus root: ~/.claude/projects/-Users-Rushi-Development-EdgeTech-ai-workspace-nightshift
+Pinned corpus root: ~/.claude/projects/<encoded-repo-path>
 
 corpus  : {'topLevelTranscripts': 107, 'subagentTranscripts': 1457}
 domain  : {'copilotCases': 1296, 'inSessionCases': 162, 'totalCases': 1458}

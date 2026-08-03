@@ -360,12 +360,15 @@ ASSERT corpus.subagentTranscripts > 0 ELSE print a loud one-line WARNING naming 
 `isSidechain` is `0` across all 69,092 records on this harness. A non-recursive
 `~/.claude/projects/*/*.jsonl` glob drops ~88% of read volume — it reduced NA-88's recorded
 baseline to 798 of 6,793 reads (11.7%). Always glob `*/subagents/*.jsonl` explicitly. **This
-story's own baseline (`docs/superpowers/plans/NA-90-measurements/read-bounding-before.txt`) uses
-the RECURSIVE corpus rule** — `corpus-list.txt` is built from `<project>/*.jsonl` (top-level,
-107 files) **union** `<project>/*/subagents/agent-*.jsonl` (550 files), generated via Python's
-`glob.glob` rather than a shell `ls` (a local shell-hook rewrite was observed to append trailing
-byte-size text to `ls` output on this machine, corrupting a naive corpus list — `glob.glob` sidesteps it
-entirely). The resulting baseline shows `topLevelTranscripts: 107`, `subagentTranscripts: 550`,
+story's own baseline (`docs/superpowers/plans/NA-90-measurements/measurement-block.txt`, which
+carries the derived numbers below and survives; the raw `corpus-list.txt` this baseline was run
+against is deliberately untracked — it embeds machine-local transcript paths and is excluded by
+`.gitignore`'s `docs/superpowers/plans/*-measurements/*corpus*` rule) uses the RECURSIVE corpus
+rule** — the corpus list was built from `<project>/*.jsonl` (top-level, 107 files) **union**
+`<project>/*/subagents/agent-*.jsonl` (550 files), generated via Python's `glob.glob` rather than
+a shell `ls` (a local shell-hook rewrite was observed to append trailing byte-size text to `ls`
+output on this machine, corrupting a naive corpus list — `glob.glob` sidesteps it entirely). The
+resulting baseline shows `topLevelTranscripts: 107`, `subagentTranscripts: 550`,
 `totalReads: 6085` — reproducing the spec's published figures within the expected drift from
 corpus growth (`windowedShare` 26.06% vs spec's 26.1%; `topDecileShare` 51.68% vs 51.6%; `max`
 25,188 matches exactly).
@@ -411,11 +414,11 @@ value, exit 2.
 
 ### Gate 2 — falsifiability
 
-| Corpus                                                                | `windowedShare` |
-| --------------------------------------------------------------------- | --------------- |
-| `all-windowed.jsonl` (synthetic, every read carries `offset`/`limit`) | `1.0`           |
-| `all-whole.jsonl` (synthetic, no read carries either)                 | `0.0`           |
-| real corpus (`NA-90-measurements/corpus-list.txt`, recursive)         | `~0.261`        |
+| Corpus                                                                                                                                                       | `windowedShare` |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
+| `all-windowed.jsonl` (synthetic, every read carries `offset`/`limit`)                                                                                        | `1.0`           |
+| `all-whole.jsonl` (synthetic, no read carries either)                                                                                                        | `0.0`           |
+| real corpus (recursive; derived figure in `NA-90-measurements/measurement-block.txt` — the raw `corpus-list.txt` it was run against is untracked, see above) | `~0.261`        |
 
 A tool that returned the same number against all three would be incapable of measuring anything.
 The 22-assertion harness (`tools/sdlc-analyser/__tests__/read-bounding.test.sh`) also exercises

@@ -404,6 +404,17 @@ def main(argv):
         )
         return 1
 
+    exit_code = 0
+    if missing_paths:
+        print(
+            "read-bounding: WARNING — %d of %d corpus paths did not resolve to a readable "
+            "file and were dropped:\n  " % (len(missing_paths), len(raw_paths))
+            + "\n  ".join(missing_paths),
+            file=sys.stderr,
+        )
+        if opts["corpus_list"]:
+            exit_code = 1
+
     top_level = sum(1 for p in resolved_paths if origin_of(p) == "orchestrator")
     subagent = sum(1 for p in resolved_paths if origin_of(p) == "subagent")
     if subagent == 0:
@@ -449,7 +460,7 @@ def main(argv):
         else:
             print_report(report)
 
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

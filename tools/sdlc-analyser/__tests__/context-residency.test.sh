@@ -10,12 +10,31 @@
 # behaviour. Gate 3 (a pilot on an independent story) is the only evidence about the boundary
 # itself. Falsifiability: the metric must return 0.0, 0.5 and 1.0 over the three fixed corpora
 # — a tool returning one number against all three would be incapable of measuring anything.
+#
+# JSON fields are read via python3 extraction, never a whole-blob substring grep — a substring
+# check like `assert_contains '"cacheReadRatio": 0.9'` also passes for a hardcoded `0.99` (0.9
+# is a literal prefix of 0.99), and `assert_contains '"inheritedShare": 0.5'` passes for
+# `0.5001` too. Ported from the top_field()/unit_field() pattern in work-placement.test.sh
+# (NA-92).
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 tool="$here/../context-residency.py"
 fixtures="$here/fixtures/context-residency"
 fail=0
+
+field() { # <json> <field> -- prints the JSON-serialised value (null/true/false/number/"string")
+  printf '%s' "$1" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(json.dumps(d['$2']))
+"
+}
+
+assert_eq() { # <label> <actual> <expected>
+  [ "$2" = "$3" ] && printf 'ok   %s\n' "$1" \
+    || { printf 'FAIL %s\n     expected: %s\n     got:      %s\n' "$1" "$3" "$2"; fail=1; }
+}
 
 assert_contains() {
   case "$2" in
@@ -26,41 +45,41 @@ assert_contains() {
 
 # --- Gate 2: the metric must reach BOTH ends AND a middle value --------------------
 out="$(python3 "$tool" no-boundary --corpus-list "$fixtures/list-no-boundary.txt" --json 2>/dev/null)"
-assert_contains '"assistantTurns": 4'      "$out" "no-boundary: four assistant turns counted"
-assert_contains '"toolResultExposure": 12' "$out" "no-boundary: byte-turn exposure summed"
-assert_contains '"boundaryTurn": null'     "$out" "no-boundary: no PR raise -> null boundary"
-assert_contains '"inheritedShare": 0.0'    "$out" "no-boundary: inheritedShare reaches 0.0"
-assert_contains '"cacheReadRatio": 0.9'    "$out" "no-boundary: cache-read ratio computed"
+assert_eq "no-boundary: four assistant turns counted"    "$(field "$out" assistantTurns)"      "4"
+assert_eq "no-boundary: byte-turn exposure summed"       "$(field "$out" toolResultExposure)"  "12"
+assert_eq "no-boundary: no PR raise -> null boundary"    "$(field "$out" boundaryTurn)"         "null"
+assert_eq "no-boundary: inheritedShare reaches 0.0"      "$(field "$out" inheritedShare)"       "0.0"
+assert_eq "no-boundary: cache-read ratio computed"       "$(field "$out" cacheReadRatio)"       "0.9"
 
 out="$(python3 "$tool" full-inherit --corpus-list "$fixtures/list-full-inherit.txt" --json 2>/dev/null)"
-assert_contains '"boundaryTurn": 1'         "$out" "full-inherit: gh pr create detected at turn 1"
-assert_contains '"inheritedExposure": 12'   "$out" "full-inherit: all exposure is inherited"
-assert_contains '"inheritedShare": 1.0'     "$out" "full-inherit: inheritedShare reaches 1.0"
+assert_eq "full-inherit: gh pr create detected at turn 1" "$(field "$out" boundaryTurn)"       "1"
+assert_eq "full-inherit: all exposure is inherited"       "$(field "$out" inheritedExposure)"  "12"
+assert_eq "full-inherit: inheritedShare reaches 1.0"      "$(field "$out" inheritedShare)"     "1.0"
 
 out="$(python3 "$tool" partial --corpus-list "$fixtures/list-partial.txt" --json 2>/dev/null)"
-assert_contains '"boundaryTurn": 2'          "$out" "partial: raise-pr.sh detected at turn 2"
-assert_contains '"toolResultExposure": 400'  "$out" "partial: total exposure 400 byte-turns"
-assert_contains '"inheritedExposure": 200'   "$out" "partial: 200 byte-turns inherited"
-assert_contains '"inheritedShare": 0.5'      "$out" "partial: inheritedShare reaches a middle value"
-assert_contains 'raise-pr.sh'                "$out" "partial: the matched boundary command is reported"
+assert_eq "partial: raise-pr.sh detected at turn 2"       "$(field "$out" boundaryTurn)"          "2"
+assert_eq "partial: total exposure 400 byte-turns"        "$(field "$out" toolResultExposure)"   "400"
+assert_eq "partial: 200 byte-turns inherited"             "$(field "$out" inheritedExposure)"    "200"
+assert_eq "partial: inheritedShare reaches a middle value" "$(field "$out" inheritedShare)"      "0.5"
+assert_contains 'raise-pr.sh' "$(field "$out" boundaryCommand)" "partial: the matched boundary command is reported"
 
 # --- The control arm: --boundary none forces the boundary off ---------------------
 out="$(python3 "$tool" partial-none --corpus-list "$fixtures/list-partial.txt" --boundary none --json 2>/dev/null)"
-assert_contains '"boundaryTurn": null'    "$out" "--boundary none: boundary forced off"
-assert_contains '"inheritedShare": 0.0'   "$out" "--boundary none: nothing is inherited"
+assert_eq "--boundary none: boundary forced off" "$(field "$out" boundaryTurn)"   "null"
+assert_eq "--boundary none: nothing is inherited" "$(field "$out" inheritedShare)" "0.0"
 
 # --- The corpus partition is always printed, both counts, always ------------------
 out="$(python3 "$tool" partition --corpus-list "$fixtures/list-partial.txt" --json 2>/dev/null)"
-assert_contains '"topLevelTranscripts": 1' "$out" "corpus: top-level partition count emitted"
-assert_contains '"subagentTranscripts": 0' "$out" "corpus: subagent partition count emitted"
+assert_eq "corpus: top-level partition count emitted" "$(field "$out" topLevelTranscripts)" "1"
+assert_eq "corpus: subagent partition count emitted"  "$(field "$out" subagentTranscripts)" "0"
 
 err="$(python3 "$tool" sub --corpus-list "$fixtures/list-subagent.txt" --json 2>&1 >/dev/null)"
 assert_contains 'subagent' "$err" "a subagent transcript prints the loud population WARNING"
 
 # --- Error handling: every row of the spec's table, exercised --------------------
 out="$(python3 "$tool" edge --corpus-list "$fixtures/list-edge-cases.txt" --json 2>/dev/null)"
-assert_contains '"skippedLines": 1'        "$out" "unparseable line is skipped and counted"
-assert_contains '"toolResultExposure": 2'  "$out" "a tool_use with no result adds no exposure"
+assert_eq "unparseable line is skipped and counted"     "$(field "$out" skippedLines)"       "1"
+assert_eq "a tool_use with no result adds no exposure"  "$(field "$out" toolResultExposure)" "2"
 
 python3 "$tool" nope /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
 [ "$?" -eq 1 ] && printf 'ok   %s\n' "unresolvable corpus exits 1" \

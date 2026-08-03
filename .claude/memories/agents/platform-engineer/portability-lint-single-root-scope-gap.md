@@ -3,8 +3,8 @@ id: portability-lint-single-root-scope-gap
 agent: [platform-engineer]
 trigger: [tools/portability-lint.sh, new plugin unscanned, lint hardcoded to one root]
 rule: When adding a second plugin root (or any new scanned unit) to a shared lint/CI script, check whether the script has a single hardcoded root var.
-evidence: [NA-3, NA-63, NA-90]
-uses: 1
+evidence: [NA-3, NA-63, NA-90, NA-82]
+uses: 2
 status: active
 ---
 
