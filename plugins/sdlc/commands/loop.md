@@ -68,7 +68,7 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md`
 by an absolute 30-pass runaway backstop**, plus a SHORTER `REREVIEW_GRACE_SECS`
 (default 600s) bound used only by rule 2b. Budget bookkeeping lives in
 `scripts/loop-budget.sh` (D8 — the script owns only the budget; `loop-decide.sh`'s decision
-table decides WAIT vs fix vs exit, applied in Step 3). Two call sites:
+table decides WAIT vs. fix vs exit, applied in Step 3). Two call sites:
 
 ```bash
 # First pass only — idempotent, safe to call every pass.
@@ -120,8 +120,8 @@ new decision-table rule).
 unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reader):
 
 - **`github-copilot`** — the GitHub Copilot bot is assigned as a PR reviewer and
-  reviews **asynchronously**; the loop waits for it. Step 3's shared probe +
-  decision table describes the full behaviour.
+  reviews **asynchronously**; the loop waits for it. Step 3 describes the full
+  behaviour.
 - **`claude-inline`** — there is no bot; the loop runs **`/code-review`
   in-session** to produce the review, then fixes via the same `/review-fix`
   machinery. **Pass routing** binds `REVIEW_PATH := in-session` and continues to
@@ -147,8 +147,8 @@ unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reade
   **Review-mode modifiers** note in `refs/loop-modes.md` for the full detail.)
 - **`on-update`** — review on every update: `github-copilot` re-requests each
   pass; the in-session agents (`claude-inline`/`claude-superpowers`) re-run
-  `REVIEW_CMD` on each new HEAD. Keep fixing and re-reviewing until clean. This is
-  the full behaviour Step 3's decision table describes, and the default.
+  `REVIEW_CMD` on each new HEAD. Keep fixing and re-reviewing until clean — the
+  default, and the full behaviour Step 3's table describes.
 
 ### 1. Resolve the target PR (first pass only, or always as a guard)
 
