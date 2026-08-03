@@ -70,3 +70,13 @@ tools/portability-denylist.txt
 
 # sdlc plugin-root marker — user/machine-specific cache path, never commit (rewritten by /sdlc:init)
 .claude/.sdlc-plugin-root
+
+# Benchmark/measurement raw inputs — these are lists of local Claude Code transcript paths and the
+# verbatim reports derived from them, so every line embeds the operator's home directory and session
+# UUIDs. This repo is public: never commit them. The derived numbers belong in the story's
+# measurement-block.txt / plan doc, which IS committed.
+docs/superpowers/plans/*-measurements/*corpus*
+docs/superpowers/plans/*-measurements/*-before.txt
+# ...except this one: it is an aggregate JSON report with no per-file paths in it, i.e. a metric
+# rather than a raw input, so it stays tracked as the committed NA-91 baseline.
+!docs/superpowers/plans/NA-91-measurements/context-residency-before.txt
