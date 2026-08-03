@@ -42,12 +42,12 @@ tot=$((qb + pb))
   || bad "(G-14a) combined playbooks <= 73704" "actual $tot (qa=$qb pe=$pb) — NEVER raise this constant"
 
 lm="$(wc -c < "$loop_md" | tr -d ' ')"
-[ "$lm" -eq 13421 ] && ok "(G-14b) commands/loop.md byte-unchanged at 13421" \
-  || bad "(G-14b) commands/loop.md == 13421" "actual $lm"
+[ "$lm" -eq 13445 ] && ok "(G-14b) commands/loop.md byte-unchanged at 13445" \
+  || bad "(G-14b) commands/loop.md == 13445" "actual $lm"
 
 lmo="$(wc -c < "$loop_modes" | tr -d ' ')"
-[ "$lmo" -eq 13534 ] && ok "(G-14c) refs/loop-modes.md byte-unchanged at 13534" \
-  || bad "(G-14c) refs/loop-modes.md == 13534" "actual $lmo"
+[ "$lmo" -eq 13554 ] && ok "(G-14c) refs/loop-modes.md byte-unchanged at 13554" \
+  || bad "(G-14c) refs/loop-modes.md == 13554" "actual $lmo"
 
 # --- G-15: site C — the PLAN_OR_REQUIREMENTS block never pastes content again -----
 block="$(awk '/^- `PLAN_OR_REQUIREMENTS`:/{f=1;print;next} f&&/^- /{exit} f' "$qa")"

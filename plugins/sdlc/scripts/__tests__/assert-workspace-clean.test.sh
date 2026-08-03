@@ -139,6 +139,42 @@ else
   fail "row exit codes — got snap_rc=$snap_rc assert_rc=$assert_rc, want 0 0"
 fi
 
+# --- Case 8: F7 regression — a failed git probe (non-git PRIMARY_ROOT) must be a hard error,
+# never a silent empty PRIMARY_HEAD with exit 0 (which would turn the guard fail-open: any fault
+# making `git -C "$PRIMARY_ROOT"` fail — a mis-substituted placeholder, a non-top-level path, a
+# `safe.directory` refusal — must surface, not report a spurious clean snapshot).
+c8="$work/c8"; nongit="$c8/not-a-repo"; mkdir -p "$nongit"
+snap_out="$(run_in "$c8" snapshot "$nongit" 2>/dev/null)"; snap_rc=$?
+head_field="$(get_field "$snap_out" PRIMARY_HEAD)"
+if [ "$snap_rc" -ne 0 ] && [ -z "$head_field" ]; then
+  pass "snapshot on a non-git PRIMARY_ROOT is a hard error (F7), not a silent empty PRIMARY_HEAD"
+else
+  fail "F7 regression — snapshot on non-git root got snap_rc=$snap_rc PRIMARY_HEAD='$head_field' (want non-zero exit, no PRIMARY_HEAD)"
+fi
+
+# --- Case 9: F8 regression — PRIMARY_STATE_FILE must be absolute, and `assert` must find it when
+# invoked from a DIFFERENT cwd than `snapshot` (the PE playbook's Step 4 prompt contract mandates
+# the agent `cd` into $WORKTREE between the two calls — differing cwd is the normal case, not an
+# edge case).
+c9="$work/c9"; repo9="$c9/repo"; make_repo "$repo9"
+otherdir="$work/c9-elsewhere"; mkdir -p "$otherdir"
+snap_out="$(run_in "$c9" snapshot "$repo9")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+case "$state_file" in
+  /*) pass "PRIMARY_STATE_FILE is absolute (F8): $state_file" ;;
+  *)  fail "F8 regression — PRIMARY_STATE_FILE is relative: '$state_file'" ;;
+esac
+# Invoke assert from a cwd that is NEITHER $c9 nor the repo — a relative state_file would resolve
+# to a nonexistent file here and hit the fail-closed VIOLATED/both branch.
+assert_out="$(run_in "$otherdir" assert "$repo9" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
+  pass "assert from a different cwd than snapshot still finds the state file (F8)"
+else
+  fail "F8 regression — assert from different cwd got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
+fi
+
 echo
 if [ "$failures" -ne 0 ]; then
   echo "assert-workspace-clean.test.sh: FAILED ($failures assertion(s) failed)"

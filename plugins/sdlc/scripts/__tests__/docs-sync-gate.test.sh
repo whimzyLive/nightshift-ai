@@ -54,6 +54,13 @@ NESTEDBRACE='| type | enabled | target-path | source | contract |
 BADBRACE='| type | enabled | target-path | source | contract |
 | --- | --- | --- | --- | --- |
 | how-to | true | docs/how-to/ | plugins/{sdlc,gtm/refs/x.md | |'
+# F3 regression: a `hooks-contract` row must classify as a reference row (adds reference-roots
+# to scopes) exactly like `*-reference`/`llms-txt` do.
+HOOKS_MANIFEST='| type | enabled | target-path | source | contract |
+| --- | --- | --- | --- | --- |
+| hooks-contract | true | docs/reference/hooks/ | | |
+| how-to | true | docs/how-to/ | src | |
+reference-roots: plugins/sdlc'
 
 check() { # <label> <repo> <expected-gate>
   out="$(cd "$2" && bash "$gate" NA-1 feat develop 2>&1)"; rc=$?
@@ -84,12 +91,27 @@ check "2 brace groups, tracked" "$(mkrepo b2trk "$BRACE2" plugins/gtm/scripts/x.
 check "nested brace stays unresolvable"    "$(mkrepo nest  "$NESTEDBRACE" src/a.ts)" dispatch-unresolvable
 check "unmatched brace stays unresolvable" "$(mkrepo badbr "$BADBRACE"    src/a.ts)" dispatch-unresolvable
 
+# F3: a hooks-contract row classifies as a reference row (matches the *-reference/llms-txt
+# classifier) so an enabled reference-roots line actually reaches scopes.
+check "hooks-contract row enables reference-roots" \
+  "$(mkrepo hookscon "$HOOKS_MANIFEST" plugins/sdlc/hooks/hooks.json)" dispatch
+
 # A nonexistent branch is unresolvable — and must NEVER resolve to a skip.
 out="$(cd "$(mkrepo nobr "$MANIFEST" src/a.ts)" && bash "$gate" NA-9 feat develop 2>&1)"
 case "$(printf '%s' "$out" | sed -n 's/^DOCS_GATE=//p')" in
   skip-*) printf 'FAIL unresolvable branch must not skip: %s\n' "$out"; fail=1 ;;
   dispatch*) printf 'ok   unresolvable branch -> dispatch (fail safe)\n' ;;
   *) printf 'FAIL unresolvable branch emitted no known value: %s\n' "$out"; fail=1 ;;
+esac
+
+# F2: an unresolvable BASE ref (no origin/<base> at all — distinct from the unresolvable STORY
+# branch checked above) must dispatch, never skip. A repo that HAS a manifest but whose base ref
+# cannot be resolved (unfetched, or renamed) must not be misread as "opted out of docs".
+out="$(cd "$(mkrepo nobase "$MANIFEST" src/a.ts)" && bash "$gate" NA-1 feat no-such-base-branch 2>&1)"
+case "$(printf '%s' "$out" | sed -n 's/^DOCS_GATE=//p')" in
+  dispatch-unresolvable) printf 'ok   unresolvable base ref -> dispatch-unresolvable (fail safe)\n' ;;
+  skip-*) printf 'FAIL unresolvable base ref must not skip (F2 regression): %s\n' "$out"; fail=1 ;;
+  *) printf 'FAIL unresolvable base ref emitted unexpected value: %s\n' "$out"; fail=1 ;;
 esac
 
 # Missing arguments are unresolvable, still exit 0, still two lines.

@@ -193,7 +193,7 @@ DECISION=wait   -> loop-budget.sh check "$HEAD" "$UNRESOLVED" [--grace iff GRACE
                    exit 0 -> schedule next; exit 1 -> STOP, print BUDGET_REASON + BLOCKED_BY
 DECISION=fix    -> /review-fix <PR> INLINE (session model; loop owns slot release)
                    error/blocked -> HALT (Step 5, loop-modes.md)
-                   on-create -> STOP after fix; on-update -> schedule next
+                   on-create -> STOP after fix; on-update -> loop-budget.sh check; schedule next
 DECISION=review -> REVIEW_CMD INLINE; write REVIEW_MARK; loop-budget.sh check; schedule next
                    (loop-modes.md `## In-session actions`)
 DECISION=clean  -> ASSERT clean-guard[REVIEW_PATH] ELSE halt; run --on-clean once, then STOP
@@ -213,27 +213,24 @@ fall through to --on-clean.
 
 ---
 
-## Report
+## Report (never improvise around any of these outcomes)
 
 **On clean exit (rule 4 / CI-d):** print the final `loop-status:` line, total pass
 count, total review comments resolved across the run, and green-checks
-confirmation.
+confirmation. `--on-clean` non-zero -> print its error instead; PR stays raised.
 
 **On budget-exceeded stop:** print `BUDGET_REASON` (from `loop-budget.sh check`),
-`BLOCKED_BY`, the total pass count, and the last `loop-status:` line. Do not
-improvise around it.
+`BLOCKED_BY`, the total pass count, and the last `loop-status:` line.
 
 **On halt (Step 5 / review-fix failure):** print the failing pass number and
-the surfaced error or halt reason. Do not improvise around it.
+the surfaced error or halt reason.
 
 **On failing-checks halt (rule 6 / CI-e):** print the failing pass number, the
 `checks-failing` count, the head oid, and: "Required check(s) failing
-(F=<n>) on <head-oid> — /loop cannot fix CI; stopping." Do not improvise
-around it.
+(F=<n>) on <head-oid> — /loop cannot fix CI; stopping."
 
 **On unexpected-state halt (rule 7 / CI-f):** print the current `loop-status:`
-line and: "unexpected loop state — stopping to avoid a silent hang." Do not
-improvise around it.
+line and: "unexpected loop state — stopping to avoid a silent hang."
 
 ---
 

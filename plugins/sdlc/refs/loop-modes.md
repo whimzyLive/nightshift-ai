@@ -142,8 +142,8 @@ DECISION=review (was CI-b) -> run REVIEW_CMD INLINE on this HEAD
   claude-superpowers -> superpowers `requesting-code-review` skill; post findings inline
   FOUND := 1 iff review REPORTS >=1 finding (summary count, not "did a thread appear" —
            summary-only still records non-clean)
-  printf '%s %s\n' "$CUR_HEAD" "$([ "$FOUND" = 1 ] && echo 0 || echo 1)" > "$REVIEW_MARK"
-  loop-budget.sh check "$CUR_HEAD" "$CUR_UNRESOLVED"   # a review IS progress
+  [ "$CUR_HEAD" = - ] || printf '%s %s\n' "$CUR_HEAD" "$([ "$FOUND" = 1 ] && echo 0 || echo 1)" > "$REVIEW_MARK"
+  loop-budget.sh check "$CUR_HEAD" "$CUR_UNRESOLVED" --progress # progress
   on-create -> STOP after this review+fix; on-update -> schedule next
 DECISION=fix (was CI-c) -> /review-fix <PR> INLINE, identical to the Copilot path's fix action
 RULE=CI-c2 (halt) -> print "<N> unresolved non-loop comment(s) on <HEAD> — review found

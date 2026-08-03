@@ -219,4 +219,48 @@ case "$j_out" in
   *) bad "(j) BLOCKED_BY names the failing probe" "got: $j_out" ;;
 esac
 
+# --- (k)/(l) F1 regression: a failing `gh pr view` (cur_head="-") must NEVER compare equal to
+# the `-` sentinel a missing/invalid marker also produces. Both vectors reproduced against the
+# shipped (pre-fix) script: (k) no mark file -> false RULE=CI-f/DECISION=halt; (l) a mark file
+# persisting "- 1" -> false RULE=CI-d/DECISION=clean (the auto-merge-triggering one). Fixed
+# script must resolve BOTH to RULE=unresolvable / DECISION=wait, mirroring case (j).
+ghdir="$(mktemp -d)"
+trap 'rm -rf "$shim" "$isdir" "$ghdir"' EXIT
+cat > "$ghdir/gh" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$ghdir/gh"
+cat > "$ghdir/pr-loop-status.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "loop-status: checks-pending=0 checks-failing=0"
+EOF
+chmod +x "$ghdir/pr-loop-status.sh"
+cat > "$ghdir/pr-unresolved-comments.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$ghdir/pr-unresolved-comments.sh"
+
+# (k) Vector A — gh fails, no mark file (last_head defaults to "-" too).
+k_out="$(SDLC_LOOP_PROBE_DIR="$ghdir" SDLC_LOOP_GH="$ghdir/gh" bash "$decide" 999 in-session "$ghdir" "$ghdir/mark-absent" 2>/dev/null)"
+k_rule="$(field "$k_out" RULE)"; k_dec="$(field "$k_out" DECISION)"
+[ "$k_rule" = "unresolvable" ] && ok "(k) gh-fails/no-mark -> RULE=unresolvable" \
+  || bad "(k) gh-fails/no-mark -> RULE=unresolvable" "got RULE=$k_rule"
+[ "$k_dec" = "wait" ] && ok "(k) gh-fails/no-mark -> DECISION=wait" \
+  || bad "(k) gh-fails/no-mark -> DECISION=wait" "got DECISION=$k_dec"
+[ "$k_dec" != "halt" ] && ok "(k) gh-fails/no-mark -> DECISION != halt (was CI-f pre-fix)" \
+  || bad "(k) gh-fails/no-mark -> DECISION != halt" "got halt (F1 regression)"
+
+# (l) Vector B — gh fails, mark file legitimately holds a prior "- 1" (head unknown, clean=1).
+printf -- '- 1\n' > "$ghdir/mark-dash"
+l_out="$(SDLC_LOOP_PROBE_DIR="$ghdir" SDLC_LOOP_GH="$ghdir/gh" bash "$decide" 999 in-session "$ghdir" "$ghdir/mark-dash" 2>/dev/null)"
+l_rule="$(field "$l_out" RULE)"; l_dec="$(field "$l_out" DECISION)"
+[ "$l_rule" = "unresolvable" ] && ok "(l) gh-fails/mark='- 1' -> RULE=unresolvable" \
+  || bad "(l) gh-fails/mark='- 1' -> RULE=unresolvable" "got RULE=$l_rule"
+[ "$l_dec" = "wait" ] && ok "(l) gh-fails/mark='- 1' -> DECISION=wait" \
+  || bad "(l) gh-fails/mark='- 1' -> DECISION=wait" "got DECISION=$l_dec"
+[ "$l_dec" != "clean" ] && ok "(l) gh-fails/mark='- 1' -> DECISION != clean (was CI-d pre-fix, auto-merge-triggering)" \
+  || bad "(l) gh-fails/mark='- 1' -> DECISION != clean" "got clean (F1 regression — false auto-merge)"
+
 exit "$fail"

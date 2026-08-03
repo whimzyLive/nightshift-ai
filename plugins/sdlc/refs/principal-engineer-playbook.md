@@ -531,7 +531,7 @@ dispatch* -> guard + dispatch below
 ```
 
 **Primary-checkout guard — reuse Step 5's machine check verbatim.** Before dispatching, snapshot the
-primary checkout (`PRIMARY_HEAD` + `PRIMARY_CLEAN_BEFORE`, exactly as Step 5). Dispatch the
+primary checkout (`PRIMARY_HEAD` + `PRIMARY_STATE_FILE`, exactly as Step 5). Dispatch the
 `knowledge-engineer` post-QA variant, handing it — like every Step 4 / QA-Step-3 dispatch — the live
 `$WORKTREE` (at `<BRANCH_PREFIX>/<STORY-KEY>`), `$NX_CACHE_DIRECTORY`, the story key, and the
 story-branch-vs-base diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>`). The agent

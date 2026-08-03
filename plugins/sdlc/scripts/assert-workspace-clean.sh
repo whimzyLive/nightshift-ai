@@ -33,6 +33,18 @@ set -uo pipefail
 
 here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 
+# abspath <path> -> an absolute path, without requiring realpath/readlink -f (portability).
+# tmp-dir.sh returns a CWD-relative "./.tmp/..." dir, so mktemp's PRIMARY_STATE_FILE would
+# otherwise be relative too — and the documented contract (line 19) is that the CALLER may `cd`
+# between the `snapshot` and paired `assert` invocations (the PE playbook's Step 4 prompt
+# contract mandates exactly that), so a relative path silently resolves to a different file.
+abspath() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *)  printf '%s/%s\n' "$(cd "$(dirname "$1")" 2>/dev/null && pwd)" "$(basename "$1")" ;;
+  esac
+}
+
 SUBCOMMAND="${1:-}"
 shift || true
 
@@ -45,10 +57,19 @@ case "$SUBCOMMAND" in
     }
 
     dir="$(bash "$here/tmp-dir.sh")"
-    state_file="$(mktemp "$dir/workspace-snapshot.XXXXXX")"
+    state_file="$(abspath "$(mktemp "$dir/workspace-snapshot.XXXXXX")")"
 
-    head_oid="$(git -C "$PRIMARY_ROOT" rev-parse HEAD)"
-    status_out="$(git -C "$PRIMARY_ROOT" status --porcelain)"
+    # A failed git probe (mis-substituted placeholder, a non-top-level path, a `safe.directory`
+    # refusal, ...) must be a hard error, never a silently-empty value — an empty head/status
+    # would make `assert` compare two unknowns as equal and report a false OK (fail-open).
+    head_oid="$(git -C "$PRIMARY_ROOT" rev-parse HEAD)" || {
+      echo "assert-workspace-clean.sh: git rev-parse HEAD failed in '$PRIMARY_ROOT' — cannot snapshot" >&2
+      exit 1
+    }
+    status_out="$(git -C "$PRIMARY_ROOT" status --porcelain)" || {
+      echo "assert-workspace-clean.sh: git status --porcelain failed in '$PRIMARY_ROOT' — cannot snapshot" >&2
+      exit 1
+    }
 
     # Line 1 = HEAD oid; every remaining line = one porcelain status row (empty when clean).
     {
@@ -82,8 +103,14 @@ case "$SUBCOMMAND" in
     snap_head="$(sed -n '1p' "$STATE_FILE")"
     snap_status="$(tail -n +2 "$STATE_FILE")"
 
-    cur_head="$(git -C "$PRIMARY_ROOT" rev-parse HEAD)"
-    cur_status="$(git -C "$PRIMARY_ROOT" status --porcelain)"
+    cur_head="$(git -C "$PRIMARY_ROOT" rev-parse HEAD)" || {
+      echo "assert-workspace-clean.sh: git rev-parse HEAD failed in '$PRIMARY_ROOT' — cannot assert" >&2
+      exit 1
+    }
+    cur_status="$(git -C "$PRIMARY_ROOT" status --porcelain)" || {
+      echo "assert-workspace-clean.sh: git status --porcelain failed in '$PRIMARY_ROOT' — cannot assert" >&2
+      exit 1
+    }
 
     head_changed=false
     [ "$cur_head" = "$snap_head" ] || head_changed=true

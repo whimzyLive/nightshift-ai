@@ -73,20 +73,41 @@ BRACEEOF
   return 0
 }
 
-# 1. Manifest, resolved checkout-independently from the base branch.
-manifest="$(git show "origin/$base:.claude/project/docs-manifest.md" 2>/dev/null)" \
-  || emit skip-no-manifest "no .claude/project/docs-manifest.md at origin/$base — repo opted out of docs"
-[ -n "$manifest" ] \
-  || emit skip-no-manifest "empty .claude/project/docs-manifest.md at origin/$base"
+# 1. Resolve the remote name: prefer the base branch's configured tracking remote; fall back to
+#    the single configured remote when there is exactly one. Never hardcode "origin" — this
+#    ships to third-party repos that may name it differently.
+remote="$(git config "branch.$base.remote" 2>/dev/null)"
+if [ -z "$remote" ]; then
+  remotes="$(git remote)"
+  remote_count="$(printf '%s\n' "$remotes" | grep -c . || true)"
+  if [ "$remote_count" -eq 1 ]; then
+    remote="$remotes"
+  else
+    emit dispatch-unresolvable "cannot resolve a remote for base branch '$base' (branch.$base.remote unset, $remote_count remotes configured) — dispatching (fail safe)"
+  fi
+fi
 
-# 2. Changed-file set, story-branch-vs-base.
-git fetch origin --quiet 2>/dev/null
-changed="$(git diff --name-only "origin/$base...$prefix/$key" 2>/dev/null)" \
-  || emit dispatch-unresolvable "cannot resolve origin/$base...$prefix/$key — dispatching (fail safe)"
+# 2. Fetch BEFORE reading anything off "$remote/$base" — reading first risks a stale/absent ref
+#    being misread as "no manifest" (a legitimate opt-out) when it is actually just unresolved.
+git fetch "$remote" --quiet 2>/dev/null
+
+# 3. Manifest, resolved checkout-independently from the base branch. Distinguish "ref
+#    unresolvable" (dispatch — the probe failed) from "ref resolves, file absent" (the only
+#    legitimate skip-no-manifest case).
+git rev-parse --verify --quiet "$remote/$base" >/dev/null \
+  || emit dispatch-unresolvable "cannot resolve $remote/$base — dispatching (fail safe)"
+manifest="$(git show "$remote/$base:.claude/project/docs-manifest.md" 2>/dev/null)" \
+  || emit skip-no-manifest "no .claude/project/docs-manifest.md at $remote/$base — repo opted out of docs"
+[ -n "$manifest" ] \
+  || emit skip-no-manifest "empty .claude/project/docs-manifest.md at $remote/$base"
+
+# 4. Changed-file set, story-branch-vs-base.
+changed="$(git diff --name-only "$remote/$base...$prefix/$key" 2>/dev/null)" \
+  || emit dispatch-unresolvable "cannot resolve $remote/$base...$prefix/$key — dispatching (fail safe)"
 [ -n "$changed" ] \
   || emit dispatch-unresolvable "empty diff for $prefix/$key — cannot confirm a skip (fail safe)"
 
-# 3. Activated row scopes. A scope this script cannot fully expand is UNRESOLVABLE, not ignored.
+# 5. Activated row scopes. A scope this script cannot fully expand is UNRESOLVABLE, not ignored.
 #    Row form: | type | enabled | target-path | source | contract |
 scopes=""
 enabled_ref=0
@@ -98,7 +119,7 @@ while IFS= read -r line; do
     con="$(printf '%s' "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$6); print $6}')"
     case "$t" in type|---*|'') continue ;; esac
     [ "$en" = "true" ] || continue
-    case "$t" in *-reference|llms-txt) enabled_ref=1 ;; esac
+    case "$t" in *-reference|llms-txt|hooks-contract) enabled_ref=1 ;; esac
     for s in $src $con; do
       case "$s" in scan:) continue ;; esac
       case "$s" in
@@ -127,7 +148,7 @@ if [ "$enabled_ref" -eq 1 ]; then
 fi
 [ -n "$scopes" ] || emit dispatch-unresolvable "no resolvable activated scopes — dispatching (fail safe)"
 
-# 4. Intersect. A single hit is enough.
+# 6. Intersect. A single hit is enough.
 for f in $changed; do
   for s in $scopes; do
     s="${s%/}"

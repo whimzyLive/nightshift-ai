@@ -6,7 +6,7 @@ set -uo pipefail
 #
 # Invocation:
 #   bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-budget.sh init
-#   bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-budget.sh check <head> <unresolved> [--grace]
+#   bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-budget.sh check <head> <unresolved> [--grace|--progress]
 #
 # `check` exit 0 means budget not exceeded (BUDGET_DECISION=CONTINUE); exit 1 means a
 # bound tripped (BUDGET_DECISION=STOP_IDLE|STOP_PASSES) — the caller's decision table
@@ -25,6 +25,9 @@ set -uo pipefail
 #   REREVIEW_GRACE_SECS=600   rule 2b's shorter grace bound for a stalled re-review
 #   BUDGET_PASSES=30          absolute runaway backstop — NOT reset on progress
 # Rule 2b selects the grace bound over the full idle budget by passing `--grace`.
+# `--progress` (in-session CI-b) forces BUDGET_PROGRESS=true and resets the idle epoch even when
+# CUR_HEAD/CUR_UNRESOLVED are unchanged from last pass — a synchronous review IS real work; without
+# this the idle timer keeps counting through a review that (correctly) found nothing to change.
 
 here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 
@@ -91,7 +94,7 @@ case "$SUBCOMMAND" in
     # Reset the idle window on PROGRESS: a new reviewed head (Copilot reviewed a new oid,
     # or a /review-fix push moved HEAD) or a changed unresolved-comment count.
     BUDGET_PROGRESS=false
-    if [ "$CUR_HEAD" != "$last_head" ] || [ "$CUR_UNRESOLVED" != "$last_unresolved" ]; then
+    if [ "$CUR_HEAD" != "$last_head" ] || [ "$CUR_UNRESOLVED" != "$last_unresolved" ] || [ "$GRACE_FLAG" = "--progress" ]; then
       progress_epoch=$now
       BUDGET_PROGRESS=true
     fi

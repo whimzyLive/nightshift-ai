@@ -216,6 +216,10 @@ probe_insession() {
   [ -n "${last_head:-}" ] || last_head=-
   case "${last_clean:-}" in 0|1) ;; *) last_clean=-; last_head=- ;; esac
   cur_head="$("$GH" pr view "$pr" --json headRefOid -q .headRefOid 2>/dev/null)"; [ -n "$cur_head" ] || cur_head="-"
+  # An unresolved head is not evidence of anything — never let it compare equal to a stored
+  # `-` sentinel (missing/invalid marker) and produce a false reviewed_head=1. Mirrors the
+  # checks_pending/checks_failing validation below: an unresolvable probe -> wait, never clean.
+  [ "$cur_head" = "-" ] && emit wait unresolvable in-session - - - no no "gh pr view failed to resolve the current PR head"
   reviewed_head=0
   [ "$cur_head" = "$last_head" ] && reviewed_head=1
   un_out="$("$PROBE_DIR/pr-unresolved-comments.sh" "$pr" 2>/dev/null)" || \
