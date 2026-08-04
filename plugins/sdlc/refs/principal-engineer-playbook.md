@@ -407,6 +407,7 @@ Then assert the primary checkout matches its pre-dispatch snapshot exactly:
 ```text
 assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
 # -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+non-zero exit / no WORKSPACE_INTEGRITY line -> STOP: cannot verify the primary checkout (see stderr)
 WORKSPACE_INTEGRITY == 'VIOLATED' -> STOP: domain agent wrote to the primary checkout instead of $WORKTREE
 ```
 

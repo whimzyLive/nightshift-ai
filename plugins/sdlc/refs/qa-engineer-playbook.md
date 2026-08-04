@@ -322,16 +322,15 @@ Then assert the primary checkout matches its pre-dispatch snapshot exactly:
 ```text
 assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
 # -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+non-zero exit / no WORKSPACE_INTEGRITY line -> BLOCKED: cannot verify the primary checkout (see stderr)
 WORKSPACE_INTEGRITY == 'VIOLATED' -> BLOCKED: fix agent wrote to the primary checkout instead of $WORKTREE
 ```
 
 The script's OK/none is exact-match against the snapshot (NOT asserted empty) — a pre-dirty
-primary that stays at the same dirt still passes; only a *change* from the captured snapshot is a
-violation.
+primary that stays at the same dirt still passes; only a *change* from the snapshot is a violation.
 
-If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason (same
-detectable-failure shape as the principal playbook's Step-5 guard) — do not attempt to fix or
-revert it yourself. Never self-repair.
+If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason — do not
+attempt to fix or revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.
