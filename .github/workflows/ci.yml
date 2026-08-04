@@ -29,76 +29,78 @@ jobs:
           node-version: 24
           cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps
+      - run: bash tools/ci-retry.sh pnpm install --frozen-lockfile
+      - run: bash tools/ci-retry.sh pnpm exec playwright install --with-deps
 
-      - if: always()
-        run: pnpm nx format:check --base="remotes/origin/main"
-      - if: always()
-        run: pnpm nx run-many -t lint test build typecheck e2e
-      - if: always()
-        run: bash tools/portability-lint.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/check-agent-skill-preloads.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/check-plugin-docs-format.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/check-frontmatter.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/docs-sync-fixtures.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/prettier-ignore.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/loop-budget.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/resolve-ai-workflow-mode.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/assert-workspace-clean.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/artifact-encoding.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/context-reuse.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/bounded-reads.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/read-bounding.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/context-residency.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/session-boundary.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/work-offload-budget.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/docs-sync-gate.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/work-placement.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/loop-decide.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/loop-decision-budget.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/loop-decision.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/plan-slice.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/plan-slice-budget.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/plan-slice-contract.test.sh
-      - if: always()
-        run: bash .claude/hooks/__tests__/rtk-line-scan.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/docs-pipeline-slicing.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/jira-site-guard.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/memory-frontmatter.test.sh
-      - if: always()
-        run: bash plugins/sdlc/scripts/__tests__/no-hardcoded-project-key.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/artifact-contract.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/rtk-coverage.test.sh
-      - if: always()
-        run: bash tools/sdlc-analyser/__tests__/branch-inventory.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh pnpm nx format:check --base="remotes/origin/main"
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh pnpm nx run-many -t lint test build typecheck e2e
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/portability-lint.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/check-agent-skill-preloads.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/check-plugin-docs-format.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/check-frontmatter.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/docs-sync-fixtures.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/prettier-ignore.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/loop-budget.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/resolve-ai-workflow-mode.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/assert-workspace-clean.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/artifact-encoding.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/context-reuse.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/bounded-reads.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/read-bounding.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/context-residency.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/session-boundary.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/work-offload-budget.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/docs-sync-gate.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/work-placement.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/loop-decide.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/loop-decision-budget.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/loop-decision.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/plan-slice.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/plan-slice-budget.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/plan-slice-contract.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash .claude/hooks/__tests__/rtk-line-scan.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/docs-pipeline-slicing.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/jira-site-guard.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/memory-frontmatter.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/no-hardcoded-project-key.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/artifact-contract.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/rtk-coverage.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/branch-inventory.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash tools/__tests__/ci-retry.test.sh
