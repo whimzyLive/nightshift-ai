@@ -65,25 +65,20 @@ Memory is a set of small, self-describing rule files, not a diary. Collection at
 dispatch (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh <your-agent-name>`) already surfaced
 every rule and ADR that binds you — this section is about what you write back, not what you read.
 
-Captures staged earlier in **this** story are not collected (`collect-memory.sh` surfaces
-`status: active` only), so also run:
-
-`bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --story <STORY-KEY> --kind rule --agent <your-agent-name>`
-
-Read the returned paths yourself. Never paste rule text into a prompt — a path costs far less than
-the content it points at.
+Captures staged this story aren't collected (`collect-memory.sh` only surfaces `status: active`) —
+also run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --story <STORY-KEY> --kind rule --agent <your-agent-name>`
+and read the returned paths yourself. Never paste rule text into a prompt — a path costs far less
+than the content it points at.
 
 ```text
-own-domain rule -> capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<body-file>]
+own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<body-file>]
 cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared/<rule-id> <STORY-KEY> <body-file>   # the body file's `agent:` lists every agent it binds
 <rule-id> := kebab-case, MUST equal the capture's `id`
 ```
 
-`bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <target> <STORY-KEY> [<body-file>]`
-
-The capture lands in the gitignored staging area in the primary checkout and prints
-`CAPTURED=<path>`. You never write `.claude/memories/agents/**` directly — a memory file is
-committed only when a human promotes a capture through `/sdlc:docs distill`.
+Prints `CAPTURED=<path>` into the gitignored staging area in the primary checkout. You never write
+`.claude/memories/agents/**` directly — a file lands there only once a human promotes a capture
+through `/sdlc:docs distill`.
 
 **The 7-field schema** (YAML frontmatter, all fields required):
 
@@ -104,8 +99,8 @@ status: active # active | deprecated | promoted — only active is collected at 
 Body is optional — a single `## Why` section, <= 10 lines. It is never read during collection; open
 it yourself only when the one-line `rule` isn't enough context.
 
-A capture carries four further fields — captured, story, origin, promote-target — written by the
-script, not by you.
+A capture also carries `captured`, `story`, `origin`, `promote-target` — written by the script, not
+you.
 
 **Admission test.** Write a candidate rule file only if ALL four hold:
 
@@ -125,7 +120,7 @@ of existing config, and any entry that only makes sense with the originating sto
 **Counter-only updates.**
 
 ```text
-rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture a counter-only record: capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <body-file with `uses: 1` and `evidence: [<STORY-KEY>]`>   # promotion adds it to the target's existing count
+rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <body-file: `uses: 1`, `evidence: [<STORY-KEY>]`>   # promotion merges into the target's count
 ```
 
 ## Domain verification
