@@ -28,9 +28,12 @@ case "$f_kind" in ""|rule|review) : ;; *) printf 'list-captured.sh: --kind must 
 if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
   root="$SDLC_CAPTURE_ROOT"
 else
+  root=""
   porcelain="$(git worktree list --porcelain 2>/dev/null)" || porcelain=""
-  main="$(printf '%s\n' "$porcelain" | sed -n 's/^worktree //p' | head -1)"
-  [ -n "$main" ] && root="$main/.claude/memories/captured" || root=""
+  if [ -n "$porcelain" ] && ! printf '%s\n' "$porcelain" | head -3 | grep -q '^bare$'; then
+    main="$(printf '%s\n' "$porcelain" | sed -n 's/^worktree //p' | head -1)"
+    [ -n "$main" ] && root="$main/.claude/memories/captured"
+  fi
 fi
 
 json_esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
@@ -66,8 +69,6 @@ scan() { # $1 = rule|review
     fi
     [ -n "$f_story" ] && [ "$f_story" != "$story" ] && continue
     if [ -n "$f_agent" ]; then
-      # bash 3.2: list_contains iterates "${items[@]}" which is unbound under `set -u`
-      # when the CSV is empty, so short-circuit before calling it.
       [ -z "$agents" ] && continue
       list_contains "$agents" "$f_agent" || continue
     fi

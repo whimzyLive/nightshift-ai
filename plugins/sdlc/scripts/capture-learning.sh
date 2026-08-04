@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # capture-learning.sh — NA-98. Write ONE learning capture into the gitignored staging area.
 #
-# usage: capture-learning.sh rule   <agent-or-shared>/<rule-id> <STORY-KEY> [<body-file>|-]
-#        capture-learning.sh review <STORY-KEY> <YYYY-MM-DD> <round>       [<body-file>|-]
+# usage: capture-learning.sh rule   <agent-or-shared>/<rule-id> <STORY-KEY> [<payload-file>|-]
+#        capture-learning.sh review <STORY-KEY> <YYYY-MM-DD> <round>       [<payload-file>|-]
 #        capture-learning.sh --print-root
 #
 # Prints CAPTURED=<path> on success. Reads exactly one environment variable, SDLC_CAPTURE_ROOT.
@@ -49,8 +49,8 @@ if [ "${1:-}" = "--print-root" ]; then
 fi
 
 kind="${1:-}"
-[ -n "$kind" ] || die "usage: capture-learning.sh rule <agent-or-shared>/<rule-id> <STORY-KEY> [<body-file>|-]
-       capture-learning.sh review <STORY-KEY> <YYYY-MM-DD> <round> [<body-file>|-]"
+[ -n "$kind" ] || die "usage: capture-learning.sh rule <agent-or-shared>/<rule-id> <STORY-KEY> [<payload-file>|-]
+       capture-learning.sh review <STORY-KEY> <YYYY-MM-DD> <round> [<payload-file>|-]"
 
 payload_fm() {                     # $1 = payload path or empty; $2 = key; $3 = default
   [ -n "$1" ] || { printf '%s' "$3"; return 0; }
@@ -66,9 +66,17 @@ payload_body() {                   # everything after the closing --- , or the w
     && awk 'NR==1&&/^---[[:space:]]*$/{o=1;next} o&&!d&&/^---[[:space:]]*$/{d=1;next} d' "$1" \
     || cat "$1"
 }
-write_atomic() {                   # $1 = dest, stdin = content
-  local dest="$1" t="$1.tmp.$$"
-  cat > "$t" && mv "$t" "$dest" || die "capture-learning.sh: failed writing '$dest'; wrote nothing"
+# write_atomic <dest> <content> — writes in the CALLING shell, never a pipeline subshell: a
+# `{ ... } | write_atomic "$dest"` pipe puts this function's `die`/`exit 1` in a subshell that
+# only kills itself, so a write failure silently falls through to the CAPTURED= success line.
+# Callers must capture content via `$(...)` first and check this function's own exit status.
+write_atomic() {
+  local dest="$1" content="$2" t="$1.tmp.$$"
+  printf '%s\n' "$content" > "$t" && mv "$t" "$dest"
+}
+validate_story_key() {             # $1 = story key; dies on a shape that isn't a real Jira key
+  printf '%s' "$1" | grep -qE '^[A-Z][A-Z0-9]*-[0-9]+$' \
+    || die "capture-learning.sh: story key '$1' is not <PROJECT>-<N> (e.g. AB-1); wrote nothing"
 }
 
 root="$(resolve_capture_root)" || exit 1
@@ -79,8 +87,9 @@ case "$kind" in
   rule)
     target="${2:-}"; story="${3:-}"; payload="${4:-}"
     [ -n "$target" ] && [ -n "$story" ] || die "capture-learning.sh: rule needs <agent-or-shared>/<rule-id> <STORY-KEY>"
+    validate_story_key "$story"
     [ "$payload" = "-" ] && payload=""
-    [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: body file '$payload' is missing or unreadable; wrote nothing"
+    [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: payload file '$payload' is missing or unreadable; wrote nothing"
     dir="${target%%/*}"; rid="${target#*/}"
     printf '%s' "$rid" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
       || die "capture-learning.sh: rule id '$rid' is not kebab-case; wrote nothing"
@@ -90,13 +99,17 @@ case "$kind" in
     done
     case "$valid" in *" $dir "*) : ;; *) die "capture-learning.sh: unknown target dir '$dir'; wrote nothing" ;; esac
     if [ "$dir" = "shared" ]; then
-      extra="$(payload_fm "$payload" agent "")"
-      agents="shared${extra:+,$extra}"
+      agents="$(payload_fm "$payload" agent "")"
+      agents_n=0
+      [ -n "$agents" ] && agents_n="$(printf '%s' "$agents" | awk -F',' '{print NF}')"
+      [ "$agents_n" -ge 2 ] \
+        || die "capture-learning.sh: agents/shared/ capture needs >= 2 agents in the payload's 'agent:' list (got [$agents]); wrote nothing"
     else
       agents="$dir"
     fi
     dest="$root/rules/$story--$rid.md"
-    { printf -- '---\n'
+    content="$(
+      printf -- '---\n'
       printf 'id: %s\n' "$rid"
       printf 'agent: %s\n' "$(as_list "$agents")"
       printf 'trigger: %s\n' "$(as_list "$(payload_fm "$payload" trigger "")")"
@@ -110,18 +123,24 @@ case "$kind" in
       printf 'promote-target: .claude/memories/agents/%s/%s.md\n' "$dir" "$rid"
       printf -- '---\n'
       payload_body "$payload"
-    } | write_atomic "$dest"
+    )"
+    write_atomic "$dest" "$content" \
+      || die "capture-learning.sh: failed writing '$dest'; wrote nothing"
     ;;
   review)
     story="${2:-}"; rdate="${3:-}"; round="${4:-1}"; payload="${5:-}"
     [ -n "$story" ] && [ -n "$rdate" ] || die "capture-learning.sh: review needs <STORY-KEY> <YYYY-MM-DD> <round>"
+    validate_story_key "$story"
     printf '%s' "$rdate" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' \
       || die "capture-learning.sh: date '$rdate' is not YYYY-MM-DD; wrote nothing"
+    printf '%s' "$round" | grep -qE '^[1-9][0-9]*$' \
+      || die "capture-learning.sh: round '$round' is not a positive integer; wrote nothing"
     [ "$payload" = "-" ] && payload=""
-    [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: body file '$payload' is missing or unreadable; wrote nothing"
-    [ "$round" -gt 1 ] 2>/dev/null && sfx="-r$round" || sfx=""
+    [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: payload file '$payload' is missing or unreadable; wrote nothing"
+    [ "$round" -gt 1 ] && sfx="-r$round" || sfx=""
     stem="$rdate-$story$sfx"; dest="$root/reviews/$stem.md"
-    { printf -- '---\n'
+    content="$(
+      printf -- '---\n'
       printf 'story: %s\n' "$story"
       printf 'date: %s\n' "$rdate"
       printf 'domains: %s\n' "$(as_list "$(payload_fm "$payload" domains "")")"
@@ -132,7 +151,9 @@ case "$kind" in
       printf 'promote-target: .claude/memories/reviews/%s.md\n' "$stem"
       printf -- '---\n'
       payload_body "$payload"
-    } | write_atomic "$dest"
+    )"
+    write_atomic "$dest" "$content" \
+      || die "capture-learning.sh: failed writing '$dest'; wrote nothing"
     ;;
   *)
     die "capture-learning.sh: unknown kind '$kind' — expected 'rule' or 'review'; wrote nothing"

@@ -53,10 +53,16 @@ SDLC_CAPTURE_ROOT="$root_a" bash "$cap" --print-root > "$tmp/out_a" 2>"$tmp/err_
 [ "$(cat "$root_a/.gitignore")" = "$(printf '*\n!.gitignore')" ] \
   && ok "(T2c) marker content exact" || bad "(T2c) marker content" "got '$(cat "$root_a/.gitignore")'"
 
-# T2d: set-but-unwritable SDLC_CAPTURE_ROOT is a hard error, writes nothing
+# T2d: set-but-unwritable SDLC_CAPTURE_ROOT is a hard error, writes nothing ANYWHERE — not just
+# at the target path (spec: "writes nothing anywhere" for an unwritable override).
 printf 'not a dir\n' > "$tmp/blocker"
+before_tree="$(find "$tmp" -type f | sort)"
 SDLC_CAPTURE_ROOT="$tmp/blocker/nested" bash "$cap" --print-root >/dev/null 2>"$tmp/err_d"
 [ "$?" -ne 0 ] && ok "(T2d) unwritable override exits non-zero" || bad "(T2d) unwritable override" "exited 0"
+after_tree="$(find "$tmp" -type f | sort)"
+[ "$before_tree" = "$(printf '%s\n' "$after_tree" | grep -vF "$tmp/err_d")" ] \
+  && ok "(T2d2) unwritable override wrote nothing anywhere under \$tmp" \
+  || bad "(T2d2) unwritable override wrote nothing anywhere" "tree changed beyond err_d: $after_tree"
 
 # T2e: from a linked worktree, the root resolves to the MAIN worktree
 wt_repo="$tmp/repo"; mkdir -p "$wt_repo"
@@ -69,6 +75,19 @@ case "$got" in
   "$wt_repo"/.claude/memories/captured) ok "(T2e) linked worktree resolves to main checkout" ;;
   *) bad "(T2e) linked worktree resolves to main checkout" "got '$got'" ;;
 esac
+
+# T2e2: a capture written from the linked worktree survives `git worktree remove --force` of
+# that worktree (spec D3's central claim — the staging root is the PRIMARY checkout, never the
+# linked worktree, so removing the worktree must not touch it).
+wt_cap_out="$(cd "$tmp/linked" && bash "$cap" rule web-engineer/survives-worktree-removal AB-1)"
+wt_cap_file="$wt_repo/.claude/memories/captured/rules/AB-1--survives-worktree-removal.md"
+[ "$wt_cap_out" = "CAPTURED=$wt_cap_file" ] && [ -f "$wt_cap_file" ] \
+  && ok "(T2e2) capture written from the linked worktree lands in the main checkout" \
+  || bad "(T2e2) capture from linked worktree" "got '$wt_cap_out'"
+git -C "$wt_repo" worktree remove --force "$tmp/linked"
+[ -f "$wt_cap_file" ] \
+  && ok "(T2e3) the capture survives 'git worktree remove --force' of the linked worktree" \
+  || bad "(T2e3) capture survives worktree removal" "capture file gone after worktree remove"
 
 # --- T3: capture writes ------------------------------------------------------
 root="$tmp/cap-root"
@@ -88,6 +107,17 @@ origin: domain-agent
 Committed memory diffs are unreviewed.
 EOF
 
+cat > "$tmp/payload-shared.md" <<'EOF'
+---
+agent: [web-engineer, mobile-engineer]
+trigger: [cross-cutting concern]
+rule: When a rule binds more than one agent, capture it under shared/.
+evidence: [AB-1]
+uses: 0
+origin: domain-agent
+---
+EOF
+
 out="$(run_cap rule web-engineer/capture-before-commit AB-1 "$tmp/payload.md")"
 f="$root/rules/AB-1--capture-before-commit.md"
 [ "$out" = "CAPTURED=$f" ] && ok "(T3a) prints CAPTURED=<path>" || bad "(T3a) CAPTURED line" "got '$out'"
@@ -99,10 +129,19 @@ p="$(extract_fm "$f" | parse_frontmatter)"
   && ok "(T3e) promote-target own dir" || bad "(T3e) promote-target own dir" "got '$(field_value "$p" promote-target)'"
 grep -q '^## Why' "$f" && ok "(T3f) body appended" || bad "(T3f) body appended" "## Why missing"
 
-run_cap rule shared/cross-cutting-thing AB-1 "$tmp/payload.md" >/dev/null
+run_cap rule shared/cross-cutting-thing AB-1 "$tmp/payload-shared.md" >/dev/null
 p2="$(extract_fm "$root/rules/AB-1--cross-cutting-thing.md" | parse_frontmatter)"
 [ "$(field_value "$p2" promote-target)" = ".claude/memories/agents/shared/cross-cutting-thing.md" ] \
   && ok "(T3g) promote-target shared" || bad "(T3g) promote-target shared" "got '$(field_value "$p2" promote-target)'"
+[ "$(field_value "$p2" agent)" = "web-engineer,mobile-engineer" ] \
+  && ok "(T3g2) shared agent list comes from the payload, never the literal 'shared'" \
+  || bad "(T3g2) shared agent list from payload" "got '$(field_value "$p2" agent)'"
+
+run_cap rule shared/under-agented AB-1 "$tmp/payload.md" >/dev/null 2>&1 \
+  && bad "(T3g3) shared/ with < 2 payload agents rejected" "exited 0" \
+  || ok "(T3g3) shared/ with < 2 payload agents rejected"
+[ ! -e "$root/rules/AB-1--under-agented.md" ] \
+  && ok "(T3g4) rejected shared capture wrote no file" || bad "(T3g4) rejected shared capture wrote no file" "file exists"
 
 run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null
 [ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3h) '-' writes frontmatter only" || bad "(T3h) frontmatter only" "body present after '-' capture"
@@ -139,25 +178,78 @@ pr="$(extract_fm "$rf" | parse_frontmatter)"
 run_cap review AB-1 2026-08-04 1 >/dev/null
 [ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
 
-before="$(cat "$f")"; run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
+run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
 [ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 2 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
+
+# --- T3s: a failed write is reported as a failure, never a false CAPTURED= (Critical 1) -----
+wf_root="$tmp/write-fail-root"; mkdir -p "$wf_root/rules" "$wf_root/reviews"
+chmod 500 "$wf_root/rules"
+wf_out="$(SDLC_CAPTURE_ROOT="$wf_root" bash "$cap" rule web-engineer/unwritable-target AB-1 2>"$tmp/wf_err")"
+wf_rc=$?
+chmod 700 "$wf_root/rules"
+[ "$wf_rc" -ne 0 ] && ok "(T3s1) a failed write exits non-zero" || bad "(T3s1) failed write exit code" "exited 0"
+printf '%s' "$wf_out" | grep -q '^CAPTURED=' \
+  && bad "(T3s2) a failed write never prints CAPTURED=" "CAPTURED= line present: $wf_out" \
+  || ok "(T3s2) a failed write never prints CAPTURED="
+[ -s "$tmp/wf_err" ] && ok "(T3s3) a failed write reports the failure on stderr" || bad "(T3s3) failure reported on stderr" "stderr empty"
+[ ! -e "$wf_root/rules/AB-1--unwritable-target.md" ] \
+  && ok "(T3s4) a failed write leaves no partial/final file behind" || bad "(T3s4) no file left behind" "file exists"
+
+# --- T3t: story-key validation, both kinds (Critical 2) --------------------------------------
+run_cap rule web-engineer/story-key-check '../../escaped' >/dev/null 2>&1 \
+  && bad "(T3t1) path-traversal story key rejected (rule)" "exited 0" \
+  || ok "(T3t1) path-traversal story key rejected (rule)"
+[ -z "$(find "$tmp" -maxdepth 2 -name 'escaped--story-key-check.md')" ] \
+  && ok "(T3t2) rejected story key escaped nothing onto disk (rule)" \
+  || bad "(T3t2) rejected story key wrote nothing" "escaped file exists"
+run_cap rule web-engineer/story-key-check 'feat/NA-98' >/dev/null 2>&1 \
+  && bad "(T3t3) a branch name is rejected as a story key (rule)" "exited 0" \
+  || ok "(T3t3) a branch name is rejected as a story key (rule)"
+run_cap rule web-engineer/story-key-check 'ab-1' >/dev/null 2>&1 \
+  && bad "(T3t4) a lowercase story key is rejected (rule)" "exited 0" \
+  || ok "(T3t4) a lowercase story key is rejected (rule)"
+run_cap rule web-engineer/story-key-check 'AB-1' >/dev/null 2>&1 \
+  && ok "(T3t5) a well-formed story key is accepted (rule)" \
+  || bad "(T3t5) well-formed story key accepted (rule)" "exited non-zero"
+run_cap review '../../escaped' 2026-08-04 1 >/dev/null 2>&1 \
+  && bad "(T3t6) path-traversal story key rejected (review)" "exited 0" \
+  || ok "(T3t6) path-traversal story key rejected (review)"
+run_cap review 'AB-1' 2026-08-04 3 >/dev/null 2>&1 \
+  && ok "(T3t7) a well-formed story key is accepted (review)" \
+  || bad "(T3t7) well-formed story key accepted (review)" "exited non-zero"
+
+# --- T3u: round must be a positive integer — a non-numeric round must NEVER silently
+# overwrite round 1's capture (Important 7) ---------------------------------------------------
+run_cap review AB-1 2026-08-05 1 >/dev/null
+r1_before="$(cat "$root/reviews/2026-08-05-AB-1.md")"
+run_cap review AB-1 2026-08-05 abc >/dev/null 2>"$tmp/round_err"
+round_rc=$?
+[ "$round_rc" -ne 0 ] && ok "(T3u1) a non-numeric round is rejected" || bad "(T3u1) non-numeric round rejected" "exited 0"
+[ -s "$tmp/round_err" ] && ok "(T3u2) a non-numeric round reports the failure on stderr" || bad "(T3u2) round failure on stderr" "stderr empty"
+r1_after="$(cat "$root/reviews/2026-08-05-AB-1.md")"
+[ "$r1_before" = "$r1_after" ] \
+  && ok "(T3u3) round 1's capture survives a rejected non-numeric round (no silent overwrite)" \
+  || bad "(T3u3) round 1 survives rejected round" "round 1's capture content changed"
+run_cap review AB-1 2026-08-05 0 >/dev/null 2>&1 \
+  && bad "(T3u4) round 0 is rejected (not a positive integer)" "exited 0" \
+  || ok "(T3u4) round 0 is rejected (not a positive integer)"
 
 # --- T4: list-captured --------------------------------------------------------
 lst="$scripts/list-captured.sh"
 run_lst() { SDLC_CAPTURE_ROOT="$root" bash "$lst" "$@"; }
 
 tsv="$(run_lst --kind rule --story AB-1)"
-[ "$(printf '%s\n' "$tsv" | wc -l | tr -d ' ')" -eq 2 ] \
-  && ok "(T4a) two rule captures listed" || bad "(T4a) rule capture count" "got: $tsv"
+[ "$(printf '%s\n' "$tsv" | wc -l | tr -d ' ')" -eq 3 ] \
+  && ok "(T4a) three rule captures listed" || bad "(T4a) rule capture count" "got: $tsv"
 printf '%s\n' "$tsv" | head -1 | cut -f1 | grep -q "^$root/rules/" \
   && ok "(T4b) TSV field 1 is the path" || bad "(T4b) TSV path leads" "got '$(printf '%s\n' "$tsv" | head -1 | cut -f1)'"
 printf '%s\n' "$tsv" | head -1 | cut -f2 | grep -qx rule \
   && ok "(T4c) TSV field 2 is the kind" || bad "(T4c) TSV kind" "got '$(printf '%s\n' "$tsv" | head -1 | cut -f2)'"
 
-run_lst --kind rule --agent shared | grep -q cross-cutting-thing \
+run_lst --kind rule --agent mobile-engineer | grep -q cross-cutting-thing \
   && ok "(T4d) --agent filters on the agent list" || bad "(T4d) --agent filter" "shared capture not returned"
-[ -z "$(run_lst --kind rule --agent mobile-engineer)" ] \
-  && ok "(T4e) --agent excludes non-matching" || bad "(T4e) --agent exclusion" "returned rows for mobile-engineer"
+[ -z "$(run_lst --kind rule --agent platform-engineer)" ] \
+  && ok "(T4e) --agent excludes non-matching" || bad "(T4e) --agent exclusion" "returned rows for platform-engineer"
 
 json="$(run_lst --json --kind review)"
 printf '%s' "$json" | grep -q '"count"' && ok "(T4f) --json has count" || bad "(T4f) --json count" "got '$json'"
