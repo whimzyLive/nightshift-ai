@@ -146,9 +146,7 @@ run_cap rule shared/under-agented AB-1 "$tmp/payload.md" >/dev/null 2>&1 \
 [ ! -e "$root/rules/AB-1--under-agented.md" ] \
   && ok "(T3g4) rejected shared capture wrote no file" || bad "(T3g4) rejected shared capture wrote no file" "file exists"
 
-# T3g5-8: the documented shared/ counter-only path (refs/domain-agent-handoff.md's
-# "own, or a `shared/` one" counter-only bullet) — a payload with `uses` set and no `rule` key
-# carries no `agent:` at all, and must NOT be forced through the >= 2 agents guard.
+# --- T3g5-7: shared/ counter-only exemption ---------------------------------
 cat > "$tmp/counter-only.md" <<'EOF'
 ---
 uses: 1
@@ -165,6 +163,21 @@ counter_rc=$?
 p3="$(extract_fm "$root/rules/AB-1--counter-only-target.md" | parse_frontmatter)"
 [ "$(field_value "$p3" uses)" = "1" ] \
   && ok "(T3g7) shared/ counter-only capture carries the payload's uses" || bad "(T3g7) counter-only uses" "got '$(field_value "$p3" uses)'"
+
+# --- T3g8-9: the counter-only exemption cannot be smuggled via a single-agent payload --------
+cat > "$tmp/smuggled.md" <<'EOF'
+---
+agent: [web-engineer]
+trigger: [some situation]
+evidence: [AB-1]
+uses: 0
+---
+EOF
+run_cap rule shared/smuggled AB-1 "$tmp/smuggled.md" >/dev/null 2>&1 \
+  && bad "(T3g8) a single-agent payload cannot smuggle past the >= 2 agents guard" "exited 0" \
+  || ok "(T3g8) a single-agent payload cannot smuggle past the >= 2 agents guard"
+[ ! -e "$root/rules/AB-1--smuggled.md" ] \
+  && ok "(T3g9) rejected smuggle attempt wrote no file" || bad "(T3g9) rejected smuggle attempt" "file exists"
 
 run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null
 [ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3h) '-' writes frontmatter only" || bad "(T3h) frontmatter only" "body present after '-' capture"
@@ -241,10 +254,7 @@ run_cap review 'AB-1' 2026-08-04 3 >/dev/null 2>&1 \
   && ok "(T3t7) a well-formed story key is accepted (review)" \
   || bad "(T3t7) well-formed story key accepted (review)" "exited non-zero"
 
-# --- T3u: round must be a positive integer — a non-numeric round must NEVER silently
-# overwrite round 1's capture (Important 7). Round 1 is seeded with a DISTINGUISHING
-# issue_count (7) so a same-second unfixed overwrite (which would reset it to the payload-less
-# default 0) is caught even when the `captured:` timestamp alone can't tell the two apart.
+# --- T3u: round must be a positive integer, never a silent overwrite of round 1 ---------------
 cat > "$tmp/round-distinguishing.md" <<'EOF'
 ---
 domains: [web-engineer]

@@ -101,7 +101,8 @@ case "$kind" in
     if [ "$dir" = "shared" ]; then
       agents="$(payload_fm "$payload" agent "")"
       counter_only=0
-      payload_has_field "$payload" uses && ! payload_has_field "$payload" rule && counter_only=1
+      payload_has_field "$payload" uses && ! payload_has_field "$payload" rule \
+        && ! payload_has_field "$payload" agent && counter_only=1
       if [ "$counter_only" -eq 0 ]; then
         agents_n=0
         [ -n "$agents" ] && agents_n="$(printf '%s' "$agents" | awk -F',' '{print NF}')"
