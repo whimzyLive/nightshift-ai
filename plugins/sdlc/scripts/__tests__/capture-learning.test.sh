@@ -190,4 +190,26 @@ printf '%s' "$out_cm" | grep -q 'staged-rule' \
   && bad "(T5b) collect-memory ignores captures" "captured rule leaked into collection" \
   || ok "(T5b) collect-memory ignores captures"
 
+# --- T6: check-frontmatter warns on a bad capture, never fails ---------------
+cf_repo="$tmp/cfrepo"; mkdir -p "$cf_repo/.claude/memories/captured/rules"
+cat > "$cf_repo/.claude/memories/captured/rules/AB-1--bad-capture.md" <<'EOF'
+---
+id: bad-capture
+agent: [web-engineer]
+trigger: []
+rule: ""
+evidence: []
+uses: 0
+status: captured
+captured: 2026-08-04T00:00:00Z
+story: AB-1
+origin: domain-agent
+promote-target: .claude/memories/agents/web-engineer/bad-capture.md
+---
+EOF
+cf_out="$(bash "$scripts/check-frontmatter.sh" "$cf_repo" 2>&1)"; cf_rc=$?
+[ "$cf_rc" -eq 0 ] && ok "(T6a) capture problems never fail the gate" || bad "(T6a) exit code" "got $cf_rc"
+printf '%s' "$cf_out" | grep -qi 'bad-capture' \
+  && ok "(T6b) malformed capture surfaced as a warning" || bad "(T6b) warning emitted" "no mention of bad-capture"
+
 exit "$fail"
