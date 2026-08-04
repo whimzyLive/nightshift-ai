@@ -132,7 +132,7 @@ need no gate:
 Two further carve-outs are **not** cross-agent writes and need no gate:
 
 - **Counter-only writes.** A counter-only update is now written as a **capture**
-  (`capture-learning.sh rule ... <payload-file with uses: 1>`, no `agent:` key required — see the
+  (`capture-learning.sh rule ... <payload-file with uses: 1>`, which must omit `agent:` — see the
   counter-only exemption in `capture-learning.sh`) by any agent that applied the rule under
   `agents/shared/` — it changes no semantics, so the capture write, and the maintenance op's later
   promotion-merge of that capture into the target rule, are not treated as writing "another agent's"
