@@ -1,3 +1,13 @@
+## 0.45.7 (2026-08-04)
+
+### 🩹 Fixes
+
+- **sdlc:** drop inert SessionEnd hook timeout, document real budget lever ([a280648](https://github.com/whimzyLive/nightshift-ai/commit/a280648))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.6 (2026-08-04)
 
 ### 🩹 Fixes
