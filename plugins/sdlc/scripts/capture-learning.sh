@@ -66,17 +66,17 @@ payload_body() {                   # everything after the closing --- , or the w
     && awk 'NR==1&&/^---[[:space:]]*$/{o=1;next} o&&!d&&/^---[[:space:]]*$/{d=1;next} d' "$1" \
     || cat "$1"
 }
-# write_atomic <dest> <content> — writes in the CALLING shell, never a pipeline subshell: a
-# `{ ... } | write_atomic "$dest"` pipe puts this function's `die`/`exit 1` in a subshell that
-# only kills itself, so a write failure silently falls through to the CAPTURED= success line.
-# Callers must capture content via `$(...)` first and check this function's own exit status.
-write_atomic() {
+write_atomic() {                   # $1 = dest, $2 = content
   local dest="$1" content="$2" t="$1.tmp.$$"
   printf '%s\n' "$content" > "$t" && mv "$t" "$dest"
 }
 validate_story_key() {             # $1 = story key; dies on a shape that isn't a real Jira key
   printf '%s' "$1" | grep -qE '^[A-Z][A-Z0-9]*-[0-9]+$' \
     || die "capture-learning.sh: story key '$1' is not <PROJECT>-<N> (e.g. AB-1); wrote nothing"
+}
+payload_has_field() {              # $1 = payload path or empty; $2 = key
+  [ -n "$1" ] || return 1
+  has_field "$(extract_fm "$1" | parse_frontmatter)" "$2"
 }
 
 root="$(resolve_capture_root)" || exit 1
@@ -100,10 +100,14 @@ case "$kind" in
     case "$valid" in *" $dir "*) : ;; *) die "capture-learning.sh: unknown target dir '$dir'; wrote nothing" ;; esac
     if [ "$dir" = "shared" ]; then
       agents="$(payload_fm "$payload" agent "")"
-      agents_n=0
-      [ -n "$agents" ] && agents_n="$(printf '%s' "$agents" | awk -F',' '{print NF}')"
-      [ "$agents_n" -ge 2 ] \
-        || die "capture-learning.sh: agents/shared/ capture needs >= 2 agents in the payload's 'agent:' list (got [$agents]); wrote nothing"
+      counter_only=0
+      payload_has_field "$payload" uses && ! payload_has_field "$payload" rule && counter_only=1
+      if [ "$counter_only" -eq 0 ]; then
+        agents_n=0
+        [ -n "$agents" ] && agents_n="$(printf '%s' "$agents" | awk -F',' '{print NF}')"
+        [ "$agents_n" -ge 2 ] \
+          || die "capture-learning.sh: agents/shared/ capture needs >= 2 agents in the payload's 'agent:' list (got [$agents]); wrote nothing"
+      fi
     else
       agents="$dir"
     fi
@@ -133,8 +137,8 @@ case "$kind" in
     validate_story_key "$story"
     printf '%s' "$rdate" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' \
       || die "capture-learning.sh: date '$rdate' is not YYYY-MM-DD; wrote nothing"
-    printf '%s' "$round" | grep -qE '^[1-9][0-9]*$' \
-      || die "capture-learning.sh: round '$round' is not a positive integer; wrote nothing"
+    printf '%s' "$round" | grep -qE '^[1-9][0-9]{0,3}$' \
+      || die "capture-learning.sh: round '$round' is not a positive integer (1-9999); wrote nothing"
     [ "$payload" = "-" ] && payload=""
     [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: payload file '$payload' is missing or unreadable; wrote nothing"
     [ "$round" -gt 1 ] && sfx="-r$round" || sfx=""

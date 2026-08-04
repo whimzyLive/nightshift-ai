@@ -85,9 +85,12 @@ wt_cap_file="$wt_repo/.claude/memories/captured/rules/AB-1--survives-worktree-re
   && ok "(T2e2) capture written from the linked worktree lands in the main checkout" \
   || bad "(T2e2) capture from linked worktree" "got '$wt_cap_out'"
 git -C "$wt_repo" worktree remove --force "$tmp/linked"
+[ ! -d "$tmp/linked" ] \
+  && ok "(T2e3a) the linked worktree was actually removed" \
+  || bad "(T2e3a) linked worktree removed" "$tmp/linked still exists — worktree remove failed silently"
 [ -f "$wt_cap_file" ] \
-  && ok "(T2e3) the capture survives 'git worktree remove --force' of the linked worktree" \
-  || bad "(T2e3) capture survives worktree removal" "capture file gone after worktree remove"
+  && ok "(T2e3b) the capture survives 'git worktree remove --force' of the linked worktree" \
+  || bad "(T2e3b) capture survives worktree removal" "capture file gone after worktree remove"
 
 # --- T3: capture writes ------------------------------------------------------
 root="$tmp/cap-root"
@@ -143,6 +146,26 @@ run_cap rule shared/under-agented AB-1 "$tmp/payload.md" >/dev/null 2>&1 \
 [ ! -e "$root/rules/AB-1--under-agented.md" ] \
   && ok "(T3g4) rejected shared capture wrote no file" || bad "(T3g4) rejected shared capture wrote no file" "file exists"
 
+# T3g5-8: the documented shared/ counter-only path (refs/domain-agent-handoff.md's
+# "own, or a `shared/` one" counter-only bullet) — a payload with `uses` set and no `rule` key
+# carries no `agent:` at all, and must NOT be forced through the >= 2 agents guard.
+cat > "$tmp/counter-only.md" <<'EOF'
+---
+uses: 1
+evidence: [AB-1]
+---
+EOF
+run_cap rule shared/counter-only-target AB-1 "$tmp/counter-only.md" >/dev/null 2>"$tmp/counter_err"
+counter_rc=$?
+[ "$counter_rc" -eq 0 ] \
+  && ok "(T3g5) shared/ counter-only payload (uses set, rule absent) is exempt from the >= 2 agents guard" \
+  || bad "(T3g5) shared counter-only exemption" "exited $counter_rc: $(cat "$tmp/counter_err")"
+[ -f "$root/rules/AB-1--counter-only-target.md" ] \
+  && ok "(T3g6) shared/ counter-only capture is written" || bad "(T3g6) shared counter-only written" "file missing"
+p3="$(extract_fm "$root/rules/AB-1--counter-only-target.md" | parse_frontmatter)"
+[ "$(field_value "$p3" uses)" = "1" ] \
+  && ok "(T3g7) shared/ counter-only capture carries the payload's uses" || bad "(T3g7) counter-only uses" "got '$(field_value "$p3" uses)'"
+
 run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null
 [ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3h) '-' writes frontmatter only" || bad "(T3h) frontmatter only" "body present after '-' capture"
 run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
@@ -179,7 +202,7 @@ run_cap review AB-1 2026-08-04 1 >/dev/null
 [ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
 
 run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
-[ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 2 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
+[ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 3 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
 
 # --- T3s: a failed write is reported as a failure, never a false CAPTURED= (Critical 1) -----
 wf_root="$tmp/write-fail-root"; mkdir -p "$wf_root/rules" "$wf_root/reviews"
@@ -219,28 +242,47 @@ run_cap review 'AB-1' 2026-08-04 3 >/dev/null 2>&1 \
   || bad "(T3t7) well-formed story key accepted (review)" "exited non-zero"
 
 # --- T3u: round must be a positive integer — a non-numeric round must NEVER silently
-# overwrite round 1's capture (Important 7) ---------------------------------------------------
-run_cap review AB-1 2026-08-05 1 >/dev/null
-r1_before="$(cat "$root/reviews/2026-08-05-AB-1.md")"
+# overwrite round 1's capture (Important 7). Round 1 is seeded with a DISTINGUISHING
+# issue_count (7) so a same-second unfixed overwrite (which would reset it to the payload-less
+# default 0) is caught even when the `captured:` timestamp alone can't tell the two apart.
+cat > "$tmp/round-distinguishing.md" <<'EOF'
+---
+domains: [web-engineer]
+root_causes: [missing-validation]
+issue_count: 7
+---
+EOF
+run_cap review AB-1 2026-08-05 1 "$tmp/round-distinguishing.md" >/dev/null
+r1f="$root/reviews/2026-08-05-AB-1.md"
+r1_before="$(field_value "$(extract_fm "$r1f" | parse_frontmatter)" issue_count)"
+[ "$r1_before" = "7" ] && ok "(T3u0) round 1 seeded with the distinguishing issue_count" \
+  || bad "(T3u0) round 1 seed" "got issue_count='$r1_before'"
 run_cap review AB-1 2026-08-05 abc >/dev/null 2>"$tmp/round_err"
 round_rc=$?
 [ "$round_rc" -ne 0 ] && ok "(T3u1) a non-numeric round is rejected" || bad "(T3u1) non-numeric round rejected" "exited 0"
 [ -s "$tmp/round_err" ] && ok "(T3u2) a non-numeric round reports the failure on stderr" || bad "(T3u2) round failure on stderr" "stderr empty"
-r1_after="$(cat "$root/reviews/2026-08-05-AB-1.md")"
+r1_after="$(field_value "$(extract_fm "$r1f" | parse_frontmatter)" issue_count)"
 [ "$r1_before" = "$r1_after" ] \
   && ok "(T3u3) round 1's capture survives a rejected non-numeric round (no silent overwrite)" \
-  || bad "(T3u3) round 1 survives rejected round" "round 1's capture content changed"
+  || bad "(T3u3) round 1 survives rejected round" "issue_count changed from '$r1_before' to '$r1_after'"
 run_cap review AB-1 2026-08-05 0 >/dev/null 2>&1 \
   && bad "(T3u4) round 0 is rejected (not a positive integer)" "exited 0" \
   || ok "(T3u4) round 0 is rejected (not a positive integer)"
+run_cap review AB-1 2026-08-05 99999999999999999999 >/dev/null 2>&1 \
+  && bad "(T3u5) an overflowing round is rejected (not 1-9999)" "exited 0" \
+  || ok "(T3u5) an overflowing round is rejected (not 1-9999)"
+r1_after2="$(field_value "$(extract_fm "$r1f" | parse_frontmatter)" issue_count)"
+[ "$r1_before" = "$r1_after2" ] \
+  && ok "(T3u6) round 1's capture survives a rejected overflowing round" \
+  || bad "(T3u6) round 1 survives overflow round" "issue_count changed from '$r1_before' to '$r1_after2'"
 
 # --- T4: list-captured --------------------------------------------------------
 lst="$scripts/list-captured.sh"
 run_lst() { SDLC_CAPTURE_ROOT="$root" bash "$lst" "$@"; }
 
 tsv="$(run_lst --kind rule --story AB-1)"
-[ "$(printf '%s\n' "$tsv" | wc -l | tr -d ' ')" -eq 3 ] \
-  && ok "(T4a) three rule captures listed" || bad "(T4a) rule capture count" "got: $tsv"
+[ "$(printf '%s\n' "$tsv" | wc -l | tr -d ' ')" -eq 4 ] \
+  && ok "(T4a) four rule captures listed" || bad "(T4a) rule capture count" "got: $tsv"
 printf '%s\n' "$tsv" | head -1 | cut -f1 | grep -q "^$root/rules/" \
   && ok "(T4b) TSV field 1 is the path" || bad "(T4b) TSV path leads" "got '$(printf '%s\n' "$tsv" | head -1 | cut -f1)'"
 printf '%s\n' "$tsv" | head -1 | cut -f2 | grep -qx rule \
