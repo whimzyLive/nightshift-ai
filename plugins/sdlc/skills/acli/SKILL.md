@@ -92,6 +92,8 @@ Flags reference:
 | `-a, --assignee` | Email or `@me` |
 | `--json` | Output created issue as JSON (captures the new issue key) |
 
+**`--parent` takes the issue KEY (e.g. `CER-123`), not the numeric id** — despite the flag's own `--help` text reading "Parent work item ID". Passing the numeric id fails with `✗ Error: Please select valid parent issue.`
+
 ### Bulk create from JSON (preferred for multiple stories)
 
 ```bash
@@ -162,6 +164,13 @@ echo "=== ATTACHMENTS ===" && echo "$attachments"
 - `acli jira workitem remote-links` does **not** exist — external/remote links (Confluence, Figma, Slack URLs) are NOT accessible via acli. Use the Jira REST API if you need them.
 - Attachment download is not supported by acli. The `content` URL in the attachment list requires Jira auth headers that acli does not expose.
 - `acli auth token` does **not** exist.
+- `view --json` returns `fields.parent: null` and `fields.labels: null` even when both **are** set on the issue — a read-side rendering gap, not a write failure. Do not diagnose a missing `--parent`/`--label` write from this field being null on read-back.
+- `acli jira workitem search --fields parent` is rejected (`✗ Error: field 'parent' is not allowed`) — not a usable fallback. To verify parent/labels actually landed, use JQL instead (see "Capturing created issue keys" below):
+
+```bash
+acli jira workitem search --jql "parent = <EPIC-KEY>" --count            # confirm the story is parented
+acli jira workitem search --jql "key = <KEY>" --fields labels --json     # labels DO render here
+```
 
 Raw JSON (when you need to parse specific fields):
 
@@ -177,6 +186,8 @@ acli jira workitem edit CER-456 \
   --summary "Updated title" \
   --description "Updated description" 2>&1
 ```
+
+**`edit` has no `--parent` flag** (`✗ Error: unknown flag: --parent`) — the parent can only be set at `create` time. Also note `edit` uses `--labels` (plural, with `-k/--key`) where `create` uses `--label` (singular).
 
 **⚠️ acli cannot set custom-field VALUES** (verified through 1.3.22 — there is no `--custom-field` flag, and the `--from-json` schema exposes no custom fields; `acli jira field update` edits field _definitions_, not values). Where a custom-field stamp is unavoidable (e.g. workflow-mode selects), use the plugin's REST helper. **Story Points are the exception: the plugin never writes them** — report the estimate for manual entry instead (requiring the helper's token env contract of every consumer proved too fragile; revisit if acli gains native custom-field support):
 
@@ -299,6 +310,13 @@ acli jira workitem create \
 result=$(acli jira workitem create --project CER --type Story --summary "Title" --json 2>&1)
 key=$(echo "$result" | jq -r '.key')
 echo "Created: $key"
+```
+
+To verify a `--parent`/`--label` write actually landed, use JQL — `view --json` and `search --fields parent` cannot confirm it (see "Known limitations" above):
+
+```bash
+acli jira workitem search --jql "parent = <EPIC-KEY>" --count            # confirm the story is parented
+acli jira workitem search --jql "key = <KEY>" --fields labels --json     # labels DO render here
 ```
 
 ## Error handling
