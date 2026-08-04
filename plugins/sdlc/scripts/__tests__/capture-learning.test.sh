@@ -186,6 +186,10 @@ run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
 
 run_cap rule web-engineer/Not_Kebab AB-1 >/dev/null 2>&1 \
   && bad "(T3j) non-kebab rule id rejected" "exited 0" || ok "(T3j) non-kebab rule id rejected"
+run_cap rule web-engineer AB-1 >/dev/null 2>&1 \
+  && bad "(T3j2) a target with no slash is rejected" "exited 0" || ok "(T3j2) a target with no slash is rejected"
+[ ! -e "$root/rules/AB-1--web-engineer.md" ] \
+  && ok "(T3j3) rejected slash-less target wrote no file" || bad "(T3j3) rejected slash-less target wrote no file" "file exists"
 run_cap rule no-such-agent/some-rule AB-1 >/dev/null 2>&1 \
   && bad "(T3k) unknown agent dir rejected" "exited 0" || ok "(T3k) unknown agent dir rejected"
 run_cap bogus foo AB-1 >/dev/null 2>&1 \
@@ -314,6 +318,24 @@ empty="$tmp/empty-root"
 [ "$(SDLC_CAPTURE_ROOT="$empty" bash "$lst" --json)" = '{"entries":[],"count":0}' ] \
   && ok "(T4j) empty staging area JSON" || bad "(T4j) empty JSON" "got '$(SDLC_CAPTURE_ROOT="$empty" bash "$lst" --json)'"
 
+# --- T4j2-3: root-resolution failure (vs T4i/T4j's resolved-but-empty root) --------------------
+nongit="$tmp/not-a-repo"; mkdir -p "$nongit"
+nongit_out="$tmp/nongit_out"; nongit_err="$tmp/nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
+nongit_rc=$?
+if [ "$nongit_rc" -ne 0 ] && [ -z "$(cat "$nongit_out")" ] && [ -s "$nongit_err" ]; then
+  pass_lst=1
+else
+  pass_lst=0
+fi
+[ "$pass_lst" -eq 1 ] && ok "(T4j2) resolution failure outside a git checkout is a hard error" \
+  || bad "(T4j2) resolution failure hard error" "rc=$nongit_rc stdout='$(cat "$nongit_out")' stderr='$(cat "$nongit_err")'"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
+nongit_json_rc=$?
+[ "$nongit_json_rc" -ne 0 ] && ! grep -q '"entries"' "$nongit_out" \
+  && ok "(T4j3) resolution failure (--json) is a hard error, not a quiet empty corpus" \
+  || bad "(T4j3) resolution failure --json hard error" "rc=$nongit_json_rc stdout='$(cat "$nongit_out")'"
+
 printf 'no frontmatter here\n' > "$root/rules/AB-1--broken.md"
 SDLC_CAPTURE_ROOT="$root" bash "$lst" --kind rule >/dev/null 2>"$tmp/warn"
 [ "$?" -eq 0 ] && [ -s "$tmp/warn" ] \
@@ -355,5 +377,33 @@ cf_out="$(bash "$scripts/check-frontmatter.sh" "$cf_repo" 2>&1)"; cf_rc=$?
 [ "$cf_rc" -eq 0 ] && ok "(T6a) capture problems never fail the gate" || bad "(T6a) exit code" "got $cf_rc"
 printf '%s' "$cf_out" | grep -qi 'bad-capture' \
   && ok "(T6b) malformed capture surfaced as a warning" || bad "(T6b) warning emitted" "no mention of bad-capture"
+
+# --- T6c-e: the documented frontmatter-only review marker (issue_count: 0) never warns ---------
+marker_repo="$tmp/markerrepo"
+SDLC_CAPTURE_ROOT="$marker_repo/.claude/memories/captured" bash "$cap" review AB-1 2026-08-04 1 - >/dev/null
+mkdir -p "$marker_repo/.claude/memories/captured/reviews"
+cf2_out="$(bash "$scripts/check-frontmatter.sh" "$marker_repo" 2>&1)"; cf2_rc=$?
+[ "$cf2_rc" -eq 0 ] && ok "(T6c) frontmatter-only review marker never fails the gate" || bad "(T6c) exit code" "got $cf2_rc"
+printf '%s' "$cf2_out" | grep -qi '2026-08-04-AB-1' \
+  && bad "(T6d) frontmatter-only review marker (issue_count: 0) does not warn" "$cf2_out" \
+  || ok "(T6d) frontmatter-only review marker (issue_count: 0) does not warn"
+
+bad_marker_repo="$tmp/badmarkerrepo"; mkdir -p "$bad_marker_repo/.claude/memories/captured/reviews"
+cat > "$bad_marker_repo/.claude/memories/captured/reviews/2026-08-04-AB-2.md" <<'EOF'
+---
+story: AB-2
+date: 2026-08-04
+domains: []
+root_causes: []
+issue_count: 2
+captured: 2026-08-04T00:00:00Z
+origin: qa-round
+promote-target: .claude/memories/reviews/2026-08-04-AB-2.md
+---
+EOF
+cf3_out="$(bash "$scripts/check-frontmatter.sh" "$bad_marker_repo" 2>&1)"
+printf '%s' "$cf3_out" | grep -qi "empty field 'domains'" \
+  && ok "(T6e) issue_count > 0 with empty domains/root_causes still warns" \
+  || bad "(T6e) genuinely malformed review still warns" "$cf3_out"
 
 exit "$fail"

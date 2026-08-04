@@ -330,8 +330,16 @@ validate_capture_file() {
   else
     for field in story date domains root_causes issue_count captured origin promote-target; do
       has_field "$parsed" "$field" || issues+="missing field '$field'; "
+    done
+    local issue_count_val
+    issue_count_val="$(field_value "$parsed" issue_count)"
+    for field in story date issue_count captured origin promote-target; do
       [ -z "$(field_value "$parsed" "$field")" ] && issues+="empty field '$field'; "
     done
+    if [ "$issue_count_val" != "0" ]; then
+      [ -z "$(field_value "$parsed" domains)" ] && issues+="empty field 'domains'; "
+      [ -z "$(field_value "$parsed" root_causes)" ] && issues+="empty field 'root_causes'; "
+    fi
     local origin_val story_val date_val
     origin_val="$(field_value "$parsed" origin)"
     [ "$origin_val" != "qa-round" ] && issues+="origin '$origin_val' is not 'qa-round'; "

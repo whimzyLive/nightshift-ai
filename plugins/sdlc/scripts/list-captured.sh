@@ -28,12 +28,20 @@ case "$f_kind" in ""|rule|review) : ;; *) printf 'list-captured.sh: --kind must 
 if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
   root="$SDLC_CAPTURE_ROOT"
 else
-  root=""
-  porcelain="$(git worktree list --porcelain 2>/dev/null)" || porcelain=""
-  if [ -n "$porcelain" ] && ! printf '%s\n' "$porcelain" | head -3 | grep -q '^bare$'; then
-    main="$(printf '%s\n' "$porcelain" | sed -n 's/^worktree //p' | head -1)"
-    [ -n "$main" ] && root="$main/.claude/memories/captured"
-  fi
+  porcelain="$(git worktree list --porcelain 2>/dev/null)" || {
+    printf "list-captured.sh: 'git worktree list --porcelain' failed — cannot resolve the staging root\n" >&2
+    exit 1
+  }
+  printf '%s\n' "$porcelain" | head -3 | grep -q '^bare$' && {
+    printf 'list-captured.sh: main repository is bare — no primary checkout to enumerate\n' >&2
+    exit 1
+  }
+  main="$(printf '%s\n' "$porcelain" | sed -n 's/^worktree //p' | head -1)"
+  [ -n "$main" ] || {
+    printf "list-captured.sh: no 'worktree ' entry in git worktree list output — cannot resolve the staging root\n" >&2
+    exit 1
+  }
+  root="$main/.claude/memories/captured"
 fi
 
 json_esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }

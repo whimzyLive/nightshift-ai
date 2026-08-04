@@ -90,6 +90,10 @@ case "$kind" in
     validate_story_key "$story"
     [ "$payload" = "-" ] && payload=""
     [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: payload file '$payload' is missing or unreadable; wrote nothing"
+    case "$target" in
+      */*) : ;;
+      *) die "capture-learning.sh: rule target '$target' needs <agent-or-shared>/<rule-id>; wrote nothing" ;;
+    esac
     dir="${target%%/*}"; rid="${target#*/}"
     printf '%s' "$rid" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
       || die "capture-learning.sh: rule id '$rid' is not kebab-case; wrote nothing"
