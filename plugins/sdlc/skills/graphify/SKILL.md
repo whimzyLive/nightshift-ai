@@ -1036,10 +1036,10 @@ Then run Steps 5–9 as normal (label communities, generate viz, benchmark, clea
 
 Two traversal modes - choose based on the question:
 
-| Mode          | Flag     | Best for                                                           |
-| ------------- | -------- | ------------------------------------------------------------------ |
+| Mode | Flag | Best for |
+| --- | --- | --- |
 | BFS (default) | _(none)_ | "What is X connected to?" - broad context, nearest neighbors first |
-| DFS           | `--dfs`  | "How does X reach Y?" - trace a specific chain or dependency path  |
+| DFS | `--dfs` | "How does X reach Y?" - trace a specific chain or dependency path |
 
 First check the graph exists:
 

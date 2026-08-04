@@ -1,16 +1,14 @@
 # Principal Engineer Playbook (top-level orchestration)
 
+<!-- notation: `:=` define, `->` leads-to, `⊆` drawn-from-set, ASSERT/ELSE guard, first-match-wins ordering. Full legend: refs/pseudocode-notation.md -->
+
 The implementation-orchestration workflow for a Jira story. **This playbook is executed
 INLINE by the top-level session** (via `/impl`, or `/auto`'s implementation phase) — it is
 NOT dispatched as a subagent.
 
-## Why inline (read this first)
+## Why inline
 
-Claude Code blocks subagent → subagent dispatch (nesting is one level deep, by design). The
-orchestrator's entire job is to dispatch domain agents with the `Agent` tool, so it MUST run
-where that tool works: the top-level session. If you dispatch `principal-engineer` as a
-subagent it will be unable to dispatch anyone and will return blocked. **Do not dispatch a
-`principal-engineer` subagent. Run these steps yourself in the main loop.**
+# rationale: refs/design-notes/inline-orchestration-rationale.md
 
 You (the top-level session) play the Principal Engineer role: you coordinate only. You never
 write feature code yourself — domain agents (`platform-engineer`, etc.) write code. You own
@@ -71,7 +69,10 @@ profile. Do not orchestrate or implement anything yourself.
 Invoke, in order, before dispatching anything:
 
 1. `executing-plans`
-2. `subagent-driven-development`
+
+(**`subagent-driven-development` is deliberately NOT preloaded here (NA-86 A8).** This playbook
+dispatches domain agents directly via its own Step 4 prompt contract, so the skill's dispatch
+guidance is never operative here — only `executing-plans`, for reading the plan doc in Step 2.)
 
 (The review/quality skills — `requesting-code-review`, `receiving-code-review`,
 `verification-before-completion` — are owned and invoked by the QA Engineer at Step 6, not here.)
@@ -135,8 +136,6 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
    (`[ai-enablement-engineer]` is dependency-free — it may be dispatched at any point in the ladder,
    but still runs alone, one domain agent at a time, like every other phase — see Step 4).
 3. Cross-reference Active agents in project-context — drop Standby phases with no tasks.
-4. Note any "grounding corrections" / "open items" the plan flagged — pass them verbatim into
-   the relevant domain-agent prompt so the implementer honors them.
 
 **Lightweight path (`LIGHTWEIGHT=true`, no plan doc):** there is no plan file to read — derive the
 task list **inline from the Jira story**:
@@ -163,21 +162,20 @@ subsection of `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (JQL
 `parent = <STORY-KEY> AND issuetype in subTaskIssueTypes() ORDER BY created ASC`,
 `--fields "key,summary"`). That subsection is the source of truth — **do not re-document the probe.**
 
-Define:
+```text
+SUBTASKS     := the ordered list of { key, summary } exactly as the probe returns it
+                (ORDER BY created ASC; NEVER re-sort by key or summary — fetch order IS implementation order)
+subtaskCount := SUBTASKS.length
 
-- `SUBTASKS` — the ordered list of `{ key, summary }` exactly as the probe returns it
-  (`ORDER BY created ASC`; **never re-sort** by key or summary — fetch order _is_ implementation order).
-- `subtaskCount` — `SUBTASKS.length`.
+ASSERT the probe returned (possibly empty) ELSE a real auth/DNS/malformed-JQL error
+  -> STOP before branching, consistent with the acli-failure rule; do not create a branch or dispatch agents
 
-Branch on the count:
-
-- **`subtaskCount === 0`** → **no-regression path**: skip ALL sub-task sequencing. Steps 3–7 run
-  exactly as they do today — one full-story implementation pass per phase, normal commit cadence,
-  normal PR. An empty probe result is **not** an error.
-- **`subtaskCount > 0`** → drive the per-sub-task commit sequencing in Step 4 and the sub-task
-  enumeration in the Step 7 PR body.
-- **Probe failure** (a real auth/DNS/malformed-JQL error, not an empty result) → **STOP before
-  branching**, consistent with the `acli`-failure rule. Do not create a branch or dispatch agents.
+subtaskCount == 0 -> no-regression path: skip ALL sub-task sequencing; Steps 3-7 run exactly as they
+                     do today — one full-story implementation pass per phase, normal commit cadence,
+                     normal PR   # an empty probe result is NOT an error
+subtaskCount > 0  -> drive the per-sub-task commit sequencing in Step 4 and the sub-task enumeration
+                     in the Step 7 PR body
+```
 
 Branch creation (Step 3) stays **once per story** regardless of `subtaskCount` — sub-tasks are
 **never** given their own branches.
@@ -190,14 +188,14 @@ misrouted into debugging. When `WORK_KIND=defect`, the `systematic-debugging` sk
 **impl driver** for the work Steps 2 and 4 do on the feature path — the rest of the ladder is
 unchanged:
 
-| Playbook step            | Feature path (default)                        | Defect path (`WORK_KIND=defect`)                                                                                                                                                                                                                                                    |
-| ------------------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Step 2 (derive tasks)    | derive agent-tagged task list from plan/story | **replaced** by systematic-debugging **phase 1 (reproduce)** + **phase 2 (root-cause/isolate)** — these _discover_ the work; there is no plan doc and no pre-derived task list                                                                                                      |
-| Step 3 (branch)          | `feat/<STORY-KEY>`                            | `fix/<STORY-KEY>` (`BRANCH_PREFIX`) — same structure, defect prefix                                                                                                                                                                                                                 |
-| Step 4 (domain dispatch) | dispatch agents to write feature code         | **replaced** by systematic-debugging **phase 3 (failing regression test)** + **phase 4 (fix + verify)**, where phase-3/4 _code-writing_ is performed by **dispatching the same Active domain agents** (the skill orchestrates; the owning domain agent writes the test and the fix) |
-| Step 5 (push/verify)     | per-phase push + silent-failure STOP          | **unchanged** — applied after each debugging-phase domain-agent commit                                                                                                                                                                                                              |
-| Step 6 (QA loop)         | QA Engineer playbook inline                   | **unchanged in structure**; QA Step-7 verification is re-pointed to the defect regression-evidence contract (see `qa-engineer-playbook.md`)                                                                                                                                         |
-| Step 7 (PR)              | `feat/<STORY-KEY>` PR, `feat` type            | `fix/<STORY-KEY>` PR, `fix` type                                                                                                                                                                                                                                                    |
+| Playbook step | Feature path (default) | Defect path (`WORK_KIND=defect`) |
+| --- | --- | --- |
+| Step 2 (derive tasks) | derive agent-tagged task list from plan/story | **replaced** by systematic-debugging **phase 1 (reproduce)** + **phase 2 (root-cause/isolate)** — these _discover_ the work; there is no plan doc and no pre-derived task list |
+| Step 3 (branch) | `feat/<STORY-KEY>` | `fix/<STORY-KEY>` (`BRANCH_PREFIX`) — same structure, defect prefix |
+| Step 4 (domain dispatch) | dispatch agents to write feature code | **replaced** by systematic-debugging **phase 3 (failing regression test)** + **phase 4 (fix + verify)**, where phase-3/4 _code-writing_ is performed by **dispatching the same Active domain agents** (the skill orchestrates; the owning domain agent writes the test and the fix) |
+| Step 5 (push/verify) | per-phase push + silent-failure STOP | **unchanged** — applied after each debugging-phase domain-agent commit |
+| Step 6 (QA loop) | QA Engineer playbook inline | **unchanged in structure**; QA Step-7 verification is re-pointed to the defect regression-evidence contract (see `qa-engineer-playbook.md`) |
+| Step 7 (PR) | `feat/<STORY-KEY>` PR, `feat` type | `fix/<STORY-KEY>` PR, `fix` type |
 
 So debugging replaces the **"decide what to do + write the code" middle of the ladder (Steps 2+4)**;
 branch (3), push/verify (5), QA (6), and PR (7) remain. Phase 4's fix is **not** the skill writing
@@ -307,6 +305,14 @@ with the normal commit cadence (today's behaviour, unchanged).
 Dispatch with the `Agent` tool. The harness's **`isolation: "worktree"` param is NOT set** — the
 orchestrator now owns isolation via the single per-story worktree provisioned in Step 3:
 
+```text
+PLAN := docs/superpowers/plans/<STORY-KEY>.md   # full path only
+LIGHTWEIGHT=true  -> skip the slice (no plan doc — plan-slice.sh would STOP on a missing one).
+                     Item 4 carries the story's ACs verbatim instead.
+LIGHTWEIGHT=false -> slice := bash ${CLAUDE_PLUGIN_ROOT}/scripts/plan-slice.sh "$PLAN" phase <agent-name>
+                     capture status first; STOP on exit 2; unset 5 keys; eval; STOP if TASKS==0
+```
+
 ```
 Agent({
   subagent_type: "<agent-name>",
@@ -323,7 +329,9 @@ Agent({
    "Before running any `nx` command (build/test/quality gate), export
    `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache."
 3. Story key, e.g. `<STORY-KEY>`.
-4. The full phase section from the plan, verbatim.
+4. `LIGHTWEIGHT=false`: `SLICE=` path from Step 4 (`## Plan slice`,
+   `refs/domain-agent-handoff.md`). `LIGHTWEIGHT=true`: the story's ACs, verbatim (no plan
+   doc, no `SLICE=`).
 5. **Applicable override skills** — EITHER name the specific project skills to invoke (read them
    from the target agent's override, `.claude/project/agents/<agent-name>.md`, the override's skills
    section — whatever heading it uses, the section listing skills to invoke via the Skill tool)
@@ -352,25 +360,27 @@ Agent({
     commit — most dispatches admit nothing, and that's expected."
 11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+13. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md." Also carries this phase's ledger row — `LEDGER_PHASE`, `LEDGER_AGENT`, `LEDGER_PLAN_SECTION`, `LEDGER_START_SHA`, `LEDGER_END_SHA`, `LEDGER_FILES_CHANGED`, `LEDGER_FILES_READ` (shape computed in Step 5), real values substituted — it names paths, not content.
+14. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
 Never send just a task title.
 
 ## Step 5 — Phase completion verification (after EACH phase)
 
-**Before dispatching the phase**, capture the primary checkout's state so a violation is machine-
-detectable, not prose-only (spec §5). This is a **snapshot to diff against later, not an
-assertion** — the primary may already be dirty (unrelated developer WIP) before this story's first
-dispatch, and that pre-existing dirt is not itself a violation:
+**Before dispatching the phase**, snapshot the primary checkout's state so a violation is
+machine-detectable, not prose-only (spec §5). A snapshot to diff against later, not an assertion —
+the primary may already be dirty (unrelated developer WIP) before this story's first dispatch, and
+that pre-existing dirt is not itself a violation:
 
-```bash
-PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
-PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
+```text
+snap := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh snapshot <primary-root>
+# -> PRIMARY_HEAD, PRIMARY_STATE_FILE, PRIMARY_PRE_DIRTY (keep PRIMARY_STATE_FILE for the assert call below)
+PRIMARY_PRE_DIRTY == 'true' -> print the one-line warning below, then proceed  # never a STOP
 ```
 
-If `PRIMARY_CLEAN_BEFORE` is non-empty the very first time you capture it for this story, that
-means the primary checkout was already dirty before any dispatch — proceed anyway with a one-line
-warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated to this story —
-snapshotting and comparing, not blocking`); do not STOP on pre-existing dirt you didn't cause.
+`WARNING: primary checkout has pre-existing uncommitted changes unrelated to this story —
+snapshotting and comparing, not blocking`. Do not STOP on pre-existing dirt you didn't cause — that
+consequence stays here, not in the script (it only ever reports the snapshot, never judges it).
 
 **After the agent returns**, run the worktree HEAD-advance/push checks against `$WORKTREE` (never
 the primary checkout — the domain agent's commits live there):
@@ -381,22 +391,33 @@ git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>           # YOU push,
 git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 ```
 
-Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
-status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
-stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
+Record this phase's ledger row (a cache, never a required input — never a STOP if any of this fails):
 
-```bash
-[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
-  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
-  || echo "STOP: domain agent wrote to the primary checkout instead of \$WORKTREE"
+```text
+LEDGER_FILE := $(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/phase-ledger.txt   # never $WORKTREE (D4)
+before dispatch -> LEDGER_START_SHA := git -C "$WORKTREE" rev-parse HEAD
+after the phase's commits -> LEDGER_END_SHA := git -C "$WORKTREE" rev-parse HEAD
+LEDGER_FILES_CHANGED := git -C "$WORKTREE" diff --name-only $LEDGER_START_SHA..$LEDGER_END_SHA, sorted, comma-joined   # from git, never the agent's return (D2)
+LEDGER_FILES_READ := the paths THIS dispatch prompt itself named
+append the LEDGER_* block for this phase to LEDGER_FILE
 ```
 
-If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
-snapshot → the agent ignored the cwd instruction (Step 4 prompt-contract item 1) and wrote to (or
-committed in) the primary checkout instead of `$WORKTREE` — **fail the phase and STOP**, same shape
-as the silent-failure STOP below.
-This makes the isolation guarantee a hard, detectable failure instead of a silently-corrupted
-primary checkout.
+Then assert the primary checkout matches its pre-dispatch snapshot exactly:
+
+```text
+assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
+# -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+WORKSPACE_INTEGRITY == 'VIOLATED' -> STOP: domain agent wrote to the primary checkout instead of $WORKTREE
+```
+
+The script's OK/none is exact-match against the snapshot (NOT asserted empty) — a pre-dirty
+primary that stays at the same dirt still passes; only a *change* from the captured snapshot is a
+violation.
+
+If `WORKSPACE_INTEGRITY=VIOLATED` → the agent ignored the cwd instruction (Step 4 prompt-contract
+item 1) and wrote to (or committed in) the primary checkout instead of `$WORKTREE` — **fail the
+phase and STOP**, same shape as the silent-failure STOP below. This makes the isolation guarantee
+a hard, detectable failure instead of a silently-corrupted primary checkout.
 
 Also assert `$WORKTREE` itself is clean after the phase's commit — the shared, persistent
 `$WORKTREE` carries forward between phases and fix rounds, so a returning agent's forgotten
@@ -471,6 +492,7 @@ must dispatch the `agent-skills:code-reviewer` subagent and domain fix agents, w
 - `WORK_KIND` (`defect` | `feature`) — re-points QA's Step-7 verification: on `defect`, QA requires
   the systematic-debugging regression-evidence contract (failing-before/passing-after test) instead
   of the plan-task checklist (see `qa-engineer-playbook.md`).
+- The phase ledger (`LEDGER_FILE`) — **optional**: QA Step 3 falls back to git when absent (D3).
 
 The QA playbook runs: request review → triage → fix loop (dispatching domain agents) →
 re-review until clean → write learnings to memory → quality gate (the quality-gate commands from `.claude/project/project-context.md`)
@@ -498,31 +520,18 @@ the existing `sync` in via its **inline post-QA dispatch variant**
 (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-postqa.md` §25); the diff source is **story-branch-vs-base**
 (§26), passed explicitly.
 
-**Manifest gate (AC4).** Resolve `.claude/project/docs-manifest.md` checkout-independently
-(`git show origin/<BASE-BRANCH>:.claude/project/docs-manifest.md`). If **absent** → **clean no-op**:
-do not dispatch, no warning, no report line — the repo opted out of docs. Proceed to Step 7
-unchanged. This is a no-op, **not** a failure.
+**Manifest + change-size gate (AC4).** Deterministic, judgment-free — a script, not a dispatch:
 
-**Change-size gate (second no-op, after the manifest gate passes).** A manifest can exist while this
-particular story touches nothing it tracks — dispatching `knowledge-engineer` in that case is pure
-overhead for a run that was always going to no-op. After the manifest gate passes, resolve the
-story-branch-vs-base changed-file set
-(`git diff --name-only "origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>"`, after
-`git fetch origin --quiet`) and compare it against the activated manifest rows' tracked source
-scopes (each enabled row's `reference-roots`/`source:`/`contract:` path, or a `how-to` row's
-`source:` glob list — the same scopes the docs-sync dispatch itself would resolve, per
-`docs-pipeline-core.md` §3's source resolver). If **no** changed
-file falls inside any activated row's scope → clean no-op: do **not** dispatch the
-`knowledge-engineer` at all, no warning, Step 8's report still notes `Docs sync: no manifest-tracked
-files touched — skipped`, and proceed to Step 7 unchanged. **Fail safe, not silent-skip:** if either
-the changed-file set or the activated rows' scopes cannot be resolved (a `git fetch`/diff failure, an
-unreadable manifest row, an unresolvable registry lookup), **dispatch anyway** — this is today's
-behaviour, unchanged. A gate that silently skipped docs regeneration on an unreadable probe would be
-a worse defect than the context-overhead this gate exists to close; when in doubt, this gate always
-resolves toward dispatching, never toward skipping.
+```text
+gate := bash ${CLAUDE_PLUGIN_ROOT}/scripts/docs-sync-gate.sh <STORY-KEY> <BRANCH_PREFIX> <BASE-BRANCH>
+-> DOCS_GATE=skip-no-manifest|skip-no-tracked-files|dispatch|dispatch-unresolvable
+bad exit/stdout/value -> dispatch-unresolvable
+skip-* -> no-op rows below
+dispatch* -> guard + dispatch below
+```
 
 **Primary-checkout guard — reuse Step 5's machine check verbatim.** Before dispatching, snapshot the
-primary checkout (`PRIMARY_HEAD` + `PRIMARY_CLEAN_BEFORE`, exactly as Step 5). Dispatch the
+primary checkout (`PRIMARY_HEAD` + `PRIMARY_STATE_FILE`, exactly as Step 5). Dispatch the
 `knowledge-engineer` post-QA variant, handing it — like every Step 4 / QA-Step-3 dispatch — the live
 `$WORKTREE` (at `<BRANCH_PREFIX>/<STORY-KEY>`), `$NX_CACHE_DIRECTORY`, the story key, and the
 story-branch-vs-base diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY-KEY>`). The agent
@@ -530,13 +539,13 @@ story-branch-vs-base diff source (`origin/<BASE-BRANCH>...<BRANCH_PREFIX>/<STORY
 
 Classify the outcome into **exactly five** buckets (do not collapse them):
 
-| Outcome at Step 6.5                                                                                                                                                                                                                                                          | Class                         | Behaviour                                                                                                                                                                                                                                           |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/project/docs-manifest.md` **absent**                                                                                                                                                                                                                                | **no-op (AC4)**               | No dispatch. Proceed to Step 7 unchanged. No warning, no report line.                                                                                                                                                                               |
-| Manifest present; the story's changed-file set **touches no manifest-tracked path** (change-size gate — resolvable case; an **unresolvable** changed-file set or row scopes falls through to an ordinary dispatch instead, fail safe, and lands in one of the buckets below) | **no-op (AC4)**               | No dispatch — the `knowledge-engineer` never runs this pass. Proceed to Step 7. Step 8 report notes `Docs sync: no manifest-tracked files touched — skipped`. Not a failure.                                                                        |
-| Manifest present; regen byte-identical **and** no `how-to` affected (change-gate, §6)                                                                                                                                                                                        | **no-op**                     | Agent makes no commit (`git status --porcelain` empty on written paths). Proceed to Step 7. Step 8 report notes `Docs sync: no changes`. Not a failure.                                                                                             |
-| Manifest present; **docs-content failure** — regen error, docs-commit push failure, or the agent returns `Status: blocked`                                                                                                                                                   | **failure (loud, non-block)** | **WARN, do not block.** Emit a distinct `WARNING: post-QA docs sync failed …`. **Still proceed to Step 7 and open the impl PR** (without the docs commit). The Step 8 report carries a `Docs sync:` line naming the failure + the recovery pointer. |
-| **Workspace-integrity failure** — the dispatch moved the **primary checkout's HEAD**, or its `git status --porcelain` no longer matches the pre-dispatch snapshot, or `$WORKTREE` is left with stray uncommitted/untracked files                                             | **failure (hard STOP)**       | **STOP the run**, same shape as Step 5's guard. Do **not** open the impl PR while the primary checkout is corrupted, or while `$WORKTREE` carries an unattributable stray. Surface the exact violation.                                             |
+| Outcome at Step 6.5 | Class | Behaviour |
+| --- | --- | --- |
+| `.claude/project/docs-manifest.md` **absent** | **no-op (AC4)** | No dispatch. Proceed to Step 7 unchanged. No warning, no report line. |
+| Manifest present; the story's changed-file set **touches no manifest-tracked path** (change-size gate — resolvable case; an **unresolvable** changed-file set or row scopes falls through to an ordinary dispatch instead, fail safe, and lands in one of the buckets below) | **no-op (AC4)** | No dispatch — the `knowledge-engineer` never runs this pass. Proceed to Step 7. Step 8 report notes `Docs sync: no manifest-tracked files touched — skipped`. Not a failure. |
+| Manifest present; regen byte-identical **and** no `how-to` affected (change-gate, §6) | **no-op** | Agent makes no commit (`git status --porcelain` empty on written paths). Proceed to Step 7. Step 8 report notes `Docs sync: no changes`. Not a failure. |
+| Manifest present; **docs-content failure** — regen error, docs-commit push failure, or the agent returns `Status: blocked` | **failure (loud, non-block)** | **WARN, do not block.** Emit a distinct `WARNING: post-QA docs sync failed …`. **Still proceed to Step 7 and open the impl PR** (without the docs commit). The Step 8 report carries a `Docs sync:` line naming the failure + the recovery pointer. |
+| **Workspace-integrity failure** — the dispatch moved the **primary checkout's HEAD**, or its `git status --porcelain` no longer matches the pre-dispatch snapshot, or `$WORKTREE` is left with stray uncommitted/untracked files | **failure (hard STOP)** | **STOP the run**, same shape as Step 5's guard. Do **not** open the impl PR while the primary checkout is corrupted, or while `$WORKTREE` carries an unattributable stray. Surface the exact violation. |
 
 **Why the split (state it inline so a later edit does not blanket-downgrade or blanket-STOP):**
 

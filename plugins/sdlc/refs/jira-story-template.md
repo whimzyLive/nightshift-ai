@@ -44,15 +44,15 @@ Do not include role or surface in summary if it makes it longer than 8 words —
 
 ## Sizing guidance
 
-| Story type                                              | Story Points |
-| ------------------------------------------------------- | ------------ |
-| Read-only view (single surface)                         | 2            |
-| Read-only view (multiple surfaces)                      | 3            |
-| CRUD with simple form (single surface)                  | 3            |
-| CRUD with validation + permissions (single surface)     | 5            |
-| CRUD (multiple surfaces, with integration)              | 8            |
-| Complex workflow with multiple states                   | 8            |
-| New domain entity + full CRUD (all applicable surfaces) | 13           |
+| Story type | Story Points |
+| --- | --- |
+| Read-only view (single surface) | 2 |
+| Read-only view (multiple surfaces) | 3 |
+| CRUD with simple form (single surface) | 3 |
+| CRUD with validation + permissions (single surface) | 5 |
+| CRUD (multiple surfaces, with integration) | 8 |
+| Complex workflow with multiple states | 8 |
+| New domain entity + full CRUD (all applicable surfaces) | 13 |
 
 **Flag anything estimated >8 points for splitting before creating in Jira.**
 
@@ -62,11 +62,11 @@ Do not include role or surface in summary if it makes it longer than 8 words —
 
 Split only at these boundaries:
 
-| Boundary       | Rule                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------- |
-| Role           | Different user roles are separate stories                                                                |
-| Workflow state | Different workflow states that are independently demoable are separate stories                           |
-| CRUD layer     | Read/list stories separate from create/edit only when each is a complete, independently demoable outcome |
+| Boundary | Rule |
+| --- | --- |
+| Role | Different user roles are separate stories |
+| Workflow state | Different workflow states that are independently demoable are separate stories |
+| CRUD layer | Read/list stories separate from create/edit only when each is a complete, independently demoable outcome |
 
 **Do NOT split by layer or domain:**
 

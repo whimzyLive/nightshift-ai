@@ -6,13 +6,15 @@
 #   nightshift's whole promise is "install once, works in any repo." That only holds if the
 #   plugin trees (plugins/*/**) contain ZERO machine- or project-specific details — no
 #   absolute home paths, no author emails, no hardcoded org/stack tokens, no malformed manifests
-#   or agents. It is easy for a contributor (or an AI agent) to paste a `/Users/you/...` path or
-#   an `acme.atlassian.net` literal into an agent and silently break portability for everyone
+#   or agents. It is easy for a contributor (or an AI agent) to paste their own machine's home
+#   directory path or an `acme.atlassian.net` literal into an agent and silently break portability
+#   for everyone
 #   else. This lint is the CI gate that makes the generic-tier invariant enforceable instead of
 #   aspirational. Project specifics belong in the CONSUMER repo's .claude/project/, never here.
 #
 # WHAT IT CHECKS per plugin under plugins/* (all run; non-zero exit if any fail)
-#   1. No machine-absolute paths (/Users/…, /home/<user>/…, C:\…)
+#   1. No machine-absolute paths (a macOS/Linux home directory, a Windows drive letter, or the
+#      Claude Code transcript-directory slug form with path separators turned into dashes)
 #   2. No `./${CLAUDE_PLUGIN_ROOT}` (broken-path regression — the var is absolute)
 #   3. No email addresses / author PII (placeholders like your-org@ are allowed)
 #   4. Plugin agents declare no forbidden frontmatter (hooks / mcpServers / permissionMode)
@@ -25,9 +27,34 @@
 set -uo pipefail   # NOT -e: run every check, aggregate failures.
 
 here="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "$here/.." && pwd)"
 plugins_dir="$(cd "$here/../plugins" && pwd)"
 denylist="$here/portability-denylist.txt"
 fail=0
+
+# Shared machine-absolute-path pattern (used by check #1 below AND by lint_tree's non-plugin
+# scan). Boundary group requires the char before the match not be a path/word char, otherwise
+# an in-repo directory named e.g. `components/home/...` false-positives on `/home/[A-Za-z]`.
+# The `-Users-[A-Za-z]` / `-home-[A-Za-z]` alternatives catch the Claude Code transcript-directory
+# slug form, where `~/.claude/projects/<abs-path>` has every `/` turned into `-` — a plain
+# `/Users/` grep never sees this shape.
+MACH_PATH_RE='(^|[^A-Za-z0-9_./-])(/Users/[A-Za-z]|/home/[A-Za-z]|[A-Za-z]:\\)|-Users-[A-Za-z]|-home-[A-Za-z]'
+
+# Known-legacy files predating this gate's tree-wide scan: they intentionally document a `cd`
+# example command with one operator's own home-directory tree baked in, and are explicitly out
+# of scope for cleanup (see NA-82 QA round). Do not add new entries here — a new file that
+# needs a real absolute-path example should derive it at runtime or use a generic placeholder
+# like `<encoded-repo-path>` instead (see docs/superpowers/plans/NA-81.md).
+TREE_SCAN_ALLOWLIST=(
+  "docs/superpowers/plans/NA-53.md"
+  "docs/superpowers/plans/NA-54.md"
+  "docs/superpowers/plans/NA-55.md"
+  "docs/superpowers/plans/NA-56.md"
+  "docs/superpowers/plans/NA-57.md"
+  "docs/superpowers/plans/NA-60.md"
+  "docs/superpowers/plans/NA-61.md"
+  "docs/superpowers/plans/NA-62.md"
+)
 
 report() { # $1=name  $2=hits
   if [ -n "$2" ]; then
@@ -46,9 +73,9 @@ lint_plugin() { # $1=plugin root (absolute)
   echo
   echo "-- plugin: $plugin_name --"
 
-  # 1. machine-absolute paths
+  # 1. machine-absolute paths (including the Claude Code transcript-directory slug form)
   report "no machine-absolute paths" \
-    "$(grep -rInE '/Users/|/home/[A-Za-z]|(^|[^A-Za-z])[A-Za-z]:\\' "$root" 2>/dev/null || true)"
+    "$(grep -rInE "$MACH_PATH_RE" "$root" 2>/dev/null || true)"
 
   # 2. broken ./${CLAUDE_PLUGIN_ROOT}
   report "no ./\${CLAUDE_PLUGIN_ROOT} regression" \
@@ -112,10 +139,35 @@ lint_plugin() { # $1=plugin root (absolute)
   fi
 }
 
+lint_tree() { # scans the tracked non-plugin tree — plugins/* has its own richer check #1 above
+  echo
+  echo "-- non-plugin tree: tools/, .claude/, docs/ --"
+
+  local hits=""
+  hits="$(cd "$repo_root" && git grep -InE "$MACH_PATH_RE" -- tools .claude docs 2>/dev/null || true)"
+
+  local filtered=""
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    local allowed=0
+    local allow
+    for allow in "${TREE_SCAN_ALLOWLIST[@]}"; do
+      case "$line" in
+        "$allow":*) allowed=1; break ;;
+      esac
+    done
+    [ "$allowed" -eq 1 ] || filtered+="$line"$'\n'
+  done <<< "$hits"
+
+  report "no machine-absolute or slug paths (tools/, .claude/, docs/)" "$(printf '%s' "$filtered")"
+}
+
 for root in "$plugins_dir"/*/; do
   [ -d "$root" ] || continue
   lint_plugin "${root%/}"
 done
+
+lint_tree
 
 # shared marketplace.json — checked once, not per plugin
 echo

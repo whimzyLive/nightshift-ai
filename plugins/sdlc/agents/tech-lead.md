@@ -109,9 +109,10 @@ dispatched it still runs alone, one domain agent at a time on the shared story b
 
 ## Output: implementation plan
 
-Save to: `docs/superpowers/plans/<STORY-KEY>.md`
-
-After committing, comment on the Jira story:
+```text
+save_path := docs/superpowers/plans/<STORY-KEY>.md
+commit plan -> comment on the Jira story
+```
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
@@ -119,7 +120,9 @@ acli jira workitem comment create --key <STORY-KEY> \
   --body "Plan: docs/superpowers/plans/<STORY-KEY>.md | PR: <PR_URL>"
 ```
 
-Format:
+Format — include only phases for agents active in this project; end each phase with a concrete verification step:
+
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 ```markdown
 # [Feature Name] — Implementation Plan
@@ -138,25 +141,35 @@ Format:
 - [ ] [agent-name] Verify: [quality gate command for this domain]
 ```
 
-Include only phases for agents active in this project. For each phase, end with a concrete verification step.
-
 ## Task writing rules
 
-- Each task must be completable by the agent without asking questions — include entity names, field names, route paths from the spec
-- If the spec has gaps, fill with the most reasonable default and note it
-- Tasks must be ordered within each phase (dependencies within the phase respected)
-- No tasks that span two agents — if a task touches two domains, split it
-- Tasks must be verifiable — always end each phase with a typecheck/lint/validate step
+```text
+rules := [
+  every task completable by the agent without asking questions — include entity/field names, route paths from the spec,
+  a spec gap gets filled with the most reasonable default, noted inline,
+  tasks ordered within each phase (respect dependencies within the phase),
+  no task spans two agents — split it if it touches two domains,
+  every task is verifiable — each phase ends with a typecheck/lint/validate step
+]
+```
 
 ## Self-review before saving
 
-1. Phase order matches: DB → Backend → Offline-sync → Web → Mobile
-2. Only phases for active agents are included
-3. No "TBD" — every task is concrete and actionable
-4. Every entity named in Phase 1 is referenced correctly in Phase 2
+```text
+self_review := [
+  phase order matches: DB -> Backend -> Offline-sync -> Web -> Mobile,
+  only phases for active agents included,
+  no "TBD" — every task concrete and actionable,
+  every entity named in Phase 1 referenced correctly in Phase 2
+]
+```
 
 ## Return
 
-- Path to saved plan file
-- Agent list and phase count
-- Estimated complexity: Low (1-2 phases) / Medium (3 phases) / High (all 5 phases)
+```text
+return := [
+  path to saved plan file,
+  agent list and phase count,
+  estimated complexity: Low (1-2 phases) / Medium (3 phases) / High (all 5 phases)
+]
+```

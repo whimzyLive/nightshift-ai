@@ -298,6 +298,22 @@ for f in "$mem_root"/reviews/*.md; do
   validate_review_file "$f"
 done
 
+# ADR frontmatter must open on line 1 — every frontmatter reader in this repo uses the
+# `NR==1 && $0=="---"` idiom (see extract_fm above), so a stray line (e.g. the writing-adrs
+# template's artifact-encoding pointer, accidentally left inside the fence) before the opening
+# `---` makes the frontmatter invisible to every reader, including collect-memory.sh — exactly
+# how docs/adr/0019-0021 shipped with zero agents reachable despite a populated `agents:` field.
+validate_adr_frontmatter() {
+  local file="$1" first_line
+  first_line="$(head -n 1 "$file")"
+  [ "$first_line" = "---" ] || add_offender "$file: line 1 is not '---' — frontmatter is invisible to every NR==1-anchored reader in this repo"
+}
+
+for f in "$repo_root"/docs/adr/*.md; do
+  [ "$(basename "$f")" = "index.md" ] && continue   # generated index, carries no frontmatter
+  validate_adr_frontmatter "$f"
+done
+
 if [ -n "$warnings" ]; then
   echo "check-frontmatter: WARNING — legacy memory artifacts present (migration is NA-74):" >&2
   printf '%s' "$warnings" | sed 's/^/  - /' >&2

@@ -3,8 +3,8 @@ id: plugin-json-version-bump-every-content-commit
 agent: [ai-enablement-engineer]
 trigger: [shipping new plugin content, plugins/sdlc/.claude-plugin/plugin.json, nx release version bump]
 rule: Every commit shipping new content under `plugins/<plugin>/` must bump that plugin's `.claude-plugin/plugin.json` version in the same commit.
-evidence: [NA-44, NA-48, NA-54, NA-58, NA-60, NA-62, NA-65, NA-68]
-uses: 0
+evidence: [NA-44, NA-48, NA-54, NA-58, NA-60, NA-62, NA-65, NA-68, NA-91]
+uses: 1
 status: active
 ---
 

@@ -7,6 +7,6 @@ Agent playbook body — never copied into the generated page.
 
 ## Error Handling
 
-| Scenario           | Behaviour                      |
-| ------------------ | ------------------------------ |
+| Scenario | Behaviour |
+| --- | --- |
 | Missing input file | STOP and surface the bad path. |

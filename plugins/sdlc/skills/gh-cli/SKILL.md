@@ -125,31 +125,31 @@ gh pr merge <number-or-url> --squash --delete-branch
 
 ## Branch conventions
 
-| Artifact   | Branch pattern           |
-| ---------- | ------------------------ |
-| Idea doc   | `ideas/<slug>`           |
-| PRD        | `feature/prd-<slug>`     |
-| Spec       | `spec/<JIRA-KEY>`        |
-| Plan       | `plan/<slug>`            |
-| DB changes | `feat/db/<feature>`      |
-| Backend    | `feat/backend/<feature>` |
-| Sync       | `feat/sync/<feature>`    |
-| Web        | `feat/web/<feature>`     |
-| Mobile     | `feat/mobile/<feature>`  |
+| Artifact | Branch pattern |
+| --- | --- |
+| Idea doc | `ideas/<slug>` |
+| PRD | `feature/prd-<slug>` |
+| Spec | `spec/<JIRA-KEY>` |
+| Plan | `plan/<slug>` |
+| DB changes | `feat/db/<feature>` |
+| Backend | `feat/backend/<feature>` |
+| Sync | `feat/sync/<feature>` |
+| Web | `feat/web/<feature>` |
+| Mobile | `feat/mobile/<feature>` |
 
 ## PR title conventions
 
-| Phase    | Title format                             |
-| -------- | ---------------------------------------- |
-| Idea doc | `docs(idea): <concept title>`            |
-| PRD      | `docs(prd): <feature title>`             |
-| Spec     | `docs(spec): <JIRA-KEY> <story summary>` |
-| Plan     | `docs(plan): <JIRA-KEY> <feature title>` |
-| DB       | `feat(db): <description>`                |
-| Backend  | `feat(backend): <description>`           |
-| Sync     | `feat(sync): <description>`              |
-| Web      | `feat(web): <description>`               |
-| Mobile   | `feat(mobile): <description>`            |
+| Phase | Title format |
+| --- | --- |
+| Idea doc | `docs(idea): <concept title>` |
+| PRD | `docs(prd): <feature title>` |
+| Spec | `docs(spec): <JIRA-KEY> <story summary>` |
+| Plan | `docs(plan): <JIRA-KEY> <feature title>` |
+| DB | `feat(db): <description>` |
+| Backend | `feat(backend): <description>` |
+| Sync | `feat(sync): <description>` |
+| Web | `feat(web): <description>` |
+| Mobile | `feat(mobile): <description>` |
 
 ## PR body template per phase
 
@@ -192,10 +192,10 @@ echo "PR: $pr_url"
 
 ## Error handling
 
-| Error                     | Fix                                                     |
-| ------------------------- | ------------------------------------------------------- | ------------- |
-| Auth error                | Tell user: `gh auth login`                              |
-| Branch not pushed         | `git push -u origin $(git branch --show-current)` first |
-| PR already exists         | Report existing URL, do NOT create duplicate            |
-| No commits ahead of base  | Nothing to PR — stop and report                         |
-| `--base` branch not found | Confirm base branch: `git branch -r                     | grep develop` |
+| Error | Fix |
+| --- | --- |
+| Auth error | Tell user: `gh auth login` |
+| Branch not pushed | `git push -u origin $(git branch --show-current)` first |
+| PR already exists | Report existing URL, do NOT create duplicate |
+| No commits ahead of base | Nothing to PR — stop and report |
+| `--base` branch not found | Confirm base branch: `git branch -r \| grep <configured-base-branch>` |

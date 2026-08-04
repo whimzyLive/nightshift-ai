@@ -1,18 +1,15 @@
 # QA Engineer Playbook (post-implementation quality loop)
 
+<!-- notation: `:=` define, `->` leads-to, `⊆` drawn-from-set, ASSERT/ELSE guard, first-match-wins ordering. Full legend: refs/pseudocode-notation.md -->
+
 The code-quality lifecycle for a Jira story implementation. **This playbook is executed
 INLINE by the top-level session** — it is invoked by the Principal Engineer playbook
 (`${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md`, Step 6) once all domain-agent
 implementation phases are pushed to `<BRANCH_PREFIX>/<STORY-KEY>`. It is NOT dispatched as a subagent.
 
-## Why inline (read this first)
+## Why inline
 
-Claude Code blocks subagent → subagent dispatch (nesting is one level deep). The QA loop's
-whole job is to dispatch an `agent-skills:code-reviewer` subagent AND dispatch domain agents
-to fix what the review finds — both need the `Agent` tool, which only works at the top level.
-The Principal Engineer playbook already runs inline; when it reaches Step 6 it **continues
-running these QA steps in the same top-level session**. Do NOT dispatch a `qa-engineer`
-subagent — it would be unable to dispatch the reviewer or fixers and would return blocked.
+# rationale: refs/design-notes/inline-orchestration-rationale.md
 
 ## Role
 
@@ -50,6 +47,8 @@ You return a single verdict (`clean` or `blocked`) to the Principal Engineer.
   > `WORK_KIND` (see `commands/review-fix.md`) — a defect has no plan doc, so that verification is
   > correctly skipped. The defect regression-evidence contract is enforced on the `/auto`/`/impl` and
   > `/review` paths, which do supply `WORK_KIND`.
+- The phase ledger — **optional**; a cache Step 3 resolves (git-reconstruction fallback) before
+  dispatching each fix agent, never a STOP when absent (D3).
 
 ## Modes
 
@@ -58,15 +57,15 @@ The loop runs in one of two modes. The caller picks the mode; the steps below ar
 lean ad-hoc variant used by `/review` with no story key — it reviews the current change set with
 no Jira ticket, plan, or PR.
 
-|                                         | Story mode                                                                    | Diff mode (ad-hoc, no story key)                                                                                                                                                                                                                     |
-| --------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trigger                                 | `<STORY-KEY>` provided                                                        | no story key — review the current diff                                                                                                                                                                                                               |
-| Review target                           | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>`                   | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
-| Requirements given to reviewer (Step 1) | plan + acceptance criteria                                                    | the change's own intent (commit subjects + changed-file summary) — there are no ACs                                                                                                                                                                  |
-| Fix commits (Step 3)                    | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user                                                                                                                       |
-| Review file + rule entries (Step 5)     | required                                                                      | **skip** — no story to key the entry to                                                                                                                                                                                                              |
-| AC + plan verification (Step 7)         | required                                                                      | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green                                                                                                                                               |
-| Verdict (Step 8)                        | full block incl. AC + learnings lines                                         | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)`                                                                                                                                                         |
+|  | Story mode | Diff mode (ad-hoc, no story key) |
+| --- | --- | --- |
+| Trigger | `<STORY-KEY>` provided | no story key — review the current diff |
+| Review target | commit range `BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>` | **single-point working-tree diff** `git diff <BASE_SHA>` (committed-unmerged + staged + **uncommitted**) + untracked files, where `BASE_SHA = git merge-base origin/develop HEAD` — NOT a commit range (a commit range cannot see uncommitted edits) |
+| Requirements given to reviewer (Step 1) | plan + acceptance criteria | the change's own intent (commit subjects + changed-file summary) — there are no ACs |
+| Fix commits (Step 3) | committed by domain agent, **pushed** by you to `<BRANCH_PREFIX>/<STORY-KEY>` | applied in the **working tree**, committed only if the change set was already committed; **never pushed** — leave for the user |
+| Review file + rule entries (Step 5) | required | **skip** — no story to key the entry to |
+| AC + plan verification (Step 7) | required | **skip the AC/plan checklist**; instead confirm every review finding is resolved and the gate is green |
+| Verdict (Step 8) | full block incl. AC + learnings lines | drop the `AC check` and `Learnings` lines; add `Fixes: applied in working tree (not pushed)` |
 
 Everything else (request review → triage → fix → re-review → quality gate → return verdict) is
 identical. In Diff mode, wherever a step says `<BRANCH_PREFIX>/<STORY-KEY>`, operate on the current branch /
@@ -130,8 +129,8 @@ skill pattern. The prompt MUST include:
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
 - `PLAN_OR_REQUIREMENTS`: Story mode — the story's **acceptance criteria verbatim** (the reviewer
-  must check the code against the ACs, not just internal consistency), **plus** the full content of
-  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists** (the full path). On the
+  must check the code against the ACs, not just internal consistency), **plus** the path to
+  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists** — the reviewer reads it itself. On the
   **lightweight** path there is no plan doc — use the Jira story **description + acceptance criteria**
   as the requirement source (the ACs are the contract). Diff mode — there are no ACs/plan; the
   requirement is the change's stated intent.
@@ -252,6 +251,27 @@ agent reuse` token** (`.claude/project/project-context.md` Tooling):
   fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
   frontmatter skill injection (harness bug #76337) — wasted tokens, not a correctness risk.
 
+Record the reuse decision (AC-3, rolled into Step 8's verdict):
+
+```text
+SDLC agent reuse = disabled -> fresh Agent(...), REUSE=false, reason=disabled-by-config
+reused instance available -> SendMessage resume, REUSE=true, reason=reused
+reused instance unavailable, session boundary -> fresh Agent(...), REUSE=false, reason=fallback-session-boundary
+reused instance already returned/terminated -> fresh Agent(...), REUSE=false, reason=fallback-instance-terminated
+```
+
+**Resolve the phase ledger row before building the prompt** (a cache, never required):
+
+```text
+ledger_file := $(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/phase-ledger.txt
+ledger_file readable -> select the row whose LEDGER_AGENT matches the dispatch target
+ledger_file absent -> reconstruct: git -C "$WORKTREE" diff --name-only BASE_SHA..origin/<BRANCH_PREFIX>/<STORY-KEY>, group by the project-context workspace->agent table   # a fresh session after Step-7 teardown has no temp dir
+reconstruction fails -> dispatch without a ledger   # never a STOP: the ledger is an optimisation, not a contract input
+no row matches the dispatched domain -> dispatch without a ledger row
+```
+
+A resolved row is placed before item 4's findings below.
+
 Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST include:
 
 1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
@@ -275,21 +295,22 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
    test in `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`) and stage them with your commit."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+10. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md."
+11. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
-**Before dispatching**, capture the primary checkout's state (spec §5, same machine guard as
-principal playbook Step 5) — a **snapshot to diff against later, not an assertion**; the primary
-may already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a
-violation:
+**Before dispatching**, snapshot the primary checkout's state (spec §5, same machine guard as
+principal playbook Step 5) — a snapshot to diff against later, not an assertion; the primary may
+already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a violation:
 
-```bash
-PRIMARY_HEAD=$(git -C "<primary-root>" rev-parse HEAD)
-PRIMARY_CLEAN_BEFORE=$(git -C "<primary-root>" status --porcelain)   # snapshot as-is (may be non-empty)
+```text
+snap := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh snapshot <primary-root>
+# -> PRIMARY_HEAD, PRIMARY_STATE_FILE, PRIMARY_PRE_DIRTY (keep PRIMARY_STATE_FILE for the assert call below)
+PRIMARY_PRE_DIRTY == 'true' -> print the one-line warning below, then proceed  # never a blocked
 ```
 
-If `PRIMARY_CLEAN_BEFORE` is non-empty the first time you capture it in this run, proceed anyway
-with a one-line warning (`WARNING: primary checkout has pre-existing uncommitted changes unrelated
-to this story — snapshotting and comparing, not blocking`); do not return `blocked` on pre-existing
-dirt you didn't cause.
+`WARNING: primary checkout has pre-existing uncommitted changes unrelated to this story —
+snapshotting and comparing, not blocking`. Do not return `blocked` on pre-existing dirt you didn't
+cause — that consequence stays here, not in the script.
 
 After the agent returns, push and confirm from the worktree:
 
@@ -299,19 +320,21 @@ git fetch origin <BRANCH_PREFIX>/<STORY-KEY>
 git log origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline -3
 ```
 
-Then assert the primary checkout matches its pre-dispatch snapshot exactly — HEAD identical AND
-status output identical to `PRIMARY_CLEAN_BEFORE` (NOT asserted empty; a pre-dirty primary that
-stays at the same dirt is a pass, only a _change_ from the captured snapshot is a violation):
+Then assert the primary checkout matches its pre-dispatch snapshot exactly:
 
-```bash
-[ "$(git -C "<primary-root>" rev-parse HEAD)" = "$PRIMARY_HEAD" ] \
-  && [ "$(git -C "<primary-root>" status --porcelain)" = "$PRIMARY_CLEAN_BEFORE" ] \
-  || echo "BLOCKED: fix agent wrote to the primary checkout instead of \$WORKTREE"
+```text
+assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
+# -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+WORKSPACE_INTEGRITY == 'VIOLATED' -> BLOCKED: fix agent wrote to the primary checkout instead of $WORKTREE
 ```
 
-If the primary checkout's HEAD moved, or its working tree no longer matches the pre-dispatch
-snapshot → **return `blocked`** immediately with that reason (same detectable-failure shape as the
-principal playbook's Step-5 guard) — do not attempt to fix or revert it yourself.
+The script's OK/none is exact-match against the snapshot (NOT asserted empty) — a pre-dirty
+primary that stays at the same dirt still passes; only a *change* from the captured snapshot is a
+violation.
+
+If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason (same
+detectable-failure shape as the principal playbook's Step-5 guard) — do not attempt to fix or
+revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.
@@ -346,10 +369,18 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Review round file** — write `$WORKTREE/.claude/memories/reviews/${DATE}-<STORY-KEY>.md`, one
-file per round, **unconditionally, every round**: a second or third round reviewed on the same date
-takes the `-r2`, `-r3`, … suffix (`${DATE}-<STORY-KEY>-r2.md`). Frontmatter is the 5-field review
-schema:
+**1. Review round file**
+
+```text
+review_file := $WORKTREE/.claude/memories/reviews/${DATE}-<STORY-KEY>.md
+write review_file unconditionally, every round
+second/third round, same date -> append -r2, -r3, ... suffix (${DATE}-<STORY-KEY>-r2.md)
+issue_count: 0 -> frontmatter only, no body   # the file exists purely as the "this story was reviewed" marker the analyze finding and the maintenance-op GC key on
+issue_count > 0 -> frontmatter + body (## Issues / ## Preventions / ## Rules written)
+never soft-skip this file — a finding that repeats something an `accepted` ADR already documents is itself recurrence evidence `/sdlc:docs distill` needs to see (adr-pipeline.md §6 Recurrence)
+```
+
+Frontmatter is the 5-field review schema:
 
 ```yaml
 ---
@@ -361,11 +392,9 @@ issue_count: <N> # count of Critical + Important findings this round
 ---
 ```
 
-**A clean round (`issue_count: 0`) writes the frontmatter above and nothing else** — no body — the
-file exists purely as the "this story was reviewed" marker that the analyze finding and the
-maintenance-op GC key on.
+A round with findings adds this body:
 
-**A round with findings** adds a body:
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 ```
 ## Issues
@@ -377,10 +406,6 @@ maintenance-op GC key on.
 ## Rules written
 <list of rule ids created from this round, or "none">
 ```
-
-This round file is never soft-skipped, even when a finding repeats something an `accepted` ADR
-already documents — a repeat violation of an accepted convention is itself recurrence evidence that
-`/sdlc:docs distill` needs to see (per `adr-pipeline.md` §6's Recurrence criterion).
 
 **2. Rule entries** — for each agent that fixed something this round, write rule entries under
 `$WORKTREE/.claude/memories/agents/<fixing-agent>/<rule-id>.md` (cross-cutting → `agents/shared/`)
@@ -404,97 +429,38 @@ git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
 
 ## Step 6 — Quality gate
 
-```bash
-git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE" merge --ff-only origin/<BRANCH_PREFIX>/<STORY-KEY>
+```text
+offload := Agent("general-purpose", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX>,
+  "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")
+Stray files non-empty -> STOP, list; never clean
+Gate:fail -> dispatch Owning agent w/Error(Step3), push, re-offload fresh
+Gate:pass,Evidence="" | no Gate: key -> re-offload once, fallback
+fallback := Read qa-gate-runner.md, run INLINE; offload=inline-fallback
+carry Evidence -> Step-8 `Quality gate:`
 ```
-
-**Before running the gate, assert `$WORKTREE` is clean.** The gate now runs in the shared,
-persistent `$WORKTREE` where an earlier fix-round agent may have left uncommitted or untracked
-files behind (e.g. a forgotten `git add` of a new source file) — the gate would then pass against a
-tree that isn't actually what got pushed, a false green.
-
-```bash
-[ -z "$(git -C "$WORKTREE" status --porcelain)" ] \
-  || { echo "STOP: \$WORKTREE has stray uncommitted/untracked files before the quality gate — $(git -C "$WORKTREE" status --porcelain)"; exit 1; }
-```
-
-A non-empty result → list the stray files and **STOP** (same blocked shape as elsewhere in this
-playbook — dispatch the owning domain agent to either commit or discard them; never silently clean
-them yourself).
-
-Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate)
-**inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the shared Nx
-cache exported so the gate run hits the warm cache (spec §3):
-
-```bash
-export NX_CACHE_DIRECTORY="$NX_CACHE_DIRECTORY"
-cd "$WORKTREE"
-# ... run the project-context Tooling + Quality Gate commands here ...
-```
-
-If the change touched infra, also run the infra build with the stage flag from project-context (still inside `$WORKTREE`).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
 **exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean. Paste the
 actual gate output — never claim a pass without it (`verification-before-completion`).
 
-> Treat the project-context quality-gate commands as a real gate: the test command may run
-> `.ts` via a transpiler and pass THROUGH type errors. Also confirm no compiled `.js` shadows
-> source — a green test suite does not prove
-> the deployed bundle is correct (consult the Step 1 pre-review scan of `.claude/memories/reviews/*.md`
-> for prior findings on this domain).
-
 ## Step 7 — Verification before completion (AC + plan check)
 
-Apply `verification-before-completion`. Produce line-by-line checklists, each item confirmed
-with evidence (git log, file existence, or test output) — no item checked off on assertion alone:
+Follow `${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md` — the plan-task checklist, the AC
+checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live there.
 
-1. **Every plan task** in `docs/superpowers/plans/<STORY-KEY>.md` → has a corresponding commit/file/test.
-   _(Full path only. On the lightweight path there is no plan doc — skip this checklist; the AC
-   checklist below is the completion contract.)_
-2. **Every acceptance criterion** on the Jira story → is met by code that exists on the branch,
-   with the specific evidence (handler/test/file) named. _(Always — and the primary gate on the
-   lightweight path.)_
-
-**On the defect path (`WORK_KIND=defect`) — ALSO require the systematic-debugging completion
-contract (AC17).** A defect has **no plan doc**, so checklist 1 is skipped (as on any lightweight
-path); the AC checklist (2) still applies, and **in addition** the following regression-evidence
-contract MUST hold — without it, return `blocked` (never `clean`):
-
-1. **A regression test that FAILED before the fix and PASSES after.** Take the evidence from the
-   branch's **own commit sequence**, NOT a `BASE_SHA` checkout:
-   - at the **phase-3 commit** (regression test added, phase-4 fix not yet applied) the test **fails
-     as an assertion** against the still-buggy behaviour;
-   - at **HEAD** (fix applied) it **passes**.
-
-   > Why not `BASE_SHA`: at develop's merge-base the test file does not yet exist, so running it
-   > there fails to _compile/resolve_ rather than _assert_ — it cannot distinguish "failed because
-   > the bug is present" from "failed to build". The **phase-3 commit** is the correct pre-fix point:
-   > the test exists there and exercises code that compiles, failing only on the assertion the fix
-   > later satisfies.
-
-   ```bash
-   # Identify the phase-3 commit (regression test added, before the fix), then show fail→pass.
-   # Always inside $WORKTREE (the same one captured in Step 5) — never the primary checkout.
-   git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-   git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline   # locate the phase-3 (test) commit
-   git -C "$WORKTREE" checkout <phase-3-sha>          # detached, inside $WORKTREE only
-   # run the regression test here: FAILS (assertion) against the still-buggy behaviour — paste output.
-   git -C "$WORKTREE" checkout <BRANCH_PREFIX>/<STORY-KEY>   # back to HEAD, inside $WORKTREE
-   # run the regression test here again: PASSES — paste output.
-   ```
-
-2. **The full test suite passes with no regressions** (the Step-6 gate output covers this).
-
-This is **in addition** to the existing lightweight ACs-as-contract fallback — the defect path
-_adds_ the failing→passing regression-test requirement. (No double-verify: systematic-debugging
-phase-4 is the _implementer's_ inner check that the fix works; this Step-7 contract is QA's _outer_
-gate proving the regression evidence + clean suite.)
-
-```bash
-git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY>
-git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
+```text
+offload := Agent("general-purpose", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
+  "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
+Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
+WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
+no Verification: -> re-offload once, fallback
+fallback := Read ac-verification.md INLINE; offload=inline-fallback
+never -> clean while Unmet non-empty
+carry result -> Step-8 AC check:
 ```
+
+**The full test suite passing with no regressions is covered by the Step-6 gate output** — the
+verifier's regression-evidence contract does not re-run it.
 
 Any plan task or AC with no corresponding evidence → dispatch the owning domain agent to
 complete it (Step 3 protocol), then re-run Steps 6–7. On the defect path, a regression test that
@@ -508,6 +474,7 @@ Return exactly this block (the caller creates the PR only on `clean`):
 ## QA verdict: <STORY-KEY>
 Status: clean | blocked
 Review rounds: <N>
+Fix dispatch: reuse <N> / fresh <N>
 Fixed (Critical/Important): <list, or "none">
 Minor noted (not fixed): <list, or "none">
 AC check: <met — all N ACs evidenced | UNMET: <which> >

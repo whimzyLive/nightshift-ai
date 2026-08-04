@@ -31,5 +31,18 @@
     "network": {
       "allowedDomains": ["www.google-analytics.com"]
     }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/rtk-line-scan.sh\""
+          }
+        ]
+      }
+    ]
   }
 }

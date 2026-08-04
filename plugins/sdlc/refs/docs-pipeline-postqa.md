@@ -56,10 +56,10 @@ see `refs/principal-engineer-playbook.md` Step 6.5; this ref defines only the di
 `sync` derives `CHANGED_FILES` / `CHANGED_DIFF` from one of **two** sources, so it works both before
 and after the story branch merges:
 
-| Diff source                                | `CHANGED_FILES` / `CHANGED_DIFF` derivation                                                                                               | Used when                                                                                                                                                                            |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Diff source | `CHANGED_FILES` / `CHANGED_DIFF` derivation | Used when |
+| --- | --- | --- |
 | **story-branch-vs-base** (existing, NA-52) | `git diff [--name-only] "origin/<BASE-BRANCH>...$STORY_BRANCH"` — three-dot range, remote-tracking base, after `git fetch origin --quiet` | The story branch **exists on origin** (`origin/feat/<STORY-KEY>` or `origin/fix/<STORY-KEY>`). The **post-QA phase (§25) always selects this** — the branch is present and unmerged. |
-| **merged-commit** (NEW, this story)        | Locate the commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>`, then `git diff [--name-only] "<sha>^..<sha>"` (see below)          | The story branch is **absent on origin** — a post-merge (squash-merged, branch deleted) or never-branched standalone `sync`.                                                         |
+| **merged-commit** (NEW, this story) | Locate the commit(s) on `origin/<BASE-BRANCH>` carrying `<STORY-KEY>`, then `git diff [--name-only] "<sha>^..<sha>"` (see below) | The story branch is **absent on origin** — a post-merge (squash-merged, branch deleted) or never-branched standalone `sync`. |
 
 ### Selection rule (deterministic, no ambient input)
 

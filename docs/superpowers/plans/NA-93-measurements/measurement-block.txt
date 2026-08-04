@@ -1,0 +1,39 @@
+| Metric | Baseline (spec corpus) | This run | Guardrail | Verdict |
+| --- | --- | --- | --- | --- |
+| Loop-pass turns on any model | 262 across 45 sessions (fable-5 129 / opus-4-8 98 / opus-5 35) | | decreased | NOT CAPTURED — pre-change contract; `plugins/**` edits do not reach running agents |
+| `loop-decide.sh` invocations per pass | 0 | | exactly 1 | NOT CAPTURED — same |
+| `returnCapExceeded` (stdout > 600 B) | n/a | false (169 B observed on 4 live invocations) | `false` | NOT CAPTURED — pilot only |
+| Clean-guard rejections | n/a | | 0 | NOT CAPTURED — pilot only |
+| `RULE=unresolvable` occurrences | n/a | 0 of 4 live invocations | recorded, each with its `BLOCKED_BY` | NOT CAPTURED — pilot only |
+| Loop passes per PR (`BUDGET_PASS_COUNT`) | — | | not increased (AC-2) | UNDECIDABLE (n=1, no matched control) |
+| Top-level resident @ loop-pass turns, mean | 254,390 | | not increased | UNDECIDABLE |
+| Top-level resident @ loop-pass turns, Σ | 66,650,150 | | decreased | UNDECIDABLE |
+| Billed tokens on the session model, per story | — | | decreased (AC-3) | UNDECIDABLE |
+| `cacheReadRatio` | 0.9660 | | >= 0.94 | NOT CAPTURED — pilot only |
+| Requests per story | — | | reported, not gated (carve-out granted; H expects <= 0) | UNDECIDABLE |
+| QA rounds per story | — | | not increased | UNDECIDABLE |
+| `Status: blocked` rate | — | | not increased | UNDECIDABLE |
+| Review findings per round | — | | not increased | UNDECIDABLE |
+| `commands/loop.md` bytes | 17,544 | 13,421 | <= 13,500 | **decided by this run — PASS** |
+| Combined `loop.md` + `loop-modes.md` bytes | 36,395 | 26,955 | <= 27,000 | **decided by this run — PASS** |
+| Combined playbook bytes | 73,386 | 73,386 (unchanged) | <= 73,704 | **decided by this run — PASS** |
+| Decision equivalence, all 1,458 cases | n/a | `mismatches=0 / cases=1458` | `mismatches[]` empty | **decided by this run — PASS** |
+| `observed.rulesWithZeroEvidence` | `["1","5","6","7"]` | `["1","5","6","7"]` (unchanged; snapshots=97, distinct=10 — see the 186-vs-97 correction in live-input-evidence.txt) | reported, never suppressed | **decided by this run — PASS** |
+
+**Five rows are decidable by this run: the three byte caps, the 1,458-case equivalence, and the
+zero-evidence register.** State that plainly rather than implying the story proved a spend cut.
+State, verbatim, what the story DOES claim: **1.52% of top-level resident tokens removed from
+every model tier**, **-9,991 B of per-pass top-level instruction surface (~= -9,571 B net of the
++420 B stdout delta)**, and **1,458-case exhaustive decision equivalence against a golden
+extracted from the pre-change tables by a different agent**. **No dollar figure.**
+
+**H ships a script, not a Haiku subagent — a deliberate deviation from AC-1's literal wording**
+(decision 1, ADR 0020). **AC-5's 3.0% stays uncounted** until the pilot passes every gate.
+
+**Correction on file, stated once here as the pointer:** the spec/plan's "186 snapshots / 9
+distinct tuples" corpus baseline is a superseded, un-deduplicated grep estimate (each probe event
+is stored twice per JSONL record — `message.content` and `toolUseResult.stdout`, byte-identical).
+The tool's own deduplicated `--replay` output is **97 snapshots / 10 distinct tuples** (the extra
+tuple is allowed corpus growth). `rulesWithZeroEvidence == ["1","5","6","7"]` is unaffected by the
+correction — that is the load-bearing conclusion, under either count. Full detail:
+`live-input-evidence.txt`.

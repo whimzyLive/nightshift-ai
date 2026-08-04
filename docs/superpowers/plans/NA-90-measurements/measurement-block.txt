@@ -1,0 +1,56 @@
+### Bounded-read measurement (NA-90 / workstream E)
+base-ref:                        71d9ea8   (spec quoted d3ea1e0, an ancestor — substitution recorded)
+corpus:                          107 top-level + 550 subagent transcripts   (subagent count > 0; recursive glob, 6,085 reads)
+windowed share, before:          26.06%  (1,586 / 6,085 reads, orchestrator 798 + subagent 5,287; spec baseline 26.1%, 1,380 / 5,292)
+windowed share, after:           NOT CAPTURED — see the deferred-runtime note (Gate 3)
+whole reads >= 2,000 est tok:    1,338 (~8,149,718 est tok, ~65.3% of read volume; spec baseline 1,139 / 7,019,073 / 63.9% — the est-tok/pct figures are re-derived here via read-bounding.py's own functions over the same pinned corpus list, since the JSON report does not itself sum est tokens for this subset; count matches the committed baseline exactly, 1,338)
+read p50 / p95 / max:            867 / 9,774 / 25,188 est tok   (spec baseline 890 / 9,924 / 25,188)
+top-decile share:                51.68%   (Epic figure 51%, spec baseline 51.6% — reproduces)
+carve-out hit rate, before:      72.59%  (4,113 / 5,666 under-cap reads read whole)
+  WHY THIS LINE EXISTS:          468 of 681 addressable reads (68.7%) are under the 400-line cap, where
+                                 Grep-first is a NET LOSS. An aggregate win with a low hit rate is a
+                                 systematic loss on the majority, hidden by the mean.
+  FINDING:                       the pre-change hit rate is already 72.59%, not low — most under-cap
+                                 reads in this corpus are already taken whole without any contract in
+                                 force. The risk this story guards against (a Grep-first contract that
+                                 pushes large numbers of these into windowed MISSES) is not yet visible
+                                 in this baseline; it is only observable once an agent executes under
+                                 the new clause (Gate 3). A passing aggregate today says nothing about
+                                 whether the hit rate holds or falls after adoption.
+NET DOMAIN-AGENT READ VOLUME:    12,474,626 -> NOT CAPTURED est tok/story
+  net reduction:                 NOT CAPTURED   (GATE: must be >= 9,020 — Decision 2; NA-90's own
+                                 implementation run cannot be the pilot — every domain dispatch in
+                                 this run executed on the PRE-change contract, see pilot-obligation.md)
+requests per story:              NOT CAPTURED -> NOT CAPTURED (delta NOT CAPTURED)   REPORTED, never a
+                                 pass/fail input (Decision 1) — deferred to the same Gate-3 pilot
+static instruction delta:        276,262 -> 276,634 est tok  (+372, instruction-inventory.sh --base
+                                 71d9ea8; POSITIVE, within the <= 500 budget; plan estimated ~+395)
+  per-story static cost:         +395 x ~4 domain dispatches = +1,580 est tok/story
+  ratio to the gate:             1,580 / 9,020 = ~18% of the threshold, paid whether or not agents obey
+bounded-reads.test.sh:           PASS (6 assertions — spec's a-e plus the carve-out guard f)
+Gate 2 falsifiability:           baseline 26.06% / all-windowed 100% / all-whole 0%
+context-reuse.test.sh:           PASS (4 assertions)   — C regression guard, verified capable of
+                                 failing (Task 2.5 Step 3: a 1-byte perturbation to '## Context reuse'
+                                 flips bounded-reads.test.sh assertion (e) to FAIL, restored clean)
+QA rounds:                       NOT CAPTURED   (gate: must not increase)
+cache hit rate:                  NOT CAPTURED   (gate: >= 94%)
+avg / peak resident:             NOT CAPTURED   (gate: must decrease)
+loop passes per PR:              NOT CAPTURED   (gate: must not increase)
+
+DECISIONS RECORDED AS DECIDED (founder, spec review gate, 2026-07-31):
+  1. More requests are acceptable PROVIDED total tokens fall significantly. Relaxes the Epic's
+     "requests per story must not increase" guardrail for workstream E ONLY. Every other Epic
+     guardrail applies unchanged. The request delta is still reported, never suppressed.
+  2. "Significantly" := >= 9,020 est tok/story net reduction in domain-agent read volume.
+     net fall >= 9,020                     -> PASS
+     net fall > 0 but < 9,020              -> FAIL -> REVERT, not argued
+     net flat or up                        -> FAIL -> REVERT
+     QA rounds / blocked rate / findings up -> FAIL -> REVERT   # Epic tie-breaker, NOT relaxed
+
+GATE 3 STATUS: NOT YET RUN. This PR ships the clause, its CI guard, and the measurement
+instrument (Phase 1's read-bounding.py + baseline); it does not and cannot supply the pilot
+evidence (NA-88 D11 / Global Constraints: NA-90's own implementation run executes on the
+pre-change contract, so an "after" number from it would measure the OLD contract while reading
+as if it measured the new one). See docs/superpowers/plans/NA-90-measurements/pilot-obligation.md
+for the pilot selection rule and the report shape the pilot must produce. Per AC-5, E's 4.9%
+cut-rate does NOT count toward the programme's AC-1 until Gate 3 passes every gate above.

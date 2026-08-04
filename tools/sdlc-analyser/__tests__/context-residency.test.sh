@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# context-residency.test.sh — NA-91 Gate-2 falsifiability harness for context-residency.py.
+#
+# AUTHOR-RUN AND CI-WIRED:
+#   bash tools/sdlc-analyser/__tests__/context-residency.test.sh
+# Exit 0 = PASS, exit 1 = FAIL.
+#
+# NA-88 D11 — these fixtures are authored by the same story that authors the tool. A pass
+# proves the tool does what its author intended; it is a SMOKE TEST, never a gate on session
+# behaviour. Gate 3 (a pilot on an independent story) is the only evidence about the boundary
+# itself. Falsifiability: the metric must return 0.0, 0.5 and 1.0 over the three fixed corpora
+# — a tool returning one number against all three would be incapable of measuring anything.
+#
+# JSON fields are read via python3 extraction, never a whole-blob substring grep — a substring
+# check like `assert_contains '"cacheReadRatio": 0.9'` also passes for a hardcoded `0.99` (0.9
+# is a literal prefix of 0.99), and `assert_contains '"inheritedShare": 0.5'` passes for
+# `0.5001` too. Ported from the top_field()/unit_field() pattern in work-placement.test.sh
+# (NA-92).
+set -uo pipefail
+
+here="$(cd "$(dirname "$0")" && pwd)"
+tool="$here/../context-residency.py"
+fixtures="$here/fixtures/context-residency"
+fail=0
+
+field() { # <json> <field> -- prints the JSON-serialised value (null/true/false/number/"string")
+  printf '%s' "$1" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(json.dumps(d['$2']))
+"
+}
+
+assert_eq() { # <label> <actual> <expected>
+  [ "$2" = "$3" ] && printf 'ok   %s\n' "$1" \
+    || { printf 'FAIL %s\n     expected: %s\n     got:      %s\n' "$1" "$3" "$2"; fail=1; }
+}
+
+assert_contains() {
+  case "$2" in
+    *"$1"*) printf 'ok   %s\n' "$3" ;;
+    *) printf 'FAIL %s\n     expected to contain: %s\n     got: %s\n' "$3" "$1" "$2"; fail=1 ;;
+  esac
+}
+
+# --- Gate 2: the metric must reach BOTH ends AND a middle value --------------------
+out="$(python3 "$tool" no-boundary --corpus-list "$fixtures/list-no-boundary.txt" --json 2>/dev/null)"
+assert_eq "no-boundary: four assistant turns counted"    "$(field "$out" assistantTurns)"      "4"
+assert_eq "no-boundary: byte-turn exposure summed"       "$(field "$out" toolResultExposure)"  "12"
+assert_eq "no-boundary: no PR raise -> null boundary"    "$(field "$out" boundaryTurn)"         "null"
+assert_eq "no-boundary: inheritedShare reaches 0.0"      "$(field "$out" inheritedShare)"       "0.0"
+assert_eq "no-boundary: cache-read ratio computed"       "$(field "$out" cacheReadRatio)"       "0.9"
+
+out="$(python3 "$tool" full-inherit --corpus-list "$fixtures/list-full-inherit.txt" --json 2>/dev/null)"
+assert_eq "full-inherit: gh pr create detected at turn 1" "$(field "$out" boundaryTurn)"       "1"
+assert_eq "full-inherit: all exposure is inherited"       "$(field "$out" inheritedExposure)"  "12"
+assert_eq "full-inherit: inheritedShare reaches 1.0"      "$(field "$out" inheritedShare)"     "1.0"
+
+out="$(python3 "$tool" partial --corpus-list "$fixtures/list-partial.txt" --json 2>/dev/null)"
+assert_eq "partial: raise-pr.sh detected at turn 2"       "$(field "$out" boundaryTurn)"          "2"
+assert_eq "partial: total exposure 400 byte-turns"        "$(field "$out" toolResultExposure)"   "400"
+assert_eq "partial: 200 byte-turns inherited"             "$(field "$out" inheritedExposure)"    "200"
+assert_eq "partial: inheritedShare reaches a middle value" "$(field "$out" inheritedShare)"      "0.5"
+assert_contains 'raise-pr.sh' "$(field "$out" boundaryCommand)" "partial: the matched boundary command is reported"
+
+# --- The control arm: --boundary none forces the boundary off ---------------------
+out="$(python3 "$tool" partial-none --corpus-list "$fixtures/list-partial.txt" --boundary none --json 2>/dev/null)"
+assert_eq "--boundary none: boundary forced off" "$(field "$out" boundaryTurn)"   "null"
+assert_eq "--boundary none: nothing is inherited" "$(field "$out" inheritedShare)" "0.0"
+
+# --- The corpus partition is always printed, both counts, always ------------------
+out="$(python3 "$tool" partition --corpus-list "$fixtures/list-partial.txt" --json 2>/dev/null)"
+assert_eq "corpus: top-level partition count emitted" "$(field "$out" topLevelTranscripts)" "1"
+assert_eq "corpus: subagent partition count emitted"  "$(field "$out" subagentTranscripts)" "0"
+
+err="$(python3 "$tool" sub --corpus-list "$fixtures/list-subagent.txt" --json 2>&1 >/dev/null)"
+assert_contains 'subagent' "$err" "a subagent transcript prints the loud population WARNING"
+
+# --- Error handling: every row of the spec's table, exercised --------------------
+out="$(python3 "$tool" edge --corpus-list "$fixtures/list-edge-cases.txt" --json 2>/dev/null)"
+assert_eq "unparseable line is skipped and counted"     "$(field "$out" skippedLines)"       "1"
+assert_eq "a tool_use with no result adds no exposure"  "$(field "$out" toolResultExposure)" "2"
+
+python3 "$tool" nope /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
+[ "$?" -eq 1 ] && printf 'ok   %s\n' "unresolvable corpus exits 1" \
+  || { printf 'FAIL %s\n' "unresolvable corpus must exit 1"; fail=1; }
+
+python3 "$tool" bad --corpus-list "$fixtures/list-partial.txt" --boundary bogus >/dev/null 2>&1
+[ "$?" -eq 2 ] && printf 'ok   %s\n' "invalid --boundary exits 2" \
+  || { printf 'FAIL %s\n' "invalid --boundary must exit 2"; fail=1; }
+
+# --- Review finding 1: a partial corpus-list miss warns loud and exits non-zero ----
+err="$(python3 "$tool" partial-miss --corpus-list "$fixtures/list-partial-miss.txt" --json 2>&1 >/dev/null)"
+assert_contains 'WARNING'              "$err" "partial-miss: a dropped corpus-list path prints a loud WARNING"
+assert_contains 'does-not-exist.jsonl' "$err" "partial-miss: the WARNING names the missing path"
+python3 "$tool" partial-miss --corpus-list "$fixtures/list-partial-miss.txt" >/dev/null 2>&1
+[ "$?" -ne 0 ] && printf 'ok   %s\n' "partial-miss: --corpus-list with a dropped path exits non-zero" \
+  || { printf 'FAIL %s\n' "partial-miss: --corpus-list with a dropped path must exit non-zero"; fail=1; }
+
+# --- Review finding 1: the same miss on BARE positional paths still warns, exit unaffected --
+err="$(python3 "$tool" bare-miss "$fixtures/no-boundary.jsonl" /nonexistent/does-not-exist.jsonl --json 2>&1 >/dev/null)"
+assert_contains 'WARNING' "$err" "bare-miss: a dropped positional path still prints the loud WARNING"
+python3 "$tool" bare-miss "$fixtures/no-boundary.jsonl" /nonexistent/does-not-exist.jsonl >/dev/null 2>&1
+[ "$?" -eq 0 ] && printf 'ok   %s\n' "bare-miss: positional paths with a dropped entry still exit 0" \
+  || { printf 'FAIL %s\n' "bare-miss: positional paths with a dropped entry must still exit 0"; fail=1; }
+
+# --- Review finding 2: cacheReadRatio's formula is stated verbatim in the docstring ---
+assert_contains 'cacheReadRatio := cacheRead / (cacheRead + cacheCreation + input)' \
+  "$(cat "$tool")" "docstring states the cacheReadRatio formula verbatim"
+
+exit "$fail"

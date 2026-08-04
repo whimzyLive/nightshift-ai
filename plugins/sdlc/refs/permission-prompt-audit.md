@@ -26,13 +26,13 @@ The Bash permission matcher statically parses the command. If it can't, it canno
 match an allow rule, so it falls through to ASK. Allowlisting does not help — the
 rule never matches. Triggers seen / known:
 
-| Trigger                           | Error / behavior                                        | Source                          |
-| --------------------------------- | ------------------------------------------------------- | ------------------------------- |
-| Backtick `` `...` ``              | `backtick_body_overrun` "cannot be statically analyzed" | user report                     |
-| Command subst `$(...)`            | unanalyzable → prompt                                   | 76 occurrences in agents/skills |
-| Quote inside brace exp `{"..."}`  | "expansion obfuscation" HARD block (overrides allow)    | CLAUDE.md                       |
-| Unbalanced/nested quotes, heredoc | parse failure → prompt                                  | —                               |
-| Inline JSON literal               | combines brace+quote → block                            | CLAUDE.md, acli skill           |
+| Trigger | Error / behavior | Source |
+| --- | --- | --- |
+| Backtick `` `...` `` | `backtick_body_overrun` "cannot be statically analyzed" | user report |
+| Command subst `$(...)` | unanalyzable → prompt | 76 occurrences in agents/skills |
+| Quote inside brace exp `{"..."}` | "expansion obfuscation" HARD block (overrides allow) | CLAUDE.md |
+| Unbalanced/nested quotes, heredoc | parse failure → prompt | — |
+| Inline JSON literal | combines brace+quote → block | CLAUDE.md, acli skill |
 
 ## Root cause #2 — compound + dynamic commands
 

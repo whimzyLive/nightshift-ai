@@ -53,13 +53,13 @@ relevant to each agent. The authoritative per-skill domain list is in
 `refs/skills-map.yml` (each skill's `domains` array). This table is a quick
 reference summary; do not duplicate or diverge the skill assignments here.
 
-| Agent                    | Relevant skill domains                                                                              |
-| ------------------------ | --------------------------------------------------------------------------------------------------- |
-| `platform-engineer`      | API/backend skills: `hono-api`, `api-routes`, `typeorm`, `electrodb`, and any custom backend skills |
-| `web-engineer`           | Frontend skills: `react-components`, `vercel-react-best-practices`, `vercel-composition-patterns`   |
-| `mobile-engineer`        | Mobile skills: any custom mobile skills; no built-in suggestions map here                           |
-| `database-administrator` | ORM/migration skills: `typeorm`, `electrodb`, and any custom DB skills                              |
-| `sync-engineer`          | Sync-layer skills: no built-in suggestions; any custom sync skills                                  |
+| Agent | Relevant skill domains |
+| --- | --- |
+| `platform-engineer` | API/backend skills: `hono-api`, `api-routes`, `typeorm`, `electrodb`, and any custom backend skills |
+| `web-engineer` | Frontend skills: `react-components`, `vercel-react-best-practices`, `vercel-composition-patterns` |
+| `mobile-engineer` | Mobile skills: any custom mobile skills; no built-in suggestions map here |
+| `database-administrator` | ORM/migration skills: `typeorm`, `electrodb`, and any custom DB skills |
+| `sync-engineer` | Sync-layer skills: no built-in suggestions; any custom sync skills |
 
 ---
 
@@ -69,13 +69,13 @@ Use this table to populate the `runs after / before` line in `## Ownership`.
 Only list the upstream/downstream agents that are **active in this repo**. If
 an agent has no active upstream, write `—`; if no active downstream, write `—`.
 
-| Agent                    | Runs after                                    | Runs before                                        |
-| ------------------------ | --------------------------------------------- | -------------------------------------------------- |
-| `database-administrator` | —                                             | `platform-engineer`, `sync-engineer`               |
-| `platform-engineer`      | `database-administrator`                      | `sync-engineer`, `web-engineer`, `mobile-engineer` |
-| `sync-engineer`          | `database-administrator`, `platform-engineer` | `web-engineer`, `mobile-engineer`                  |
-| `web-engineer`           | `platform-engineer`, `sync-engineer`          | —                                                  |
-| `mobile-engineer`        | `platform-engineer`, `sync-engineer`          | —                                                  |
+| Agent | Runs after | Runs before |
+| --- | --- | --- |
+| `database-administrator` | — | `platform-engineer`, `sync-engineer` |
+| `platform-engineer` | `database-administrator` | `sync-engineer`, `web-engineer`, `mobile-engineer` |
+| `sync-engineer` | `database-administrator`, `platform-engineer` | `web-engineer`, `mobile-engineer` |
+| `web-engineer` | `platform-engineer`, `sync-engineer` | — |
+| `mobile-engineer` | `platform-engineer`, `sync-engineer` | — |
 
 ---
 

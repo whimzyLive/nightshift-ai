@@ -23,18 +23,57 @@ If either check fails → return immediately (full 5-line blocked shape — see 
 
 The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Your responsibility is to add commits on this branch — nothing else.
 
+## Context reuse
+
+```text
+path already read in full in this transcript -> never read it again
+Edit/Write returned success -> no confirming read   # Edit/Write fail loudly; a read after a successful edit verifies nothing
+earlier read was windowed AND another region is needed -> read ONLY the missing region with offset/limit
+```
+
+Carve-outs — a re-read here is correct, not a violation:
+
+```text
+a git op (checkout, merge --ff-only, fetch+reset) changed the tree since the read -> re-read
+the earlier read was reported truncated -> re-read
+the earlier read happened in a DIFFERENT transcript -> read normally   # a dispatched agent's context is empty; a ledger names paths, it never supplies their content
+```
+
+Precedence: correctness wins. Cannot establish the current content of a file you must edit -> read it. An unnecessary read is cheap; a wrong edit is not.
+
+## Bounded reads
+
+```text
+you need a named symbol/string, not the whole file -> Grep/Glob for it FIRST, then Read with offset around the hit
+file is over the threshold AND you are not executing it as instructions -> Read with limit; widen only if the window proves insufficient
+threshold := ~400 lines (limit=400)   # 2,000 est tok ~= 7,400 bytes ~= 400 lines; Read's own default cap is 2,000 lines
+```
+
+Carve-outs — a whole-file read here is correct, not a violation:
+
+```text
+the file IS the instruction you must execute (a playbook, a ref, your dispatch's plan/spec section) -> read whole   # executed end-to-end, not searched
+the file is under the threshold -> read whole   # 68.7% of candidate reads sit here; the window returns the file anyway, so the Grep is pure overhead
+you are about to Edit it and must establish its current content -> read whole
+```
+
+Precedence: correctness wins. A missing-context failure costs a QA round; an unnecessary whole read costs bytes. When in doubt, read more.
+
 ## Memory write (before committing)
 
 Memory is a set of small, self-describing rule files, not a diary. Collection at the start of your
 dispatch (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh <your-agent-name>`) already surfaced
 every rule and ADR that binds you — this section is about what you write back, not what you read.
 
-**Where a rule file lives.** A rule that binds only your own domain goes at
-`.claude/memories/agents/<your-name>/<rule-id>.md`. A rule that binds more than one agent (a
-cross-domain finding) goes at `.claude/memories/agents/shared/<rule-id>.md`, with every agent it
-binds listed in `agent`. `<rule-id>` is kebab-case and MUST equal the filename stem.
+```text
+own-domain rule -> .claude/memories/agents/<your-name>/<rule-id>.md
+cross-domain rule (binds more than one agent) -> .claude/memories/agents/shared/<rule-id>.md   # list every agent it binds in `agent`
+<rule-id> := kebab-case, MUST equal the filename stem
+```
 
 **The 7-field schema** (YAML frontmatter, all fields required):
+
+Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
 ```yaml
 ---
@@ -53,18 +92,24 @@ it yourself only when the one-line `rule` isn't enough context.
 
 **Admission test.** Write a candidate rule file only if ALL four hold:
 
-1. **Generalized** — a condition + action that constrains future work, not a narrative of one story.
-2. **Non-obvious** — not already derivable from the agent definition, the project override, or a repo `CLAUDE.md`.
-3. **Falsifiable trigger** — you can name the concrete situation it fires in (this populates `trigger`).
-4. **Not already an accepted ADR** — no `status: accepted` ADR covers the same decision (T2 wins; write nothing).
+```text
+ASSERT generalized — a condition + action that constrains future work, not a narrative of one story
+ASSERT non-obvious — not already derivable from the agent definition, the project override, or a repo `CLAUDE.md`
+ASSERT falsifiable trigger — you can name the concrete situation it fires in (populates `trigger`)
+ASSERT not already an accepted ADR — no `status: accepted` ADR covers the same decision (T2 wins)
+all four hold -> write the candidate rule file
+any fail -> write nothing
+```
 
 Rejected by construction: story diaries, `Learnings`/`Pitfalls`/`Patterns` prose blocks, restatements
 of existing config, and any entry that only makes sense with the originating story in mind.
 **Skipping is normal, not a failure** — most dispatches write nothing new.
 
-**Counter-only updates.** For every rule you cited in `trigger` and actually applied this dispatch —
-your own, or a `shared/` one — increment its `uses` and append the current story key to its
-`evidence`. This is the only edit you make to a rule file you did not just create.
+**Counter-only updates.**
+
+```text
+rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> increment its `uses`, append the current story key to its `evidence`   # the only edit made to a rule file not just created this dispatch
+```
 
 ## Domain verification
 
@@ -129,3 +174,10 @@ Large outputs are dropped at the dispatch boundary — keep it to the 4 lines (c
 - Never run any agent or skill from outside your declared domain — escalate by returning `Status: blocked` with a one-line note instead.
 - Never update the package lockfile or modify dependency versions without explicit instruction.
 - Never run cloud deploys — those are manual ops actions outside agent scope.
+
+## Plan slice
+
+```text
+SLICE names a path -> Read it before Task 1; it is this phase's contract
+unreadable | empty -> Status: blocked, Note: plan slice unreadable   # never improvise the phase
+```
