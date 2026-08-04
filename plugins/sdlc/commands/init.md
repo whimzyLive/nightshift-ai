@@ -829,6 +829,20 @@ the user exactly what to set up and how to verify. Print this checklist:
 > place — the field, or the label convention on projects that cannot create it — the project is
 > ready: run `/auto <KEY>-<n>` (or `/refine-feature` to start a new idea).
 >
+> **Also configure — SessionEnd hook budget:** if you ever see `SessionEnd hook [...] failed: Hook
+> cancelled`, it is not a bug in this plugin's hooks. SessionEnd hooks share one abort budget whose
+> floor is 1500ms, computed only from **settings-level** SessionEnd hooks — a plugin's own
+> `hooks/hooks.json` `timeout` field is never read for it. Set the budget yourself in this repo's
+> `.claude/settings.json`:
+>
+> ```json
+> { "env": { "CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS": "15000" } }
+> ```
+>
+> 15000 gives roughly 5x headroom over `worktree-gc.sh`'s measured ~3.1s runtime — the shutdown
+> watchdog waits `budget + 3500ms`, so don't set it much higher. This cannot be fixed from inside
+> the plugin; it is a required setting on every consumer of it.
+>
 > **Next, to teach an agent your stack:** the scaffolded overrides
 > (`.claude/project/agents/<agent>.md`) already list any skills confirmed during `/init`. Skills with
 > a declared `source` were downloaded into `.claude/skills/<name>/`, plugin-backed ones were installed
