@@ -519,13 +519,16 @@ the old `--distill "<focus>"` semantics. **Empty focus means "whole corpus" — 
 
 Dispatch the **ADR pipeline (distill)** with an explicit **ADR dispatch-type signal** — **no**
 manifest gate. Runs the two-phase dispatch defined in `refs/adr-pipeline.md`: Phase 1 mines the
-learnings corpus and returns candidate ADR(s), proposed `agents:` tags, and the per-candidate
-deletion list; the founder-confirmation gate at this command layer presents them (drafts and
-deletions together — nothing is deleted the founder did not see and approve); Phase 2 writes
-confirmed ADRs (`status: accepted`), deletes founder-approved learnings in the same PR, and
-regenerates `docs/adr/index.md`. The two-phase split, the gate flow, and the `docs(adr):` branch/PR
-naming are handed to the agent per `refs/adr-pipeline.md`'s §3a command-layer-flow section, not
-restated here.
+learnings corpus (now including the capture corpus — `refs/adr-pipeline.md` §4) and returns
+candidate ADR(s), proposed `agents:` tags, and the per-candidate deletion list; the
+founder-confirmation gate at this command layer presents them (drafts and deletions together —
+nothing is deleted the founder did not see and approve), plus one `kind`/`id`-or-`story`/`summary`/
+`promote-target` row per capture, taking a per-item `memory` | `adr` | `skip` choice (§6). Phase 2 is
+**two dispatches on one branch, one PR**: `knowledge-engineer` writes confirmed ADRs
+(`status: accepted`) and regenerates `docs/adr/index.md`; `ai-enablement-engineer` executes every
+`memory` choice via the capture-promotion operation (§8). The two-phase split, the gate flow, and
+the `docs(adr):` branch/PR naming are handed to the agent per `refs/adr-pipeline.md`'s §3a
+command-layer-flow section, not restated here.
 
 ## Release branch/PR naming
 
@@ -683,6 +686,8 @@ or `seed`'s no-op/STOP set).
 | `distill`, claude-mem tools **absent** | **HALT** — `claude-mem tools unavailable — /sdlc:docs distill requires the claude-mem plugin; install it or use seed adr`. **Not** softened to `seed`'s "continue without corpus" path. |
 | `distill`, claude-mem tools present but **DB empty** | Non-fatal — continue on repo-native citations; note the empty DB. Distinct from the tools-absent halt. |
 | `distill`, **no promotable candidates** | Clean no-op (AC6) — report "no candidates met the promotion criteria", open **no** PR, exit cleanly. Distinct from the tools-absent halt and from a git/`gh` STOP. |
+| `distill`, claude-mem tools **absent** but the **capture corpus is non-empty** | Warn and continue on captures alone — the tools-absent halt applies only when the corpus is also empty. |
+| `distill`, founder chooses `memory` but `promote-target` already exists | Merge `uses` and union `evidence` per the maintenance op; never clobber the `rule` line; surface the merge at the gate. |
 
 Mode + args:
 $ARGUMENTS
