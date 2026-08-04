@@ -100,3 +100,5 @@ jobs:
         run: bash tools/sdlc-analyser/__tests__/artifact-contract.test.sh
       - if: always()
         run: bash tools/sdlc-analyser/__tests__/rtk-coverage.test.sh
+      - if: always()
+        run: bash tools/sdlc-analyser/__tests__/branch-inventory.test.sh

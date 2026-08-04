@@ -3,8 +3,8 @@ id: regex-fix-verify-against-existing-content
 agent: [platform-engineer]
 trigger: [review's own suggested regex fix, tightening a lint detector, worktree wrong-branch alternative recovery]
 rule: A review finding's own suggested regex fix can be under-verified.
-evidence: [NA-3]
-uses: 0
+evidence: [NA-3, PR#226]
+uses: 1
 status: active
 ---
 

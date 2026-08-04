@@ -44,7 +44,7 @@ count_outcomes() { # reads content on stdin, prints a single integer
         next
       }
       row_idx = 0
-      if (t ~ /^(if|elif|else)\b/) { total++; next }
+      if (t ~ /^(if|elif|else)([^A-Za-z]|$)/) { total++; next }
       semis = gsub(/;;/, "&", t)
       asserts = gsub(/ASSERT/, "&", t)
       total += semis + asserts
