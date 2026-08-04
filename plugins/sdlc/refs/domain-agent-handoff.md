@@ -71,8 +71,8 @@ and read the returned paths yourself. Never paste rule text into a prompt — a 
 than the content it points at.
 
 ```text
-own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<body-file>]
-cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared/<rule-id> <STORY-KEY> <body-file>   # the body file's `agent:` lists every agent it binds
+own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<payload-file>]
+cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared/<rule-id> <STORY-KEY> <payload-file>   # the payload file's `agent:` lists every agent it binds
 <rule-id> := kebab-case, MUST equal the capture's `id`
 ```
 
@@ -80,7 +80,9 @@ Prints `CAPTURED=<path>` into the gitignored staging area in the primary checkou
 `.claude/memories/agents/**` directly — a file lands there only once a human promotes a capture
 through `/sdlc:docs distill`.
 
-**The 7-field schema** (YAML frontmatter, all fields required):
+`<payload-file>` carries YAML frontmatter — `trigger`/`rule`/`evidence`/`uses` (`agent` too for
+`shared/`); `id`/`status`/`captured`/`story`/`promote-target` are script-derived. **The 7-field
+schema** (all fields required in the promoted file):
 
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
@@ -120,7 +122,7 @@ of existing config, and any entry that only makes sense with the originating sto
 **Counter-only updates.**
 
 ```text
-rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <body-file: `uses: 1`, `evidence: [<STORY-KEY>]`>   # promotion merges into the target's count
+rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <payload-file: `uses: 1`, `evidence: [<STORY-KEY>]`>   # promotion merges into the target's count
 ```
 
 ## Domain verification

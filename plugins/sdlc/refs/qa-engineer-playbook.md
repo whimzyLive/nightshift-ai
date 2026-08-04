@@ -160,8 +160,7 @@ fetched comments:
   **body** + general/issue comments + review-summary bodies; `"$dir/review-fix-inline.json"` =
   **unresolved** inline review comments. Read BOTH — the only exclusion is inline threads marked
   _Resolved_ (filtered at fetch via GraphQL `reviewThreads.isResolved`, already addressed). The PR
-  body and generic comments have no resolved state and are ALWAYS included — they carry intent the
-  line-anchored notes assume.
+  body and generic comments have no resolved state and are ALWAYS included.
 - Each inline comment becomes one candidate finding; treat the PR body + general comments as
   context AND as potential candidate requests in their own right. Keep each comment's file/line
   anchor, author, AND its numeric `id` (databaseId), required to reply on and resolve that exact
@@ -170,16 +169,15 @@ fetched comments:
   decide which are real (`receiving-code-review`). Record a decision ledger row per comment:
   `{id, path:line, decision: accepted|rejected, justification}`.
 
-This mode operates on the **PR head branch** (or the commit's branch): fix commits in Step 3 are
-committed AND **pushed** to that branch, so the PR updates and the original reviewers see the
-resolution. The re-review in Step 4 is a fresh `agent-skills:code-reviewer` pass over the
-**applied fix commits** (`BASE_SHA` = pre-fix HEAD, `HEAD_SHA` = post-fix HEAD) to confirm each
-accepted comment is correctly resolved and nothing regressed.
+This mode operates on the **PR head branch** (or the commit's branch): Step 3 fix commits are
+committed AND **pushed** there, so the PR updates and reviewers see the resolution. Step 4's
+re-review is a fresh `agent-skills:code-reviewer` pass over the **applied fix commits**
+(`BASE_SHA`=pre-fix HEAD, `HEAD_SHA`=post-fix HEAD), confirming each accepted comment is resolved
+and nothing regressed.
 
-**Close out the PR threads (after fixes are pushed + the gate is green — `/review-fix` only).**
-Post each decision back so the reviewer sees only what still needs attention, every item carrying a
-justification. For each triaged inline comment, write the reply to a file (never inline JSON) and
-call the helper:
+**Close out the PR threads (fixes pushed + gate green — `/review-fix` only).** Post each decision
+back so the reviewer sees only what still needs attention, each with a justification. For every
+triaged inline comment, write the reply to a file (never inline JSON) and call the helper:
 
 ```bash
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
@@ -187,11 +185,10 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accep
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected "$dir/reply-<id>.md"   # replies, leaves thread OPEN
 ```
 
-- **Accepted** → reply names why it was valid + the fix commit, then the thread is RESOLVED (drops
-  off the reviewer's open list).
-- **Rejected** → reply explains why it's wrong/stale/out-of-scope in this app; thread stays OPEN.
-- Review-summary bodies / top-level issue comments are not resolvable threads → post ONE
-  summarising PR issue comment (`gh pr comment`) listing those decisions instead.
+- **Accepted** → reply with why + the fix commit; thread RESOLVES (drops off the open list).
+- **Rejected** → reply why it's wrong/stale/out-of-scope; thread stays OPEN.
+- Review-summary/top-level issue comments aren't resolvable threads → post ONE summarising PR
+  issue comment (`gh pr comment`) instead.
 - Commit-SHA target → reply on the commit comment; nothing to resolve.
 - Best-effort: a reply/resolve failure must NOT fail the run (fixes are already pushed) — log + continue.
 
