@@ -27,6 +27,9 @@
       }
     }
   },
+  "env": {
+    "CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS": "15000"
+  },
   "sandbox": {
     "network": {
       "allowedDomains": ["www.google-analytics.com"]
