@@ -54,7 +54,7 @@ round.
 
 | Token                                           | Value |
 | ----------------------------------------------- | ----- |
-| Lightweight threshold (story points, inclusive) | `8`   |
+| Lightweight threshold (story points, inclusive) | `5`   |
 
 ## Code Review
 
