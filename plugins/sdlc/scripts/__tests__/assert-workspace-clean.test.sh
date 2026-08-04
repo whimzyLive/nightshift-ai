@@ -117,27 +117,71 @@ else
   fail "both changed — got assert_rc=$assert_rc integrity=$integrity violation=$violation"
 fi
 
-# --- Case 6: missing state file -> VIOLATED/both (fail closed) -----------------------
+# --- Case 6: missing state file -> hard error, non-zero exit, no WORKSPACE_INTEGRITY= line -----
 c6="$work/c6"; repo6="$c6/repo"; make_repo "$repo6"
-assert_out="$(run_in "$c6" assert "$repo6" "$c6/does-not-exist")"; assert_rc=$?
-integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
-violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
-if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "VIOLATED" ] && [ "$violation" = "both" ]; then
-  pass "missing state file -> VIOLATED/both, fail closed"
+c6_out="$c6/stdout"; c6_err="$c6/stderr"
+run_in "$c6" assert "$repo6" "$c6/does-not-exist" >"$c6_out" 2>"$c6_err"; assert_rc=$?
+if [ "$assert_rc" -ne 0 ] && ! grep -q '^WORKSPACE_INTEGRITY=' "$c6_out"; then
+  pass "missing state file -> hard error, non-zero exit, no WORKSPACE_INTEGRITY= line"
 else
-  fail "missing state file — got assert_rc=$assert_rc integrity=$integrity violation=$violation"
+  fail "missing state file — got assert_rc=$assert_rc stdout='$(cat "$c6_out")'"
+fi
+[ -s "$c6_err" ] && pass "missing state file reports the failure on stderr" \
+  || fail "missing state file stderr" "stderr empty"
+
+# --- Case 7: every VERIFIABLE row exits 0 — re-confirm on a fresh OK pair and VIOLATED pair -----
+c7="$work/c7"; repo7="$c7/repo"; make_repo "$repo7"
+snap_out="$(run_in "$c7" snapshot "$repo7")"; snap_rc=$?
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+run_in "$c7" assert "$repo7" "$state_file" >/dev/null; assert_ok_rc=$?
+printf 'uncommitted\n' >> "$repo7/file.txt"
+run_in "$c7" assert "$repo7" "$state_file" >/dev/null; assert_violated_rc=$?
+if [ "$snap_rc" -eq 0 ] && [ "$assert_ok_rc" -eq 0 ] && [ "$assert_violated_rc" -eq 0 ]; then
+  pass "every verifiable row exits 0 (decision lives in stdout, not exit code)"
+else
+  fail "row exit codes — got snap_rc=$snap_rc assert_ok_rc=$assert_ok_rc assert_violated_rc=$assert_violated_rc, want 0 0 0"
 fi
 
-# --- Case 7: every row exits 0 (checked inline above) — explicit summary assertion ---
-# snapshot and assert never signal the decision via exit code — re-confirm on a fresh clean pair.
-c7="$work/c7"; repo7="$c7/repo"; make_repo "$repo7"
-run_in "$c7" snapshot "$repo7" >/dev/null; snap_rc=$?
-run_in "$c7" assert "$repo7" "$c7/does-not-exist" >/dev/null; assert_rc=$?
-if [ "$snap_rc" -eq 0 ] && [ "$assert_rc" -eq 0 ]; then
-  pass "every row exits 0 (decision lives in stdout, not exit code)"
+# --- Case 7b: an EMPTY state file -> hard error, non-zero exit, no WORKSPACE_INTEGRITY= line ----
+c7b="$work/c7b"; repo7b="$c7b/repo"; make_repo "$repo7b"
+: > "$c7b/empty-state"
+c7b_out="$c7b/stdout"; c7b_err="$c7b/stderr"
+run_in "$c7b" assert "$repo7b" "$c7b/empty-state" >"$c7b_out" 2>"$c7b_err"; assert_rc=$?
+if [ "$assert_rc" -ne 0 ] && ! grep -q '^WORKSPACE_INTEGRITY=' "$c7b_out"; then
+  pass "an empty state file -> hard error, non-zero exit, no WORKSPACE_INTEGRITY= line"
 else
-  fail "row exit codes — got snap_rc=$snap_rc assert_rc=$assert_rc, want 0 0"
+  fail "empty state file — got assert_rc=$assert_rc stdout='$(cat "$c7b_out")'"
 fi
+[ -s "$c7b_err" ] && pass "empty state file reports the failure on stderr" \
+  || fail "empty state file stderr" "stderr empty"
+
+# --- Case 7c: a MALFORMED state file (line 1 is not a git oid) -> same --------------------------
+c7c="$work/c7c"; repo7c="$c7c/repo"; make_repo "$repo7c"
+printf 'not-an-oid\nsome status line\n' > "$c7c/malformed-state"
+c7c_out="$c7c/stdout"; c7c_err="$c7c/stderr"
+run_in "$c7c" assert "$repo7c" "$c7c/malformed-state" >"$c7c_out" 2>"$c7c_err"; assert_rc=$?
+if [ "$assert_rc" -ne 0 ] && ! grep -q '^WORKSPACE_INTEGRITY=' "$c7c_out"; then
+  pass "a malformed state file (line 1 not a git oid) -> hard error, no WORKSPACE_INTEGRITY= line"
+else
+  fail "malformed state file — got assert_rc=$assert_rc stdout='$(cat "$c7c_out")'"
+fi
+[ -s "$c7c_err" ] && pass "malformed state file reports the failure on stderr" \
+  || fail "malformed state file stderr" "stderr empty"
+
+# --- Case 7d: snapshot cannot write its state file -> hard error, no PRIMARY_STATE_FILE= line ---
+c7d="$work/c7d"; repo7d="$c7d/repo"; make_repo "$repo7d"
+mkdir -p "$c7d/.tmp"
+chmod 500 "$c7d/.tmp"
+c7d_out="$c7d/stdout"; c7d_err="$c7d/stderr"
+run_in "$c7d" snapshot "$repo7d" >"$c7d_out" 2>"$c7d_err"; snap_rc=$?
+chmod 700 "$c7d/.tmp"
+if [ "$snap_rc" -ne 0 ] && ! grep -q '^PRIMARY_STATE_FILE=' "$c7d_out"; then
+  pass "snapshot cannot create its state file -> hard error, no PRIMARY_STATE_FILE= line"
+else
+  fail "snapshot mktemp failure — got snap_rc=$snap_rc stdout='$(cat "$c7d_out")'"
+fi
+[ -s "$c7d_err" ] && pass "snapshot mktemp failure reports the failure on stderr" \
+  || fail "snapshot mktemp failure stderr" "stderr empty"
 
 # --- Case 8: F7 regression — a failed git probe (non-git PRIMARY_ROOT) must be a hard error,
 # never a silent empty PRIMARY_HEAD with exit 0 (which would turn the guard fail-open: any fault

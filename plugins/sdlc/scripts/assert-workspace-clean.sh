@@ -12,7 +12,10 @@ set -uo pipefail
 #   bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh snapshot <primary-root>
 #   bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> <state-file>
 #
-# Every row exits 0 — the decision lives in stdout, never the exit code.
+# A row that can verify the workspace exits 0 — the decision lives in stdout, never the exit
+# code. A row that CANNOT verify (a failed git probe, or, on `assert`, a missing/unreadable/
+# malformed state file) is a hard error: it exits non-zero, prints the reason to stderr, and
+# emits no WorkspaceAssertResult/WorkspaceSnapshotResult line at all — never a fabricated verdict.
 #
 # `snapshot` stdout (WorkspaceSnapshotResult) — three KEY=value lines:
 #   PRIMARY_HEAD         40-char oid — `git -C <primary-root> rev-parse HEAD`, as-is
@@ -29,7 +32,8 @@ set -uo pipefail
 #
 # assert passes (OK/none) IFF HEAD is identical AND the porcelain status is identical to the
 # snapshot — only a CHANGE from the snapshot is a violation; a snapshot taken pre-dirty that stays
-# at the SAME dirt is a pass. A missing state file on assert is VIOLATED/both — fail closed.
+# at the SAME dirt is a pass. A missing/unreadable/malformed state file on assert is a hard error
+# (see above) — it is NOT a verified violation, since there is nothing to compare against.
 #
 # Capture-staging exclusion (NA-98 fix-round): the learning-capture staging root
 # (capture-learning.sh's resolve_capture_root — SDLC_CAPTURE_ROOT if set, else
@@ -104,7 +108,11 @@ case "$SUBCOMMAND" in
     }
 
     dir="$(bash "$here/tmp-dir.sh")"
-    state_file="$(abspath "$(mktemp "$dir/workspace-snapshot.XXXXXX")")"
+    raw_state_file="$(mktemp "$dir/workspace-snapshot.XXXXXX")" || {
+      echo "assert-workspace-clean.sh: mktemp failed under '$dir' — cannot snapshot" >&2
+      exit 1
+    }
+    state_file="$(abspath "$raw_state_file")"
 
     # A failed git probe (mis-substituted placeholder, a non-top-level path, a `safe.directory`
     # refusal, ...) must be a hard error, never a silently-empty value — an empty head/status
@@ -124,7 +132,10 @@ case "$SUBCOMMAND" in
     {
       printf '%s\n' "$head_oid"
       printf '%s' "$status_out"
-    } > "$state_file"
+    } > "$state_file" || {
+      echo "assert-workspace-clean.sh: failed writing state file '$state_file' — cannot snapshot" >&2
+      exit 1
+    }
 
     PRIMARY_PRE_DIRTY=false
     [ -n "$status_out" ] && PRIMARY_PRE_DIRTY=true
@@ -142,15 +153,18 @@ case "$SUBCOMMAND" in
       exit 1
     }
 
-    if [ ! -f "$STATE_FILE" ]; then
-      # Fail closed: no snapshot to compare against is itself a violation, never a silent pass.
-      printf 'WORKSPACE_INTEGRITY=%s\n' "VIOLATED"
-      printf 'WORKSPACE_VIOLATION=%s\n' "both"
-      exit 0
-    fi
+    [ -r "$STATE_FILE" ] || {
+      echo "assert-workspace-clean.sh: state file '$STATE_FILE' is missing or unreadable — cannot verify workspace integrity" >&2
+      exit 1
+    }
 
     snap_head="$(sed -n '1p' "$STATE_FILE")"
     snap_status="$(tail -n +2 "$STATE_FILE")"
+
+    printf '%s' "$snap_head" | grep -qE '^[0-9a-f]{40}$|^[0-9a-f]{64}$' || {
+      echo "assert-workspace-clean.sh: state file '$STATE_FILE' is malformed (line 1 is not a git oid) — cannot verify workspace integrity" >&2
+      exit 1
+    }
 
     cur_head="$(git -C "$PRIMARY_ROOT" rev-parse HEAD)" || {
       echo "assert-workspace-clean.sh: git rev-parse HEAD failed in '$PRIMARY_ROOT' — cannot assert" >&2
