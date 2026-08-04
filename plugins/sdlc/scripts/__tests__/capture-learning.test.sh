@@ -142,4 +142,52 @@ run_cap review AB-1 2026-08-04 1 >/dev/null
 before="$(cat "$f")"; run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
 [ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 2 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
 
+# --- T4: list-captured --------------------------------------------------------
+lst="$scripts/list-captured.sh"
+run_lst() { SDLC_CAPTURE_ROOT="$root" bash "$lst" "$@"; }
+
+tsv="$(run_lst --kind rule --story AB-1)"
+[ "$(printf '%s\n' "$tsv" | wc -l | tr -d ' ')" -eq 2 ] \
+  && ok "(T4a) two rule captures listed" || bad "(T4a) rule capture count" "got: $tsv"
+printf '%s\n' "$tsv" | head -1 | cut -f1 | grep -q "^$root/rules/" \
+  && ok "(T4b) TSV field 1 is the path" || bad "(T4b) TSV path leads" "got '$(printf '%s\n' "$tsv" | head -1 | cut -f1)'"
+printf '%s\n' "$tsv" | head -1 | cut -f2 | grep -qx rule \
+  && ok "(T4c) TSV field 2 is the kind" || bad "(T4c) TSV kind" "got '$(printf '%s\n' "$tsv" | head -1 | cut -f2)'"
+
+run_lst --kind rule --agent shared | grep -q cross-cutting-thing \
+  && ok "(T4d) --agent filters on the agent list" || bad "(T4d) --agent filter" "shared capture not returned"
+[ -z "$(run_lst --kind rule --agent mobile-engineer)" ] \
+  && ok "(T4e) --agent excludes non-matching" || bad "(T4e) --agent exclusion" "returned rows for mobile-engineer"
+
+json="$(run_lst --json --kind review)"
+printf '%s' "$json" | grep -q '"count"' && ok "(T4f) --json has count" || bad "(T4f) --json count" "got '$json'"
+printf '%s' "$json" | grep -q '"promoteTarget"' && ok "(T4g) --json has promoteTarget" || bad "(T4g) --json promoteTarget" "missing"
+printf '%s' "$json" | grep -q 'findings' && ok "(T4h) review summary is '<N> findings — ...'" || bad "(T4h) review summary" "missing"
+
+empty="$tmp/empty-root"
+[ -z "$(SDLC_CAPTURE_ROOT="$empty" bash "$lst")" ] \
+  && ok "(T4i) empty staging area prints nothing" || bad "(T4i) empty TSV" "printed output"
+[ "$(SDLC_CAPTURE_ROOT="$empty" bash "$lst" --json)" = '{"entries":[],"count":0}' ] \
+  && ok "(T4j) empty staging area JSON" || bad "(T4j) empty JSON" "got '$(SDLC_CAPTURE_ROOT="$empty" bash "$lst" --json)'"
+
+printf 'no frontmatter here\n' > "$root/rules/AB-1--broken.md"
+SDLC_CAPTURE_ROOT="$root" bash "$lst" --kind rule >/dev/null 2>"$tmp/warn"
+[ "$?" -eq 0 ] && [ -s "$tmp/warn" ] \
+  && ok "(T4k) malformed capture warns and continues" || bad "(T4k) malformed capture" "no warning or non-zero exit"
+rm -f "$root/rules/AB-1--broken.md"
+
+# --- T5: collect-memory never sees a capture; git stays clean ---------------
+cm_repo="$tmp/cmrepo"; mkdir -p "$cm_repo/.claude/memories/agents/web-engineer"
+git -C "$cm_repo" init -q
+git -C "$cm_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+SDLC_CAPTURE_ROOT="$cm_repo/.claude/memories/captured" bash "$cap" rule web-engineer/staged-rule AB-1 "$tmp/payload.md" >/dev/null
+git -C "$cm_repo" add -f .claude/memories/captured/.gitignore
+git -C "$cm_repo" -c user.email=t@t -c user.name=t commit -q -m marker
+[ -z "$(git -C "$cm_repo" status --porcelain)" ] \
+  && ok "(T5a) staging .gitignore keeps git status clean" || bad "(T5a) git status clean" "got '$(git -C "$cm_repo" status --porcelain)'"
+out_cm="$(bash "$scripts/collect-memory.sh" web-engineer "$cm_repo" 2>/dev/null)"
+printf '%s' "$out_cm" | grep -q 'staged-rule' \
+  && bad "(T5b) collect-memory ignores captures" "captured rule leaked into collection" \
+  || ok "(T5b) collect-memory ignores captures"
+
 exit "$fail"

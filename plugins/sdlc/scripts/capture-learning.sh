@@ -89,7 +89,12 @@ case "$kind" in
       n="$(basename "$a" .md)"; [ "$n" = "principal-engineer" ] || valid="$valid$n "
     done
     case "$valid" in *" $dir "*) : ;; *) die "capture-learning.sh: unknown target dir '$dir'; wrote nothing" ;; esac
-    [ "$dir" = "shared" ] && agents="$(payload_fm "$payload" agent "")" || agents="$dir"
+    if [ "$dir" = "shared" ]; then
+      extra="$(payload_fm "$payload" agent "")"
+      agents="shared${extra:+,$extra}"
+    else
+      agents="$dir"
+    fi
     dest="$root/rules/$story--$rid.md"
     { printf -- '---\n'
       printf 'id: %s\n' "$rid"
