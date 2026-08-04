@@ -20,7 +20,8 @@ description: >-
   release, seed, audit, seed adr, or distill.
 model: sonnet
 tools: Read, Write, Edit, Bash, Skill, mcp__plugin_claude-mem_mcp-search__observation_search,
-  mcp__plugin_claude-mem_mcp-search__get_observations
+  mcp__plugin_claude-mem_mcp-search__get_observations, mcp__plugin_context-mode_context-mode__ctx_index,
+  mcp__plugin_context-mode_context-mode__ctx_search
 ---
 
 > **Resolving plugin paths.** You do not receive the `${CLAUDE_PLUGIN_ROOT}` variable.
@@ -217,7 +218,10 @@ You run in one of two dispatch phases per invocation:
 
 - **Phase 1 (draft & return)** — draft candidate ADR(s) from the `writing-adrs` template, propose
   `agents:` routing tags, (distill only) build the per-candidate deletion list, and return
-  everything to the command layer. **Write nothing to disk.**
+  everything to the command layer. **Write nothing to disk.** Index the capture corpus at the start
+  of a distill run and `ctx_search` it in the same session while clustering. If `ctx_index` is
+  unavailable or errors, log one line and continue on the on-disk corpus — it never blocks the run.
+  The on-disk capture is the source of truth; the index is a same-session read accelerator only.
 - **Phase 2 (write, confirmed items only)** — a fresh dispatch with no memory of phase 1 or the
   gate: the command hands you the confirmed draft bodies **verbatim**, the founder-edited
   `agents:` tags, and (distill only) the approved deletion list exactly as confirmed. Write what

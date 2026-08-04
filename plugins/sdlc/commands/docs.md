@@ -519,13 +519,16 @@ the old `--distill "<focus>"` semantics. **Empty focus means "whole corpus" — 
 
 Dispatch the **ADR pipeline (distill)** with an explicit **ADR dispatch-type signal** — **no**
 manifest gate. Runs the two-phase dispatch defined in `refs/adr-pipeline.md`: Phase 1 mines the
-learnings corpus and returns candidate ADR(s), proposed `agents:` tags, and the per-candidate
-deletion list; the founder-confirmation gate at this command layer presents them (drafts and
-deletions together — nothing is deleted the founder did not see and approve); Phase 2 writes
-confirmed ADRs (`status: accepted`), deletes founder-approved learnings in the same PR, and
-regenerates `docs/adr/index.md`. The two-phase split, the gate flow, and the `docs(adr):` branch/PR
-naming are handed to the agent per `refs/adr-pipeline.md`'s §3a command-layer-flow section, not
-restated here.
+learnings corpus (now including the capture corpus — `refs/adr-pipeline.md` §4) and returns
+candidate ADR(s), proposed `agents:` tags, and the per-candidate deletion list; the
+founder-confirmation gate at this command layer presents them (drafts and deletions together —
+nothing is deleted the founder did not see and approve), plus one `kind`/`id`-or-`story`/`summary`/
+`promote-target` row per capture, taking a per-item `memory` | `adr` | `skip` choice (§6). Phase 2 is
+**two dispatches on one branch, one PR**: `knowledge-engineer` writes confirmed ADRs
+(`status: accepted`) and regenerates `docs/adr/index.md`; `ai-enablement-engineer` executes every
+`memory` choice via the capture-promotion operation (§8). The two-phase split, the gate flow, and
+the `docs(adr):` branch/PR naming are handed to the agent per `refs/adr-pipeline.md`'s §3a
+command-layer-flow section, not restated here.
 
 ## Release branch/PR naming
 
@@ -663,7 +666,7 @@ or `seed`'s no-op/STOP set).
 | Founder confirms a page missing `title` or `description` frontmatter | Caught **at the gate**, where the content still exists and the founder fixes the line in place. **Not** a phase-2 STOP: phase 2 holds an opaque payload and could only discard a fully authored page over a one-line defect. |
 | A **pre-existing** enabled `public: yes` page lacks `title`/`description` during the regen | **Skipped and surfaced** (path in phase-2 output + PR body) — never a STOP (which would tear the write: page committed, index not), and never inferred from body/filename (which would fabricate published index copy). |
 | Founder omits `source:` on a seeded `how-to` / `integration-guide` | Not an error — the key is **omitted entirely** (never written empty). Per §5 the page is simply never auto-refreshed. `seed` never infers globs. |
-| claude-mem tools unavailable | **Never a halt for `seed`** — phase 1 proceeds without corpus enrichment and says so at the gate. (Contrast `distill`, which halts: the corpus is `seed`'s enrichment but `distill`'s entire input.) |
+| claude-mem tools unavailable | **Never a halt for `seed`** — phase 1 proceeds without corpus enrichment and says so at the gate. (Contrast `distill`, which halts only when the capture corpus is ALSO empty: the corpus is `seed`'s enrichment but `distill`'s entire input — see the capture-corpus exception below.) |
 | `<type>` is `tutorial` and the corpus is available | Not consulted — `tutorial`'s registry `source-of-truth` is `founder-authored` only. |
 | No section index page exists at `SEED_ROW`'s `target-path` | Not an error — `llms.txt` is the sole index; no separate section index is created. The existence test reads the **pre-write** tree, so a page this run wrote can never satisfy it. |
 | Re-run: branch carries **out-of-pipeline** edits to generated pages (no trailer) | **STOP at step 5**, before the founder authors — surface the paths and the PR number. Never overwritten. The scanned path set is `PAGE` **plus** `llms.txt` (when enabled) **plus** any regenerated section index page. |
@@ -680,9 +683,11 @@ or `seed`'s no-op/STOP set).
 | A narrative page diverges from an ADR it references | **Flagged** as "the doc diverges from the ADR" (AC4) — ADR is source of truth, direction fixed, **never** written into `docs/adr/`. |
 | A narrative page's `.md`/`.mdx` link target does not resolve file-relative from the page's own directory | **Flagged** as `dangling-link` — deterministic path-existence check; external, `mailto:`, and pure-anchor links are skipped, and a link's `#fragment` is stripped before resolving (only file existence is checked). **Never** rewritten or auto-corrected. |
 | Re-run: audit branch carries out-of-pipeline edits (no `Audit-Generated:` trailer) | **STOP** (re-run content guard) — surface the paths + PR number; never overwritten. |
-| `distill`, claude-mem tools **absent** | **HALT** — `claude-mem tools unavailable — /sdlc:docs distill requires the claude-mem plugin; install it or use seed adr`. **Not** softened to `seed`'s "continue without corpus" path. |
+| `distill`, claude-mem tools **absent AND the capture corpus is empty** | **HALT** — `claude-mem tools unavailable — /sdlc:docs distill requires the claude-mem plugin; install it or use seed adr`. **Not** softened to `seed`'s "continue without corpus" path. See the capture-corpus exception three rows below. |
 | `distill`, claude-mem tools present but **DB empty** | Non-fatal — continue on repo-native citations; note the empty DB. Distinct from the tools-absent halt. |
 | `distill`, **no promotable candidates** | Clean no-op (AC6) — report "no candidates met the promotion criteria", open **no** PR, exit cleanly. Distinct from the tools-absent halt and from a git/`gh` STOP. |
+| `distill`, claude-mem tools **absent** but the **capture corpus is non-empty** | Warn and continue on captures alone — the tools-absent halt applies only when the corpus is also empty. |
+| `distill`, founder chooses `memory` but `promote-target` already exists | Merge `uses` and union `evidence` per the maintenance op; never clobber the `rule` line; surface the merge at the gate. |
 
 Mode + args:
 $ARGUMENTS

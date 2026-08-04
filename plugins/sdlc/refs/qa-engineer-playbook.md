@@ -123,6 +123,9 @@ git status --porcelain                    # surface any untracked new files to r
 domains — open the full body only for the rounds that actually overlap, not every file. This
 replaces reading a single append-only audit log whole.
 
+Captured round files are not committed, so also read them:
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --kind review`
+
 Dispatch an `agent-skills:code-reviewer` subagent following the `requesting-code-review`
 skill pattern. The prompt MUST include:
 
@@ -155,30 +158,26 @@ fetched comments:
 - The caller (`/review-fix`) has fetched the feedback into files under the session temp dir
   (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`): `"$dir/review-fix-summary.json"` = PR
   **body** + general/issue comments + review-summary bodies; `"$dir/review-fix-inline.json"` =
-  **unresolved** inline review comments. Read BOTH. The only
-  exclusion is inline threads explicitly marked _Resolved_ (filtered at fetch via GraphQL
-  `reviewThreads.isResolved`, since a resolved comment is already addressed). The PR body and all
-  generic comments have no resolved state and are ALWAYS included — they carry intent the
-  line-anchored notes assume.
+  **unresolved** inline review comments. Read BOTH — the only exclusion is inline threads marked
+  _Resolved_ (filtered at fetch via GraphQL `reviewThreads.isResolved`, already addressed). The PR
+  body and generic comments have no resolved state and are ALWAYS included.
 - Each inline comment becomes one candidate finding; treat the PR body + general comments as
   context AND as potential candidate requests in their own right. Keep each comment's file/line
-  anchor, author, AND its numeric `id` (databaseId) — the `id` is required to reply on and resolve
-  that exact thread in the close-out step. (Do NOT re-triage already-resolved threads — they were
-  excluded at fetch.)
-- Treat these EXACTLY as if a reviewer had produced them, then proceed to Step 2 triage — which is
-  where you decide which are real (`receiving-code-review`). Record a decision ledger row per
-  comment: `{id, path:line, decision: accepted|rejected, justification}`.
+  anchor, author, AND its numeric `id` (databaseId), required to reply on and resolve that exact
+  thread in the close-out step. (Do NOT re-triage already-resolved threads — excluded at fetch.)
+- Treat these EXACTLY as if a reviewer had produced them, then proceed to Step 2 triage — where you
+  decide which are real (`receiving-code-review`). Record a decision ledger row per comment:
+  `{id, path:line, decision: accepted|rejected, justification}`.
 
-This mode operates on the **PR head branch** (or the commit's branch): fix commits in Step 3 are
-committed AND **pushed** to that branch, so the PR updates and the original reviewers see the
-resolution. The re-review in Step 4 is a fresh `agent-skills:code-reviewer` pass over the
-**applied fix commits** (`BASE_SHA` = pre-fix HEAD, `HEAD_SHA` = post-fix HEAD) to confirm each
-accepted comment is correctly resolved and nothing regressed.
+This mode operates on the **PR head branch** (or the commit's branch): Step 3 fix commits are
+committed AND **pushed** there, so the PR updates and reviewers see the resolution. Step 4's
+re-review is a fresh `agent-skills:code-reviewer` pass over the **applied fix commits**
+(`BASE_SHA`=pre-fix HEAD, `HEAD_SHA`=post-fix HEAD), confirming each accepted comment is resolved
+and nothing regressed.
 
-**Close out the PR threads (after fixes are pushed + the gate is green — `/review-fix` only).**
-Post each decision back on the PR so the reviewer sees only what they still need to look at, every
-item carrying a justification. For each triaged inline comment, write the reply to a file (never
-inline JSON) and call the helper:
+**Close out the PR threads (fixes pushed + gate green — `/review-fix` only).** Post each decision
+back so the reviewer sees only what still needs attention, each with a justification. For every
+triaged inline comment, write the reply to a file (never inline JSON) and call the helper:
 
 ```bash
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
@@ -186,11 +185,10 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accep
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected "$dir/reply-<id>.md"   # replies, leaves thread OPEN
 ```
 
-- **Accepted** → reply names why it was valid + the fix commit, then the thread is RESOLVED (drops
-  off the reviewer's open list).
-- **Rejected** → reply explains why it's wrong/stale/out-of-scope in this app; thread stays OPEN.
-- Review-summary bodies / top-level issue comments are not resolvable threads → post ONE
-  summarising PR issue comment (`gh pr comment`) listing those decisions instead.
+- **Accepted** → reply with why + the fix commit; thread RESOLVES (drops off the open list).
+- **Rejected** → reply why it's wrong/stale/out-of-scope; thread stays OPEN.
+- Review-summary/top-level issue comments aren't resolvable threads → post ONE summarising PR
+  issue comment (`gh pr comment`) instead.
 - Commit-SHA target → reply on the commit comment; nothing to resolve.
 - Best-effort: a reply/resolve failure must NOT fail the run (fixes are already pushed) — log + continue.
 
@@ -214,10 +212,9 @@ PR. Accepted comments flow into the Step 3 fix loop; discarded ones go in the re
 - **Security** — treat as Critical unless demonstrably non-exploitable; say why if downgraded.
 - **Informative/explanatory comment** (per `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`) —
   treat as **Important**: the fix requests the comment be removed and, if it captured real
-  non-obvious context, that the context be written as a rule entry under the introducing agent's
-  `.claude/memories/agents/<agent>/<rule-id>.md` instead (per the admission test in
-  `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). A comment required by language/lint
-  convention (per that same doc's exclusions) is not a finding.
+  non-obvious context, that the introducing agent capture it as a rule entry instead (per the
+  admission test in `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). A comment required by
+  language/lint convention (per that same doc's exclusions) is not a finding.
 
 **Domain mapping (file path → owning agent — derive from project-context Workspace Structure):**
 
@@ -291,8 +288,8 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Fix ONLY these issues, and commit (use the
    `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
-7. "Write any admitted rule entries under `.claude/memories/agents/<your-name>/` (per the admission
-   test in `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`) and stage them with your commit."
+7. "Capture any admitted rule entries per the admission test in
+   `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s memory-write section."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
 9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 10. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md."
@@ -325,16 +322,15 @@ Then assert the primary checkout matches its pre-dispatch snapshot exactly:
 ```text
 assert := bash ${CLAUDE_PLUGIN_ROOT}/scripts/assert-workspace-clean.sh assert <primary-root> $PRIMARY_STATE_FILE
 # -> WORKSPACE_INTEGRITY ⊆ {OK, VIOLATED}, WORKSPACE_VIOLATION ⊆ {none, head-moved, worktree-changed, both}
+non-zero exit / no WORKSPACE_INTEGRITY line -> BLOCKED: cannot verify the primary checkout (see stderr)
 WORKSPACE_INTEGRITY == 'VIOLATED' -> BLOCKED: fix agent wrote to the primary checkout instead of $WORKTREE
 ```
 
 The script's OK/none is exact-match against the snapshot (NOT asserted empty) — a pre-dirty
-primary that stays at the same dirt still passes; only a *change* from the captured snapshot is a
-violation.
+primary that stays at the same dirt still passes; only a *change* from the snapshot is a violation.
 
-If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason (same
-detectable-failure shape as the principal playbook's Step-5 guard) — do not attempt to fix or
-revert it yourself. Never self-repair.
+If `WORKSPACE_INTEGRITY=VIOLATED` → **return `blocked`** immediately with that reason — do not
+attempt to fix or revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.
@@ -369,15 +365,15 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
 DATE=$(date +%Y-%m-%d)
 ```
 
-**1. Review round file**
+**1. Review round file** — capture unconditionally, every round, via the script's own PRIMARY
+checkout resolution (never `$WORKTREE`, which worktree-gc.sh deletes):
 
 ```text
-review_file := $WORKTREE/.claude/memories/reviews/${DATE}-<STORY-KEY>.md
-write review_file unconditionally, every round
-second/third round, same date -> append -r2, -r3, ... suffix (${DATE}-<STORY-KEY>-r2.md)
-issue_count: 0 -> frontmatter only, no body   # the file exists purely as the "this story was reviewed" marker the analyze finding and the maintenance-op GC key on
-issue_count > 0 -> frontmatter + body (## Issues / ## Preventions / ## Rules written)
-never soft-skip this file — a finding that repeats something an `accepted` ADR already documents is itself recurrence evidence `/sdlc:docs distill` needs to see (adr-pipeline.md §6 Recurrence)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh review <STORY-KEY> ${DATE} <round-number> <payload-file>
+round 1 -> no suffix; round N >= 2 -> the script appends -rN
+issue_count: 0 -> pass `-` for the payload (frontmatter only)
+issue_count > 0 -> payload carries `domains`, `root_causes`, `issue_count` frontmatter + the ## Issues / ## Preventions / ## Rules written body
+never soft-skip — a finding repeating an `accepted` ADR is itself recurrence evidence `/sdlc:docs distill` needs (adr-pipeline.md §6)
 ```
 
 Frontmatter is the 5-field review schema:
@@ -407,25 +403,18 @@ Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, v
 <list of rule ids created from this round, or "none">
 ```
 
-**2. Rule entries** — for each agent that fixed something this round, write rule entries under
-`$WORKTREE/.claude/memories/agents/<fixing-agent>/<rule-id>.md` (cross-cutting → `agents/shared/`)
-for any candidate that passes the admission test in
-`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — do not restate the schema or the test here
-(ADR-0004). This is the one sanctioned case where `qa-engineer` creates files under another agent's
-rule directory; it is bounded to **creating new rule files from this round's findings**, never
-editing or deleting existing ones. List every id you created in the round file's `## Rules written`.
+**2. Rule entries** — for each agent that fixed something this round, capture a rule entry for the
+**fixing agent** (never `qa-engineer`) for any candidate passing the admission test in
+`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` (ADR-0004; schema/test not restated here):
 
-**3. Counter-only updates** — for any existing rule a finding proves was violated, increment its
-`uses` and append `<STORY-KEY>` to its `evidence`, whether the rule lives in your own scope or
-`agents/shared/` (permitted per the counter-only carve-out in `analyze-protocol.md`).
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <fixing-agent>/<rule-id> <STORY-KEY> <payload-file>`
 
-Then commit and push, both from the worktree:
+Payload frontmatter carries `origin: qa-round`. Cross-cutting → `shared/`. Creates only — never edits
+or deletes an existing rule file. List captured ids in `## Rules written`.
 
-```bash
-git -C "$WORKTREE" add .claude/memories/
-git -C "$WORKTREE" commit -m "chore: update learnings after <STORY-KEY> review"
-git -C "$WORKTREE" push origin <BRANCH_PREFIX>/<STORY-KEY>
-```
+**3. Counter-only updates** — for any existing rule a finding proves was violated, capture a
+counter-only record with `uses: 1` and `evidence: [<STORY-KEY>]`; promotion merges it into the
+target's existing count. You never edit the committed rule file.
 
 ## Step 6 — Quality gate
 
@@ -479,12 +468,12 @@ Fixed (Critical/Important): <list, or "none">
 Minor noted (not fixed): <list, or "none">
 AC check: <met — all N ACs evidenced | UNMET: <which> >
 Quality gate: typecheck pass | tests pass   (paste evidence)
-Learnings: written to review file + <rule ids, or "none">
+Learnings: captured to <N> file(s): <ids, or "none">
 Blocked reason: <one line — only if Status: blocked>
 ```
 
 - `Status: clean` only when: review has no Critical/Important findings, every AC is evidenced,
-  the gate is green with pasted output, and learnings are committed + pushed.
+  the gate is green with pasted output, and learnings are captured.
 - `Status: blocked` at any unrecoverable point (agent blocked, push conflict, AC cannot be met)
   → return immediately with the reason; do not improvise around it.
 

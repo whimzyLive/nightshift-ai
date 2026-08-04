@@ -65,13 +65,24 @@ Memory is a set of small, self-describing rule files, not a diary. Collection at
 dispatch (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh <your-agent-name>`) already surfaced
 every rule and ADR that binds you — this section is about what you write back, not what you read.
 
+Captures staged this story aren't collected (`collect-memory.sh` only surfaces `status: active`) —
+also run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --story <STORY-KEY> --kind rule --agent <your-agent-name>`
+and read the returned paths yourself. Never paste rule text into a prompt — a path costs far less
+than the content it points at.
+
 ```text
-own-domain rule -> .claude/memories/agents/<your-name>/<rule-id>.md
-cross-domain rule (binds more than one agent) -> .claude/memories/agents/shared/<rule-id>.md   # list every agent it binds in `agent`
-<rule-id> := kebab-case, MUST equal the filename stem
+own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<payload-file>]
+cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared/<rule-id> <STORY-KEY> <payload-file>   # the payload file's `agent:` lists every agent it binds
+<rule-id> := kebab-case, MUST equal the capture's `id`
 ```
 
-**The 7-field schema** (YAML frontmatter, all fields required):
+Prints `CAPTURED=<path>` into the gitignored staging area in the primary checkout. You never write
+`.claude/memories/agents/**` directly — a file lands there only once a human promotes a capture
+through `/sdlc:docs distill`.
+
+`<payload-file>` carries YAML frontmatter — `trigger`/`rule`/`evidence`/`uses` (`agent` too for
+`shared/`); `id`/`status`/`captured`/`story`/`promote-target` are script-derived. **The 7-field
+schema** (all fields required in the promoted file):
 
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
@@ -89,6 +100,9 @@ status: active # active | deprecated | promoted — only active is collected at 
 
 Body is optional — a single `## Why` section, <= 10 lines. It is never read during collection; open
 it yourself only when the one-line `rule` isn't enough context.
+
+A capture also carries `captured`, `story`, `origin`, `promote-target` — written by the script, not
+you.
 
 **Admission test.** Write a candidate rule file only if ALL four hold:
 
@@ -108,26 +122,22 @@ of existing config, and any entry that only makes sense with the originating sto
 **Counter-only updates.**
 
 ```text
-rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> increment its `uses`, append the current story key to its `evidence`   # the only edit made to a rule file not just created this dispatch
+rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <payload-file: `uses: 1`, `evidence: [<STORY-KEY>]`>   # promotion merges into the target's count
 ```
 
 ## Domain verification
 
 Each domain has its own verification commands. Run **all** of them before considering work complete — listed in each agent's body and the directory CLAUDE.md files. See `.claude/project/project-context.md` for project-level quality gate commands.
 
-## Commit the memory file alongside your domain changes
+## Commit your domain changes
 
-Stage your specific files and the rule files you touched (do NOT use `git add .`):
+Stage your specific files (do NOT use `git add .`):
 
 ```bash
-git add <domain paths> <rule files created or updated this dispatch>
+git add <domain paths>
 ```
 
 Then invoke the `conventional-commit` skill to construct and execute the commit message. Use the directory name as the scope — see `.claude/project/project-context.md` for valid scopes in this project.
-
-Do not split memory updates into a separate commit — they belong with the work that produced them.
-**If the dispatch produced no other change, skip the `uses` increment rather than raising an
-empty commit** — a counter-only diff is not worth a commit on its own.
 
 **Do NOT push.** The Principal Engineer pushes `<BRANCH_PREFIX>/<STORY-KEY>` to origin after verifying your commits landed locally. Your job ends at commit.
 
