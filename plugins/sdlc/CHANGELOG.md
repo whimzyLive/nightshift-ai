@@ -1,3 +1,13 @@
+## 0.45.6 (2026-08-04)
+
+### 🩹 Fixes
+
+- **sdlc:** give the SessionEnd hooks a timeout and unbreak the release changelog ([86329cb](https://github.com/whimzyLive/nightshift-ai/commit/86329cb))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.5 (2026-08-04)
 
 ### 🚀 Features
