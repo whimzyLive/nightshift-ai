@@ -70,4 +70,76 @@ case "$got" in
   *) bad "(T2e) linked worktree resolves to main checkout" "got '$got'" ;;
 esac
 
+# --- T3: capture writes ------------------------------------------------------
+root="$tmp/cap-root"
+run_cap() { SDLC_CAPTURE_ROOT="$root" bash "$cap" "$@"; }
+
+cat > "$tmp/payload.md" <<'EOF'
+---
+trigger: [capture staging, memory write]
+rule: When writing a learning, capture it instead of committing it.
+evidence: [AB-1, PR#7]
+uses: 0
+origin: domain-agent
+---
+
+## Why
+
+Committed memory diffs are unreviewed.
+EOF
+
+out="$(run_cap rule web-engineer/capture-before-commit AB-1 "$tmp/payload.md")"
+f="$root/rules/AB-1--capture-before-commit.md"
+[ "$out" = "CAPTURED=$f" ] && ok "(T3a) prints CAPTURED=<path>" || bad "(T3a) CAPTURED line" "got '$out'"
+p="$(extract_fm "$f" | parse_frontmatter)"
+[ "$(field_value "$p" id)" = "capture-before-commit" ] && ok "(T3b) id derived from arg" || bad "(T3b) id" "got '$(field_value "$p" id)'"
+[ "$(field_value "$p" status)" = "captured" ] && ok "(T3c) status captured" || bad "(T3c) status" "got '$(field_value "$p" status)'"
+[ "$(field_value "$p" agent)" = "web-engineer" ] && ok "(T3d) agent = target dir" || bad "(T3d) agent" "got '$(field_value "$p" agent)'"
+[ "$(field_value "$p" promote-target)" = ".claude/memories/agents/web-engineer/capture-before-commit.md" ] \
+  && ok "(T3e) promote-target own dir" || bad "(T3e) promote-target own dir" "got '$(field_value "$p" promote-target)'"
+grep -q '^## Why' "$f" && ok "(T3f) body appended" || bad "(T3f) body appended" "## Why missing"
+
+run_cap rule shared/cross-cutting-thing AB-1 "$tmp/payload.md" >/dev/null
+p2="$(extract_fm "$root/rules/AB-1--cross-cutting-thing.md" | parse_frontmatter)"
+[ "$(field_value "$p2" promote-target)" = ".claude/memories/agents/shared/cross-cutting-thing.md" ] \
+  && ok "(T3g) promote-target shared" || bad "(T3g) promote-target shared" "got '$(field_value "$p2" promote-target)'"
+
+run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null
+[ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3h) '-' writes frontmatter only" || bad "(T3h) frontmatter only" "body present after '-' capture"
+run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
+[ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3i) omitted payload writes frontmatter only" || bad "(T3i) omitted payload" "body present"
+
+run_cap rule web-engineer/Not_Kebab AB-1 >/dev/null 2>&1 \
+  && bad "(T3j) non-kebab rule id rejected" "exited 0" || ok "(T3j) non-kebab rule id rejected"
+run_cap rule no-such-agent/some-rule AB-1 >/dev/null 2>&1 \
+  && bad "(T3k) unknown agent dir rejected" "exited 0" || ok "(T3k) unknown agent dir rejected"
+run_cap bogus foo AB-1 >/dev/null 2>&1 \
+  && bad "(T3l) unknown kind rejected" "exited 0" || ok "(T3l) unknown kind rejected"
+run_cap rule web-engineer/some-rule AB-1 "$tmp/missing-file.md" >/dev/null 2>&1 \
+  && bad "(T3m) missing payload file rejected" "exited 0" || ok "(T3m) missing payload file rejected"
+
+cat > "$tmp/round.md" <<'EOF'
+---
+domains: [web-engineer]
+root_causes: [missing-validation]
+issue_count: 2
+---
+
+## Issues
+
+- one
+EOF
+out_r="$(run_cap review AB-1 2026-08-04 2 "$tmp/round.md")"
+rf="$root/reviews/2026-08-04-AB-1-r2.md"
+[ "$out_r" = "CAPTURED=$rf" ] && ok "(T3n) review path with -r2" || bad "(T3n) review path" "got '$out_r'"
+pr="$(extract_fm "$rf" | parse_frontmatter)"
+[ "$(field_value "$pr" origin)" = "qa-round" ] && ok "(T3o) review origin fixed" || bad "(T3o) review origin" "got '$(field_value "$pr" origin)'"
+[ "$(field_value "$pr" promote-target)" = ".claude/memories/reviews/2026-08-04-AB-1-r2.md" ] \
+  && ok "(T3p) review promote-target" || bad "(T3p) review promote-target" "got '$(field_value "$pr" promote-target)'"
+run_cap review AB-1 2026-08-04 1 >/dev/null
+[ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
+
+before="$(cat "$f")"; run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
+[ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 2 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
+
 exit "$fail"
