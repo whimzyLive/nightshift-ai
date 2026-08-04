@@ -183,6 +183,21 @@ fi
 [ -s "$c7d_err" ] && pass "snapshot mktemp failure reports the failure on stderr" \
   || fail "snapshot mktemp failure stderr" "stderr empty"
 
+# --- Case 7e: mktemp succeeds but the state-file write then fails -> hard error, no verdict line
+c7e="$work/c7e"; repo7e="$c7e/repo"; make_repo "$repo7e"
+mkdir -p "$c7e/.tmp"
+chmod 755 "$c7e/.tmp"
+c7e_out="$c7e/stdout"; c7e_err="$c7e/stderr"
+( cd "$c7e" && umask 0600 && env -u SDLC_SESSION_KEY -u CLAUDE_CODE_SESSION_ID bash "$script" snapshot "$repo7e" ) >"$c7e_out" 2>"$c7e_err"
+snap_rc=$?
+if [ "$snap_rc" -ne 0 ] && ! grep -q '^PRIMARY_STATE_FILE=' "$c7e_out"; then
+  pass "snapshot's write to its (successfully mktemp'd) state file failing -> hard error, no PRIMARY_STATE_FILE= line"
+else
+  fail "snapshot write failure — got snap_rc=$snap_rc stdout='$(cat "$c7e_out")'"
+fi
+[ -s "$c7e_err" ] && pass "snapshot write failure reports the failure on stderr" \
+  || fail "snapshot write failure stderr" "stderr empty"
+
 # --- Case 8: F7 regression — a failed git probe (non-git PRIMARY_ROOT) must be a hard error,
 # never a silent empty PRIMARY_HEAD with exit 0 (which would turn the guard fail-open: any fault
 # making `git -C "$PRIMARY_ROOT"` fail — a mis-substituted placeholder, a non-top-level path, a
@@ -209,7 +224,7 @@ case "$state_file" in
   *)  fail "F8 regression — PRIMARY_STATE_FILE is relative: '$state_file'" ;;
 esac
 # Invoke assert from a cwd that is NEITHER $c9 nor the repo — a relative state_file would resolve
-# to a nonexistent file here and hit the fail-closed VIOLATED/both branch.
+# to a nonexistent file here and hit the missing-state-file hard error.
 assert_out="$(run_in "$otherdir" assert "$repo9" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
 violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
@@ -238,7 +253,10 @@ c10="$work/c10"; repo10="$c10/repo"; make_repo "$repo10"; seed_initialised_memor
 cap_script="$scripts_dir/capture-learning.sh"
 snap_out="$(run_in "$c10" snapshot "$repo10")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
-( cd "$c10" && SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test AB-1 >/dev/null )
+cap_out10="$( cd "$c10" && SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test AB-1 )"
+printf '%s' "$cap_out10" | grep -q '^CAPTURED=' \
+  && pass "Case 10 setup: the capture actually wrote a file" \
+  || fail "Case 10 setup: capture-learning.sh did not print CAPTURED=" "got '$cap_out10'"
 assert_out="$(run_in "$c10" assert "$repo10" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
 violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
@@ -270,7 +288,10 @@ c12="$work/c12"; repo12="$c12/repo"; make_repo "$repo12"
 custom_root="$repo12/tmp-capture-override"
 snap_out="$(run_in "$c12" snapshot "$repo12")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
-( cd "$c12" && SDLC_CAPTURE_ROOT="$custom_root" bash "$cap_script" rule web-engineer/na98-fixround-test-3 AB-1 >/dev/null )
+cap_out12="$( cd "$c12" && SDLC_CAPTURE_ROOT="$custom_root" bash "$cap_script" rule web-engineer/na98-fixround-test-3 AB-1 )"
+printf '%s' "$cap_out12" | grep -q '^CAPTURED=' \
+  && pass "Case 12 setup: the capture actually wrote a file" \
+  || fail "Case 12 setup: capture-learning.sh did not print CAPTURED=" "got '$cap_out12'"
 assert_out="$(SDLC_CAPTURE_ROOT="$custom_root" run_in "$c12" assert "$repo12" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
 violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
