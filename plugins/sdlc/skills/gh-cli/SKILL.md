@@ -193,9 +193,9 @@ echo "PR: $pr_url"
 ## Error handling
 
 | Error | Fix |
-| --- | --- | --- |
+| --- | --- |
 | Auth error | Tell user: `gh auth login` |
 | Branch not pushed | `git push -u origin $(git branch --show-current)` first |
 | PR already exists | Report existing URL, do NOT create duplicate |
 | No commits ahead of base | Nothing to PR — stop and report |
-| `--base` branch not found | Confirm base branch: `git branch -r | grep develop` |
+| `--base` branch not found | Confirm base branch: `git branch -r \| grep <configured-base-branch>` |

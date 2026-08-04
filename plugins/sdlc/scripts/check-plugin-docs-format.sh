@@ -14,8 +14,9 @@
 #   .prettierignore now ignores all plugins/sdlc/**/*.md, so plugins/gtm/** is the SOLE remaining
 #   non-ignored tree this script's plugins/**/*.md glob actually checks — one more .prettierignore
 #   entry away from this gate silently checking zero files and reporting a vacuous pass (see the
-#   "bare directory-level .prettierignore" limitation noted above: this script cannot detect that
-#   case itself). plugins/sdlc/scripts/__tests__/prettier-ignore.test.sh assertion 3
+#   "bare directory-level .prettierignore" limitation documented further down in this file, next to
+#   the main `prettier --check` call below: this script cannot detect that case itself).
+#   plugins/sdlc/scripts/__tests__/prettier-ignore.test.sh assertion 3
 #   (plugins/gtm/README.md must still report ignored:false) is the only thing that would catch it.
 
 set -uo pipefail
