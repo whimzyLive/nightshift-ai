@@ -30,6 +30,14 @@ set -uo pipefail
 # assert passes (OK/none) IFF HEAD is identical AND the porcelain status is identical to the
 # snapshot — only a CHANGE from the snapshot is a violation; a snapshot taken pre-dirty that stays
 # at the SAME dirt is a pass. A missing state file on assert is VIOLATED/both — fail closed.
+#
+# Capture-staging exclusion (NA-98 fix-round): the learning-capture staging root
+# (capture-learning.sh's resolve_capture_root — SDLC_CAPTURE_ROOT if set, else
+# <PRIMARY_ROOT>/.claude/memories/captured) is gitignored EXCEPT its own marker file, so a fresh
+# capture makes the primary's `git status --porcelain` grow an untracked directory line even
+# though nothing a human needs to review changed. Porcelain lines under that root are stripped
+# before both the snapshot is recorded and the assert comparison runs, so a capture write can
+# never trip WORKSPACE_INTEGRITY on its own — every other primary-checkout mutation still can.
 
 here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 
@@ -43,6 +51,45 @@ abspath() {
     /*) printf '%s\n' "$1" ;;
     *)  printf '%s/%s\n' "$(cd "$(dirname "$1")" 2>/dev/null && pwd)" "$(basename "$1")" ;;
   esac
+}
+
+# capture_root_rel <primary-root-abs> -> the capture staging root's path RELATIVE to
+# <primary-root-abs>, or empty when the root (honouring SDLC_CAPTURE_ROOT, same as
+# capture-learning.sh's resolve_capture_root) isn't under the primary checkout at all — in which
+# case it can never appear in `git -C <primary-root> status --porcelain` output anyway, so there
+# is nothing to filter.
+capture_root_rel() {
+  local primary_abs="$1" cap
+  if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
+    cap="$SDLC_CAPTURE_ROOT"
+  else
+    cap="$primary_abs/.claude/memories/captured"
+  fi
+  case "$cap" in
+    "$primary_abs"/*) printf '%s\n' "${cap#"$primary_abs"/}" ;;
+    "$primary_abs")   printf '.\n' ;;
+    *)                printf '\n' ;;
+  esac
+}
+
+# filter_capture_lines <rel> — reads porcelain status on stdin, drops any line whose path is the
+# capture root itself or lives under it. <rel> empty -> passthrough unchanged. Porcelain v1 lines
+# are always `XY<space>PATH` (3-char fixed prefix), regardless of what X/Y are — untracked ("??"),
+# a rename never applies here since the excluded root is entirely `??`/ignored, never staged.
+filter_capture_lines() {
+  local rel="$1"
+  if [ -z "$rel" ]; then
+    cat
+    return
+  fi
+  awk -v rel="$rel" '
+    {
+      path = substr($0, 4)
+      gsub(/^"/, "", path); gsub(/"$/, "", path)
+      if (path == rel || path == rel "/" || index(path, rel "/") == 1) next
+      print
+    }
+  '
 }
 
 SUBCOMMAND="${1:-}"
@@ -70,6 +117,8 @@ case "$SUBCOMMAND" in
       echo "assert-workspace-clean.sh: git status --porcelain failed in '$PRIMARY_ROOT' — cannot snapshot" >&2
       exit 1
     }
+    rel="$(capture_root_rel "$(abspath "$PRIMARY_ROOT")")"
+    status_out="$(printf '%s' "$status_out" | filter_capture_lines "$rel")"
 
     # Line 1 = HEAD oid; every remaining line = one porcelain status row (empty when clean).
     {
@@ -111,6 +160,8 @@ case "$SUBCOMMAND" in
       echo "assert-workspace-clean.sh: git status --porcelain failed in '$PRIMARY_ROOT' — cannot assert" >&2
       exit 1
     }
+    rel="$(capture_root_rel "$(abspath "$PRIMARY_ROOT")")"
+    cur_status="$(printf '%s' "$cur_status" | filter_capture_lines "$rel")"
 
     head_changed=false
     [ "$cur_head" = "$snap_head" ] || head_changed=true

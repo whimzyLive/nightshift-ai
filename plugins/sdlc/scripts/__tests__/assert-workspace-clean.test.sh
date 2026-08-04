@@ -175,6 +175,67 @@ else
   fail "F8 regression — assert from different cwd got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
 fi
 
+# seed_initialised_memories <repo-dir> — commits a placeholder file under .claude/memories/ so the
+# repo matches a real post-`/sdlc:init` checkout (where agents/**/.gitkeep, reviews/.gitkeep etc.
+# are already tracked). Without this, git's untracked-directory collapse in a bare scratch repo
+# stops at the highest never-tracked ancestor (`.claude/`), not at `.claude/memories/captured/` —
+# a fixture artifact that does not reproduce the real repo shape the fix targets.
+seed_initialised_memories() {
+  local repo="$1"
+  mkdir -p "$repo/.claude/memories/agents/shared"
+  : > "$repo/.claude/memories/agents/shared/.gitkeep"
+  git -C "$repo" add .claude
+  git -C "$repo" commit -q -m "seed .claude/memories (init scaffold)"
+}
+
+# --- Case 10 (NA-98 fix-round): a capture write in the primary's default staging root is never
+# a violation — snapshot -> write a capture (default SDLC_CAPTURE_ROOT resolution) -> assert OK.
+c10="$work/c10"; repo10="$c10/repo"; make_repo "$repo10"; seed_initialised_memories "$repo10"
+cap_script="$scripts_dir/capture-learning.sh"
+snap_out="$(run_in "$c10" snapshot "$repo10")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+( cd "$c10" && SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test AB-1 >/dev/null )
+assert_out="$(run_in "$c10" assert "$repo10" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
+  pass "a capture write in the staging root is never a workspace-integrity violation"
+else
+  fail "capture write flagged a violation — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
+fi
+
+# --- Case 11 (NA-98 fix-round): a real stray file OUTSIDE the staging root still trips the guard,
+# proving the exclusion is scoped to the capture root only, not a general relaxation.
+c11="$work/c11"; repo11="$c11/repo"; make_repo "$repo11"; seed_initialised_memories "$repo11"
+snap_out="$(run_in "$c11" snapshot "$repo11")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+( cd "$c11" && SDLC_CAPTURE_ROOT="$repo11/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test-2 AB-1 >/dev/null )
+printf 'not a capture\n' > "$repo11/stray-file.txt"
+assert_out="$(run_in "$c11" assert "$repo11" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "VIOLATED" ] && [ "$violation" = "worktree-changed" ]; then
+  pass "a stray file outside the staging root still trips VIOLATED (exclusion is scoped, not general)"
+else
+  fail "stray file outside staging root did not trip the guard — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want VIOLATED/worktree-changed)"
+fi
+
+# --- Case 12 (NA-98 fix-round): SDLC_CAPTURE_ROOT override, pointed OUTSIDE .claude/memories/,
+# is honoured — the exclusion follows the env var, never a hardcoded .claude/memories/captured path.
+c12="$work/c12"; repo12="$c12/repo"; make_repo "$repo12"
+custom_root="$repo12/tmp-capture-override"
+snap_out="$(run_in "$c12" snapshot "$repo12")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+( cd "$c12" && SDLC_CAPTURE_ROOT="$custom_root" bash "$cap_script" rule web-engineer/na98-fixround-test-3 AB-1 >/dev/null )
+assert_out="$(SDLC_CAPTURE_ROOT="$custom_root" run_in "$c12" assert "$repo12" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
+  pass "SDLC_CAPTURE_ROOT override outside .claude/memories/ is honoured by the exclusion"
+else
+  fail "SDLC_CAPTURE_ROOT override not honoured — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
+fi
+
 echo
 if [ "$failures" -ne 0 ]; then
   echo "assert-workspace-clean.test.sh: FAILED ($failures assertion(s) failed)"
