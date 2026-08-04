@@ -1,3 +1,41 @@
+## 0.45.5 (2026-08-04)
+
+### 🚀 Features
+
+- **sdlc:** NA-81 add plan-slice.sh — arg handling, worktree resolution, eval-safe emitter, fence-aware phase/checklist extraction ([8ef32c2](https://github.com/whimzyLive/nightshift-ai/commit/8ef32c2))
+- **sdlc:** NA-93 add loop-decide.sh — the loop decision table as a deterministic script ([bc40593](https://github.com/whimzyLive/nightshift-ai/commit/bc40593))
+- **sdlc:** NA-91 release the top-level session at PR raise ([30ec1fb](https://github.com/whimzyLive/nightshift-ai/commit/30ec1fb))
+- **sdlc:** add bounded-reads pointer to the QA fix-loop contract ([67fe982](https://github.com/whimzyLive/nightshift-ai/commit/67fe982))
+- **sdlc:** add bounded-reads pointer to the PE dispatch contract ([cebdf1b](https://github.com/whimzyLive/nightshift-ai/commit/cebdf1b))
+- **sdlc:** add bounded-reads clause to the domain-agent handoff ([21e25f3](https://github.com/whimzyLive/nightshift-ai/commit/21e25f3))
+- **sdlc:** add context-reuse clause, phase ledger and reuse observability ([f3353f4](https://github.com/whimzyLive/nightshift-ai/commit/f3353f4))
+- **sdlc:** re-encode self-generated artifact templates with encoding contract ([88a953d](https://github.com/whimzyLive/nightshift-ai/commit/88a953d))
+- **sdlc:** NA-86 P4+P5 — pseudocode conversion, rationale extraction, ADR 0017, CI wiring ([406c3c4](https://github.com/whimzyLive/nightshift-ai/commit/406c3c4))
+- **sdlc:** NA-86 P4 tasks 4.1-4.7 — assert-workspace-clean.sh, playbook + agent lazy loading ([a432aa0](https://github.com/whimzyLive/nightshift-ai/commit/a432aa0))
+- **sdlc:** NA-86 S2 — loop.md fast path, auto.md epic split, shared AI-Workflow ladder ([a782762](https://github.com/whimzyLive/nightshift-ai/commit/a782762))
+- **sdlc:** NA-86 unpad plugin tables and prettier-ignore plugins/sdlc ([eee87f1](https://github.com/whimzyLive/nightshift-ai/commit/eee87f1))
+
+### 🩹 Fixes
+
+- **sdlc:** repair gh-cli error table and dangling doc pointer ([00f512d](https://github.com/whimzyLive/nightshift-ai/commit/00f512d))
+- **sdlc:** fix 9 defects found by the max-effort review of PR #226 ([#226](https://github.com/whimzyLive/nightshift-ai/issues/226))
+- **sdlc:** trim loop.md back to the plan-slice-budget.test.sh G-14b pin ([0f2e994](https://github.com/whimzyLive/nightshift-ai/commit/0f2e994))
+- **sdlc:** fix 6 critical QA defects in the loop/plan-slice/ADR surface ([1e458b6](https://github.com/whimzyLive/nightshift-ai/commit/1e458b6))
+- **sdlc:** single-quote resolve-ai-workflow-mode.sh output so Full Auto survives eval ([3bd10b0](https://github.com/whimzyLive/nightshift-ai/commit/3bd10b0))
+- **sdlc:** NA-81 bound G-18's item-1 extraction to the Procedure section ([a6cea7b](https://github.com/whimzyLive/nightshift-ai/commit/a6cea7b))
+- **sdlc:** NA-93 H-Gate-2 must compare DECISION too, not RULE alone ([d08fb4e](https://github.com/whimzyLive/nightshift-ai/commit/d08fb4e))
+- **sdlc:** NA-93 stop run_case swallowing its own ok/bad diagnostics into captured output ([1b45251](https://github.com/whimzyLive/nightshift-ai/commit/1b45251))
+- **sdlc:** NA-92 expand flat brace alternation in docs-sync-gate scopes ([1958e71](https://github.com/whimzyLive/nightshift-ai/commit/1958e71))
+- **sdlc:** NA-92 make return-contract key mentions unique in the offload refs ([11517c7](https://github.com/whimzyLive/nightshift-ai/commit/11517c7))
+- **sdlc:** NA-91 invert the session boundary to opt-in (SDLC_BOUNDARY_ON) ([e857e72](https://github.com/whimzyLive/nightshift-ai/commit/e857e72))
+- **sdlc:** NA-91 tighten session-boundary assertion (b) to match the row, not the bare token ([d2273fe](https://github.com/whimzyLive/nightshift-ai/commit/d2273fe))
+- **sdlc:** make artifact-encoding.test.sh fence tracking nesting-aware ([#209](https://github.com/whimzyLive/nightshift-ai/issues/209))
+- **sdlc:** repair writing-specs template fence closed 87 lines early ([b0e2fb9](https://github.com/whimzyLive/nightshift-ai/commit/b0e2fb9))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.4 (2026-07-28)
 
 ### 🩹 Fixes
