@@ -80,3 +80,9 @@ docs/superpowers/plans/*-measurements/*-before.txt
 # ...except this one: it is an aggregate JSON report with no per-file paths in it, i.e. a metric
 # rather than a raw input, so it stays tracked as the committed NA-91 baseline.
 !docs/superpowers/plans/NA-91-measurements/context-residency-before.txt
+
+# Per-run benchmark output — local measurement artifacts from a story's own /auto run, keyed by
+# story + plugin version. Same class as the raw inputs above: machine-local and unreproducible
+# elsewhere. Untracked here it also kept tripping `nx format:check`, which now costs 5x under
+# tools/ci-retry.sh. Promote a number into the story's plan doc if it needs to survive.
+docs/benchmarks/
