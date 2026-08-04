@@ -15,11 +15,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/cleanup-tmp.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/cleanup-tmp.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/worktree-gc.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/worktree-gc.sh",
+            "timeout": 30
           }
         ]
       }
