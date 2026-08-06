@@ -1,3 +1,36 @@
+## 0.45.8 (2026-08-06)
+
+### 🚀 Features
+
+- **sdlc:** promote captured learnings through the distill gate ([012f115](https://github.com/whimzyLive/nightshift-ai/commit/012f115))
+- **sdlc:** add capture promotion to the memory maintenance op ([b0f854e](https://github.com/whimzyLive/nightshift-ai/commit/b0f854e))
+- **sdlc:** sanction capture promotion under memory-ownership exception 2 ([f85ca46](https://github.com/whimzyLive/nightshift-ai/commit/f85ca46))
+- **sdlc:** capture QA review rounds instead of committing them ([a272d5d](https://github.com/whimzyLive/nightshift-ai/commit/a272d5d))
+- **sdlc:** retarget domain-agent memory writes to learning captures ([78ccbf7](https://github.com/whimzyLive/nightshift-ai/commit/78ccbf7))
+- **sdlc:** validate captured learnings as warnings only ([61e4d87](https://github.com/whimzyLive/nightshift-ai/commit/61e4d87))
+- **sdlc:** enumerate the learning-capture corpus ([c2aa1ea](https://github.com/whimzyLive/nightshift-ai/commit/c2aa1ea))
+- **sdlc:** write rule and review learning captures to the staging area ([d6e6e83](https://github.com/whimzyLive/nightshift-ai/commit/d6e6e83))
+- **sdlc:** resolve capture staging root to the primary checkout ([60cd6f9](https://github.com/whimzyLive/nightshift-ai/commit/60cd6f9))
+- **sdlc:** add shared frontmatter helper for capture scripts ([2ea1344](https://github.com/whimzyLive/nightshift-ai/commit/2ea1344))
+
+### 🩹 Fixes
+
+- **sdlc:** three Copilot findings — capture-only warn, slash-less target, silent-empty corpus ([c922df3](https://github.com/whimzyLive/nightshift-ai/commit/c922df3))
+- **sdlc:** STOP/BLOCKED on a cannot-verify workspace assert, not just VIOLATED ([6e199e5](https://github.com/whimzyLive/nightshift-ai/commit/6e199e5))
+- **sdlc:** a cannot-verify workspace state is a hard error, never a fabricated VIOLATED ([409af60](https://github.com/whimzyLive/nightshift-ai/commit/409af60))
+- **sdlc:** close the shared counter-only smuggle path, drop test rationale comments ([b5fe436](https://github.com/whimzyLive/nightshift-ai/commit/b5fe436))
+- **sdlc:** correct sibling-ref drift and off-by-one pointers in the capture docs ([a28700f](https://github.com/whimzyLive/nightshift-ai/commit/a28700f))
+- **sdlc:** exempt the shared/ counter-only path, bound round, drop a why-comment ([e2f1a19](https://github.com/whimzyLive/nightshift-ai/commit/e2f1a19))
+- **sdlc:** document the payload-file frontmatter channel in the memory-write contract ([af72c95](https://github.com/whimzyLive/nightshift-ai/commit/af72c95))
+- **sdlc:** resolve the distill halt-row contradiction for a non-empty capture corpus ([0344f65](https://github.com/whimzyLive/nightshift-ai/commit/0344f65))
+- **sdlc:** capture writes now abort on failure instead of reporting false success ([7bccfa9](https://github.com/whimzyLive/nightshift-ai/commit/7bccfa9))
+- **sdlc:** add NA-98.md to the plan-slice corpus-expectation snapshot ([fbed421](https://github.com/whimzyLive/nightshift-ai/commit/fbed421))
+- **sdlc:** exclude the capture staging root from the workspace-integrity guard ([00973fa](https://github.com/whimzyLive/nightshift-ai/commit/00973fa))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.7 (2026-08-04)
 
 ### 🩹 Fixes
