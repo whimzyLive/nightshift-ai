@@ -88,8 +88,8 @@ write-scope above.
 | ~~**Memory bloat (recommendation-only)**~~ | **SUPERSEDED by `memory-gc-overdue` below** (NA-73) — the old recommendation-only "run `/sdlc:docs distill`" finding is replaced by a real gated apply path (the maintenance op) keyed on the retention window, rather than a size/duplication heuristic |
 | **`legacy-memory-layout`** | `.claude/memories/agents/<name>.md` exists as a regular file, and/or `.claude/memories/reviews/patterns.md` exists — v1 flat-diary layout not yet migrated (NA-74). Gated apply path, with the migration instructions inline in the finding |
 | **`malformed-memory-frontmatter`** | `bash plugins/sdlc/scripts/check-frontmatter.sh` exits non-zero against this repo's `.claude/memories/**`. Gated apply — fix the offending frontmatter the script names |
-| **`memory-gc-overdue`** | Any review round file, `deprecated` rule, or `active` rule with `uses: 0` is older than the project's `Review retention window` (`.claude/project/project-context.md` Memory section; dual-form `<n> months` \| `<n> stories`, see `refs/memory-maintenance.md`). Gated apply — run the maintenance op |
-| **`story-merged-without-review-entry`** | A story key merged into `<BASE-BRANCH>` has no matching `.claude/memories/reviews/*-<KEY>*.md` review round file. Report-only (no write) — surfaces a QA-loop gap, never auto-fabricates a review record |
+| **`memory-gc-overdue`** | Any review round file, `deprecated` rule, or `active` rule with `uses: 0` is older than the project's `Review retention window` (`.claude/project/project-context.md` Memory section; dual-form `<n> months` \| `<n> stories`, see `refs/memory-maintenance.md`). Gated apply — run the maintenance op. An active rule with `uses: 0` is NOT GC-eligible while an unpromoted rule capture with the same id exists |
+| **`story-merged-without-review-entry`** | A story key merged into `<BASE-BRANCH>` has no matching `.claude/memories/reviews/*-<KEY>*.md` review round file. Report-only (no write) — surfaces a QA-loop gap, never auto-fabricates a review record. A captured round file for the merged key satisfies this check exactly as a committed one does; report only when neither exists |
 
 ## Skill usage guardrails
 
@@ -117,24 +117,29 @@ need no gate:
   may reset it to match — applied only as a reviewable diff/PR (or under explicit human
   instruction), never silently.
 - **Exception 2 — founder-gated maintenance-op promotion-and-deletion.**
-  `ai-enablement-engineer`, running the T1 deletion-on-promotion operation in
-  `${CLAUDE_PLUGIN_ROOT}/refs/memory-maintenance.md`, may set `status: promoted` on and then delete
-  a rule file from any agent's rule directory (subject to the `agents/shared/`
-  audience-preservation rule in `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` §7) once a
-  `knowledge-engineer`-authored ADR supersedes it — **only** as a reviewable diff/PR, **only**
-  after the founder-confirmation gate approved the specific promotion (the phase-1 deletion list
-  from `adr-pipeline.md`). This moved off `knowledge-engineer` (NA-73) — the ADR-authoring dispatch
+  `ai-enablement-engineer`, running the T1 deletion-on-promotion **and capture-promotion**
+  operations in `${CLAUDE_PLUGIN_ROOT}/refs/memory-maintenance.md`,
+  may (a) set `status: promoted` on and then delete a rule file from any agent's rule directory, or
+  (b) **create a rule file in, or merge `uses`/`evidence` into an existing rule file in, any agent's
+  rule directory** when promoting a capture (subject to the `agents/shared/`
+  audience-preservation rule in `${CLAUDE_PLUGIN_ROOT}/refs/adr-pipeline.md` §7) — (a) once a
+  `knowledge-engineer`-authored ADR supersedes the rule, (b) once the `/sdlc:docs distill`
+  founder-confirmation gate recorded a per-item `memory` choice for that specific capture — **only**
+  as a reviewable diff/PR, **only** after the gate approved the specific promotion.
+  This moved off `knowledge-engineer` (NA-73) — the ADR-authoring dispatch
   now writes `docs/adr/**` only and marks nothing. Like Exception 1, this is never a silent write.
 
 Two further carve-outs are **not** cross-agent writes and need no gate:
 
-- **Counter-only writes.** Incrementing `uses` and appending a story key to `evidence` on a rule
-  under `agents/shared/` is permitted for any agent that applied the rule — it changes no
-  semantics, so it is not treated as writing "another agent's" rule directory even when the
-  applying agent isn't the rule's sole owner.
+- **Counter-only writes.** A counter-only update is now written as a **capture**
+  (`capture-learning.sh rule ... <payload-file with uses: 1>`, which must omit `agent:` — see the
+  counter-only exemption in `capture-learning.sh`) by any agent that applied the rule under
+  `agents/shared/` — it changes no semantics, so the capture write, and the maintenance op's later
+  promotion-merge of that capture into the target rule, are not treated as writing "another agent's"
+  rule directory.
 - **QA rule authorship for the fixing agent.** `qa-engineer` Step 5 (`refs/qa-engineer-playbook.md`)
-  creates new rule files under `agents/<fixing-agent>/` from that round's findings — bounded to
-  creation only, never editing or deleting an existing rule file there.
+  now creates `captured/rules/*.md` carrying `agent: [<fixing-agent>]` — **never** a file under
+  `agents/<fixing-agent>/` directly — from that round's findings, still bounded to creation only.
 
 No other cross-agent memory write is sanctioned; any reset or deletion outside the two named
 exceptions above (and outside the two no-gate carve-outs) is refused per
@@ -229,7 +234,7 @@ command — defined exactly once here; each references this anchor instead of re
 | Apply attempted without human confirmation | Refuse — confirmation is mandatory (never auto-apply). |
 | Apply target outside resolved write-scope | Refuse and abort; print the offending path(s); make no writes (AC-5). |
 | Memory conflict with no human decision (deferred) | Report only; reset nothing. |
-| Cross-agent memory write attempted outside the two named exceptions and the two no-gate carve-outs (see [Memory-ownership exceptions](#memory-ownership-exceptions)) | Refuse — a reset must be human-arbitrated (Exception 1) and a maintenance-op promotion-and-deletion must be founder-gated (Exception 2); a write that isn't a counter-only edit or QA's Step-5 fixing-agent rule authorship is refused. |
+| Cross-agent memory write attempted outside the two named exceptions and the two no-gate carve-outs (see [Memory-ownership exceptions](#memory-ownership-exceptions)) | Refuse — a reset must be human-arbitrated (Exception 1) and a maintenance-op promotion-and-deletion must be founder-gated (Exception 2); a write that isn't a counter-only edit, a capture write, or QA's Step-5 fixing-agent rule capture is refused. |
 | `find-skills` / `skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
 | `find-skills` install/update commands would run | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only. |
 | `raise-pr.sh` fails during standalone apply | Surface the failure; leave branch + local commit for manual recovery; do not retry silently. |

@@ -9,7 +9,7 @@ Knowledge curator: SDLC agent that owns ADR curation: turns founder-known patter
 
 ## Tools
 
-`Read`, `Write`, `Edit`, `Bash`, `Skill`, `mcp__plugin_claude-mem_mcp-search__observation_search`, `mcp__plugin_claude-mem_mcp-search__get_observations`
+`Read`, `Write`, `Edit`, `Bash`, `Skill`, `mcp__plugin_claude-mem_mcp-search__observation_search`, `mcp__plugin_claude-mem_mcp-search__get_observations`, `mcp__plugin_context-mode_context-mode__ctx_index`, `mcp__plugin_context-mode_context-mode__ctx_search`
 
 ## Source
 

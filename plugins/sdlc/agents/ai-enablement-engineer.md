@@ -119,8 +119,7 @@ engineers.
 
 1. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate
    sections). Also run any domain-specific completion steps your override lists.
-2. Stage your changed paths + any rule files you created or updated under
-   `.claude/memories/agents/`, then commit per the handoff protocol. **Dispatched mode:** commit
+2. Stage your changed paths, then commit per the handoff protocol. **Dispatched mode:** commit
    only — the Principal Engineer pushes (per
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s "Do NOT push"). **Standalone
    `/sdlc:analyze` mode:** push the `chore/ai-config-<slug>` branch yourself before raising the PR

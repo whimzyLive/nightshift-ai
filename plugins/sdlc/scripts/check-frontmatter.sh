@@ -298,6 +298,67 @@ for f in "$mem_root"/reviews/*.md; do
   validate_review_file "$f"
 done
 
+validate_capture_file() {
+  local file="$1" kind="$2"
+  local base stem fm parsed issues field
+  base="$(basename "$file")"
+  stem="${base%.md}"
+
+  fm="$(extract_fm "$file")"
+  if [ -z "$fm" ]; then
+    add_warning "$file: missing or unparseable frontmatter"
+    return
+  fi
+  parsed="$(printf '%s\n' "$fm" | parse_frontmatter)"
+
+  issues=""
+  if [ "$kind" = "rule" ]; then
+    for field in id agent trigger rule evidence uses status captured story origin promote-target; do
+      has_field "$parsed" "$field" || issues+="missing field '$field'; "
+      [ -z "$(field_value "$parsed" "$field")" ] && issues+="empty field '$field'; "
+    done
+    local status_val id_val origin_val
+    status_val="$(field_value "$parsed" status)"
+    [ "$status_val" != "captured" ] && issues+="status '$status_val' is not 'captured'; "
+    id_val="$(field_value "$parsed" id)"
+    [ "${stem#*--}" != "$id_val" ] && issues+="id '$id_val' does not match filename segment '${stem#*--}'; "
+    origin_val="$(field_value "$parsed" origin)"
+    case "$origin_val" in
+      domain-agent | qa-round) ;;
+      *) issues+="origin '$origin_val' is not one of domain-agent|qa-round; " ;;
+    esac
+  else
+    for field in story date domains root_causes issue_count captured origin promote-target; do
+      has_field "$parsed" "$field" || issues+="missing field '$field'; "
+    done
+    local issue_count_val
+    issue_count_val="$(field_value "$parsed" issue_count)"
+    for field in story date issue_count captured origin promote-target; do
+      [ -z "$(field_value "$parsed" "$field")" ] && issues+="empty field '$field'; "
+    done
+    if [ "$issue_count_val" != "0" ]; then
+      [ -z "$(field_value "$parsed" domains)" ] && issues+="empty field 'domains'; "
+      [ -z "$(field_value "$parsed" root_causes)" ] && issues+="empty field 'root_causes'; "
+    fi
+    local origin_val story_val date_val
+    origin_val="$(field_value "$parsed" origin)"
+    [ "$origin_val" != "qa-round" ] && issues+="origin '$origin_val' is not 'qa-round'; "
+    story_val="$(field_value "$parsed" story)"
+    date_val="$(field_value "$parsed" date)"
+    if [[ "$stem" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})-([A-Z][A-Z0-9]*-[0-9]+)(-r[0-9]+)?$ ]]; then
+      [ "$story_val" != "${BASH_REMATCH[2]}" ] && issues+="story '$story_val' disagrees with filename key '${BASH_REMATCH[2]}'; "
+      [ "$date_val" != "${BASH_REMATCH[1]}" ] && issues+="date '$date_val' disagrees with filename date '${BASH_REMATCH[1]}'; "
+    else
+      issues+="filename does not match YYYY-MM-DD-<KEY>[-rN].md; "
+    fi
+  fi
+
+  [ -n "$issues" ] && add_warning "$file: $issues"
+}
+
+for f in "$mem_root"/captured/rules/*.md;   do [ -e "$f" ] && validate_capture_file "$f" rule;   done
+for f in "$mem_root"/captured/reviews/*.md; do [ -e "$f" ] && validate_capture_file "$f" review; done
+
 # ADR frontmatter must open on line 1 — every frontmatter reader in this repo uses the
 # `NR==1 && $0=="---"` idiom (see extract_fm above), so a stray line (e.g. the writing-adrs
 # template's artifact-encoding pointer, accidentally left inside the fence) before the opening

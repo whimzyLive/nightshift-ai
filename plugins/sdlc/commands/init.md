@@ -795,8 +795,14 @@ Error / no-op branches:
   set established in Step 3 / written an override in 4c — a `SdlcAgentName` other than
   `principal-engineer`, which gets no rule directory)
 - `.claude/memories/reviews/.gitkeep`
+- `.claude/memories/captured/rules/` and `.claude/memories/captured/reviews/`
+- `.claude/memories/captured/.gitignore` containing exactly `*` on line 1 and `!.gitignore` on line 2
 
-This step is additive and idempotent: on the merge/re-init path, backfill any of the three that are
+The marker is self-ignoring, so the staging area is invisible to git in every consumer repo without
+editing that repo's root `.gitignore`. All three are required — `*` ignores the subdirectories, so a
+fresh clone has the marker and nothing else.
+
+This step is additive and idempotent: on the merge/re-init path, backfill any of the five that are
 missing **without touching any existing memory content** (an existing rule file, review file, or
 non-empty directory is left exactly as it is — this step only ever creates an absent `.gitkeep` in
 an absent or genuinely-empty directory).

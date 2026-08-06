@@ -54,14 +54,14 @@ round.
 
 | Token                                           | Value |
 | ----------------------------------------------- | ----- |
-| Lightweight threshold (story points, inclusive) | `3`   |
+| Lightweight threshold (story points, inclusive) | `5`   |
 
 ## Code Review
 
-| Token        | Value           |
-| ------------ | --------------- |
-| Review agent | `claude-inline` |
-| Review mode  | `on-update`     |
+| Token        | Value                |
+| ------------ | -------------------- |
+| Review agent | `claude-superpowers` |
+| Review mode  | `on-update`          |
 
 ## CI
 

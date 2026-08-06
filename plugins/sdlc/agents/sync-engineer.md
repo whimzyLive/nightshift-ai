@@ -66,7 +66,6 @@ Follow `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — shared protocol 
 ## Completion checklist
 
 1. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate sections). Also run any domain-specific completion steps your override lists.
-2. Stage your changed paths + any rule files you created or updated under
-   `.claude/memories/agents/`, then commit and push per the handoff protocol.
+2. Stage your changed paths, then commit and push per the handoff protocol.
 
 Return to Principal Engineer a summary of what changed in your domain (stacks, handlers, entities, config, screens — as applicable).

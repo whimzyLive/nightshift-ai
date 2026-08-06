@@ -167,9 +167,14 @@ Evidence sources (cluster across all of these):
 | --- | --- |
 | The `ai-enablement-engineer` maintenance-op nomination list (`refs/memory-maintenance.md`) | Read (mechanically-nominated rule candidates) |
 | `.claude/memories/reviews/*.md` | Read (per-round review files, corroborating evidence) |
+| The capture corpus (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --json`) | Read — **nomination input** |
 | PR review threads | `gh` (e.g. `gh pr list` / `gh api` for review comments) |
 | Commit history | `git log` |
 | claude-mem observations | `observation_search` / `get_observations` MCP tools |
+
+A capture is not itself a citation. The evidence contract still resolves to the Jira key / PR
+thread / SHA carried in the capture's evidence field, so a candidate stays verifiable after the
+capture is deleted on promotion.
 
 Distill **consumes** the maintenance op's nomination list — it does not re-derive candidates by
 mining `.claude/memories/agents/**` itself. The nomination list already applied the promotion
@@ -207,6 +212,10 @@ claude-mem tools unavailable — /sdlc:docs distill requires the claude-mem plug
 
 It does not silently proceed without them.
 
+**Exception — non-empty capture corpus.** When `list-captured.sh` returns at least one entry,
+distill runs on captures alone with a warning rather than halting. Tools absent AND an empty
+corpus still halts.
+
 - **Tools present but DB empty → non-fatal.** A zero-result observation search is not an error —
   per §4, a candidate carried entirely by repo-native citations still fully satisfies the evidence
   contract.
@@ -228,6 +237,10 @@ A clustered learning is promoted to an ADR candidate iff it meets at least one o
 Candidates failing all three are NOT promoted — report them as "below threshold" and leave them in
 memory untouched.
 
+Distill's founder gate takes one of three per-item choices per capture — memory | adr | skip. A
+memory outcome is NOT subject to the Recurrence / Cross-agent / Durable-convention test; that test
+gates ADR promotion only. skip leaves the capture staged.
+
 ## 7. `agents/shared/` and review-file audience-preservation rules
 
 `.claude/memories/agents/shared/*.md` rules are readable by every agent named in their `agent`
@@ -245,17 +258,18 @@ its agents would narrow its visibility from that whole list down to tag-list-onl
   offered only when the audience-preservation condition holds.
 
 **Review-file tagging rule (same audience-preservation concern, applied at tagging time rather
-than deletion time).** `.claude/memories/reviews/*.md` round files are `qa-engineer`'s working
-evidence — every QA round's Step 1 pre-review scan reads them (see `qa-engineer-playbook.md`
-Step 1/5). A candidate nominated from a rule that a review
-round file's `## Rules written` cited, whose proposed `agents:` tags name only the agent(s) whose
-_work_ the pattern constrains (e.g. `web-engineer`) and omit `qa-engineer`, would silently drop the
-pattern out of QA's own read path — QA would no longer see, via its own index section, a pattern it
-used to see directly in its review files. Therefore: **an ADR candidate nominated from a
-review-file-sourced rule ALWAYS carries `qa-engineer` in its `agents:` list**, in addition to
-whichever other agent(s) the decision constrains — this is not optional and is not subject to
-founder override at the tag-editing step of the confirmation gate (the founder may add more
-agents; they may not remove `qa-engineer` from a review-file-sourced candidate). Unlike the
+than deletion time).** `.claude/memories/reviews/*.md` round files, **and captured round files not
+yet committed**, are `qa-engineer`'s working evidence — every QA round's Step 1 pre-review scan
+reads both (see `qa-engineer-playbook.md` Step 1/5). A candidate nominated from a rule that a
+committed OR **captured** round file's `## Rules written` cited, whose proposed `agents:` tags name
+only the agent(s) whose _work_ the pattern constrains (e.g. `web-engineer`) and omit `qa-engineer`,
+would silently drop the pattern out of QA's own read path — QA would no longer see, via its own
+index section, a pattern it used to see directly in its review files. Without this the rule
+silently stops firing the day round files stop being committed. Therefore: **an ADR candidate
+nominated from a review-file-sourced rule ALWAYS carries `qa-engineer` in its `agents:` list**, in
+addition to whichever other agent(s) the decision constrains — this is not optional and is not
+subject to founder override at the tag-editing step of the confirmation gate (the founder may add
+more agents; they may not remove `qa-engineer` from a review-file-sourced candidate). Unlike the
 `agents/shared/` rule above, this is enforced at **draft time** (phase 1, when tags are proposed),
 not at deletion time — there is no `General`-section escape hatch here because a review-file-sourced
 promotion always needs the tag, never a broader/narrower substitute.
@@ -284,6 +298,13 @@ This cross-agent memory write (marking and deleting another agent's rule) is san
 [`analyze-protocol.md`'s memory-ownership rules](analyze-protocol.md#memory-ownership-exceptions)
 — see that anchor for the canonical statement of the exception, now scoped to the
 `ai-enablement-engineer` maintenance op rather than to `knowledge-engineer`'s distill run.
+
+**Capture promotion is a second phase-2 dispatch.** Every `memory` choice is executed by
+`ai-enablement-engineer` running the capture-promotion operation in `refs/memory-maintenance.md`;
+`knowledge-engineer` still writes `docs/adr/**` only and never `.claude/memories/**`. Both
+dispatches commit to the **same** distill branch, so the founder gets one PR from one interaction.
+This cross-agent memory write is sanctioned as the widened **Exception 2** in
+[`analyze-protocol.md`'s memory-ownership rules](analyze-protocol.md#memory-ownership-exceptions).
 
 ## 9. Seed-mode `source-stories` scoping
 
