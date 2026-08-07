@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# memory-root.test.sh — NA-101. Contract suite for memory-root.sh (R1-R14 of the spec).
+# memory-root.test.sh — NA-101. Contract suite for memory-root.sh (R1-R16 of the spec, plus
+# R12g-R12j hardening cases added during review).
 #
 # AUTHOR-RUN AND CI-WIRED:
 #   bash plugins/sdlc/scripts/__tests__/memory-root.test.sh
@@ -235,6 +236,18 @@ err4="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens4" bash "$mr" --ensure 2>&1 >/d
   && [ ! -d "$ens4/agents" ] && [ ! -d "$ens4/reviews" ] && [ ! -d "$ens4/captured/rules" ]; } \
   && ok "(R12i) captured/.gitignore pre-existing as a directory is a hard error, creating nothing" \
   || bad "(R12i) .gitignore-as-directory" "rc=$rc4 err='$err4' agents=$([ -d "$ens4/agents" ] && echo present)"
+
+# --- R12j: --ensure with captured/.gitignore pre-existing as a DANGLING SYMLINK creates NOTHING ---
+# Copilot review: [ -d "$p" ] alone follows the link and reports false for a dangling target, so
+# mkdir -p would create all four directories before the write fails, breaking "no partial layout".
+ens5="$tmp/ensure-root5"
+mkdir -p "$ens5/captured"
+ln -s "$ens5/nowhere-target" "$ens5/captured/.gitignore"
+err5="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens5" bash "$mr" --ensure 2>&1 >/dev/null )"; rc5=$?
+{ [ "$rc5" -ne 0 ] && printf '%s' "$err5" | grep -qF "$ens5/captured/.gitignore" \
+  && [ ! -d "$ens5/agents" ] && [ ! -d "$ens5/reviews" ] && [ ! -d "$ens5/captured/rules" ]; } \
+  && ok "(R12j) captured/.gitignore pre-existing as a dangling symlink is a hard error, creating nothing" \
+  || bad "(R12j) .gitignore-as-dangling-symlink" "rc=$rc5 err='$err5' agents=$([ -d "$ens5/agents" ] && echo present)"
 
 # --- R15: HOME, XDG_DATA_HOME and SDLC_MEMORY_ROOT all unset -> hard error, correct message ----
 out15="$( cd "$repo_ssh" && env -u SDLC_MEMORY_ROOT -u XDG_DATA_HOME -u HOME bash "$mr" --print-root 2>&1 >/dev/null )"; rc15=$?

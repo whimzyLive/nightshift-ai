@@ -142,8 +142,10 @@ sdlc_memory_ensure() {
            "$root/captured" "$root/captured/rules" "$root/captured/reviews"; do
     { [ ! -d "$p" ] && { [ -e "$p" ] || [ -L "$p" ]; }; } && blocked="$blocked $p"
   done
-  # The .gitignore write below needs the opposite check: a DIRECTORY there blocks the file write.
-  [ -d "$root/captured/.gitignore" ] && blocked="$blocked $root/captured/.gitignore"
+  # The .gitignore write below needs the mirrored check: anything there that is not a regular
+  # file (a directory, or a dangling/misdirected symlink) blocks the write.
+  p="$root/captured/.gitignore"
+  { [ ! -f "$p" ] && { [ -e "$p" ] || [ -L "$p" ]; }; } && blocked="$blocked $p"
   if [ -n "$blocked" ]; then
     printf 'memory-root.sh: cannot create the memory layout under %s — a path segment is a file, not a directory:%s\n' "$root" "$blocked" >&2
     return 1
