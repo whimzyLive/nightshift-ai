@@ -70,19 +70,20 @@ wt_repo="$(cd "$wt_repo" && pwd -P)"  # canonicalise: git worktree list --porcel
 git -C "$wt_repo" init -q
 git -C "$wt_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 git -C "$wt_repo" worktree add -q "$tmp/linked" -b linked >/dev/null 2>&1
-got="$(cd "$tmp/linked" && bash "$cap" --print-root)"
+wt_mem="$tmp/wt-memroot"
+got="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" --print-root )"
 case "$got" in
-  "$wt_repo"/.claude/memories/captured) ok "(T2e) linked worktree resolves to main checkout" ;;
-  *) bad "(T2e) linked worktree resolves to main checkout" "got '$got'" ;;
+  "$wt_mem"/captured) ok "(T2e) linked worktree resolves to the resolved memory root" ;;
+  *) bad "(T2e) linked worktree resolves to the resolved memory root" "got '$got'" ;;
 esac
 
-# T2e2: a capture written from the linked worktree survives `git worktree remove --force` of
-# that worktree (spec D3's central claim — the staging root is the PRIMARY checkout, never the
-# linked worktree, so removing the worktree must not touch it).
-wt_cap_out="$(cd "$tmp/linked" && bash "$cap" rule web-engineer/survives-worktree-removal AB-1)"
-wt_cap_file="$wt_repo/.claude/memories/captured/rules/AB-1--survives-worktree-removal.md"
+# T2e2: a capture written from the linked worktree lands in the RESOLVED root, which is outside
+# the git tree entirely — so it necessarily survives `git worktree remove --force` (NA-101
+# strengthens spec D3's claim: the staging root is no longer any checkout).
+wt_cap_out="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" rule web-engineer/survives-worktree-removal AB-1 )"
+wt_cap_file="$wt_mem/captured/rules/AB-1--survives-worktree-removal.md"
 [ "$wt_cap_out" = "CAPTURED=$wt_cap_file" ] && [ -f "$wt_cap_file" ] \
-  && ok "(T2e2) capture written from the linked worktree lands in the main checkout" \
+  && ok "(T2e2) capture written from the linked worktree lands in the resolved root" \
   || bad "(T2e2) capture from linked worktree" "got '$wt_cap_out'"
 git -C "$wt_repo" worktree remove --force "$tmp/linked"
 [ ! -d "$tmp/linked" ] \
