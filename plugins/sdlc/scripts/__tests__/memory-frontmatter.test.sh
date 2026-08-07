@@ -290,6 +290,46 @@ else
   echo "FAIL: success-path stderr contamination — rc=$rc validated-lines=$validated_lines out='$out'"; failures=$((failures + 1))
 fi
 
+# --- Important-1 regression (PR #234 review): from a LINKED worktree, a capture staged in the
+# PRIMARY checkout must still be seen. captured/** is untracked and lives only in the primary, so
+# the legacy entry's captured-scan must resolve via sdlc_primary_worktree, not <git-toplevel> (which
+# is the linked worktree's own — empty — tree). SDLC_MEMORY_ROOT points at a never-created dir so
+# only the legacy (primary-resolved) entry is active, isolating the exact behaviour under test.
+li_tmp="$(mktemp -d)"; li_tmp="$(cd "$li_tmp" && pwd -P)"
+li_primary="$li_tmp/primary"; mkdir -p "$li_primary/.claude/memories/agents/shared"
+git -C "$li_primary" init -q
+# .claude/memories/** is TRACKED content (per /sdlc:init scaffolding) so it exists identically in
+# every worktree — only captured/** (gitignored) is primary-only. Commit a placeholder so the
+# linked worktree below has a real .claude/memories dir, matching a real post-init checkout.
+: > "$li_primary/.claude/memories/agents/shared/.gitkeep"
+git -C "$li_primary" add .claude
+git -C "$li_primary" -c user.email=t@t -c user.name=t commit -q -m "seed .claude/memories"
+git -C "$li_primary" worktree add -q "$li_tmp/linked" -b linked-cf-test >/dev/null 2>&1
+mkdir -p "$li_primary/.claude/memories/captured/rules"
+cat > "$li_primary/.claude/memories/captured/rules/AB-9--broken.md" <<'EOF'
+---
+id: mismatched-id
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: A rule.
+evidence: [AB-9]
+uses: 0
+status: captured
+captured: 2026-08-04T00:00:00Z
+story: AB-9
+origin: domain-agent
+promote-target: /absolute/bogus/path.md
+---
+EOF
+li_out="$( cd "$li_tmp/linked" && env -u SDLC_MEMORY_ROOT SDLC_MEMORY_ROOT="$li_tmp/never-created" bash "$check_frontmatter" 2>&1 )"; li_rc=$?
+if [ "$li_rc" -eq 0 ] && printf '%s' "$li_out" | grep -qF "AB-9--broken.md" \
+  && printf '%s' "$li_out" | grep -qF "1 file(s) validated under $li_tmp/linked/.claude/memories"; then
+  echo "PASS: check-frontmatter.sh from a linked worktree sees a capture staged in the primary (Important-1, PR #234)"
+else
+  echo "FAIL: linked-worktree primary-capture blindness — rc=$li_rc out='$li_out'"; failures=$((failures + 1))
+fi
+rm -rf "$li_tmp"
+
 rm -rf "$cf_tmp"
 
 if [ "$failures" -ne 0 ]; then

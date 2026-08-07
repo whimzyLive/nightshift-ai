@@ -213,7 +213,7 @@ while IFS= read -r mem_root; do
   if [ "$legacy_banner_done" -eq 0 ] && [ -f "$legacy_file" ]; then
     printf 'LEGACY\n'
     cat "$legacy_file"
-    echo "collect-memory: WARNING — $legacy_file is a v1 flat diary; migrate to .claude/memories/agents/$agent/<rule-id>.md (NA-74)." >&2
+    echo "collect-memory: WARNING — $legacy_file is a v1 flat diary; migrate to <memory-root>/agents/$agent/<rule-id>.md (NA-74)." >&2
     legacy_banner_done=1
   fi
 

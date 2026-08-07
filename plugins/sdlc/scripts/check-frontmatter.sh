@@ -14,13 +14,21 @@ if [ -z "$repo_root" ]; then
   [ -z "$repo_root" ] && repo_root="$(pwd)"
 fi
 
-# mem_roots — newline-delimited. arg1 present -> LEGACY-ONLY (fixture runs stay hermetic and
-# byte-identical). arg1 absent -> DUAL: resolved root, then <git-toplevel>/.claude/memories.
+# mem_roots — newline-delimited TSV pairs "<tracked-root><TAB><captured-root>". arg1 present ->
+# LEGACY-ONLY (fixture runs stay hermetic and byte-identical; both columns equal explicit_root).
+# arg1 absent -> DUAL: resolved root (both columns equal — capture-learning.sh writes captures
+# there directly), then the legacy entry, where the two columns DIVERGE: the tracked corpus
+# (agents/**, reviews/**) is checked out identically in every worktree, so <git-toplevel> is
+# correct for column 1 — but captured/** is untracked and gitignored, so it exists ONLY in the
+# PRIMARY checkout. From a linked worktree, <git-toplevel>/captured is empty even when the primary
+# has staged captures list-captured.sh can see, so column 2 resolves via sdlc_primary_worktree
+# (matching list-captured.sh), falling back to column 1 if that fails.
 # The legacy entry is the NA-101 transition shim; NA-102 removes it.
 mem_roots=""
 resolver_failed=0
 if [ -n "$explicit_root" ]; then
-  [ -d "$explicit_root/.claude/memories" ] && mem_roots="$explicit_root/.claude/memories"
+  [ -d "$explicit_root/.claude/memories" ] \
+    && mem_roots="$explicit_root/.claude/memories	$explicit_root/.claude/memories"
 else
   # A hasher on the success path can write to stderr while still exiting 0 (e.g. macOS
   # /usr/bin/shasum is Perl and warns on a locale mismatch) — 2>&1 on the success call would
@@ -36,10 +44,15 @@ else
     resolver_failed=1
     echo "check-frontmatter: RESOLVER-FAILED — ${resolver_err:-memory-root.sh could not resolve a root}" >&2
   elif [ -d "$resolved" ]; then
-    mem_roots="$resolved"
+    mem_roots="$resolved	$resolved"
   fi
-  [ -d "$repo_root/.claude/memories" ] && mem_roots="$mem_roots${mem_roots:+
-}$repo_root/.claude/memories"
+  if [ -d "$repo_root/.claude/memories" ]; then
+    legacy_captured_root="$repo_root"
+    legacy_primary="$(sdlc_primary_worktree 2>/dev/null)" || legacy_primary=""
+    [ -n "$legacy_primary" ] && legacy_captured_root="$legacy_primary"
+    mem_roots="$mem_roots${mem_roots:+
+}$repo_root/.claude/memories	$legacy_captured_root/.claude/memories"
+  fi
 fi
 
 vocab_list=""
@@ -362,13 +375,14 @@ validate_capture_file() {
   [ -n "$issues" ] && add_warning "$file: $issues"
 }
 
-while IFS= read -r mem_root; do
+while IFS=$'\t' read -r mem_root captured_root; do
   [ -n "$mem_root" ] || continue
+  [ -n "$captured_root" ] || captured_root="$mem_root"
   id_records=""          # duplicate-id detection is PER ROOT: the same id in both roots is
   validated=0            # expected mid-migration, never a defect
 
   for f in "$mem_root"/agents/*.md; do
-    add_warning "$f is a v1 flat diary; migrate to .claude/memories/agents/<agent>/<rule-id>.md (NA-74)"
+    add_warning "$f is a v1 flat diary; migrate to <memory-root>/agents/<agent>/<rule-id>.md (NA-74)"
   done
 
   for dir in "$mem_root"/agents/*/; do
@@ -398,8 +412,10 @@ while IFS= read -r mem_root; do
     validate_review_file "$f"; validated=$((validated + 1))
   done
 
-  for f in "$mem_root"/captured/rules/*.md;   do [ -e "$f" ] && { validate_capture_file "$f" rule;   validated=$((validated + 1)); }; done
-  for f in "$mem_root"/captured/reviews/*.md; do [ -e "$f" ] && { validate_capture_file "$f" review; validated=$((validated + 1)); }; done
+  # captured/** is scanned via $captured_root, not $mem_root — they diverge for the legacy entry
+  # from a linked worktree (see the mem_roots comment above).
+  for f in "$captured_root"/captured/rules/*.md;   do [ -e "$f" ] && { validate_capture_file "$f" rule;   validated=$((validated + 1)); }; done
+  for f in "$captured_root"/captured/reviews/*.md; do [ -e "$f" ] && { validate_capture_file "$f" review; validated=$((validated + 1)); }; done
 
   echo "check-frontmatter: $validated file(s) validated under $mem_root"
 done <<< "$mem_roots"
