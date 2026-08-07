@@ -202,4 +202,32 @@ after="$(find "$tmp" | sort)"
   && ok "(R12f) an uncreatable root is a hard error naming the path, creating nothing" \
   || bad "(R12f) uncreatable root" "rc=$rc err='$err'"
 
+# --- R12g: --ensure with a SUB-PATH (not the root) blocked by a regular file creates NOTHING,
+# not a partial layout (mkdir -p continues past a failed operand — this is the probe-first guard).
+ens2="$tmp/ensure-root2"
+mkdir -p "$ens2"
+printf 'not a dir either\n' > "$ens2/captured"
+err2="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens2" bash "$mr" --ensure 2>&1 >/dev/null )"; rc2=$?
+{ [ "$rc2" -ne 0 ] && printf '%s' "$err2" | grep -qF "$ens2/captured" \
+  && [ ! -d "$ens2/agents" ] && [ ! -d "$ens2/reviews" ]; } \
+  && ok "(R12g) a blocked sub-path is a hard error naming it, creating no sibling directory" \
+  || bad "(R12g) blocked sub-path" "rc=$rc2 err='$err2' agents=$([ -d "$ens2/agents" ] && echo present) reviews=$([ -d "$ens2/reviews" ] && echo present)"
+
+# --- R15: HOME, XDG_DATA_HOME and SDLC_MEMORY_ROOT all unset -> hard error, correct message ----
+out15="$( cd "$repo_ssh" && env -u SDLC_MEMORY_ROOT -u XDG_DATA_HOME -u HOME bash "$mr" --print-root 2>&1 >/dev/null )"; rc15=$?
+{ [ "$rc15" -ne 0 ] && printf '%s' "$out15" | grep -qF 'neither XDG_DATA_HOME (absolute) nor HOME is set'; } \
+  && ok "(R15) HOME + XDG_DATA_HOME + SDLC_MEMORY_ROOT all unset is a hard error with the exact reason" \
+  || bad "(R15) all-unset hard error" "rc=$rc15 out='$out15'"
+
+# --- R16: no shasum/sha256sum/cksum on PATH -> hard error, correct message ---------------------
+stub_bin="$tmp/stub-bin"; mkdir -p "$stub_bin"
+for c in bash git sed cut basename tr head awk mkdir; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$stub_bin/$c"
+done
+out16="$( cd "$repo_ssh" && env -u SDLC_MEMORY_ROOT PATH="$stub_bin" HOME="$tmp/home" bash "$mr" --print-root 2>&1 >/dev/null )"; rc16=$?
+{ [ "$rc16" -ne 0 ] && printf '%s' "$out16" | grep -qF 'no shasum, sha256sum or cksum available'; } \
+  && ok "(R16) no shasum/sha256sum/cksum on PATH is a hard error with the exact reason" \
+  || bad "(R16) missing-hasher hard error" "rc=$rc16 out='$out16'"
+
 exit "$fail"

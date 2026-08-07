@@ -131,6 +131,20 @@ sdlc_memory_ensure() {
     printf 'memory-root.sh: sdlc_memory_ensure needs a <root> argument\n' >&2
     return 1
   }
+  # Probe every ancestor `mkdir -p` below would need BEFORE calling it: POSIX mkdir -p processes
+  # each operand independently and continues past a failed one, so a single blocked sub-path (e.g.
+  # <root>/captured already existing as a regular file) would otherwise leave a PARTIAL layout —
+  # some of the four directories created, some not — contradicting the "creates nothing partially"
+  # contract.
+  local p blocked=""
+  for p in "$root" "$root/agents" "$root/agents/shared" "$root/reviews" \
+           "$root/captured" "$root/captured/rules" "$root/captured/reviews"; do
+    [ -e "$p" ] && [ ! -d "$p" ] && blocked="$blocked $p"
+  done
+  if [ -n "$blocked" ]; then
+    printf 'memory-root.sh: cannot create the memory layout under %s — a path segment is a file, not a directory:%s\n' "$root" "$blocked" >&2
+    return 1
+  fi
   mkdir -p "$root/agents/shared" "$root/reviews" "$root/captured/rules" "$root/captured/reviews" 2>/dev/null || {
     printf 'memory-root.sh: cannot create the memory layout under %s — check permissions and that no path segment is a file\n' "$root" >&2
     return 1
