@@ -129,13 +129,13 @@ p="$(extract_fm "$f" | parse_frontmatter)"
 [ "$(field_value "$p" id)" = "capture-before-commit" ] && ok "(T3b) id derived from arg" || bad "(T3b) id" "got '$(field_value "$p" id)'"
 [ "$(field_value "$p" status)" = "captured" ] && ok "(T3c) status captured" || bad "(T3c) status" "got '$(field_value "$p" status)'"
 [ "$(field_value "$p" agent)" = "web-engineer" ] && ok "(T3d) agent = target dir" || bad "(T3d) agent" "got '$(field_value "$p" agent)'"
-[ "$(field_value "$p" promote-target)" = ".claude/memories/agents/web-engineer/capture-before-commit.md" ] \
+[ "$(field_value "$p" promote-target)" = "agents/web-engineer/capture-before-commit.md" ] \
   && ok "(T3e) promote-target own dir" || bad "(T3e) promote-target own dir" "got '$(field_value "$p" promote-target)'"
 grep -q '^## Why' "$f" && ok "(T3f) body appended" || bad "(T3f) body appended" "## Why missing"
 
 run_cap rule shared/cross-cutting-thing AB-1 "$tmp/payload-shared.md" >/dev/null
 p2="$(extract_fm "$root/rules/AB-1--cross-cutting-thing.md" | parse_frontmatter)"
-[ "$(field_value "$p2" promote-target)" = ".claude/memories/agents/shared/cross-cutting-thing.md" ] \
+[ "$(field_value "$p2" promote-target)" = "agents/shared/cross-cutting-thing.md" ] \
   && ok "(T3g) promote-target shared" || bad "(T3g) promote-target shared" "got '$(field_value "$p2" promote-target)'"
 [ "$(field_value "$p2" agent)" = "web-engineer,mobile-engineer" ] \
   && ok "(T3g2) shared agent list comes from the payload, never the literal 'shared'" \
@@ -214,7 +214,7 @@ rf="$root/reviews/2026-08-04-AB-1-r2.md"
 [ "$out_r" = "CAPTURED=$rf" ] && ok "(T3n) review path with -r2" || bad "(T3n) review path" "got '$out_r'"
 pr="$(extract_fm "$rf" | parse_frontmatter)"
 [ "$(field_value "$pr" origin)" = "qa-round" ] && ok "(T3o) review origin fixed" || bad "(T3o) review origin" "got '$(field_value "$pr" origin)'"
-[ "$(field_value "$pr" promote-target)" = ".claude/memories/reviews/2026-08-04-AB-1-r2.md" ] \
+[ "$(field_value "$pr" promote-target)" = "reviews/2026-08-04-AB-1-r2.md" ] \
   && ok "(T3p) review promote-target" || bad "(T3p) review promote-target" "got '$(field_value "$pr" promote-target)'"
 run_cap review AB-1 2026-08-04 1 >/dev/null
 [ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
@@ -371,7 +371,7 @@ status: captured
 captured: 2026-08-04T00:00:00Z
 story: AB-1
 origin: domain-agent
-promote-target: .claude/memories/agents/web-engineer/bad-capture.md
+promote-target: agents/web-engineer/bad-capture.md
 ---
 EOF
 cf_out="$(bash "$scripts/check-frontmatter.sh" "$cf_repo" 2>&1)"; cf_rc=$?
@@ -399,13 +399,35 @@ root_causes: []
 issue_count: 2
 captured: 2026-08-04T00:00:00Z
 origin: qa-round
-promote-target: .claude/memories/reviews/2026-08-04-AB-2.md
+promote-target: reviews/2026-08-04-AB-2.md
 ---
 EOF
 cf3_out="$(bash "$scripts/check-frontmatter.sh" "$bad_marker_repo" 2>&1)"
 printf '%s' "$cf3_out" | grep -qi "empty field 'domains'" \
   && ok "(T6e) issue_count > 0 with empty domains/root_causes still warns" \
   || bad "(T6e) genuinely malformed review still warns" "$cf3_out"
+
+# --- T6f (NA-101): a legacy `.claude/memories/...` promote-target warns, never fails ---------
+legacy_pt_repo="$tmp/legacyptrepo"; mkdir -p "$legacy_pt_repo/.claude/memories/captured/rules"
+cat > "$legacy_pt_repo/.claude/memories/captured/rules/AB-3--legacy-promote-target.md" <<'EOF'
+---
+id: legacy-promote-target
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: A rule.
+evidence: [AB-3]
+uses: 0
+status: captured
+captured: 2026-08-04T00:00:00Z
+story: AB-3
+origin: domain-agent
+promote-target: .claude/memories/agents/web-engineer/legacy-promote-target.md
+---
+EOF
+cf6_out="$(bash "$scripts/check-frontmatter.sh" "$legacy_pt_repo" 2>&1)"; cf6_rc=$?
+{ [ "$cf6_rc" -eq 0 ] && printf '%s' "$cf6_out" | grep -qi 'promote-target'; } \
+  && ok "(T6f) a legacy absolute promote-target warns but never fails the gate" \
+  || bad "(T6f) legacy promote-target warning" "rc=$cf6_rc out='$cf6_out'"
 
 # --- T4l/T4m/T4n (NA-101): dual-root listing — resolved root + legacy primary-checkout root --
 dr_repo="$tmp/dualrepo"; mkdir -p "$dr_repo"

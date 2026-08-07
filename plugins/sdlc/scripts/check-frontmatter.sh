@@ -342,6 +342,14 @@ validate_capture_file() {
     fi
   fi
 
+  local pt
+  pt="$(field_value "$parsed" promote-target)"
+  case "$pt" in
+    agents/*|reviews/*) : ;;
+    "") : ;;   # an empty promote-target is already reported by the per-kind field loop above
+    *) issues+="promote-target '$pt' is not root-relative — expected agents/... or reviews/...; " ;;
+  esac
+
   [ -n "$issues" ] && add_warning "$file: $issues"
 }
 

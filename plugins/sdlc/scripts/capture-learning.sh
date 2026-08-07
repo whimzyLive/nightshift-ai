@@ -126,7 +126,7 @@ case "$kind" in
       printf 'captured: %s\n' "$now"
       printf 'story: %s\n' "$story"
       printf 'origin: %s\n' "$(payload_fm "$payload" origin domain-agent)"
-      printf 'promote-target: .claude/memories/agents/%s/%s.md\n' "$dir" "$rid"
+      printf 'promote-target: agents/%s/%s.md\n' "$dir" "$rid"
       printf -- '---\n'
       payload_body "$payload"
     )"
@@ -154,7 +154,7 @@ case "$kind" in
       printf 'issue_count: %s\n' "$(payload_fm "$payload" issue_count 0)"
       printf 'captured: %s\n' "$now"
       printf 'origin: qa-round\n'
-      printf 'promote-target: .claude/memories/reviews/%s.md\n' "$stem"
+      printf 'promote-target: reviews/%s.md\n' "$stem"
       printf -- '---\n'
       payload_body "$payload"
     )"
