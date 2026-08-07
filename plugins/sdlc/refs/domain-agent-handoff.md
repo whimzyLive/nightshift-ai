@@ -76,9 +76,9 @@ cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared
 <rule-id> := kebab-case, MUST equal the capture's `id`
 ```
 
-Prints `CAPTURED=<path>` into the gitignored staging area in the primary checkout. You never write
-`<memory-root>/agents/**` directly — a file lands there only once a human promotes a capture
-through `/sdlc:docs distill`.
+Prints `CAPTURED=<path>` into the gitignored staging area. You never write
+`<memory-root>/agents/**` (see `refs/memory-maintenance.md`) directly — a file lands there
+only once a human promotes a capture through `/sdlc:docs distill`.
 
 `<payload-file>` carries YAML frontmatter — `trigger`/`rule`/`evidence`/`uses` (`agent` too for
 `shared/`); `id`/`status`/`captured`/`story`/`promote-target` are script-derived. **The 7-field

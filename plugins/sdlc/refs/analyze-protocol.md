@@ -4,6 +4,9 @@ Shared scan/apply protocol for the `ai-enablement-engineer` agent and the `/sdlc
 Neither file duplicates this logic — both reference the anchor headings below. This ref exists so
 the drift/gap rules, ownership resolution, and apply flow are defined exactly once.
 
+`<memory-root>` := `bash ${CLAUDE_PLUGIN_ROOT}/scripts/memory-root.sh --print-root` (see
+`refs/memory-maintenance.md`).
+
 ## Ownership-resolution rules
 
 **Runtime rule (verbatim):** effective write-scope = (config-driven AI-config surface ∪
