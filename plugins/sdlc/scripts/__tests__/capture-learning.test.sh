@@ -321,7 +321,7 @@ empty="$tmp/empty-root"
 # --- T4j2-3: root-resolution failure (vs T4i/T4j's resolved-but-empty root) --------------------
 nongit="$tmp/not-a-repo"; mkdir -p "$nongit"
 nongit_out="$tmp/nongit_out"; nongit_err="$tmp/nongit_err"
-( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT -u SDLC_MEMORY_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
 nongit_rc=$?
 if [ "$nongit_rc" -ne 0 ] && [ -z "$(cat "$nongit_out")" ] && [ -s "$nongit_err" ]; then
   pass_lst=1
@@ -330,7 +330,7 @@ else
 fi
 [ "$pass_lst" -eq 1 ] && ok "(T4j2) resolution failure outside a git checkout is a hard error" \
   || bad "(T4j2) resolution failure hard error" "rc=$nongit_rc stdout='$(cat "$nongit_out")' stderr='$(cat "$nongit_err")'"
-( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT -u SDLC_MEMORY_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
 nongit_json_rc=$?
 [ "$nongit_json_rc" -ne 0 ] && ! grep -q '"entries"' "$nongit_out" \
   && ok "(T4j3) resolution failure (--json) is a hard error, not a quiet empty corpus" \
@@ -405,5 +405,36 @@ cf3_out="$(bash "$scripts/check-frontmatter.sh" "$bad_marker_repo" 2>&1)"
 printf '%s' "$cf3_out" | grep -qi "empty field 'domains'" \
   && ok "(T6e) issue_count > 0 with empty domains/root_causes still warns" \
   || bad "(T6e) genuinely malformed review still warns" "$cf3_out"
+
+# --- T4l/T4m/T4n (NA-101): dual-root listing — resolved root + legacy primary-checkout root --
+dr_repo="$tmp/dualrepo"; mkdir -p "$dr_repo"
+dr_repo="$(cd "$dr_repo" && pwd -P)"
+git -C "$dr_repo" init -q
+git -C "$dr_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+# SDLC_MEMORY_ROOT names the memory ROOT; its staging area is <root>/captured. Seed one capture in
+# the LEGACY in-repo staging root and one in the RESOLVED root's staging area.
+dr_root="$tmp/dual-root"
+SDLC_CAPTURE_ROOT="$dr_repo/.claude/memories/captured" bash "$cap" rule web-engineer/legacy-only AB-1 "$tmp/payload.md" >/dev/null
+SDLC_CAPTURE_ROOT="$dr_root/captured" bash "$cap" rule web-engineer/resolved-only AB-1 "$tmp/payload.md" >/dev/null
+dr_out="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$dr_root" bash "$lst" --kind rule 2>/dev/null )"
+{ printf '%s' "$dr_out" | grep -q 'legacy-only' && printf '%s' "$dr_out" | grep -q 'resolved-only'; } \
+  && ok "(T4l) both the resolved root and the legacy in-repo root are listed" \
+  || bad "(T4l) dual-root listing" "got '$dr_out'"
+
+# T4m: the same <kind>/<basename> in both roots is emitted ONCE, resolved root winning
+SDLC_CAPTURE_ROOT="$dr_repo/.claude/memories/captured" bash "$cap" rule web-engineer/dupe-both AB-1 "$tmp/payload.md" >/dev/null
+SDLC_CAPTURE_ROOT="$dr_root/captured" bash "$cap" rule web-engineer/dupe-both AB-1 "$tmp/payload.md" >/dev/null
+dupe_all="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$dr_root" bash "$lst" --kind rule 2>/dev/null | grep 'AB-1--dupe-both.md' )"
+dupe_n="$(printf '%s\n' "$dupe_all" | grep -c 'AB-1--dupe-both.md')"
+dupe_win="$(printf '%s\n' "$dupe_all" | head -1 | cut -f1)"
+{ [ "$dupe_n" -eq 1 ] && [ "$dupe_win" = "$dr_root/captured/rules/AB-1--dupe-both.md" ]; } \
+  && ok "(T4m) a capture present in both roots is emitted once, resolved root winning" \
+  || bad "(T4m) dedupe precedence" "count=$dupe_n winner='$dupe_win'"
+
+# T4n: resolver failure WITH a legacy root -> warning on stderr, legacy-only listing, exit 0
+n_out="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT -u XDG_DATA_HOME SDLC_MEMORY_ROOT="relative-path" bash "$lst" --kind rule 2>"$tmp/dr_warn" )"; n_rc=$?
+{ [ "$n_rc" -eq 0 ] && [ -s "$tmp/dr_warn" ] && printf '%s' "$n_out" | grep -q 'legacy-only'; } \
+  && ok "(T4n) resolver failure with a legacy root warns and lists the legacy root alone" \
+  || bad "(T4n) resolver-failure fallback" "rc=$n_rc out='$n_out'"
 
 exit "$fail"
