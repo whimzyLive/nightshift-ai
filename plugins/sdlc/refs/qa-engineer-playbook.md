@@ -117,9 +117,10 @@ git status --porcelain                    # surface any untracked new files to r
 ```
 
 **Pre-review consult.** Before dispatching the reviewer, scan the frontmatter of
-`<memory-root>/reviews/*.md` (excluding the legacy `patterns.md`, flagged separately by
-`check-frontmatter.sh`) for prior rounds whose `domains` or `root_causes` overlap this story's
-domains — open the full body only for the rounds that actually overlap, not every file. This
+`<memory-root>/reviews/*.md` (`<memory-root>` — see `refs/memory-maintenance.md`; excluding the
+legacy `patterns.md`, flagged separately by `check-frontmatter.sh`) for prior rounds whose
+`domains` or `root_causes` overlap this story's domains — open the full body only for the rounds
+that actually overlap, not every file. This
 replaces reading a single append-only audit log whole.
 
 Captured round files are not committed, so also read them:

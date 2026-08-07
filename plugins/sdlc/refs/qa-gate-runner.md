@@ -48,7 +48,7 @@ cd "$WORKTREE"
 > `.ts` via a transpiler and pass THROUGH type errors. Also confirm no compiled `.js` shadows
 > source — a green test suite does not prove
 > the deployed bundle is correct (consult the Step 1 pre-review scan of `<memory-root>/reviews/*.md`
-> for prior findings on this domain).
+> (`<memory-root>` — see `refs/memory-maintenance.md`) for prior findings on this domain).
 
 ## Return — return ONLY this block, nothing else. Cap 2,000 B.
 
