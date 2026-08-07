@@ -135,12 +135,15 @@ sdlc_memory_ensure() {
   # each operand independently and continues past a failed one, so a single blocked sub-path (e.g.
   # <root>/captured already existing as a regular file) would otherwise leave a PARTIAL layout —
   # some of the four directories created, some not — contradicting the "creates nothing partially"
-  # contract.
+  # contract. `[ -e "$p" ]` alone misses a DANGLING symlink (neither -e nor a real dir, but still
+  # blocks mkdir), so also check `[ -L "$p" ]`.
   local p blocked=""
   for p in "$root" "$root/agents" "$root/agents/shared" "$root/reviews" \
            "$root/captured" "$root/captured/rules" "$root/captured/reviews"; do
-    [ -e "$p" ] && [ ! -d "$p" ] && blocked="$blocked $p"
+    { [ ! -d "$p" ] && { [ -e "$p" ] || [ -L "$p" ]; }; } && blocked="$blocked $p"
   done
+  # The .gitignore write below needs the opposite check: a DIRECTORY there blocks the file write.
+  [ -d "$root/captured/.gitignore" ] && blocked="$blocked $root/captured/.gitignore"
   if [ -n "$blocked" ]; then
     printf 'memory-root.sh: cannot create the memory layout under %s — a path segment is a file, not a directory:%s\n' "$root" "$blocked" >&2
     return 1

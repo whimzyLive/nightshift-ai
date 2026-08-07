@@ -213,6 +213,29 @@ err2="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens2" bash "$mr" --ensure 2>&1 >/d
   && ok "(R12g) a blocked sub-path is a hard error naming it, creating no sibling directory" \
   || bad "(R12g) blocked sub-path" "rc=$rc2 err='$err2' agents=$([ -d "$ens2/agents" ] && echo present) reviews=$([ -d "$ens2/reviews" ] && echo present)"
 
+# --- R12h: --ensure with a SUB-PATH that is a DANGLING SYMLINK creates NOTHING -----------------
+# [ -e "$p" ] alone follows the link and reports false for a dangling target, so a probe using
+# only -e would miss this and let mkdir -p create a partial layout.
+ens3="$tmp/ensure-root3"
+mkdir -p "$ens3"
+ln -s "$ens3/nowhere-target" "$ens3/captured"
+err3="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens3" bash "$mr" --ensure 2>&1 >/dev/null )"; rc3=$?
+{ [ "$rc3" -ne 0 ] && printf '%s' "$err3" | grep -qF "$ens3/captured" \
+  && [ ! -d "$ens3/agents" ] && [ ! -d "$ens3/reviews" ]; } \
+  && ok "(R12h) a dangling-symlink sub-path is a hard error naming it, creating no sibling directory" \
+  || bad "(R12h) dangling-symlink sub-path" "rc=$rc3 err='$err3' agents=$([ -d "$ens3/agents" ] && echo present) reviews=$([ -d "$ens3/reviews" ] && echo present)"
+
+# --- R12i: --ensure with captured/.gitignore pre-existing as a DIRECTORY creates NOTHING --------
+# Without probing .gitignore too, the four dirs get created and the ignore-marker write then fails
+# with a raw "Is a directory" shell error leaking ahead of memory-root.sh's own message.
+ens4="$tmp/ensure-root4"
+mkdir -p "$ens4/captured/.gitignore"
+err4="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens4" bash "$mr" --ensure 2>&1 >/dev/null )"; rc4=$?
+{ [ "$rc4" -ne 0 ] && printf '%s' "$err4" | grep -qF "$ens4/captured/.gitignore" \
+  && [ ! -d "$ens4/agents" ] && [ ! -d "$ens4/reviews" ] && [ ! -d "$ens4/captured/rules" ]; } \
+  && ok "(R12i) captured/.gitignore pre-existing as a directory is a hard error, creating nothing" \
+  || bad "(R12i) .gitignore-as-directory" "rc=$rc4 err='$err4' agents=$([ -d "$ens4/agents" ] && echo present)"
+
 # --- R15: HOME, XDG_DATA_HOME and SDLC_MEMORY_ROOT all unset -> hard error, correct message ----
 out15="$( cd "$repo_ssh" && env -u SDLC_MEMORY_ROOT -u XDG_DATA_HOME -u HOME bash "$mr" --print-root 2>&1 >/dev/null )"; rc15=$?
 { [ "$rc15" -ne 0 ] && printf '%s' "$out15" | grep -qF 'neither XDG_DATA_HOME (absolute) nor HOME is set'; } \
