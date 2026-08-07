@@ -22,10 +22,14 @@ resolver_failed=0
 if [ -n "$explicit_root" ]; then
   [ -d "$explicit_root/.claude/memories" ] && mem_roots="$explicit_root/.claude/memories"
 else
-  if resolved="$(sdlc_memory_root 2>&1)"; then
-    resolver_err=""
-  else
-    resolver_err="$resolved"
+  # A hasher on the success path can write to stderr while still exiting 0 (e.g. macOS
+  # /usr/bin/shasum is Perl and warns on a locale mismatch) — 2>&1 on the success call would
+  # contaminate $resolved with that warning text. Only re-invoke with 2>&1 to capture the reason
+  # AFTER a plain 2>/dev/null call has already established failure; the resolver is side-effect
+  # free on --print-root, so a second call is safe.
+  resolver_err=""
+  if ! resolved="$(sdlc_memory_root 2>/dev/null)" || [ -z "$resolved" ]; then
+    resolver_err="$(sdlc_memory_root 2>&1 >/dev/null)"
     resolved=""
   fi
   if [ -z "$resolved" ]; then

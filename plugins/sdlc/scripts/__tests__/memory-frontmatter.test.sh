@@ -247,6 +247,49 @@ if [ "$rc" -eq 1 ] && grep -qF "RESOLVER-FAILED" "$err_file"; then
 else
   echo "FAIL: RESOLVER-FAILED contract — rc=$rc"; failures=$((failures + 1))
 fi
+# --- Success-path stderr contamination regression (QA re-review): a hasher that warns to stderr
+# but exits 0 must not contaminate the resolved value — a naive `resolved="$(sdlc_memory_root
+# 2>&1)"` on the SUCCESS path would prepend that warning text to the path, making `[ -d "$resolved"
+# ]` fail and silently dropping the resolved root (1 validated instead of 2, no RESOLVER-FAILED).
+# SDLC_MEMORY_ROOT bypasses the hasher entirely (it short-circuits before sdlc_repo_key), so this
+# MUST exercise the XDG_DATA_HOME default-resolution path, which does call sdlc_mr_hash8.
+warn_bin="$cf_tmp/warn-bin"; mkdir -p "$warn_bin"
+for c in bash git sed cut basename dirname tr head awk mkdir grep sort uniq paste cat find; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$warn_bin/$c"
+done
+cat > "$warn_bin/shasum" <<'EOF'
+#!/usr/bin/env bash
+cat >/dev/null
+printf 'perl: warning: Setting locale failed.\n' >&2
+printf 'perl: warning: Falling back to the standard locale ("C").\n' >&2
+printf '%s\n' "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef  -"
+EOF
+chmod +x "$warn_bin/shasum"
+
+warn_repo="$cf_tmp/warnrepo"; mkdir -p "$warn_repo/.claude/memories/agents/web-engineer"
+git -C "$warn_repo" init -q
+git -C "$warn_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+warn_xdg="$cf_tmp/warn-xdg"
+# Compute the key using the SAME stub hasher the actual run below uses (its fixed fake hash),
+# not the real one — otherwise the pre-seeded content lands under a DIFFERENT path than the one
+# the warning-hasher run resolves to.
+warn_key="$( cd "$warn_repo" && env -u SDLC_MEMORY_ROOT -u XDG_DATA_HOME PATH="$warn_bin" bash "$here/../memory-root.sh" --print-key 2>/dev/null )"
+warn_resolved="$warn_xdg/sdlc/memories/$warn_key"
+mkdir -p "$warn_resolved/agents/web-engineer"
+write_rule "$warn_resolved/agents/web-engineer/resolved-under-warning.md" resolved-under-warning "Seen despite the warning."
+
+out="$( cd "$warn_repo" && env -u SDLC_MEMORY_ROOT PATH="$warn_bin" XDG_DATA_HOME="$warn_xdg" HOME="$cf_tmp/home" \
+  bash "$check_frontmatter" 2>&1 )"; rc=$?
+validated_lines="$(printf '%s' "$out" | grep -c 'file(s) validated under')"
+if [ "$rc" -eq 0 ] && [ "$validated_lines" -eq 2 ] \
+  && printf '%s' "$out" | grep -qF "file(s) validated under $warn_resolved" \
+  && ! printf '%s' "$out" | grep -qi 'warning: Setting locale'; then
+  echo "PASS: a warning-emitting hasher on the success path does not contaminate the resolved root; both roots still validated"
+else
+  echo "FAIL: success-path stderr contamination — rc=$rc validated-lines=$validated_lines out='$out'"; failures=$((failures + 1))
+fi
+
 rm -rf "$cf_tmp"
 
 if [ "$failures" -ne 0 ]; then
