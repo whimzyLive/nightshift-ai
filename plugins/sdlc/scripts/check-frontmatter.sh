@@ -22,10 +22,15 @@ resolver_failed=0
 if [ -n "$explicit_root" ]; then
   [ -d "$explicit_root/.claude/memories" ] && mem_roots="$explicit_root/.claude/memories"
 else
-  resolved="$(sdlc_memory_root 2>/dev/null)" || resolved=""
+  if resolved="$(sdlc_memory_root 2>&1)"; then
+    resolver_err=""
+  else
+    resolver_err="$resolved"
+    resolved=""
+  fi
   if [ -z "$resolved" ]; then
     resolver_failed=1
-    echo "check-frontmatter: RESOLVER-FAILED — memory-root.sh could not resolve a root" >&2
+    echo "check-frontmatter: RESOLVER-FAILED — ${resolver_err:-memory-root.sh could not resolve a root}" >&2
   elif [ -d "$resolved" ]; then
     mem_roots="$resolved"
   fi

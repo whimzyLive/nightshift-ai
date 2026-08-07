@@ -33,7 +33,12 @@ roots=""
 if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
   roots="$SDLC_CAPTURE_ROOT"
 else
-  resolved="$(sdlc_memory_root 2>/dev/null)" || resolved=""
+  if resolved="$(sdlc_memory_root 2>&1)"; then
+    resolver_err=""
+  else
+    resolver_err="$resolved"
+    resolved=""
+  fi
   # NA-101 transition shim: capture-learning.sh wrote into the PRIMARY checkout before this story,
   # and those files are untracked + gitignored, so a `git rev-parse --show-toplevel` probe from a
   # linked worktree would make every already-staged capture invisible. Use sdlc_primary_worktree,
@@ -43,9 +48,11 @@ else
   [ -n "$primary" ] && legacy="$primary/.claude/memories/captured"
   if [ -z "$resolved" ]; then
     if [ -n "$legacy" ] && [ -d "$legacy" ]; then
-      printf 'list-captured.sh: WARNING — cannot resolve the memory root; listing the legacy in-repo staging root only\n' >&2
+      printf 'list-captured.sh: WARNING — %s; listing the legacy in-repo staging root only\n' \
+        "${resolver_err:-cannot resolve the memory root}" >&2
     else
-      printf 'list-captured.sh: cannot resolve the staging root\n' >&2
+      printf 'list-captured.sh: cannot resolve the staging root — %s\n' \
+        "${resolver_err:-memory-root.sh could not resolve a root}" >&2
       exit 1
     fi
   fi

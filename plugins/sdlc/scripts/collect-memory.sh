@@ -29,9 +29,14 @@ mem_roots=""
 if [ -n "$explicit_root" ]; then
   mem_roots="$explicit_root/.claude/memories"
 else
-  resolved="$(sdlc_memory_root 2>/dev/null)" || resolved=""
+  if resolved="$(sdlc_memory_root 2>&1)"; then
+    resolver_err=""
+  else
+    resolver_err="$resolved"
+    resolved=""
+  fi
   if [ -z "$resolved" ]; then
-    echo "collect-memory: WARNING — cannot resolve the memory root; using the legacy in-repo root only" >&2
+    echo "collect-memory: WARNING — ${resolver_err:-cannot resolve the memory root}; using the legacy in-repo root only" >&2
   elif [ -d "$resolved" ]; then
     mem_roots="$resolved"
   fi
