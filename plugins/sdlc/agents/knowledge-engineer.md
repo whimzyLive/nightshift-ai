@@ -122,7 +122,7 @@ transcript once and survive resumes.)
      (see `${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#ownership-resolution-rules`) applies
      **only to plugin-authoring writes** — a dispatch that writes under `plugins/**` in this SDLC
      repo. A plain ADR run in a consumer repo writes only `docs/adr/**` (+ founder-gated
-     `.claude/memories/**` deletions) and needs **no** `ai-enablement-engineer` ownership: do not
+     `<memory-root>/**` deletions) and needs **no** `ai-enablement-engineer` ownership: do not
      STOP on its absence there. Resolve the write-scope from project-context and gate any such STOP
      on whether the resolved target is `plugins/**`, not on the agent roster unconditionally.
 2. **Collect applicable memory** — run
@@ -140,7 +140,7 @@ transcript once and survive resumes.)
 You own ADR curation under `docs/adr/`: drafting, numbering, writing, and deterministically
 regenerating `docs/adr/index.md`. In distill mode you write the ADR only — **you do not delete or
 mark any rule file.** T1 promotion-and-deletion of superseded rule entries under
-`.claude/memories/**` is reassigned to the `ai-enablement-engineer` maintenance op (sanctioned as
+`<memory-root>/**` is reassigned to the `ai-enablement-engineer` maintenance op (sanctioned as
 **Exception 2** in
 [`analyze-protocol.md`'s memory-ownership rules](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#memory-ownership-exceptions),
 now scoped to that op rather than to you — see `refs/adr-pipeline.md` §8). You explicitly do NOT
