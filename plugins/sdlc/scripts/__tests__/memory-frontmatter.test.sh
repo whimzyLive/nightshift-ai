@@ -175,6 +175,80 @@ else
 fi
 rm -rf "$dual_tmp"
 
+echo "=== check-frontmatter.sh dual-root mode (NA-101) ==="
+cf_tmp="$(mktemp -d)"; cf_tmp="$(cd "$cf_tmp" && pwd -P)"
+cf_repo="$cf_tmp/repo"; mkdir -p "$cf_repo/.claude/memories/agents/web-engineer"
+git -C "$cf_repo" init -q
+git -C "$cf_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+cf_root="$cf_tmp/memroot"; mkdir -p "$cf_root/agents/web-engineer"
+
+cat > "$cf_root/agents/web-engineer/broken-in-resolved.md" <<'EOF'
+---
+id: wrong-id-stem
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: A rule.
+evidence: [AB-1]
+uses: 0
+status: active
+---
+EOF
+out="$( cd "$cf_repo" && SDLC_MEMORY_ROOT="$cf_root" bash "$check_frontmatter" 2>&1 )"; rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -qF "broken-in-resolved.md"; then
+  echo "PASS: an offender in the resolved root fails the dual-mode gate"
+else
+  echo "FAIL: resolved-root offender not caught — rc=$rc"; failures=$((failures + 1))
+fi
+rm -f "$cf_root/agents/web-engineer/broken-in-resolved.md"
+
+# the SAME id in both roots is expected mid-migration and must NOT be a duplicate-id offender
+for r in "$cf_repo/.claude/memories" "$cf_root"; do
+  mkdir -p "$r/agents/web-engineer"
+  cat > "$r/agents/web-engineer/same-id.md" <<'EOF'
+---
+id: same-id
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: A rule.
+evidence: [AB-1]
+uses: 0
+status: active
+---
+EOF
+done
+out="$( cd "$cf_repo" && SDLC_MEMORY_ROOT="$cf_root" bash "$check_frontmatter" 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -qF "duplicate id 'same-id'"; then
+  echo "PASS: duplicate-id detection is scoped per root, never across roots"
+else
+  echo "FAIL: cross-root duplicate id wrongly reported — rc=$rc"; failures=$((failures + 1))
+fi
+if printf '%s' "$out" | grep -qF "file(s) validated under $cf_root"; then
+  echo "PASS: dual mode prints a per-root validated-file count"
+else
+  echo "FAIL: per-root count line missing"; failures=$((failures + 1))
+fi
+
+# neither root present -> the new absent-root line, exit 0
+absent_repo="$cf_tmp/absent"; mkdir -p "$absent_repo"
+git -C "$absent_repo" init -q
+git -C "$absent_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+out="$( cd "$absent_repo" && SDLC_MEMORY_ROOT="$cf_tmp/never-created" bash "$check_frontmatter" 2>&1 )"; rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF "no memory root present (0 files validated)"; then
+  echo "PASS: absent roots print the new absent-root line and exit 0"
+else
+  echo "FAIL: absent-root contract — rc=$rc out='$out'"; failures=$((failures + 1))
+fi
+
+# resolver failure in dual mode -> RESOLVER-FAILED on stderr, legacy validated anyway, exit 1
+err_file="$cf_tmp/err"
+out="$( cd "$cf_repo" && env -u XDG_DATA_HOME SDLC_MEMORY_ROOT="relative-path" bash "$check_frontmatter" 2>"$err_file" )"; rc=$?
+if [ "$rc" -eq 1 ] && grep -qF "RESOLVER-FAILED" "$err_file"; then
+  echo "PASS: a resolver failure never reads as a green gate"
+else
+  echo "FAIL: RESOLVER-FAILED contract — rc=$rc"; failures=$((failures + 1))
+fi
+rm -rf "$cf_tmp"
+
 if [ "$failures" -ne 0 ]; then
   echo
   echo "memory-frontmatter.test.sh: FAILED ($failures assertion(s) failed)"

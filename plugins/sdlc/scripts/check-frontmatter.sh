@@ -4,14 +4,34 @@ shopt -s nullglob
 
 here="$(cd "$(dirname "$0")" && pwd)"
 vocab_file="$here/../refs/root-cause-vocab.txt"
+# shellcheck source=/dev/null
+. "$here/memory-root.sh"
 
-repo_root="${1:-}"
+explicit_root="${1:-}"
+repo_root="$explicit_root"
 if [ -z "$repo_root" ]; then
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
   [ -z "$repo_root" ] && repo_root="$(pwd)"
 fi
 
-mem_root="$repo_root/.claude/memories"
+# mem_roots — newline-delimited. arg1 present -> LEGACY-ONLY (fixture runs stay hermetic and
+# byte-identical). arg1 absent -> DUAL: resolved root, then <git-toplevel>/.claude/memories.
+# The legacy entry is the NA-101 transition shim; NA-102 removes it.
+mem_roots=""
+resolver_failed=0
+if [ -n "$explicit_root" ]; then
+  [ -d "$explicit_root/.claude/memories" ] && mem_roots="$explicit_root/.claude/memories"
+else
+  resolved="$(sdlc_memory_root 2>/dev/null)" || resolved=""
+  if [ -z "$resolved" ]; then
+    resolver_failed=1
+    echo "check-frontmatter: RESOLVER-FAILED — memory-root.sh could not resolve a root" >&2
+  elif [ -d "$resolved" ]; then
+    mem_roots="$resolved"
+  fi
+  [ -d "$repo_root/.claude/memories" ] && mem_roots="$mem_roots${mem_roots:+
+}$repo_root/.claude/memories"
+fi
 
 vocab_list=""
 if [ -f "$vocab_file" ]; then
@@ -116,14 +136,10 @@ id_records=""
 add_offender() { offenders+="$1"$'\n'; }
 add_warning() { warnings+="$1"$'\n'; }
 
-if [ ! -d "$mem_root" ]; then
-  echo "check-frontmatter: OK — $mem_root not present"
+if [ -z "$mem_roots" ] && [ "$resolver_failed" -eq 0 ]; then
+  echo "check-frontmatter: OK — no memory root present (0 files validated)"
   exit 0
 fi
-
-for f in "$mem_root"/agents/*.md; do
-  add_warning "$f is a v1 flat diary; migrate to .claude/memories/agents/<agent>/<rule-id>.md (NA-74)"
-done
 
 validate_rule_file() {
   local file="$1" dirname="$2"
@@ -209,24 +225,6 @@ validate_rule_file() {
   [ -n "$issues" ] && add_offender "$file: $issues"
 }
 
-for dir in "$mem_root"/agents/*/; do
-  agentdir="$(basename "$dir")"
-  for f in "$dir"*.md; do
-    validate_rule_file "$f" "$agentdir"
-  done
-done
-
-if [ -n "$id_records" ]; then
-  dupe_ids="$(printf '%s' "$id_records" | cut -d'|' -f1 | sort | uniq -d)"
-  if [ -n "$dupe_ids" ]; then
-    while IFS= read -r dup; do
-      [ -z "$dup" ] && continue
-      files_for_dup="$(printf '%s' "$id_records" | awk -F'|' -v id="$dup" '$1==id {print $2}' | paste -sd, -)"
-      add_offender "duplicate id '$dup' across: $files_for_dup"
-    done <<< "$dupe_ids"
-  fi
-fi
-
 validate_review_file() {
   local file="$1"
   local base stem fm parsed
@@ -289,15 +287,6 @@ validate_review_file() {
   [ -n "$issues" ] && add_offender "$file: $issues"
 }
 
-for f in "$mem_root"/reviews/*.md; do
-  base="$(basename "$f")"
-  if [ "$base" = "patterns.md" ]; then
-    add_warning "$f is the legacy patterns.md audit log; migrate to per-round review files (NA-74)"
-    continue
-  fi
-  validate_review_file "$f"
-done
-
 validate_capture_file() {
   local file="$1" kind="$2"
   local base stem fm parsed issues field
@@ -356,8 +345,47 @@ validate_capture_file() {
   [ -n "$issues" ] && add_warning "$file: $issues"
 }
 
-for f in "$mem_root"/captured/rules/*.md;   do [ -e "$f" ] && validate_capture_file "$f" rule;   done
-for f in "$mem_root"/captured/reviews/*.md; do [ -e "$f" ] && validate_capture_file "$f" review; done
+while IFS= read -r mem_root; do
+  [ -n "$mem_root" ] || continue
+  id_records=""          # duplicate-id detection is PER ROOT: the same id in both roots is
+  validated=0            # expected mid-migration, never a defect
+
+  for f in "$mem_root"/agents/*.md; do
+    add_warning "$f is a v1 flat diary; migrate to .claude/memories/agents/<agent>/<rule-id>.md (NA-74)"
+  done
+
+  for dir in "$mem_root"/agents/*/; do
+    agentdir="$(basename "$dir")"
+    for f in "$dir"*.md; do
+      validate_rule_file "$f" "$agentdir"; validated=$((validated + 1))
+    done
+  done
+
+  if [ -n "$id_records" ]; then
+    dupe_ids="$(printf '%s' "$id_records" | cut -d'|' -f1 | sort | uniq -d)"
+    if [ -n "$dupe_ids" ]; then
+      while IFS= read -r dup; do
+        [ -z "$dup" ] && continue
+        files_for_dup="$(printf '%s' "$id_records" | awk -F'|' -v id="$dup" '$1==id {print $2}' | paste -sd, -)"
+        add_offender "duplicate id '$dup' across: $files_for_dup"
+      done <<< "$dupe_ids"
+    fi
+  fi
+
+  for f in "$mem_root"/reviews/*.md; do
+    base="$(basename "$f")"
+    if [ "$base" = "patterns.md" ]; then
+      add_warning "$f is the legacy patterns.md audit log; migrate to per-round review files (NA-74)"
+      continue
+    fi
+    validate_review_file "$f"; validated=$((validated + 1))
+  done
+
+  for f in "$mem_root"/captured/rules/*.md;   do [ -e "$f" ] && { validate_capture_file "$f" rule;   validated=$((validated + 1)); }; done
+  for f in "$mem_root"/captured/reviews/*.md; do [ -e "$f" ] && { validate_capture_file "$f" review; validated=$((validated + 1)); }; done
+
+  echo "check-frontmatter: $validated file(s) validated under $mem_root"
+done <<< "$mem_roots"
 
 # ADR frontmatter must open on line 1 — every frontmatter reader in this repo uses the
 # `NR==1 && $0=="---"` idiom (see extract_fm above), so a stray line (e.g. the writing-adrs
@@ -384,6 +412,11 @@ if [ -n "$offenders" ]; then
   echo "check-frontmatter: FAILED"
   echo
   printf '%s' "$offenders" | sed 's/^/  - /'
+  exit 1
+fi
+
+if [ "$resolver_failed" -eq 1 ]; then
+  echo "check-frontmatter: FAILED — resolver failure (see stderr); the legacy root was validated but the gate cannot be green"
   exit 1
 fi
 
