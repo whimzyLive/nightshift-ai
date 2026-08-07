@@ -169,4 +169,37 @@ pwd_after="$(find "$repo_ssh" | sort)"
   && ok "(R14) relative XDG_DATA_HOME is ignored, falls back to \$HOME, creates nothing" \
   || bad "(R14) relative XDG_DATA_HOME" "rc=$rc got='$got'"
 
+# --- R12: --ensure creates exactly the five entries; second run is a no-op -----------------
+ens="$tmp/ensure-root"
+out="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens" bash "$mr" --ensure )"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$out" = "$ens" ]; } \
+  && ok "(R12a) --ensure prints the resolved root" || bad "(R12a) --ensure stdout" "rc=$rc out='$out'"
+missing=""
+for d in "$ens/agents/shared" "$ens/reviews" "$ens/captured/rules" "$ens/captured/reviews"; do
+  [ -d "$d" ] || missing="$missing $d"
+done
+[ -z "$missing" ] && ok "(R12b) --ensure created the four directories" || bad "(R12b) --ensure directories" "missing:$missing"
+[ "$(cat "$ens/captured/.gitignore")" = "$(printf '*\n!.gitignore')" ] \
+  && ok "(R12c) captured/.gitignore has the exact bytes" \
+  || bad "(R12c) .gitignore bytes" "got '$(cat "$ens/captured/.gitignore")'"
+[ -z "$(find "$ens" -name '.gitkeep')" ] \
+  && ok "(R12d) --ensure creates no .gitkeep and no per-agent directory" \
+  || bad "(R12d) unexpected .gitkeep" "$(find "$ens" -name '.gitkeep')"
+printf 'do not clobber\n' > "$ens/agents/shared/keeper.md"
+snap1="$(find "$ens" | sort)"
+( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$ens" bash "$mr" --ensure >/dev/null )
+snap2="$(find "$ens" | sort)"
+{ [ "$snap1" = "$snap2" ] && [ "$(cat "$ens/agents/shared/keeper.md")" = "do not clobber" ]; } \
+  && ok "(R12e) a second --ensure is a no-op that touches no existing content" \
+  || bad "(R12e) --ensure idempotency" "tree or content changed"
+
+# --- R12f: --ensure that cannot create the root is a hard error that creates nothing --------
+printf 'not a dir\n' > "$tmp/ensure-blocker"
+before="$(find "$tmp" | sort)"
+err="$( cd "$repo_ssh" && SDLC_MEMORY_ROOT="$tmp/ensure-blocker/nested" bash "$mr" --ensure 2>&1 >/dev/null )"; rc=$?
+after="$(find "$tmp" | sort)"
+{ [ "$rc" -ne 0 ] && printf '%s' "$err" | grep -qF "$tmp/ensure-blocker/nested" && [ "$before" = "$after" ]; } \
+  && ok "(R12f) an uncreatable root is a hard error naming the path, creating nothing" \
+  || bad "(R12f) uncreatable root" "rc=$rc err='$err'"
+
 exit "$fail"

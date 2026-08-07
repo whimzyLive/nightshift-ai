@@ -124,11 +124,34 @@ sdlc_memory_root() {
   printf '%s/sdlc/memories/%s\n' "$xdg" "$key"
 }
 
+# sdlc_memory_ensure <root> — create the layout under <root>, idempotently. Never called on source.
+sdlc_memory_ensure() {
+  local root="${1:-}"
+  [ -n "$root" ] || {
+    printf 'memory-root.sh: sdlc_memory_ensure needs a <root> argument\n' >&2
+    return 1
+  }
+  mkdir -p "$root/agents/shared" "$root/reviews" "$root/captured/rules" "$root/captured/reviews" 2>/dev/null || {
+    printf 'memory-root.sh: cannot create the memory layout under %s — check permissions and that no path segment is a file\n' "$root" >&2
+    return 1
+  }
+  if [ ! -f "$root/captured/.gitignore" ]; then
+    printf '*\n!.gitignore\n' > "$root/captured/.gitignore" 2>/dev/null || {
+      printf 'memory-root.sh: cannot write the ignore marker in %s/captured\n' "$root" >&2
+      return 1
+    }
+  fi
+  return 0
+}
+
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   set -uo pipefail
   case "${1:-}" in
     --print-root) sdlc_memory_root || exit 1 ;;
     --print-key)  sdlc_repo_key    || exit 1 ;;
+    --ensure)     root="$(sdlc_memory_root)" || exit 1
+                  sdlc_memory_ensure "$root" || exit 1
+                  printf '%s\n' "$root" ;;
     *) printf 'usage: memory-root.sh --print-root|--print-key|--ensure\n' >&2; exit 1 ;;
   esac
 fi
