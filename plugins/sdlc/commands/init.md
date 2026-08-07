@@ -797,7 +797,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/memory-root.sh --ensure
 It prints the resolved root and creates the layout under it. The `--ensure` contract is already
 idempotent and already self-ignoring (`captured/.gitignore`), and it deliberately creates no
 per-agent directory and no `.gitkeep` — the memory root lives outside the repository, so there is
-nothing for git to track and nothing to backfill.
+nothing for git to track and nothing to backfill. (NA-101: this replaces the pre-NA-101 version of
+this step, which wrote five `.gitkeep`-anchored entries directly under the repo's own
+`.claude/memories/` — no repo-side scaffold remains to keep in sync with `memory-root.sh`.)
 
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 
