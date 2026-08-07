@@ -325,6 +325,42 @@ else
   fail "default resolved root tripped the guard — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
 fi
 
+# --- Case 14 (PR #234 review, Minor): a repo with a PRE-EXISTING legacy in-repo staging dir
+# (content staged there before this story's write retarget landed) must not silently flip
+# PRIMARY_PRE_DIRTY / trip the guard, even though SDLC_MEMORY_ROOT points somewhere else entirely.
+c14="$work/c14"; repo14="$c14/repo"; make_repo "$repo14"; seed_initialised_memories "$repo14"
+mem14="$work/c14-memroot"          # hermetic; unrelated to the legacy in-repo path below
+mkdir -p "$repo14/.claude/memories/captured/rules"
+printf '*\n!.gitignore\n' > "$repo14/.claude/memories/captured/.gitignore"
+cat > "$repo14/.claude/memories/captured/rules/AB-1--pre-existing-legacy.md" <<'EOF'
+---
+id: pre-existing-legacy
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: Staged before the write retarget.
+evidence: [AB-1]
+uses: 0
+status: captured
+captured: 2026-08-01T00:00:00Z
+story: AB-1
+origin: domain-agent
+promote-target: agents/web-engineer/pre-existing-legacy.md
+---
+EOF
+run14() { ( cd "$c14" && env -u SDLC_CAPTURE_ROOT -u SDLC_SESSION_KEY -u CLAUDE_CODE_SESSION_ID \
+    SDLC_MEMORY_ROOT="$mem14" bash "$script" "$@" ); }
+snap_out="$(run14 snapshot "$repo14")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+pre_dirty="$(get_field "$snap_out" PRIMARY_PRE_DIRTY)"
+assert_out="$(run14 assert "$repo14" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$pre_dirty" = "false" ] && [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
+  pass "a pre-existing legacy in-repo staging dir never flips PRIMARY_PRE_DIRTY or trips the guard"
+else
+  fail "pre-existing legacy staging dir tripped the guard — got pre_dirty=$pre_dirty assert_rc=$assert_rc integrity=$integrity violation=$violation (want false/OK/none)"
+fi
+
 echo
 if [ "$failures" -ne 0 ]; then
   echo "assert-workspace-clean.test.sh: FAILED ($failures assertion(s) failed)"

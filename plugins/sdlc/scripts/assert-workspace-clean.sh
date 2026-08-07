@@ -35,15 +35,16 @@ set -uo pipefail
 # at the SAME dirt is a pass. A missing/unreadable/malformed state file on assert is a hard error
 # (see above) — it is NOT a verified violation, since there is nothing to compare against.
 #
-# Capture-staging exclusion (NA-98 fix-round, retargeted by NA-101): the learning-capture staging
-# root is capture-learning.sh's resolve_capture_root — SDLC_CAPTURE_ROOT if set, else
-# <memory-root>/captured, where <memory-root> comes from memory-root.sh and resolves OUTSIDE every
-# checkout by default. Under that default the root can never appear in the primary's
-# `git status --porcelain` at all, so capture_root_rel returns empty and this filter is a
-# passthrough. The filter still matters for an SDLC_CAPTURE_ROOT override pointed INSIDE the
-# primary (and for any pre-NA-102 in-repo staging root): porcelain lines under that root are
-# stripped before both the snapshot is recorded and the assert comparison runs, so a capture write
-# can never trip WORKSPACE_INTEGRITY on its own — every other primary-checkout mutation still can.
+# Capture-staging exclusion (NA-98 fix-round, retargeted by NA-101): capture_root_rel excludes TWO
+# entries from porcelain, always. (1) capture-learning.sh's resolve_capture_root — SDLC_CAPTURE_ROOT
+# if set, else <memory-root>/captured, where <memory-root> comes from memory-root.sh and resolves
+# OUTSIDE every checkout by default, so under that default this entry is empty (nothing under the
+# primary to filter). (2) the fixed pre-NA-101 legacy in-repo path `.claude/memories/captured`,
+# unconditionally — a repo that already had captures staged there before this story's write
+# retarget landed can still carry that content, independent of entry (1). Either way, porcelain
+# lines under a matched entry are stripped before both the snapshot is recorded and the assert
+# comparison runs, so a capture write (new-style or pre-existing legacy) can never trip
+# WORKSPACE_INTEGRITY on its own — every other primary-checkout mutation still can.
 
 here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
 # shellcheck source=/dev/null
@@ -61,43 +62,50 @@ abspath() {
   esac
 }
 
-# capture_root_rel <primary-root-abs> -> the capture staging root's path RELATIVE to
-# <primary-root-abs>, or empty when the root (honouring SDLC_CAPTURE_ROOT, same as
-# capture-learning.sh's resolve_capture_root) isn't under the primary checkout at all — in which
-# case it can never appear in `git -C <primary-root> status --porcelain` output anyway, so there
-# is nothing to filter.
+# capture_root_rel <primary-root-abs> -> exactly two lines, each a capture-staging path RELATIVE
+# to <primary-root-abs> to exclude from porcelain (or empty for "nothing to filter for this entry").
+# Line 1: the root honouring SDLC_CAPTURE_ROOT, same as capture-learning.sh's resolve_capture_root
+# — empty when that root isn't under the primary checkout at all, since it can then never appear in
+# `git -C <primary-root> status --porcelain` output anyway. Line 2: the fixed pre-NA-101 legacy
+# in-repo path `.claude/memories/captured`, ALWAYS present — a repo that already had captures
+# staged there before this story's write retarget landed can still carry that content on disk,
+# independent of whatever SDLC_CAPTURE_ROOT/the resolved root currently point at. Without line 2,
+# PRIMARY_PRE_DIRTY silently flips `true` on such a repo even though the only "dirt" is pre-existing
+# capture-staging noise this filter exists to hide.
 capture_root_rel() {
-  local primary_abs="$1" cap
+  local primary_abs="$1" cap rel
   if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
     cap="$SDLC_CAPTURE_ROOT"
   else
-    # A resolver failure must never fabricate a verdict: fall through to an empty rel
-    # (passthrough filter), exactly as an out-of-primary root does.
-    cap="$(sdlc_memory_root 2>/dev/null)" || { printf '\n'; return 0; }
-    cap="$cap/captured"
+    # A resolver failure must never fabricate a verdict: fall through to an empty rel for THIS
+    # entry (passthrough for it) — the legacy entry below still applies regardless.
+    cap="$(sdlc_memory_root 2>/dev/null)" && cap="$cap/captured"
   fi
-  case "$cap" in
-    "$primary_abs"/*) printf '%s\n' "${cap#"$primary_abs"/}" ;;
-    "$primary_abs")   printf '.\n' ;;
-    *)                printf '\n' ;;
-  esac
+  rel=""
+  if [ -n "${cap:-}" ]; then
+    case "$cap" in
+      "$primary_abs"/*) rel="${cap#"$primary_abs"/}" ;;
+      "$primary_abs")   rel="." ;;
+    esac
+  fi
+  printf '%s\n.claude/memories/captured\n' "$rel"
 }
 
-# filter_capture_lines <rel> — reads porcelain status on stdin, drops any line whose path is the
-# capture root itself or lives under it. <rel> empty -> passthrough unchanged. Porcelain v1 lines
-# are always `XY<space>PATH` (3-char fixed prefix), regardless of what X/Y are — untracked ("??"),
-# a rename never applies here since the excluded root is entirely `??`/ignored, never staged.
+# filter_capture_lines <rel1> <rel2> — reads porcelain status on stdin, drops any line whose path
+# is <rel1> or <rel2> (capture_root_rel always emits exactly two entries) or lives under either. An
+# empty entry passes through (not a match against anything). Porcelain v1 lines are always
+# `XY<space>PATH` (3-char fixed prefix), regardless of what X/Y are — a rename never applies here
+# since every excluded root is entirely `??`/ignored, never staged.
 filter_capture_lines() {
-  local rel="$1"
-  if [ -z "$rel" ]; then
-    cat
-    return
-  fi
-  awk -v rel="$rel" '
+  local rel1="$1" rel2="$2"
+  awk -v rel1="$rel1" -v rel2="$rel2" '
+    function excluded(path, rel) {
+      return rel != "" && (path == rel || path == rel "/" || index(path, rel "/") == 1)
+    }
     {
       path = substr($0, 4)
       gsub(/^"/, "", path); gsub(/"$/, "", path)
-      if (path == rel || path == rel "/" || index(path, rel "/") == 1) next
+      if (excluded(path, rel1) || excluded(path, rel2)) next
       print
     }
   '
@@ -132,8 +140,10 @@ case "$SUBCOMMAND" in
       echo "assert-workspace-clean.sh: git status --porcelain failed in '$PRIMARY_ROOT' — cannot snapshot" >&2
       exit 1
     }
-    rel="$(capture_root_rel "$(abspath "$PRIMARY_ROOT")")"
-    status_out="$(printf '%s' "$status_out" | filter_capture_lines "$rel")"
+    caps="$(capture_root_rel "$(abspath "$PRIMARY_ROOT")")"
+    rel1="$(printf '%s\n' "$caps" | sed -n '1p')"
+    rel2="$(printf '%s\n' "$caps" | sed -n '2p')"
+    status_out="$(printf '%s' "$status_out" | filter_capture_lines "$rel1" "$rel2")"
 
     # Line 1 = HEAD oid; every remaining line = one porcelain status row (empty when clean).
     {
@@ -181,8 +191,10 @@ case "$SUBCOMMAND" in
       echo "assert-workspace-clean.sh: git status --porcelain failed in '$PRIMARY_ROOT' — cannot assert" >&2
       exit 1
     }
-    rel="$(capture_root_rel "$(abspath "$PRIMARY_ROOT")")"
-    cur_status="$(printf '%s' "$cur_status" | filter_capture_lines "$rel")"
+    caps="$(capture_root_rel "$(abspath "$PRIMARY_ROOT")")"
+    rel1="$(printf '%s\n' "$caps" | sed -n '1p')"
+    rel2="$(printf '%s\n' "$caps" | sed -n '2p')"
+    cur_status="$(printf '%s' "$cur_status" | filter_capture_lines "$rel1" "$rel2")"
 
     head_changed=false
     [ "$cur_head" = "$snap_head" ] || head_changed=true
