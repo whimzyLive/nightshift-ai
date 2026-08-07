@@ -257,7 +257,7 @@ cap_out10="$( cd "$c10" && SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured"
 printf '%s' "$cap_out10" | grep -q '^CAPTURED=' \
   && pass "Case 10 setup: the capture actually wrote a file" \
   || fail "Case 10 setup: capture-learning.sh did not print CAPTURED=" "got '$cap_out10'"
-assert_out="$(run_in "$c10" assert "$repo10" "$state_file")"; assert_rc=$?
+assert_out="$(SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured" run_in "$c10" assert "$repo10" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
 violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
 if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
@@ -273,7 +273,7 @@ snap_out="$(run_in "$c11" snapshot "$repo11")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
 ( cd "$c11" && SDLC_CAPTURE_ROOT="$repo11/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test-2 AB-1 >/dev/null )
 printf 'not a capture\n' > "$repo11/stray-file.txt"
-assert_out="$(run_in "$c11" assert "$repo11" "$state_file")"; assert_rc=$?
+assert_out="$(SDLC_CAPTURE_ROOT="$repo11/.claude/memories/captured" run_in "$c11" assert "$repo11" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
 violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
 if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "VIOLATED" ] && [ "$violation" = "worktree-changed" ]; then
@@ -299,6 +299,30 @@ if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" 
   pass "SDLC_CAPTURE_ROOT override outside .claude/memories/ is honoured by the exclusion"
 else
   fail "SDLC_CAPTURE_ROOT override not honoured — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
+fi
+
+# --- Case 13 (NA-101): with SDLC_CAPTURE_ROOT unset the default root resolves OUTSIDE the
+# primary checkout, so the filter is a passthrough and a capture write cannot trip the guard.
+c13="$work/c13"; repo13="$c13/repo"; make_repo "$repo13"; seed_initialised_memories "$repo13"
+mem13="$work/c13-memroot"          # hermetic: never ${HOME}/.local/share
+run13() { # remaining args passed to the script under test, with the root pinned
+  ( cd "$c13" && env -u SDLC_CAPTURE_ROOT -u SDLC_SESSION_KEY -u CLAUDE_CODE_SESSION_ID \
+      SDLC_MEMORY_ROOT="$mem13" bash "$script" "$@" )
+}
+snap_out="$(run13 snapshot "$repo13")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+cap_out13="$( cd "$c13" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$mem13" \
+  bash "$cap_script" rule web-engineer/na101-default-root AB-1 )"
+printf '%s' "$cap_out13" | grep -q "^CAPTURED=$mem13/captured/" \
+  && pass "Case 13 setup: the default-root capture landed outside the primary checkout" \
+  || fail "Case 13 setup: capture did not land in the resolved root — got '$cap_out13'"
+assert_out="$(run13 assert "$repo13" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
+  pass "the default resolved capture root is outside the primary — passthrough filter, no violation"
+else
+  fail "default resolved root tripped the guard — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
 fi
 
 echo

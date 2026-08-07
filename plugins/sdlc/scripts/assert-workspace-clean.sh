@@ -35,15 +35,19 @@ set -uo pipefail
 # at the SAME dirt is a pass. A missing/unreadable/malformed state file on assert is a hard error
 # (see above) — it is NOT a verified violation, since there is nothing to compare against.
 #
-# Capture-staging exclusion (NA-98 fix-round): the learning-capture staging root
-# (capture-learning.sh's resolve_capture_root — SDLC_CAPTURE_ROOT if set, else
-# <PRIMARY_ROOT>/.claude/memories/captured) is gitignored EXCEPT its own marker file, so a fresh
-# capture makes the primary's `git status --porcelain` grow an untracked directory line even
-# though nothing a human needs to review changed. Porcelain lines under that root are stripped
-# before both the snapshot is recorded and the assert comparison runs, so a capture write can
-# never trip WORKSPACE_INTEGRITY on its own — every other primary-checkout mutation still can.
+# Capture-staging exclusion (NA-98 fix-round, retargeted by NA-101): the learning-capture staging
+# root is capture-learning.sh's resolve_capture_root — SDLC_CAPTURE_ROOT if set, else
+# <memory-root>/captured, where <memory-root> comes from memory-root.sh and resolves OUTSIDE every
+# checkout by default. Under that default the root can never appear in the primary's
+# `git status --porcelain` at all, so capture_root_rel returns empty and this filter is a
+# passthrough. The filter still matters for an SDLC_CAPTURE_ROOT override pointed INSIDE the
+# primary (and for any pre-NA-102 in-repo staging root): porcelain lines under that root are
+# stripped before both the snapshot is recorded and the assert comparison runs, so a capture write
+# can never trip WORKSPACE_INTEGRITY on its own — every other primary-checkout mutation still can.
 
 here="${BASH_SOURCE[0]%/*}"; [ "$here" = "${BASH_SOURCE[0]}" ] && here="."
+# shellcheck source=/dev/null
+. "$here/memory-root.sh"
 
 # abspath <path> -> an absolute path, without requiring realpath/readlink -f (portability).
 # tmp-dir.sh returns a CWD-relative "./.tmp/..." dir, so mktemp's PRIMARY_STATE_FILE would
@@ -67,7 +71,10 @@ capture_root_rel() {
   if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
     cap="$SDLC_CAPTURE_ROOT"
   else
-    cap="$primary_abs/.claude/memories/captured"
+    # A resolver failure must never fabricate a verdict: fall through to an empty rel
+    # (passthrough filter), exactly as an out-of-primary root does.
+    cap="$(sdlc_memory_root 2>/dev/null)" || { printf '\n'; return 0; }
+    cap="$cap/captured"
   fi
   case "$cap" in
     "$primary_abs"/*) printf '%s\n' "${cap#"$primary_abs"/}" ;;
