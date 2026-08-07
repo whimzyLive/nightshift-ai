@@ -125,6 +125,56 @@ else
   failures=$((failures + 1))
 fi
 
+echo "=== collect-memory.sh dual-root mode (NA-101) ==="
+dual_tmp="$(mktemp -d)"; dual_tmp="$(cd "$dual_tmp" && pwd -P)"
+dual_repo="$dual_tmp/repo"; mkdir -p "$dual_repo/.claude/memories/agents/web-engineer"
+git -C "$dual_repo" init -q
+git -C "$dual_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+dual_root="$dual_tmp/memroot"; mkdir -p "$dual_root/agents/web-engineer"
+
+write_rule() { # $1 = path, $2 = id, $3 = rule text
+  cat > "$1" <<EOF
+---
+id: $2
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: $3
+evidence: [AB-1]
+uses: 0
+status: active
+---
+EOF
+}
+write_rule "$dual_repo/.claude/memories/agents/web-engineer/legacy-rule.md" legacy-rule "Legacy copy."
+write_rule "$dual_root/agents/web-engineer/resolved-rule.md" resolved-rule "Resolved copy."
+write_rule "$dual_repo/.claude/memories/agents/web-engineer/both-rule.md" both-rule "Legacy version of both-rule."
+write_rule "$dual_root/agents/web-engineer/both-rule.md" both-rule "Resolved version of both-rule."
+
+dual_out="$( cd "$dual_repo" && SDLC_MEMORY_ROOT="$dual_root" bash "$collect_memory" web-engineer 2>/dev/null )"
+for needle in "RULE legacy-rule" "RULE resolved-rule"; do
+  if printf '%s' "$dual_out" | grep -qF "$needle"; then
+    echo "PASS: dual mode emits '$needle'"
+  else
+    echo "FAIL: dual mode missing '$needle'"; failures=$((failures + 1))
+  fi
+done
+dup_n="$(printf '%s\n' "$dual_out" | grep -c '^RULE both-rule ')"
+if [ "$dup_n" -eq 1 ] && printf '%s' "$dual_out" | grep -qF "Resolved version of both-rule."; then
+  echo "PASS: a rule id present in both roots is emitted once, resolved root winning"
+else
+  echo "FAIL: dedupe/precedence wrong — count=$dup_n"; failures=$((failures + 1))
+fi
+
+# resolver failure in DUAL mode -> WARNING on stderr, legacy root still collected, exit 0
+warn_file="$dual_tmp/warn"
+warn_out="$( cd "$dual_repo" && env -u XDG_DATA_HOME SDLC_MEMORY_ROOT="relative-path" bash "$collect_memory" web-engineer 2>"$warn_file" )"; warn_rc=$?
+if [ "$warn_rc" -eq 0 ] && [ -s "$warn_file" ] && printf '%s' "$warn_out" | grep -qF "RULE legacy-rule"; then
+  echo "PASS: resolver failure warns, falls back to the legacy root, and still exits 0"
+else
+  echo "FAIL: resolver-failure fallback — rc=$warn_rc"; failures=$((failures + 1))
+fi
+rm -rf "$dual_tmp"
+
 if [ "$failures" -ne 0 ]; then
   echo
   echo "memory-frontmatter.test.sh: FAILED ($failures assertion(s) failed)"
