@@ -379,8 +379,10 @@ sdlc_mm_main() {
     fi
   done < "$list_file"
   if [ "$copy_bad" -eq 1 ]; then
-    printf 'migrate-memory-root: copy FAILED — the destination at %s may now hold a PARTIAL copy. Recovery: clear %s and re-run this script (do not simply retry without clearing it — a partial destination refuses at the occupancy gate, and --force would then refuse at the collision scan against that same partial content)\n' \
+    printf 'migrate-memory-root: copy FAILED — the destination at %s may now hold a PARTIAL copy from this run. Do not simply retry — a partial destination refuses at the occupancy gate, and --force would then refuse at the collision scan against that same partial content. Recovery: remove ONLY what this run wrote (never blanket-clear %s — under --force it may hold unrelated pre-existing content this run never touched), then re-run:\n' \
       "$dest_root" "$dest_root" >&2
+    printf '  git -C %s ls-files -z -- .claude/memories/agents .claude/memories/reviews | while IFS= read -r -d "" p; do rm -f -- "%s/${p#.claude/memories/}"; done; find "%s/agents" "%s/reviews" -type d -empty -delete 2>/dev/null\n' \
+      "$repo_root" "$dest_root" "$dest_root" "$dest_root" >&2
     return 1
   fi
 
@@ -393,8 +395,10 @@ sdlc_mm_main() {
     fi
   done < "$list_file"
   if [ "$verify_bad" -eq 1 ] || [ "$matched" -ne "$total" ]; then
-    printf 'migrate-memory-root: verification FAILED — %s of %s tracked files verified at the destination; repo left untouched, but the destination at %s now holds an UNVERIFIED copy. Recovery: clear %s and re-run (do not simply retry — a re-run refuses at the occupancy gate, and --force would then refuse at the collision scan against that same unverified content)\n' \
+    printf 'migrate-memory-root: verification FAILED — %s of %s tracked files verified at the destination; repo left untouched, but the destination at %s now holds an UNVERIFIED copy. Do not simply retry — a re-run refuses at the occupancy gate, and --force would then refuse at the collision scan against that same unverified content. Recovery: remove ONLY what this run wrote (never blanket-clear %s — under --force it may hold unrelated pre-existing content this run never touched), then re-run:\n' \
       "$matched" "$total" "$dest_root" "$dest_root" >&2
+    printf '  git -C %s ls-files -z -- .claude/memories/agents .claude/memories/reviews | while IFS= read -r -d "" p; do rm -f -- "%s/${p#.claude/memories/}"; done; find "%s/agents" "%s/reviews" -type d -empty -delete 2>/dev/null\n' \
+      "$repo_root" "$dest_root" "$dest_root" "$dest_root" >&2
     return 1
   fi
   printf 'migrate-memory-root: verification passed — all %s tracked files match at the destination\n' "$total"
@@ -407,8 +411,10 @@ sdlc_mm_main() {
   # identical by construction, matching this script's own stated invariant. No `-r` needed —
   # the list already names individual files, not directories.
   git -C "$repo_root" rm --cached --quiet --pathspec-from-file="$list_file" --pathspec-file-nul || {
-    printf 'migrate-memory-root: git rm --cached failed — the repo itself is untouched (still at its prior committed state), but the destination at %s already holds a full VERIFIED copy from this run. Recovery: clear %s and re-run (do not simply retry — a re-run refuses at the occupancy gate, and --force would then refuse at the collision scan against that same verified copy)\n' \
+    printf 'migrate-memory-root: git rm --cached failed — the repo itself is untouched (still at its prior committed state), but the destination at %s already holds a full VERIFIED copy from this run. Do not simply retry — a re-run refuses at the occupancy gate, and --force would then refuse at the collision scan against that same verified copy. Recovery: remove ONLY what this run wrote (never blanket-clear %s — under --force it may hold unrelated pre-existing content this run never touched), then re-run:\n' \
       "$dest_root" "$dest_root" >&2
+    printf '  git -C %s ls-files -z -- .claude/memories/agents .claude/memories/reviews | while IFS= read -r -d "" p; do rm -f -- "%s/${p#.claude/memories/}"; done; find "%s/agents" "%s/reviews" -type d -empty -delete 2>/dev/null\n' \
+      "$repo_root" "$dest_root" "$dest_root" "$dest_root" >&2
     return 1
   }
 
@@ -443,7 +449,14 @@ sdlc_mm_main() {
       printf '  2. fix whatever caused step 3 below to fail (permissions, a lock, ...)\n' >&2
       printf '  3. git -C %s rm -r --cached -- .claude/memories/agents .claude/memories/reviews && rm -rf %s %s && git -C %s commit -m "chore(memory): migrate agent and review memory corpus to the external memory root" -- .claude/memories/agents .claude/memories/reviews\n' \
         "$repo_root" "$repo_root/.claude/memories/agents" "$repo_root/.claude/memories/reviews" "$repo_root" >&2
-      printf '  (or, to start over instead: clear %s and re-run this script)\n' "$dest_root" >&2
+      printf '  (or, to start over instead — in THIS order, or the re-run will refuse at the disk-presence check:)\n' >&2
+      printf '    a. git -C %s checkout -- .claude/memories/agents .claude/memories/reviews   # restore the working tree FIRST\n' \
+        "$repo_root" >&2
+      printf '    b. remove ONLY what this run wrote to the destination (never blanket-clear %s — under --force it may hold unrelated pre-existing content this run never touched):\n' \
+        "$dest_root" >&2
+      printf '       git -C %s ls-files -z -- .claude/memories/agents .claude/memories/reviews | while IFS= read -r -d "" p; do rm -f -- "%s/${p#.claude/memories/}"; done; find "%s/agents" "%s/reviews" -type d -empty -delete 2>/dev/null\n' \
+        "$repo_root" "$dest_root" "$dest_root" "$dest_root" >&2
+      printf '    c. re-run this script\n' >&2
     else
       printf 'migrate-memory-root: index restoration FAILED (git reset exit=%s) — the removal may still be staged AND the working tree may be partially deleted. Recovery (the destination at %s already holds a verified copy — do not re-run this script against it, it will correctly refuse):\n' \
         "$reset_rc" "$dest_root" >&2
@@ -454,7 +467,16 @@ sdlc_mm_main() {
       printf '  3. fix whatever caused the working-tree delete to fail (permissions, a lock, ...)\n' >&2
       printf '  4. git -C %s rm -r --cached -- .claude/memories/agents .claude/memories/reviews && rm -rf %s %s && git -C %s commit -m "chore(memory): migrate agent and review memory corpus to the external memory root" -- .claude/memories/agents .claude/memories/reviews\n' \
         "$repo_root" "$repo_root/.claude/memories/agents" "$repo_root/.claude/memories/reviews" "$repo_root" >&2
-      printf '  (or, to start over instead: clear %s and re-run this script)\n' "$dest_root" >&2
+      printf '  (or, to start over instead — in THIS order, or the re-run will refuse at the disk-presence check:)\n' >&2
+      printf '    a. git -C %s reset -- .claude/memories/agents .claude/memories/reviews     # un-stage the removal FIRST\n' \
+        "$repo_root" >&2
+      printf '    b. git -C %s checkout -- .claude/memories/agents .claude/memories/reviews   # THEN restore the working tree\n' \
+        "$repo_root" >&2
+      printf '    c. remove ONLY what this run wrote to the destination (never blanket-clear %s — under --force it may hold unrelated pre-existing content this run never touched):\n' \
+        "$dest_root" >&2
+      printf '       git -C %s ls-files -z -- .claude/memories/agents .claude/memories/reviews | while IFS= read -r -d "" p; do rm -f -- "%s/${p#.claude/memories/}"; done; find "%s/agents" "%s/reviews" -type d -empty -delete 2>/dev/null\n' \
+        "$repo_root" "$dest_root" "$dest_root" "$dest_root" >&2
+      printf '    d. re-run this script\n' >&2
     fi
     return 1
   fi

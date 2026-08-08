@@ -671,7 +671,8 @@ EOF
 chmod +x "$verify_bin/cp"
 out24="$( cd "$repo24" && PATH="$verify_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest24" bash "$mm" 2>&1 )"; rc24=$?
 { [ "$rc24" -ne 0 ] && printf '%s' "$out24" | grep -qi 'unverified copy' \
-  && printf '%s' "$out24" | grep -qi -- 'clear .* and re-run' \
+  && printf '%s' "$out24" | grep -qi 'remove ONLY what this run wrote' \
+  && printf '%s' "$out24" | grep -qi 'never blanket-clear' \
   && ! printf '%s' "$out24" | grep -qi 'safe to retry'; } \
   && ok "(T24) the verification-failure message states the destination holds an unverified copy, not 'safe to retry'" \
   || bad "(T24) verify-failure message" "rc=$rc24 out='$out24'"
@@ -702,7 +703,8 @@ EOF
 chmod +x "$rmfail_bin/git"
 out25="$( cd "$repo25" && PATH="$rmfail_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest25" bash "$mm" 2>&1 )"; rc25=$?
 { [ "$rc25" -ne 0 ] && printf '%s' "$out25" | grep -qi 'verified copy' \
-  && printf '%s' "$out25" | grep -qi -- 'clear .* and re-run'; } \
+  && printf '%s' "$out25" | grep -qi 'remove ONLY what this run wrote' \
+  && printf '%s' "$out25" | grep -qi 'never blanket-clear'; } \
   && ok "(T25) the git-rm-cached-failure message names the destination's verified copy and recovery" \
   || bad "(T25) git-rm-cached-failure message" "rc=$rc25 out='$out25'"
 
@@ -714,7 +716,7 @@ out25="$( cd "$repo25" && PATH="$rmfail_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="
 # ============================================================================================
 out26="$(bash "$mm" -h 2>&1)"; rc26=$?
 { [ "$rc26" -eq 0 ] && printf '%s' "$out26" | grep -qi -- '--force' \
-  && printf '%s' "$out26" | grep -qi 'not.*relax\|never overwrite\|does not relax'; } \
+  && printf '%s' "$out26" | grep -Eqi 'not.*relax|never overwrite|does not relax'; } \
   && ok "(T26) -h documents --force's actual scope, not just its name" \
   || bad "(T26) -h help text" "rc=$rc26 out='$out26'"
 
@@ -800,5 +802,60 @@ out30b="$(run_migrate "$repo30b" "$dest30b" --dry-run)"
 printf '%s' "$out30b" | grep -qF "$repo30b" && printf '%s' "$out30b" | grep -qi 'branch' \
   && ok "(T30b) --dry-run also names the repo and branch" \
   || bad "(T30b) dry-run repo/branch" "out='$out30b'"
+
+# ============================================================================================
+# T31 (MINOR 1 regression, PR #235 round 2): the delete-failure fallback ("or, to start over
+# instead: ...") must be genuinely followable end-to-end, not just readable. This test extracts
+# the ACTUAL commands the script prints (never a hardcoded assumption of what it "should" say)
+# and executes them verbatim, in the order printed, then re-runs the script exactly as the
+# fallback's final step instructs — asserting the re-run reaches rc=0. A stubbed `rm` fails only
+# for one specific tracked file (never touching real filesystem permissions, which a chmod-based
+# induction would also copy onto the destination via cp -R and confound the result).
+# Independently verified against the pre-fix script (commit 37bc07d) BEFORE writing this fix:
+# following ITS OWN printed fallback ("clear <dest_root> and re-run") reached rc=1 — the re-run
+# refused at the disk-presence check, because the working tree was left partially deleted and
+# clearing the destination alone does not restore it.
+# ============================================================================================
+repo31="$tmp/repo31"; mk_memory_repo "$repo31"
+dest31="$tmp/dest31"
+real_rm31="$(command -v rm)"
+repo31_canon="$(cd "$repo31" && pwd -P)"
+fail_target31="$repo31_canon/.claude/memories/agents/agent-a/one.md"
+rmfail31_bin="$tmp/rmfail31-bin"; mkdir -p "$rmfail31_bin"
+for c in bash git sed cut basename dirname tr head awk mkdir grep find wc printf shasum sha256sum cksum mktemp ls sort cp; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$rmfail31_bin/$c"
+done
+cat > "$rmfail31_bin/rm" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do
+  if [ "\$a" = "$fail_target31" ]; then
+    printf 'rm: %s: Permission denied (stub)\n' "$fail_target31" >&2
+    exit 1
+  fi
+done
+exec "$real_rm31" "\$@"
+EOF
+chmod +x "$rmfail31_bin/rm"
+
+out31="$( cd "$repo31" && PATH="$rmfail31_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest31" bash "$mm" 2>&1 )"; rc31=$?
+
+# Extract the lettered command lines under "(or, to start over instead" and execute them
+# verbatim, in order — this is literally what the fallback tells the operator to run.
+block31="$(printf '%s\n' "$out31" | awk '/\(or, to start over instead/{f=1; next} f')"
+cmds31="$(printf '%s\n' "$block31" | sed -E 's/^[[:space:]]*[a-z]\.[[:space:]]*//; s/^[[:space:]]+//' | grep -E '^(git |rm )' || true)"
+walkthrough_ok=1
+if [ -n "$cmds31" ]; then
+  while IFS= read -r c31; do
+    [ -z "$c31" ] && continue
+    eval "$c31" || walkthrough_ok=0
+  done <<< "$cmds31"
+else
+  walkthrough_ok=0
+fi
+final_out31="$(run_migrate "$repo31" "$dest31")"; final_rc31=$?
+{ [ "$rc31" -ne 0 ] && [ -n "$cmds31" ] && [ "$final_rc31" -eq 0 ]; } \
+  && ok "(T31) following the delete-failure fallback's own printed commands, verbatim and in order, reaches rc=0" \
+  || bad "(T31) fallback end-to-end walkthrough" "rc31=$rc31 cmds_found=$([ -n "$cmds31" ] && echo yes || echo no) final_rc31=$final_rc31 out31='$out31' final_out31='$final_out31'"
 
 exit "$fail"
