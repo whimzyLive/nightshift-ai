@@ -135,11 +135,11 @@ need no gate:
 Two further carve-outs are **not** cross-agent writes and need no gate:
 
 - **Counter-only writes.** A counter-only update is now written as a **capture**
-  (`capture-learning.sh rule ... <payload-file with uses: 1>`, which must omit `agent:` — see the
-  counter-only exemption in `capture-learning.sh`) by any agent that applied the rule under
-  `agents/shared/` — it changes no semantics, so the capture write, and the maintenance op's later
-  promotion-merge of that capture into the target rule, are not treated as writing "another agent's"
-  rule directory.
+  (`capture-learning.sh rule ... <payload-file with uses: 1>`; a `shared/` target still needs
+  `agent:` with >= 2 entries — NA-103, see the counter-only exemption in `capture-learning.sh`) by
+  any agent that applied the rule under `agents/shared/` — it changes no semantics, so the capture
+  write, and the maintenance op's later promotion-merge of that capture into the target rule, are
+  not treated as writing "another agent's" rule directory.
 - **QA rule authorship for the fixing agent.** `qa-engineer` Step 5 (`refs/qa-engineer-playbook.md`)
   now creates `captured/rules/*.md` carrying `agent: [<fixing-agent>]` — **never** a file under
   `agents/<fixing-agent>/` directly — from that round's findings, still bounded to creation only.

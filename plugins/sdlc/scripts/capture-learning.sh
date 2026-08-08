@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # capture-learning.sh — NA-98. Write ONE learning capture into the gitignored staging area.
 #
-# usage: capture-learning.sh rule   <agent-or-shared>/<rule-id> <STORY-KEY> [<payload-file>|-]
+# usage: capture-learning.sh rule   <agent-or-shared>/<rule-id> <STORY-KEY> <payload-file>
 #        capture-learning.sh review <STORY-KEY> <YYYY-MM-DD> <round>       [<payload-file>|-]
 #        capture-learning.sh --print-root
+#
+# NA-103: <payload-file> is REQUIRED for `rule` (no bare/omitted/'-' form) — the 7-field rule
+# schema (trigger/rule/evidence, or a counter-only uses/evidence update) can only come from a
+# payload; a bare write can no longer produce anything but a refused, malformed capture. `review`
+# keeps its optional payload — a review with no findings legitimately has nothing to add.
 #
 # Prints CAPTURED=<path> on success. Reads exactly one environment variable, SDLC_CAPTURE_ROOT.
 # Never reads stdin.
@@ -46,7 +51,7 @@ if [ "${1:-}" = "--print-root" ]; then
 fi
 
 kind="${1:-}"
-[ -n "$kind" ] || die "usage: capture-learning.sh rule <agent-or-shared>/<rule-id> <STORY-KEY> [<payload-file>|-]
+[ -n "$kind" ] || die "usage: capture-learning.sh rule <agent-or-shared>/<rule-id> <STORY-KEY> <payload-file>
        capture-learning.sh review <STORY-KEY> <YYYY-MM-DD> <round> [<payload-file>|-]"
 
 payload_fm() {                     # $1 = payload path or empty; $2 = key; $3 = default
@@ -75,6 +80,77 @@ payload_has_field() {              # $1 = payload path or empty; $2 = key
   [ -n "$1" ] || return 1
   has_field "$(extract_fm "$1" | parse_frontmatter)" "$2"
 }
+csv_len() {                        # $1 = comma-joined list (possibly empty) -> item count
+  [ -n "$1" ] && printf '%s' "$1" | awk -F',' '{print NF}' || printf '0'
+}
+valid_evidence_item() {            # $1 = one evidence token -> 0 if Jira key | PR#n | 7-40 char SHA
+  # [A-Z0-9]* (not +) — must accept a single-letter Jira project key (e.g. "A-1"), same as
+  # validate_story_key below; check-frontmatter.sh's copy must agree (NA-103 Minor 6).
+  [[ "$1" =~ ^[A-Z][A-Z0-9]*-[0-9]+$ ]] && return 0
+  [[ "$1" =~ ^PR#[0-9]+$ ]] && return 0
+  [[ "$1" =~ ^[0-9a-f]{7,40}$ ]] && return 0
+  return 1
+}
+is_counter_only_payload() {        # $1 = payload path or empty -> 0 if a counter-only update
+  # NA-103: `agent` presence is deliberately NOT part of this signature — a shared/ counter-only
+  # payload legitimately carries `agent:` (Important 3 fix, the >= 2 agents check is now
+  # unconditional). `trigger`/`rule` absence is what actually distinguishes "counter-only" from "a
+  # full capture" — the T3g8-style smuggle attempt (agent + trigger, no rule) is still excluded
+  # here purely by its `trigger:` field, then correctly falls through to full validation.
+  payload_has_field "$1" uses && ! payload_has_field "$1" rule && ! payload_has_field "$1" trigger
+}
+validate_rule_payload_schema() {   # $1 = payload path or empty; dies on a non-7-field-shaped payload
+  local payload="$1" trig trig_n rule_val evidence_val evidence_n uses_val item IFS_OLD
+  trig="$(payload_fm "$payload" trigger "")"
+  trig_n="$(csv_len "$trig")"
+  { [ "$trig_n" -ge 1 ] && [ "$trig_n" -le 6 ]; } \
+    || die "capture-learning.sh: payload trigger must have 1-6 items, got $trig_n; wrote nothing"
+
+  rule_val="$(payload_fm "$payload" rule "")"
+  [ -n "$rule_val" ] \
+    || die "capture-learning.sh: payload rule is empty; wrote nothing"
+  [ "${#rule_val}" -le 200 ] \
+    || die "capture-learning.sh: payload rule exceeds 200 chars (${#rule_val}); wrote nothing"
+
+  # NA-103 (PR #237 review, Important 2): uses was validated on the counter-only path but not
+  # here — a full-rule payload could write `uses: banana` or `uses: -5` successfully, then break
+  # check-frontmatter.sh's hard-fail on the SAME values once promoted. Same check, both paths.
+  uses_val="$(payload_fm "$payload" uses 0)"
+  [[ "$uses_val" =~ ^[0-9]+$ ]] \
+    || die "capture-learning.sh: payload uses '$uses_val' is not a non-negative integer; wrote nothing"
+
+  evidence_val="$(payload_fm "$payload" evidence "")"
+  evidence_n="$(csv_len "$evidence_val")"
+  [ "$evidence_n" -ge 1 ] \
+    || die "capture-learning.sh: payload evidence must have >= 1 item, got $evidence_n; wrote nothing"
+  IFS_OLD="$IFS"; IFS=','
+  for item in $evidence_val; do
+    valid_evidence_item "$item" \
+      || { IFS="$IFS_OLD"; die "capture-learning.sh: payload evidence item '$item' is not a Jira key, PR#n, or 7-40 char SHA; wrote nothing"; }
+  done
+  IFS="$IFS_OLD"
+}
+validate_counter_only_payload() { # $1 = payload path; dies on a malformed counter-only update
+  # A counter-only update is exempt from trigger/rule content, but `uses`/`evidence` are the ONLY
+  # content it carries — leaving them unchecked let garbage (uses: not-a-number, an unrecognised
+  # evidence token) through untouched, defeating AC1's "malformed capture cannot be created" for
+  # this whole branch (NA-103 Important 3).
+  local payload="$1" uses_val evidence_val evidence_n item IFS_OLD
+  uses_val="$(payload_fm "$payload" uses "")"
+  [[ "$uses_val" =~ ^[0-9]+$ ]] \
+    || die "capture-learning.sh: counter-only payload uses '$uses_val' is not a non-negative integer; wrote nothing"
+
+  evidence_val="$(payload_fm "$payload" evidence "")"
+  evidence_n="$(csv_len "$evidence_val")"
+  [ "$evidence_n" -ge 1 ] \
+    || die "capture-learning.sh: counter-only payload evidence must have >= 1 item, got $evidence_n; wrote nothing"
+  IFS_OLD="$IFS"; IFS=','
+  for item in $evidence_val; do
+    valid_evidence_item "$item" \
+      || { IFS="$IFS_OLD"; die "capture-learning.sh: counter-only payload evidence item '$item' is not a Jira key, PR#n, or 7-40 char SHA; wrote nothing"; }
+  done
+  IFS="$IFS_OLD"
+}
 
 root="$(resolve_capture_root)" || exit 1
 ensure_capture_root "$root"
@@ -83,10 +159,17 @@ now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 case "$kind" in
   rule)
     target="${2:-}"; story="${3:-}"; payload="${4:-}"
-    [ -n "$target" ] && [ -n "$story" ] || die "capture-learning.sh: rule needs <agent-or-shared>/<rule-id> <STORY-KEY>"
+    [ -n "$target" ] && [ -n "$story" ] || die "capture-learning.sh: rule needs <agent-or-shared>/<rule-id> <STORY-KEY> <payload-file>"
     validate_story_key "$story"
-    [ "$payload" = "-" ] && payload=""
-    [ -n "$payload" ] && [ ! -r "$payload" ] && die "capture-learning.sh: payload file '$payload' is missing or unreadable; wrote nothing"
+    # NA-103 Critical 2: a payload is now REQUIRED for `rule` — the 7-field schema (or a
+    # counter-only uses/evidence update) can only come from one, so a bare/omitted/'-' write can
+    # no longer produce anything but a refused, malformed capture. refs/domain-agent-handoff.md's
+    # own-domain usage line and this script's usage header agree with this.
+    [ -n "$payload" ] \
+      || die "capture-learning.sh: rule needs a <payload-file> — every rule capture must carry real trigger/rule/evidence content (or a counter-only uses/evidence update); wrote nothing"
+    [ "$payload" = "-" ] \
+      && die "capture-learning.sh: rule no longer accepts '-' (explicit no-payload) — a rule capture always needs real content; wrote nothing"
+    [ -r "$payload" ] || die "capture-learning.sh: payload file '$payload' is missing or unreadable; wrote nothing"
     case "$target" in
       */*) : ;;
       *) die "capture-learning.sh: rule target '$target' needs <agent-or-shared>/<rule-id>; wrote nothing" ;;
@@ -99,19 +182,28 @@ case "$kind" in
       n="$(basename "$a" .md)"; [ "$n" = "principal-engineer" ] || valid="$valid$n "
     done
     case "$valid" in *" $dir "*) : ;; *) die "capture-learning.sh: unknown target dir '$dir'; wrote nothing" ;; esac
+    counter_only=0
+    is_counter_only_payload "$payload" && counter_only=1
+    # NA-103 Important 3: the >= 2 agents rule for shared/ is now UNCONDITIONAL — a counter-only
+    # update no longer skips it. The exemption only ever covered trigger/rule CONTENT (the target's
+    # own promoted file already carries the real agent list); it never had to also waive the
+    # agent-list format check, and doing so let `agent: []` through unnoticed.
     if [ "$dir" = "shared" ]; then
       agents="$(payload_fm "$payload" agent "")"
-      counter_only=0
-      payload_has_field "$payload" uses && ! payload_has_field "$payload" rule \
-        && ! payload_has_field "$payload" agent && counter_only=1
-      if [ "$counter_only" -eq 0 ]; then
-        agents_n=0
-        [ -n "$agents" ] && agents_n="$(printf '%s' "$agents" | awk -F',' '{print NF}')"
-        [ "$agents_n" -ge 2 ] \
-          || die "capture-learning.sh: agents/shared/ capture needs >= 2 agents in the payload's 'agent:' list (got [$agents]); wrote nothing"
-      fi
+      agents_n="$(csv_len "$agents")"
+      [ "$agents_n" -ge 2 ] \
+        || die "capture-learning.sh: agents/shared/ capture needs >= 2 agents in the payload's 'agent:' list (got [$agents]); wrote nothing"
     else
       agents="$dir"
+    fi
+    # 7-field rule schema (trigger/rule/evidence) is validated at write time — a counter-only
+    # update (uses+evidence only, re-incrementing an already-promoted rule) is exempt from the
+    # trigger/rule CONTENT check, since it deliberately carries none of its own (distill merges it
+    # into the target), but its own uses/evidence content is still validated either way.
+    if [ "$counter_only" -eq 0 ]; then
+      validate_rule_payload_schema "$payload"
+    else
+      validate_counter_only_payload "$payload"
     fi
     dest="$root/rules/$story--$rid.md"
     content="$(

@@ -148,7 +148,9 @@ list_len() {
 }
 
 valid_evidence_item() {
-  [[ "$1" =~ ^[A-Z][A-Z0-9]+-[0-9]+$ ]] && return 0
+  # [A-Z0-9]* (not +) — a single-letter Jira project key (e.g. "A-1") is a valid story key per
+  # validate_story_key in capture-learning.sh; the two regexes must agree (NA-103 Minor 6).
+  [[ "$1" =~ ^[A-Z][A-Z0-9]*-[0-9]+$ ]] && return 0
   [[ "$1" =~ ^PR#[0-9]+$ ]] && return 0
   [[ "$1" =~ ^[0-9a-f]{7,40}$ ]] && return 0
   return 1
@@ -161,9 +163,15 @@ id_records=""
 add_offender() { offenders+="$1"$'\n'; }
 add_warning() { warnings+="$1"$'\n'; }
 
+# A SKIP here is informational, never a script-level exit — corpus_skipped only means the
+# rule/review/capture while-loop below has nothing to iterate (it already no-ops safely on an
+# empty $mem_roots, via its own `[ -n "$mem_root" ] || continue`). The ADR frontmatter loop further
+# down is unconditional and independent of the memory-root corpus entirely: exiting early here used
+# to skip it too, silently disabling the only ADR frontmatter guard in the repo whenever the memory
+# root was absent (e.g. every fresh CI checkout once AC5 removed the last tracked file under
+# `.claude/memories/`) — see NA-103.
 if [ -z "$mem_roots" ] && [ "$resolver_failed" -eq 0 ]; then
-  echo "check-frontmatter: OK — no memory root present (0 files validated)"
-  exit 0
+  echo "check-frontmatter: SKIP: no memory root — nothing to validate (0 files); ADR frontmatter is still checked below"
 fi
 
 validate_rule_file() {

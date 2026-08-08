@@ -412,9 +412,9 @@ Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, v
 Payload frontmatter carries `origin: qa-round`. Cross-cutting → `shared/`. Creates only — never edits
 or deletes an existing rule file. List captured ids in `## Rules written`.
 
-**3. Counter-only updates** — for any existing rule a finding proves was violated, capture a
-counter-only record with `uses: 1` and `evidence: [<STORY-KEY>]`; promotion merges it into the
-target's existing count. You never edit the committed rule file.
+**3. Counter-only updates** — for a violated rule, capture `uses: 1`, `evidence: [<STORY-KEY>]`
+(shared/ needs `agent:` >= 2 too — NA-103); promotion merges into the target's count. Never edit the
+committed rule file.
 
 ## Step 6 — Quality gate
 
