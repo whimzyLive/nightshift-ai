@@ -1,15 +1,27 @@
 #!/usr/bin/env bash
 # migrate-memory-root.test.sh — NA-102. Contract suite for migrate-memory-root.sh.
 #
-# AUTHOR-RUN AND CI-WIRED:
+# AUTHOR-RUN:
 #   bash plugins/sdlc/scripts/__tests__/migrate-memory-root.test.sh
 # Exit 0 = PASS, exit 1 = FAIL.
 #
-# HERMETICITY: every migration runs against a throwaway fixture repo under $tmp, with
-# SDLC_MEMORY_ROOT and HOME pointed inside $tmp — never the operator's real
-# $HOME/.local/share or this real repository's own tracked corpus. The AC-6 block below is
-# the one deliberate exception: it reads (never writes) THIS repo's real tracked file counts
-# via `git ls-files`, which is read-only and safe.
+# Not yet wired into .github/workflows/ci.yml — that file is platform-engineer's, not this
+# agent's, to edit; wiring it (or leaving it author-run-only by policy) is a separate call for
+# the coordinator to make.
+#
+# HERMETICITY:
+#   - every migration runs against a throwaway fixture repo under $tmp, with SDLC_MEMORY_ROOT
+#     and HOME pointed inside $tmp — never the operator's real $HOME/.local/share or this real
+#     repository's own tracked corpus.
+#   - GIT_CONFIG_GLOBAL is pointed at a nonexistent file under $tmp and GIT_CONFIG_NOSYSTEM=1,
+#     for every `git` invocation in this file (including inside migrate-memory-root.sh, since
+#     they're exported): otherwise every `git init`/`commit` here runs under the OPERATOR's real
+#     global gitconfig, and something as ordinary as `commit.gpgsign = true` turns migration
+#     commits interactive/failing, breaking the suite on that operator's machine only.
+#   - the AC-6 block below is the one deliberate exception to "throwaway fixture only": it reads
+#     (never writes) THIS repo's real tracked corpus, but pinned to a fixed historical commit
+#     (see AC-6 comment) rather than the live worktree, so it does not invert to failing once
+#     the corpus this story adds the tooling for is actually migrated out of the live tree.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -21,6 +33,8 @@ bad() { printf 'FAIL %s\n     %s\n' "$1" "$2"; fail=1; }
 tmp="$(mktemp -d)"; tmp="$(cd "$tmp" && pwd -P)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/home"
+export GIT_CONFIG_GLOBAL="$tmp/gitconfig-does-not-exist"
+export GIT_CONFIG_NOSYSTEM=1
 
 # mk_memory_repo <dir> — a throwaway repo with a small, git-committed memory corpus under
 # .claude/memories/{agents,reviews}, mirroring the real shape (per-agent subdirs, a nested
@@ -49,15 +63,21 @@ run_migrate() { # $1=repo dir  $2=dest root  [extra args...]
 }
 
 # ============================================================================================
-# AC-6: documented per-agent/reviews file counts, verified read-only against THIS repo's real
-# tracked corpus (not a fixture) — the migration is never executed for real here.
+# AC-6: documented per-agent/reviews file counts, verified read-only against a PINNED historical
+# commit of this repo's real tracked corpus (f1f5d10 — the NA-101 merge, the last commit before
+# this story's own work), not the live worktree. Pinning is deliberate: once this script's
+# purpose is fulfilled and the corpus is actually migrated out, `git ls-files` against the LIVE
+# tree would read 0 for every row below and this block would invert from a real gate into a
+# permanent, meaningless failure. `git ls-tree` against a fixed, already-merged commit can never
+# do that — that commit's content is immutable history.
 # ============================================================================================
 real_root="$(git -C "$here" rev-parse --show-toplevel)"
+pinned_sha="f1f5d10c9d79d05cf0a63bf714b1fdd985bed32f"
 check_count() { # $1=path relative to real_root  $2=expected count  $3=label
   local n
-  n="$(git -C "$real_root" ls-files -- "$1" | wc -l | tr -d '[:space:]')"
-  [ "$n" = "$2" ] && ok "(AC6) $3 tracked file count = $2" \
-    || bad "(AC6) $3 tracked file count" "expected $2 got $n"
+  n="$(git -C "$real_root" ls-tree -r --name-only "$pinned_sha" -- "$1" 2>/dev/null | wc -l | tr -d '[:space:]')"
+  [ "$n" = "$2" ] && ok "(AC6) $3 tracked file count at $pinned_sha = $2" \
+    || bad "(AC6) $3 tracked file count at $pinned_sha" "expected $2 got $n"
 }
 check_count ".claude/memories/agents/ai-enablement-engineer" 131 "ai-enablement-engineer"
 check_count ".claude/memories/agents/web-engineer" 67 "web-engineer"
@@ -65,8 +85,9 @@ check_count ".claude/memories/agents/platform-engineer" 21 "platform-engineer"
 check_count ".claude/memories/agents/knowledge-engineer" 14 "knowledge-engineer"
 check_count ".claude/memories/agents/shared" 12 "shared"
 check_count ".claude/memories/reviews" 28 "reviews"
-total="$(git -C "$real_root" ls-files -- .claude/memories/agents .claude/memories/reviews | wc -l | tr -d '[:space:]')"
-[ "$total" = "273" ] && ok "(AC6) total tracked corpus = 273" || bad "(AC6) total tracked corpus" "got $total"
+total="$(git -C "$real_root" ls-tree -r --name-only "$pinned_sha" -- .claude/memories/agents .claude/memories/reviews 2>/dev/null | wc -l | tr -d '[:space:]')"
+[ "$total" = "273" ] && ok "(AC6) total tracked corpus at $pinned_sha = 273" \
+  || bad "(AC6) total tracked corpus at $pinned_sha" "got $total"
 
 # ============================================================================================
 # T1: happy path — copy, verify, git rm --cached, delete working copies, commit
@@ -123,7 +144,7 @@ after_tree2="$(find "$repo2/.claude/memories" | sort)"
   || bad "(T2b) destination mutation" "stranger.md or agent-a state changed under $dest2"
 
 # ============================================================================================
-# T3: --force merges into a non-empty destination and completes the migration
+# T3: --force merges into a non-empty destination (no collision) and completes the migration
 # ============================================================================================
 repo3="$tmp/repo3"; mk_memory_repo "$repo3"
 dest3="$tmp/dest3"
@@ -162,7 +183,7 @@ repo5="$tmp/repo5"; mk_memory_repo "$repo5"
 dest5="$tmp/dest5"
 real_cp="$(command -v cp)"
 stub_bin="$tmp/corrupt-bin"; mkdir -p "$stub_bin"
-for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum; do
+for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp; do
   real="$(command -v "$c" 2>/dev/null)" || continue
   ln -sf "$real" "$stub_bin/$c"
 done
@@ -222,20 +243,24 @@ after_tree6b="$(find "$dest6b" | sort)"
   || bad "(T6b) dry-run non-empty destination" "rc=$rc6b out='$out6b'"
 
 # ============================================================================================
-# T7 (bonus): a partial corpus (only one of agents/reviews present) is a hard refusal
+# T7: a partial corpus (only agents/ actually tracked, reviews/ fully untracked+removed) is a
+# hard refusal, not a guess. Genuinely untracks reviews/ via `git rm --cached` (not just an
+# `rm -rf` of the working tree, which would instead be a T10-shaped tracked-but-missing case).
 # ============================================================================================
 repo7="$tmp/repo7"; mk_memory_repo "$repo7"
+git -C "$repo7" rm -r --cached --quiet -- .claude/memories/reviews
 rm -rf "$repo7/.claude/memories/reviews"
+git -C "$repo7" commit -q -m 'untrack reviews for the test fixture'
 dest7="$tmp/dest7"
 before_head7="$(git -C "$repo7" rev-parse HEAD 2>/dev/null)"
 out7="$(run_migrate "$repo7" "$dest7" 2>&1)"; rc7=$?
 after_head7="$(git -C "$repo7" rev-parse HEAD 2>/dev/null)"
 { [ "$rc7" -ne 0 ] && [ "$before_head7" = "$after_head7" ] && printf '%s' "$out7" | grep -qi 'partial'; } \
-  && ok "(T7) a partial corpus (only agents present) is a hard refusal, not a guess" \
+  && ok "(T7) a partial corpus (only agents/ tracked) is a hard refusal, not a guess" \
   || bad "(T7) partial corpus" "rc=$rc7 out='$out7'"
 
 # ============================================================================================
-# T8 (bonus): an unknown flag is rejected
+# T8: an unknown flag is rejected
 # ============================================================================================
 repo8="$tmp/repo8"; mk_memory_repo "$repo8"
 dest8="$tmp/dest8"
@@ -243,5 +268,143 @@ out8="$(run_migrate "$repo8" "$dest8" --bogus 2>&1)"; rc8=$?
 [ "$rc8" -ne 0 ] && printf '%s' "$out8" | grep -qi 'unknown argument' \
   && ok "(T8) an unrecognised argument is rejected with a clear message" \
   || bad "(T8) unknown argument" "rc=$rc8 out='$out8'"
+
+# ============================================================================================
+# T9 (CRITICAL 1 regression): a sparse/empty checkout — the corpus is fully TRACKED but absent
+# from the working tree entirely. Independently verified against the pre-fix script (saved from
+# commit f341e5f) BEFORE writing this fix: it silently reported "already migrated (no-op)"
+# without ever having copied anything anywhere — a false idempotency claim that leaves the
+# corpus reachable ONLY via git history once someone later runs an actual `git rm`. The fixed
+# script must refuse loudly instead.
+# ============================================================================================
+repo9="$tmp/repo9"; mk_memory_repo "$repo9"
+git -C "$repo9" sparse-checkout init --cone >/dev/null
+git -C "$repo9" sparse-checkout set --skip-checks nonexistent-placeholder >/dev/null
+dest9="$tmp/dest9"
+before_head9="$(git -C "$repo9" rev-parse HEAD)"
+out9="$(run_migrate "$repo9" "$dest9" 2>&1)"; rc9=$?
+after_head9="$(git -C "$repo9" rev-parse HEAD)"
+{ [ "$rc9" -ne 0 ] && [ "$before_head9" = "$after_head9" ] \
+  && ! printf '%s' "$out9" | grep -qi 'already migrated' \
+  && [ ! -e "$dest9" ]; } \
+  && ok "(T9) a tracked-but-not-checked-out corpus refuses rather than falsely claiming no-op" \
+  || bad "(T9) sparse checkout" "rc=$rc9 out='$out9' dest_exists=$([ -e "$dest9" ] && echo yes || echo no)"
+
+# ============================================================================================
+# T10 (CRITICAL 2 regression): one tracked file deleted from the working tree but never
+# committed — an entirely ordinary local state. Independently verified against the pre-fix
+# script BEFORE writing this fix: it silently completed (verification never saw the missing
+# file because it walked `find`, not the tracked set), then `git rm --cached` dropped the file
+# from the index too — leaving it neither at the destination nor at the new HEAD, recoverable
+# only from old history. The fixed script must refuse and leave the file tracked at HEAD.
+# ============================================================================================
+repo10="$tmp/repo10"; mk_memory_repo "$repo10"
+rm "$repo10/.claude/memories/agents/agent-b/two.md"
+dest10="$tmp/dest10"
+before_head10="$(git -C "$repo10" rev-parse HEAD)"
+out10="$(run_migrate "$repo10" "$dest10" 2>&1)"; rc10=$?
+after_head10="$(git -C "$repo10" rev-parse HEAD)"
+still_tracked10="NO"
+git -C "$repo10" cat-file -e "HEAD:.claude/memories/agents/agent-b/two.md" 2>/dev/null && still_tracked10="YES"
+{ [ "$rc10" -ne 0 ] && [ "$before_head10" = "$after_head10" ] && [ "$still_tracked10" = "YES" ] \
+  && printf '%s' "$out10" | grep -qi 'missing on disk'; } \
+  && ok "(T10) a tracked-but-uncommitted-deleted file refuses; nothing dropped from HEAD" \
+  || bad "(T10) uncommitted delete" "rc=$rc10 out='$out10' still_tracked=$still_tracked10"
+
+# ============================================================================================
+# T11 (IMPORTANT 3 regression): the working-tree delete (`rm -rf`) fails after `git rm --cached`
+# already succeeded. Independently verified against the pre-fix script BEFORE writing this fix:
+# it printed the `rm` permission error but then committed anyway and reported success (rc=0).
+# The fixed script must fail loudly AND restore the index (`git reset`) rather than leave a
+# half-staged, uncommitted removal.
+# ============================================================================================
+repo11="$tmp/repo11"; mk_memory_repo "$repo11"
+chmod 555 "$repo11/.claude/memories/agents"
+dest11="$tmp/dest11"
+before_head11="$(git -C "$repo11" rev-parse HEAD)"
+out11="$(run_migrate "$repo11" "$dest11" 2>&1)"; rc11=$?
+chmod 755 "$repo11/.claude/memories/agents" 2>/dev/null || true
+after_head11="$(git -C "$repo11" rev-parse HEAD)"
+staged11="$(git -C "$repo11" diff --cached --name-only)"
+{ [ "$rc11" -ne 0 ] && [ "$before_head11" = "$after_head11" ] && [ -z "$staged11" ] \
+  && printf '%s' "$out11" | grep -qi 'restoring the index'; } \
+  && ok "(T11) an rm -rf failure after git rm --cached surfaces as a failure with the index restored" \
+  || bad "(T11) rm -rf failure" "rc=$rc11 out='$out11' staged='$staged11'"
+rm -rf "$repo11/.claude/memories/agents" 2>/dev/null || true
+
+# ============================================================================================
+# T12 (IMPORTANT 4 regression): an operator's unrelated file is already staged before the
+# migration runs. Independently verified against the pre-fix script BEFORE writing this fix: it
+# swept the unrelated staged file into the migration commit. The fixed script's commit must be
+# pathspec-scoped to just the two migrated trees.
+# ============================================================================================
+repo12="$tmp/repo12"; mk_memory_repo "$repo12"
+printf 'unrelated wip\n' > "$repo12/unrelated.txt"
+git -C "$repo12" add unrelated.txt
+dest12="$tmp/dest12"
+out12="$(run_migrate "$repo12" "$dest12")"; rc12=$?
+in_commit12="NO"
+git -C "$repo12" show --name-only --pretty=format: HEAD 2>/dev/null | grep -q '^unrelated.txt$' && in_commit12="YES"
+still_staged12="NO"
+git -C "$repo12" diff --cached --name-only 2>/dev/null | grep -q '^unrelated.txt$' && still_staged12="YES"
+{ [ "$rc12" -eq 0 ] && [ "$in_commit12" = "NO" ] && [ "$still_staged12" = "YES" ]; } \
+  && ok "(T12) an unrelated pre-staged file is not swept into the migration commit" \
+  || bad "(T12) commit pathspec scoping" "rc=$rc12 out='$out12' in_commit=$in_commit12 still_staged=$still_staged12"
+
+# ============================================================================================
+# T13 (IMPORTANT 5 regression): --force must not silently clobber a colliding destination file
+# with distinct content. Independently verified against the pre-fix script BEFORE writing this
+# fix: it overwrote the destination file with no warning and rc=0. The fixed script must refuse
+# and leave the destination content untouched.
+# ============================================================================================
+repo13="$tmp/repo13"; mk_memory_repo "$repo13"
+dest13="$tmp/dest13"
+mkdir -p "$dest13/agents/agent-a"
+printf 'DISTINCT EXTERNAL CONTENT\n' > "$dest13/agents/agent-a/one.md"
+out13="$(run_migrate "$repo13" "$dest13" --force 2>&1)"; rc13=$?
+after13="$(cat "$dest13/agents/agent-a/one.md" 2>/dev/null)"
+{ [ "$rc13" -ne 0 ] && [ "$after13" = "DISTINCT EXTERNAL CONTENT" ] \
+  && printf '%s' "$out13" | grep -qi 'collision'; } \
+  && ok "(T13) --force refuses on a colliding destination file rather than clobbering it" \
+  || bad "(T13) force collision" "rc=$rc13 out='$out13' dest_content='$after13'"
+
+# ============================================================================================
+# T14 (IMPORTANT 6 regression): the resolved destination sits inside the repository itself.
+# Independently verified against the pre-fix script BEFORE writing this fix: `cp -R` recursed
+# into its own output (agents/agents/agents/...) until "File name too long", leaving the
+# tracked corpus directory polluted with a nested `agents/` and a `captured/` tree that
+# `git status` collapses into one innocuous-looking `??` line. The fixed script must refuse
+# before any `cp` runs at all.
+# ============================================================================================
+repo14="$tmp/repo14"; mk_memory_repo "$repo14"
+before_head14="$(git -C "$repo14" rev-parse HEAD)"
+before_count14="$(find "$repo14/.claude/memories" -type f | wc -l | tr -d ' ')"
+dest14="$repo14/.claude/memories/agents"
+out14="$(run_migrate "$repo14" "$dest14" 2>&1)"; rc14=$?
+after_head14="$(git -C "$repo14" rev-parse HEAD)"
+after_count14="$(find "$repo14/.claude/memories" -type f 2>/dev/null | wc -l | tr -d ' ')"
+{ [ "$rc14" -ne 0 ] && [ "$before_head14" = "$after_head14" ] && [ "$before_count14" = "$after_count14" ] \
+  && printf '%s' "$out14" | grep -qi 'inside the repository'; } \
+  && ok "(T14) a destination inside the repository is refused before any copy runs" \
+  || bad "(T14) destination inside repo" "rc=$rc14 out='$out14' count_before=$before_count14 count_after=$after_count14"
+
+# ============================================================================================
+# T15 (MINOR 11 regression): a tracked corpus entry that is ITSELF a symlink (not merely a path
+# traversing one) is refused outright rather than being silently copied structurally (as a
+# symlink, not its content) and left to potentially dangle at the destination once the source
+# is deleted.
+# ============================================================================================
+repo15="$tmp/repo15"; mk_memory_repo "$repo15"
+ln -s ../../../../outside-the-corpus.md "$repo15/.claude/memories/agents/agent-a/evil-link.md"
+git -C "$repo15" add "$repo15/.claude/memories/agents/agent-a/evil-link.md"
+git -C "$repo15" commit -q -m 'add a symlinked corpus entry for the test fixture'
+dest15="$tmp/dest15"
+before_head15="$(git -C "$repo15" rev-parse HEAD)"
+out15="$(run_migrate "$repo15" "$dest15" 2>&1)"; rc15=$?
+after_head15="$(git -C "$repo15" rev-parse HEAD)"
+{ [ "$rc15" -ne 0 ] && [ "$before_head15" = "$after_head15" ] \
+  && printf '%s' "$out15" | grep -qi 'symlink'; } \
+  && ok "(T15) a symlinked tracked corpus entry is refused, not silently migrated structurally" \
+  || bad "(T15) symlinked entry" "rc=$rc15 out='$out15'"
 
 exit "$fail"
