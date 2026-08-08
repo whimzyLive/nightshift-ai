@@ -1,3 +1,47 @@
+## 0.45.9 (2026-08-08)
+
+### 🚀 Features
+
+- **sdlc:** validate the 7-field rule schema at capture write time (NA-103) ([74a3bdc](https://github.com/whimzyLive/nightshift-ai/commit/74a3bdc))
+- **sdlc:** add one-shot memory-corpus migration script (NA-102) ([f341e5f](https://github.com/whimzyLive/nightshift-ai/commit/f341e5f))
+- **sdlc:** NA-101 make promote-target root-relative and normalise it once on promotion ([e90d341](https://github.com/whimzyLive/nightshift-ai/commit/e90d341))
+- **sdlc:** NA-101 write captures into the resolved memory root ([b59b47e](https://github.com/whimzyLive/nightshift-ai/commit/b59b47e))
+- **sdlc:** NA-101 validate memory frontmatter across both roots ([d5d283e](https://github.com/whimzyLive/nightshift-ai/commit/d5d283e))
+- **sdlc:** NA-101 collect rules from the resolved root and the legacy root ([ba62160](https://github.com/whimzyLive/nightshift-ai/commit/ba62160))
+- **sdlc:** NA-101 list captures from the resolved root and the legacy root ([9d6420d](https://github.com/whimzyLive/nightshift-ai/commit/9d6420d))
+- **sdlc:** NA-101 add memory-root --ensure layout creation ([4456062](https://github.com/whimzyLive/nightshift-ai/commit/4456062))
+- **sdlc:** NA-101 add the memory-root resolver library ([02426b5](https://github.com/whimzyLive/nightshift-ai/commit/02426b5))
+
+### 🩹 Fixes
+
+- **sdlc:** finish the counter-only sweep, validate uses on the full-rule path, replace the phrasing-based ref sweep ([#237](https://github.com/whimzyLive/nightshift-ai/issues/237))
+- **sdlc:** sweep refs/ for the inverted counter-only contract, drop the SHA-pinned test fixture ([43a02ee](https://github.com/whimzyLive/nightshift-ai/commit/43a02ee))
+- **sdlc:** close the QA gate findings on NA-103's capture/frontmatter validation ([fb5f4d7](https://github.com/whimzyLive/nightshift-ai/commit/fb5f4d7))
+- **sdlc:** fix the delete-failure fallback order and scope, drop a reintroduced BRE (PR #235 round 2) ([#235](https://github.com/whimzyLive/nightshift-ai/issues/235))
+- **sdlc:** make the copy list-driven, close portability and messaging gaps (PR #235 round 1) ([#235](https://github.com/whimzyLive/nightshift-ai/issues/235))
+- **sdlc:** treat an unreadable destination as occupied, make delete-failure recovery actionable (NA-102) ([3eaa173](https://github.com/whimzyLive/nightshift-ai/commit/3eaa173))
+- **sdlc:** stop trusting find's emptiness as an affirmative safety signal (NA-102) ([b1a54cd](https://github.com/whimzyLive/nightshift-ai/commit/b1a54cd))
+- **sdlc:** close vacuous-pass and destructive-path gaps in memory migration (NA-102) ([5e992e2](https://github.com/whimzyLive/nightshift-ai/commit/5e992e2))
+- **sdlc:** NA-101 refuse to run gen-goldens.py against a dirty plans tree ([583a2a8](https://github.com/whimzyLive/nightshift-ai/commit/583a2a8))
+- **sdlc:** NA-101 regenerate corpus-expectation.tsv from a clean tree and widen the provenance check ([f889e54](https://github.com/whimzyLive/nightshift-ai/commit/f889e54))
+- **sdlc:** NA-101 explain the init.md Step 4h rewrite's provenance ([44770c1](https://github.com/whimzyLive/nightshift-ai/commit/44770c1))
+- **sdlc:** NA-101 exclude the legacy in-repo capture root from the workspace-integrity guard ([8b4530f](https://github.com/whimzyLive/nightshift-ai/commit/8b4530f))
+- **sdlc:** NA-101 correct the plan doc's corpus-expectation.tsv scope claim and regenerate it ([fa71aee](https://github.com/whimzyLive/nightshift-ai/commit/fa71aee))
+- **sdlc:** NA-101 point qa-engineer-playbook and qa-gate-runner at memory-root.sh ([760a054](https://github.com/whimzyLive/nightshift-ai/commit/760a054))
+- **sdlc:** NA-101 close the memory-root ensure dangling-symlink gap Copilot found ([cf2022e](https://github.com/whimzyLive/nightshift-ai/commit/cf2022e))
+- **sdlc:** NA-101 resolve check-frontmatter's legacy captured/** scan via primary worktree ([bcd6309](https://github.com/whimzyLive/nightshift-ai/commit/bcd6309))
+- **sdlc:** NA-101 make the ensure probe catch dangling symlinks and a directory-shaped .gitignore ([deca920](https://github.com/whimzyLive/nightshift-ai/commit/deca920))
+- **sdlc:** NA-101 stop success-path stderr from contaminating the resolved memory root ([bcb1439](https://github.com/whimzyLive/nightshift-ai/commit/bcb1439))
+- **sdlc:** NA-101 point domain-agent-handoff and analyze-protocol at memory-root.sh ([2e310fa](https://github.com/whimzyLive/nightshift-ai/commit/2e310fa))
+- **sdlc:** NA-101 make memory-root --ensure probe-first and cover remaining error paths ([b5e16c0](https://github.com/whimzyLive/nightshift-ai/commit/b5e16c0))
+- **sdlc:** NA-101 surface the real resolver failure reason instead of discarding stderr ([b09d6f7](https://github.com/whimzyLive/nightshift-ai/commit/b09d6f7))
+- **sdlc:** NA-101 regenerate plan-slice corpus-expectation.tsv for NA-101.md ([41b174c](https://github.com/whimzyLive/nightshift-ai/commit/41b174c))
+- **sdlc:** NA-101 resolve the capture-exclusion root via memory-root.sh ([7f1a1c5](https://github.com/whimzyLive/nightshift-ai/commit/7f1a1c5))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.8 (2026-08-06)
 
 ### 🚀 Features
