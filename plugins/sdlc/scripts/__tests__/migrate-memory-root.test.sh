@@ -329,7 +329,7 @@ chmod -R u+w "$repo11/.claude/memories" "$dest11" 2>/dev/null || true
 after_head11="$(git -C "$repo11" rev-parse HEAD)"
 staged11="$(git -C "$repo11" diff --cached --name-only)"
 { [ "$rc11" -ne 0 ] && [ "$before_head11" = "$after_head11" ] && [ -z "$staged11" ] \
-  && printf '%s' "$out11" | grep -qi 'restore the index'; } \
+  && printf '%s' "$out11" | grep -qi 'index restored'; } \
   && ok "(T11) a per-file delete failure after git rm --cached surfaces as a failure with the index restored" \
   || bad "(T11) rm -rf failure" "rc=$rc11 out='$out11' staged='$staged11'"
 rm -rf "$repo11/.claude/memories/agents" 2>/dev/null || true
@@ -536,5 +536,48 @@ out19="$(run_migrate "$repo19" "$dest19" --force 2>&1)"; rc19=$?
 { [ "$rc19" -ne 0 ] && printf '%s' "$out19" | grep -qi 'already has agents/agent-a/one.md'; } \
   && ok "(T19) a dangling symlink at a tracked file's destination path is treated as a collision" \
   || bad "(T19) dangling symlink collision" "rc=$rc19 out='$out19'"
+
+# ============================================================================================
+# T20 (MINOR 1 regression, round 3): the destination-occupancy probe must not read an
+# UNREADABLE-but-occupied directory (mode 0300: writable/searchable, not listable) as "empty".
+# `ls -A` fails on such a directory and its stdout is empty — the same shape as a genuinely
+# empty directory — so the probe must check `ls`'s own exit status, not just its output.
+# Independently verified against the pre-fix script (round-2 HEAD, commit b1a54cd) BEFORE
+# writing this fix: it proceeded without demanding --force and committed (rc=0). No data was
+# lost in that repro (the unconditional collision scan is a separate, functioning defence-in-
+# depth even at that mode), which is exactly why this is a Minor rather than a repeat Critical.
+# ============================================================================================
+repo20="$tmp/repo20"; mk_memory_repo "$repo20"
+dest20="$tmp/dest20"
+mkdir -p "$dest20/agents"
+printf 'PRECIOUS-STRANGER\n' > "$dest20/agents/stranger.md"
+chmod 0300 "$dest20/agents"
+out20="$(run_migrate "$repo20" "$dest20" 2>&1)"; rc20=$?
+chmod 0755 "$dest20/agents" 2>/dev/null || true
+{ [ "$rc20" -ne 0 ] && printf '%s' "$out20" | grep -qi -- '--force'; } \
+  && ok "(T20) an unreadable (mode 0300) destination directory is treated as occupied, not empty" \
+  || bad "(T20) unreadable destination occupancy" "rc=$rc20 out='$out20'"
+
+# ============================================================================================
+# T21 (MINOR 2 regression, round 3): the delete-failure recovery message must be genuinely
+# actionable. The prior message's sole instruction — "re-run once the underlying issue is
+# fixed" — cannot work: by this point the destination already holds a full verified copy from
+# the successful copy+verify step earlier in the SAME run, so a bare re-run refuses at the
+# occupancy gate, and --force then refuses at the collision scan. Independently verified
+# against the pre-fix script (b1a54cd) BEFORE writing this fix: a literal re-run after its
+# advice demonstrably fails (rc=1) and the original message never says why or offers an
+# alternative. The fix states the real cause and a concrete recovery path.
+# ============================================================================================
+repo21="$tmp/repo21"; mk_memory_repo "$repo21"
+chmod 555 "$repo21/.claude/memories/agents/agent-a"
+dest21="$tmp/dest21"
+out21="$(run_migrate "$repo21" "$dest21" 2>&1)"; rc21=$?
+chmod -R u+w "$repo21/.claude/memories" "$dest21" 2>/dev/null || true
+{ [ "$rc21" -ne 0 ] \
+  && printf '%s' "$out21" | grep -qi 'already holds a verified copy' \
+  && printf '%s' "$out21" | grep -qi 'do not re-run this script' \
+  && printf '%s' "$out21" | grep -q 'rm -r --cached'; } \
+  && ok "(T21) the delete-failure recovery message states the real cause and a concrete recovery path" \
+  || bad "(T21) recovery message actionability" "rc=$rc21 out='$out21'"
 
 exit "$fail"

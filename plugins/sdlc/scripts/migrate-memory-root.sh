@@ -96,21 +96,31 @@ sdlc_mm_realpath() {
   printf '%s%s\n' "$existing" "$tail"
 }
 
-# sdlc_mm_dir_occupied <path> -> 0 (true) iff <path> is "not safely empty": either it exists as
-# a directory (or a symlink to one) holding at least one entry, or it exists as anything else at
-# all (a stray file, a dangling symlink squatting on the name). 1 (false) only for "does not
-# exist" or "exists as a genuinely empty directory".
+# sdlc_mm_dir_occupied <path> -> 0 (true) iff <path> is "not confirmed safely empty": it exists
+# as a directory (or a symlink to one) holding at least one entry, it exists as anything else at
+# all (a stray file, a dangling symlink squatting on the name), OR it exists as a directory `ls`
+# could not actually read (e.g. write-only, mode 0300) — an unreadable directory can never be
+# confirmed empty, so it must count as occupied rather than defaulting to "safe". 1 (false) only
+# for the one case that was actually CONFIRMED: "does not exist" or "exists as a directory `ls`
+# successfully read and found empty".
 #
 # Deliberately NOT `find $path -type f | wc -l` (or any recursive walk): `find` does not descend
 # into a directory reached via a symlink, so a destination that IS a symlink to a populated
 # external directory reads as empty — the exact gap that let an unguarded `cp -R` clobber real
 # external data with neither --force nor a warning. `ls -A` resolves the given path exactly the
 # way `cp`/`git rm --cached`/every other tool here will, so its emptiness answer cannot diverge
-# from theirs the way `find`'s can.
+# from theirs the way `find`'s can — but `ls`'s own exit status must be checked too: a failing
+# `ls` produces empty stdout the same way a genuinely empty directory does, and reading THAT
+# emptiness as "safe" is the identical failure class this function exists to close.
 sdlc_mm_dir_occupied() {
-  local p="$1"
+  local p="$1" listing rc
   if [ -d "$p" ]; then
-    [ -n "$(ls -A "$p" 2>/dev/null)" ] && return 0
+    listing="$(ls -A "$p" 2>/dev/null)"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      return 0
+    fi
+    [ -n "$listing" ] && return 0
     return 1
   fi
   { [ -e "$p" ] || [ -L "$p" ]; } && return 0
@@ -381,12 +391,31 @@ sdlc_mm_main() {
     local reset_rc
     git -C "$repo_root" reset -q --pathspec-from-file="$list_file" --pathspec-file-nul 2>/dev/null
     reset_rc=$?
+    # In BOTH branches below, re-running this script is NOT the fix: the destination at
+    # $dest_root already holds a full, verified copy from the successful copy+verify step
+    # earlier in THIS run, so a bare re-run refuses at the occupancy gate ("pass --force to
+    # merge into it"), and --force then refuses at the collision scan (every tracked path
+    # already exists there). Recovery is by hand instead — precise commands, not a hand-wave.
     if [ "$reset_rc" -eq 0 ]; then
-      printf 'migrate-memory-root: index restored; inspect %s manually (some files may already be gone) and re-run once the underlying issue is fixed\n' \
-        "$repo_root/.claude/memories" >&2
+      printf 'migrate-memory-root: index restored — the corpus is tracked again, but the working tree may now be PARTIALLY deleted. Recovery (the destination at %s already holds a verified copy — do not re-run this script against it, it will correctly refuse):\n' \
+        "$dest_root" >&2
+      printf '  1. git -C %s checkout -- .claude/memories/agents .claude/memories/reviews   # restores any partially-deleted tracked files\n' \
+        "$repo_root" >&2
+      printf '  2. fix whatever caused step 3 below to fail (permissions, a lock, ...)\n' >&2
+      printf '  3. git -C %s rm -r --cached -- .claude/memories/agents .claude/memories/reviews && rm -rf %s %s && git -C %s commit -m "chore(memory): migrate agent and review memory corpus to the external memory root" -- .claude/memories/agents .claude/memories/reviews\n' \
+        "$repo_root" "$repo_root/.claude/memories/agents" "$repo_root/.claude/memories/reviews" "$repo_root" >&2
+      printf '  (or, to start over instead: clear %s and re-run this script)\n' "$dest_root" >&2
     else
-      printf 'migrate-memory-root: index restoration FAILED (git reset exit=%s) — the removal may still be staged; run `git reset -- .claude/memories/agents .claude/memories/reviews` manually before doing anything else, then re-run once the underlying issue is fixed\n' \
-        "$reset_rc" >&2
+      printf 'migrate-memory-root: index restoration FAILED (git reset exit=%s) — the removal may still be staged AND the working tree may be partially deleted. Recovery (the destination at %s already holds a verified copy — do not re-run this script against it, it will correctly refuse):\n' \
+        "$reset_rc" "$dest_root" >&2
+      printf '  1. git -C %s reset -- .claude/memories/agents .claude/memories/reviews    # un-stage the removal\n' \
+        "$repo_root" >&2
+      printf '  2. git -C %s checkout -- .claude/memories/agents .claude/memories/reviews  # restore any partially-deleted files\n' \
+        "$repo_root" >&2
+      printf '  3. fix whatever caused the working-tree delete to fail (permissions, a lock, ...)\n' >&2
+      printf '  4. git -C %s rm -r --cached -- .claude/memories/agents .claude/memories/reviews && rm -rf %s %s && git -C %s commit -m "chore(memory): migrate agent and review memory corpus to the external memory root" -- .claude/memories/agents .claude/memories/reviews\n' \
+        "$repo_root" "$repo_root/.claude/memories/agents" "$repo_root/.claude/memories/reviews" "$repo_root" >&2
+      printf '  (or, to start over instead: clear %s and re-run this script)\n' "$dest_root" >&2
     fi
     return 1
   fi
