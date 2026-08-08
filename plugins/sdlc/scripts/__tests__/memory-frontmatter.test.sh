@@ -335,9 +335,11 @@ rm -rf "$cf_tmp"
 # --- NA-103 Critical 1: AC5 + AC2 combined to kill AC3 — a fresh CI checkout has NOTHING tracked
 # under `.claude/memories/` (AC5 deletes the last tracked file), so the resolver's SKIP path used
 # to `exit 0` BEFORE the docs/adr/*.md frontmatter loop ever ran, silently disabling the only ADR
-# frontmatter guard in the repo. This is a base-vs-head comparison against the actual commit the
-# defect shipped in (74a3bdc), not a message assertion — it proves the OLD script misses a planted
-# violation and the CURRENT script catches it, on the identical fixture.
+# frontmatter guard in the repo. This is a base-vs-head comparison, not a message assertion — it
+# proves the OLD script misses a planted violation and the CURRENT script catches it, on the
+# identical fixture. "Base" is reconstructed by re-mutating the LIVE, checked-out script (re-insert
+# the one `exit 0` the fix removed) rather than `git show <sha>:...` — self-contained, no
+# dependency on any commit staying reachable after this branch merges (re-review Minor finding).
 c1_tmp="$(mktemp -d)"; c1_tmp="$(cd "$c1_tmp" && pwd -P)"
 
 # Fresh-CI-checkout fixture: a git repo with NOTHING under .claude/memories/ (not even the
@@ -356,10 +358,17 @@ EOF
 git -C "$c1_repo" -c user.email=t@t -c user.name=t add -A
 git -C "$c1_repo" -c user.email=t@t -c user.name=t commit -q -m "fresh checkout fixture"
 
-# Base (74a3bdc): extract check-frontmatter.sh as it shipped, alongside the (unchanged since)
-# memory-root.sh it sources — both scripts are hermetic, no `../agents/` dependency.
+# Base: the live check-frontmatter.sh with the historical bug re-inserted — an `exit 0` right
+# after the SKIP line, exactly as it read before this fix. Derived from today's actual file (never
+# a frozen duplicate that can drift), and asserted below to have actually applied.
 c1_base_dir="$c1_tmp/base-scripts"; mkdir -p "$c1_base_dir"
-git -C "$here" show 74a3bdc:plugins/sdlc/scripts/check-frontmatter.sh > "$c1_base_dir/check-frontmatter.sh"
+awk '{print} /SKIP: no memory root/{print "  exit 0"}' "$check_frontmatter" > "$c1_base_dir/check-frontmatter.sh"
+if grep -A1 -F 'SKIP: no memory root' "$c1_base_dir/check-frontmatter.sh" | grep -qF 'exit 0'; then
+  echo "PASS: base mutation actually re-inserted the historical exit 0 after the SKIP line"
+else
+  echo "FAIL: base mutation did not apply — the SKIP line's shape in check-frontmatter.sh changed; update this test's awk pattern"
+  failures=$((failures + 1))
+fi
 cp "$scripts_dir/memory-root.sh" "$c1_base_dir/memory-root.sh"
 chmod +x "$c1_base_dir/check-frontmatter.sh"
 
@@ -372,9 +381,9 @@ run_c1() { # $1 = script path
 
 base_out="$(run_c1 "$c1_base_dir/check-frontmatter.sh" 2>&1)"; base_rc=$?
 if [ "$base_rc" -eq 0 ]; then
-  echo "PASS: base (74a3bdc) reproduces the defect — exits 0, missing the planted bad ADR"
+  echo "PASS: base (pre-fix mutation) reproduces the defect — exits 0, missing the planted bad ADR"
 else
-  echo "FAIL: base (74a3bdc) did not reproduce the defect — expected exit 0, got $base_rc: $base_out"
+  echo "FAIL: base (pre-fix mutation) did not reproduce the defect — expected exit 0, got $base_rc: $base_out"
   failures=$((failures + 1))
 fi
 

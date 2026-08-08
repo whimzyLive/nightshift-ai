@@ -261,6 +261,18 @@ case "$own_domain_line" in
   *)                    bad "(T3m5) domain-agent-handoff.md's own-domain line" "payload-file not found at all: $own_domain_line" ;;
 esac
 
+# --- T3m6 (NA-103 re-review): whole-plugins/sdlc/refs/ sweep — no ref may instruct a shared/
+# counter-only payload to omit `agent:`. This was the actual QA re-review finding: the shared/ >= 2
+# agents check is unconditional post-Important-3, so any ref still telling an agent to omit
+# `agent:` (or claiming a counter-only capture "legitimately carries an empty agent") sends every
+# reader of that ref into a guaranteed rc=1/lost-capture, exactly as capture-learning.sh's own
+# behaviour changed underneath it.
+refs_dir="$scripts/../refs"
+stale_hits="$(grep -rlE 'must omit .?agent:|omit `?agent:`?|carries an empty `?agent`?' "$refs_dir" 2>/dev/null)"
+[ -z "$stale_hits" ] \
+  && ok "(T3m6) no plugins/sdlc/refs/ file instructs omitting agent: for a counter-only capture" \
+  || bad "(T3m6) stale omit-agent instruction survives in refs/" "found in: $stale_hits"
+
 cat > "$tmp/round.md" <<'EOF'
 ---
 domains: [web-engineer]
