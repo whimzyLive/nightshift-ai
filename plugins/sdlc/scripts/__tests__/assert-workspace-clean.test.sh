@@ -251,9 +251,20 @@ seed_initialised_memories() {
 # a violation — snapshot -> write a capture (default SDLC_CAPTURE_ROOT resolution) -> assert OK.
 c10="$work/c10"; repo10="$c10/repo"; make_repo "$repo10"; seed_initialised_memories "$repo10"
 cap_script="$scripts_dir/capture-learning.sh"
+# NA-103: capture-learning.sh now validates the 7-field rule schema on the payload at write time —
+# every capture written by this test file's setup steps needs a well-formed payload.
+cap_payload="$work/cap-payload.md"
+cat > "$cap_payload" <<'EOF'
+---
+trigger: [a triggering situation]
+rule: When X happens, do Y.
+evidence: [AB-1]
+uses: 0
+---
+EOF
 snap_out="$(run_in "$c10" snapshot "$repo10")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
-cap_out10="$( cd "$c10" && SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test AB-1 )"
+cap_out10="$( cd "$c10" && SDLC_CAPTURE_ROOT="$repo10/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test AB-1 "$cap_payload" )"
 printf '%s' "$cap_out10" | grep -q '^CAPTURED=' \
   && pass "Case 10 setup: the capture actually wrote a file" \
   || fail "Case 10 setup: capture-learning.sh did not print CAPTURED=" "got '$cap_out10'"
@@ -271,7 +282,7 @@ fi
 c11="$work/c11"; repo11="$c11/repo"; make_repo "$repo11"; seed_initialised_memories "$repo11"
 snap_out="$(run_in "$c11" snapshot "$repo11")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
-( cd "$c11" && SDLC_CAPTURE_ROOT="$repo11/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test-2 AB-1 >/dev/null )
+( cd "$c11" && SDLC_CAPTURE_ROOT="$repo11/.claude/memories/captured" bash "$cap_script" rule web-engineer/na98-fixround-test-2 AB-1 "$cap_payload" >/dev/null )
 printf 'not a capture\n' > "$repo11/stray-file.txt"
 assert_out="$(SDLC_CAPTURE_ROOT="$repo11/.claude/memories/captured" run_in "$c11" assert "$repo11" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
@@ -288,7 +299,7 @@ c12="$work/c12"; repo12="$c12/repo"; make_repo "$repo12"
 custom_root="$repo12/tmp-capture-override"
 snap_out="$(run_in "$c12" snapshot "$repo12")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
-cap_out12="$( cd "$c12" && SDLC_CAPTURE_ROOT="$custom_root" bash "$cap_script" rule web-engineer/na98-fixround-test-3 AB-1 )"
+cap_out12="$( cd "$c12" && SDLC_CAPTURE_ROOT="$custom_root" bash "$cap_script" rule web-engineer/na98-fixround-test-3 AB-1 "$cap_payload" )"
 printf '%s' "$cap_out12" | grep -q '^CAPTURED=' \
   && pass "Case 12 setup: the capture actually wrote a file" \
   || fail "Case 12 setup: capture-learning.sh did not print CAPTURED=" "got '$cap_out12'"
@@ -312,7 +323,7 @@ run13() { # remaining args passed to the script under test, with the root pinned
 snap_out="$(run13 snapshot "$repo13")"
 state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
 cap_out13="$( cd "$c13" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$mem13" \
-  bash "$cap_script" rule web-engineer/na101-default-root AB-1 )"
+  bash "$cap_script" rule web-engineer/na101-default-root AB-1 "$cap_payload" )"
 printf '%s' "$cap_out13" | grep -q "^CAPTURED=$mem13/captured/" \
   && pass "Case 13 setup: the default-root capture landed outside the primary checkout" \
   || fail "Case 13 setup: capture did not land in the resolved root — got '$cap_out13'"
@@ -325,9 +336,11 @@ else
   fail "default resolved root tripped the guard — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
 fi
 
-# --- Case 14 (PR #234 review, Minor): a repo with a PRE-EXISTING legacy in-repo staging dir
-# (content staged there before this story's write retarget landed) must not silently flip
-# PRIMARY_PRE_DIRTY / trip the guard, even though SDLC_MEMORY_ROOT points somewhere else entirely.
+# --- Case 14 (NA-103): the legacy `.claude/memories/captured` carve-out is DELETED — a repo with
+# a pre-existing legacy in-repo staging dir now correctly flips PRIMARY_PRE_DIRTY and trips the
+# guard, exactly like any other untracked content would. Pre-NA-103 this carve-out hid such content
+# (see PR #234); NA-103 removes it since the tracked-corpus migration (NA-102) means that path
+# should hold nothing but the (now also deleted) .gitignore marker in a migrated repo.
 c14="$work/c14"; repo14="$c14/repo"; make_repo "$repo14"; seed_initialised_memories "$repo14"
 mem14="$work/c14-memroot"          # hermetic; unrelated to the legacy in-repo path below
 mkdir -p "$repo14/.claude/memories/captured/rules"
@@ -355,10 +368,50 @@ pre_dirty="$(get_field "$snap_out" PRIMARY_PRE_DIRTY)"
 assert_out="$(run14 assert "$repo14" "$state_file")"; assert_rc=$?
 integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
 violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
-if [ "$pre_dirty" = "false" ] && [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
-  pass "a pre-existing legacy in-repo staging dir never flips PRIMARY_PRE_DIRTY or trips the guard"
+# The carve-out's removal is proven by PRIMARY_PRE_DIRTY itself: pre-NA-103 this content was
+# filtered out of porcelain entirely, so PRIMARY_PRE_DIRTY read false even with real content
+# sitting there. A rerun of the snapshot's own status at assert time is unchanged dirt, so it's
+# still a pass (Case 2's already-established "same dirt persists -> OK" semantics) — the NEW
+# behaviour under test is that this content is now VISIBLE at all, not that it re-trips the guard
+# on its own.
+if [ "$pre_dirty" = "true" ] && [ "$assert_rc" -eq 0 ] && [ "$integrity" = "OK" ] && [ "$violation" = "none" ]; then
+  pass "a pre-existing legacy in-repo staging dir now flips PRIMARY_PRE_DIRTY true (NA-103 carve-out removal)"
 else
-  fail "pre-existing legacy staging dir tripped the guard — got pre_dirty=$pre_dirty assert_rc=$assert_rc integrity=$integrity violation=$violation (want false/OK/none)"
+  fail "pre-existing legacy staging dir did not flip PRIMARY_PRE_DIRTY — got pre_dirty=$pre_dirty assert_rc=$assert_rc integrity=$integrity violation=$violation (want true/OK/none)"
+fi
+
+# --- Case 14b (NA-103): NEW content appearing at the legacy path AFTER snapshot now trips the
+# guard exactly like a stray file anywhere else (Case 11) — the removed carve-out is not a general
+# passthrough, it simply no longer special-cases this one path.
+c14b="$work/c14b"; repo14b="$c14b/repo"; make_repo "$repo14b"; seed_initialised_memories "$repo14b"
+mem14b="$work/c14b-memroot"
+run14b() { ( cd "$c14b" && env -u SDLC_CAPTURE_ROOT -u SDLC_SESSION_KEY -u CLAUDE_CODE_SESSION_ID \
+    SDLC_MEMORY_ROOT="$mem14b" bash "$script" "$@" ); }
+snap_out="$(run14b snapshot "$repo14b")"
+state_file="$(get_field "$snap_out" PRIMARY_STATE_FILE)"
+mkdir -p "$repo14b/.claude/memories/captured/rules"
+cat > "$repo14b/.claude/memories/captured/rules/AB-1--new-legacy-capture.md" <<'EOF'
+---
+id: new-legacy-capture
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: Staged at the legacy path after this story landed.
+evidence: [AB-1]
+uses: 0
+status: captured
+captured: 2026-08-08T00:00:00Z
+story: AB-1
+origin: domain-agent
+promote-target: agents/web-engineer/new-legacy-capture.md
+---
+EOF
+assert_out="$(run14b assert "$repo14b" "$state_file")"; assert_rc=$?
+integrity="$(get_field "$assert_out" WORKSPACE_INTEGRITY)"
+violation="$(get_field "$assert_out" WORKSPACE_VIOLATION)"
+if [ "$assert_rc" -eq 0 ] && [ "$integrity" = "VIOLATED" ] && [ "$violation" = "worktree-changed" ]; then
+  pass "new content staged at the legacy path after snapshot now trips the guard (NA-103 carve-out removal)"
+else
+  fail "new legacy-path content did not trip the guard — got assert_rc=$assert_rc integrity=$integrity violation=$violation (want VIOLATED/worktree-changed)"
 fi
 
 echo

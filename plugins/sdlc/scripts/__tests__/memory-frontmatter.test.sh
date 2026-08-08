@@ -228,15 +228,15 @@ else
   echo "FAIL: per-root count line missing"; failures=$((failures + 1))
 fi
 
-# neither root present -> the new absent-root line, exit 0
+# neither root present -> the explicit SKIP line (NA-103), exit 0 — never a silent pass
 absent_repo="$cf_tmp/absent"; mkdir -p "$absent_repo"
 git -C "$absent_repo" init -q
 git -C "$absent_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 out="$( cd "$absent_repo" && SDLC_MEMORY_ROOT="$cf_tmp/never-created" bash "$check_frontmatter" 2>&1 )"; rc=$?
-if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF "no memory root present (0 files validated)"; then
-  echo "PASS: absent roots print the new absent-root line and exit 0"
+if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF "SKIP: no memory root"; then
+  echo "PASS: absent roots print the explicit SKIP: no memory root line and exit 0"
 else
-  echo "FAIL: absent-root contract — rc=$rc out='$out'"; failures=$((failures + 1))
+  echo "FAIL: absent-root SKIP contract — rc=$rc out='$out'"; failures=$((failures + 1))
 fi
 
 # resolver failure in dual mode -> RESOLVER-FAILED on stderr, legacy validated anyway, exit 1

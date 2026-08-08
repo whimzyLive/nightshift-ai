@@ -80,7 +80,15 @@ esac
 # T2e2: a capture written from the linked worktree lands in the RESOLVED root, which is outside
 # the git tree entirely — so it necessarily survives `git worktree remove --force` (NA-101
 # strengthens spec D3's claim: the staging root is no longer any checkout).
-wt_cap_out="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" rule web-engineer/survives-worktree-removal AB-1 )"
+cat > "$tmp/wt-payload.md" <<'EOF'
+---
+trigger: [worktree removal]
+rule: When a worktree is removed, the capture must still be found afterward.
+evidence: [AB-1]
+uses: 0
+---
+EOF
+wt_cap_out="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" rule web-engineer/survives-worktree-removal AB-1 "$tmp/wt-payload.md" )"
 wt_cap_file="$wt_mem/captured/rules/AB-1--survives-worktree-removal.md"
 [ "$wt_cap_out" = "CAPTURED=$wt_cap_file" ] && [ -f "$wt_cap_file" ] \
   && ok "(T2e2) capture written from the linked worktree lands in the resolved root" \
@@ -180,10 +188,23 @@ run_cap rule shared/smuggled AB-1 "$tmp/smuggled.md" >/dev/null 2>&1 \
 [ ! -e "$root/rules/AB-1--smuggled.md" ] \
   && ok "(T3g9) rejected smuggle attempt wrote no file" || bad "(T3g9) rejected smuggle attempt" "file exists"
 
-run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null
-[ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3h) '-' writes frontmatter only" || bad "(T3h) frontmatter only" "body present after '-' capture"
-run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
-[ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3i) omitted payload writes frontmatter only" || bad "(T3i) omitted payload" "body present"
+# T3h/T3i (NA-103): '-' and an omitted payload both mean "no content" — for an EXISTING rule
+# capture this is now a malformed (schema-empty) re-capture and is refused by the 7-field schema
+# check, leaving the already-captured file (with its real trigger/rule/evidence) untouched rather
+# than blanked out. Pre-NA-103 these silently overwrote the file with empty fields; verified below.
+before_body="$(cat "$f")"
+run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null 2>&1 \
+  && bad "(T3h) '-' (no content) re-capture of an existing rule is refused" "exited 0" \
+  || ok "(T3h) '-' (no content) re-capture of an existing rule is refused"
+[ "$(cat "$f")" = "$before_body" ] \
+  && ok "(T3h2) the existing capture is left untouched by the refused '-' re-capture" \
+  || bad "(T3h2) existing capture untouched by refused '-' re-capture" "content changed"
+run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null 2>&1 \
+  && bad "(T3i) an omitted-payload re-capture of an existing rule is refused" "exited 0" \
+  || ok "(T3i) an omitted-payload re-capture of an existing rule is refused"
+[ "$(cat "$f")" = "$before_body" ] \
+  && ok "(T3i2) the existing capture is left untouched by the refused omitted-payload re-capture" \
+  || bad "(T3i2) existing capture untouched by refused omitted-payload re-capture" "content changed"
 
 run_cap rule web-engineer/Not_Kebab AB-1 >/dev/null 2>&1 \
   && bad "(T3j) non-kebab rule id rejected" "exited 0" || ok "(T3j) non-kebab rule id rejected"
@@ -219,7 +240,9 @@ pr="$(extract_fm "$rf" | parse_frontmatter)"
 run_cap review AB-1 2026-08-04 1 >/dev/null
 [ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
 
-run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
+# A genuine re-capture (same id, a valid full payload again) is a same-path overwrite, not a
+# second file — NA-103's schema check doesn't change this, since this payload is well-formed.
+run_cap rule web-engineer/capture-before-commit AB-1 "$tmp/payload.md" >/dev/null
 [ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 3 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
 
 # --- T3s: a failed write is reported as a failure, never a false CAPTURED= (Critical 1) -----
@@ -249,7 +272,9 @@ run_cap rule web-engineer/story-key-check 'feat/NA-98' >/dev/null 2>&1 \
 run_cap rule web-engineer/story-key-check 'ab-1' >/dev/null 2>&1 \
   && bad "(T3t4) a lowercase story key is rejected (rule)" "exited 0" \
   || ok "(T3t4) a lowercase story key is rejected (rule)"
-run_cap rule web-engineer/story-key-check 'AB-1' >/dev/null 2>&1 \
+# NA-103: a well-formed-story-key write also needs a schema-valid payload now — use payload.md
+# (already valid trigger/rule/evidence) so this test isolates the story-key assertion alone.
+run_cap rule web-engineer/story-key-check 'AB-1' "$tmp/payload.md" >/dev/null 2>&1 \
   && ok "(T3t5) a well-formed story key is accepted (rule)" \
   || bad "(T3t5) well-formed story key accepted (rule)" "exited non-zero"
 run_cap review '../../escaped' 2026-08-04 1 >/dev/null 2>&1 \
@@ -290,6 +315,117 @@ r1_after2="$(field_value "$(extract_fm "$r1f" | parse_frontmatter)" issue_count)
 [ "$r1_before" = "$r1_after2" ] \
   && ok "(T3u6) round 1's capture survives a rejected overflowing round" \
   || bad "(T3u6) round 1 survives overflow round" "issue_count changed from '$r1_before' to '$r1_after2'"
+
+# --- T3v (NA-103): the 7-field rule schema (trigger/rule/evidence) is validated on the payload
+# at write time — a malformed capture is refused, never silently written with blank/bad fields.
+# Uses its own root + story AB-2 so it never perturbs T4's AB-1-scoped counts below.
+schema_root="$tmp/schema-root"
+run_schema() { SDLC_CAPTURE_ROOT="$schema_root" bash "$cap" "$@"; }
+
+cat > "$tmp/schema-good.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-good AB-2 "$tmp/schema-good.md" >/dev/null 2>&1 \
+  && ok "(T3v0) a well-formed 7-field payload is accepted" \
+  || bad "(T3v0) well-formed payload accepted" "exited non-zero"
+[ -f "$schema_root/rules/AB-2--schema-good.md" ] \
+  && ok "(T3v0b) well-formed payload file written" || bad "(T3v0b) well-formed payload file written" "file missing"
+
+cat > "$tmp/schema-no-trigger.md" <<'EOF'
+---
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-no-trigger AB-2 "$tmp/schema-no-trigger.md" >/dev/null 2>&1 \
+  && bad "(T3v1) a payload with no trigger is rejected" "exited 0" \
+  || ok "(T3v1) a payload with no trigger is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-no-trigger.md" ] \
+  && ok "(T3v1b) rejected no-trigger capture wrote no file" || bad "(T3v1b) rejected no-trigger wrote no file" "file exists"
+
+cat > "$tmp/schema-too-many-triggers.md" <<'EOF'
+---
+trigger: [a, b, c, d, e, f, g]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-too-many-triggers AB-2 "$tmp/schema-too-many-triggers.md" >/dev/null 2>&1 \
+  && bad "(T3v2) a 7-item trigger list is rejected" "exited 0" \
+  || ok "(T3v2) a 7-item trigger list is rejected"
+
+cat > "$tmp/schema-no-rule.md" <<'EOF'
+---
+trigger: [one situation]
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-no-rule AB-2 "$tmp/schema-no-rule.md" >/dev/null 2>&1 \
+  && bad "(T3v3) an empty rule is rejected" "exited 0" \
+  || ok "(T3v3) an empty rule is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-no-rule.md" ] \
+  && ok "(T3v3b) rejected empty-rule capture wrote no file" || bad "(T3v3b) rejected empty-rule wrote no file" "file exists"
+
+long_rule="When $(printf 'x%.0s' $(seq 1 220)), do Y."
+cat > "$tmp/schema-long-rule.md" <<EOF
+---
+trigger: [one situation]
+rule: $long_rule
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-long-rule AB-2 "$tmp/schema-long-rule.md" >/dev/null 2>&1 \
+  && bad "(T3v4) a rule over 200 chars is rejected" "exited 0" \
+  || ok "(T3v4) a rule over 200 chars is rejected"
+
+cat > "$tmp/schema-no-evidence.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-no-evidence AB-2 "$tmp/schema-no-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v5) empty evidence is rejected" "exited 0" \
+  || ok "(T3v5) empty evidence is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-no-evidence.md" ] \
+  && ok "(T3v5b) rejected empty-evidence capture wrote no file" || bad "(T3v5b) rejected empty-evidence wrote no file" "file exists"
+
+cat > "$tmp/schema-bad-evidence.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [not-a-real-evidence-token]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-bad-evidence AB-2 "$tmp/schema-bad-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v6) a malformed evidence item is rejected" "exited 0" \
+  || ok "(T3v6) a malformed evidence item is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-bad-evidence.md" ] \
+  && ok "(T3v6b) rejected bad-evidence capture wrote no file" || bad "(T3v6b) rejected bad-evidence wrote no file" "file exists"
+
+# a counter-only update (uses+evidence only, no rule/agent) is exempt from the 7-field content
+# check on BOTH own-dir and shared/ targets — this re-increments an already-promoted rule, whose
+# trigger/rule content lives at the promotion target, not in this staged capture.
+cat > "$tmp/schema-counter-only.md" <<'EOF'
+---
+uses: 3
+evidence: [AB-2]
+---
+EOF
+run_schema rule web-engineer/schema-good AB-2 "$tmp/schema-counter-only.md" >/dev/null 2>&1 \
+  && ok "(T3v7) an own-dir counter-only update is exempt from the 7-field content check" \
+  || bad "(T3v7) own-dir counter-only exemption" "exited non-zero"
 
 # --- T4: list-captured --------------------------------------------------------
 lst="$scripts/list-captured.sh"

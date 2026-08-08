@@ -75,6 +75,43 @@ payload_has_field() {              # $1 = payload path or empty; $2 = key
   [ -n "$1" ] || return 1
   has_field "$(extract_fm "$1" | parse_frontmatter)" "$2"
 }
+csv_len() {                        # $1 = comma-joined list (possibly empty) -> item count
+  [ -n "$1" ] && printf '%s' "$1" | awk -F',' '{print NF}' || printf '0'
+}
+valid_evidence_item() {            # $1 = one evidence token -> 0 if Jira key | PR#n | 7-40 char SHA
+  [[ "$1" =~ ^[A-Z][A-Z0-9]+-[0-9]+$ ]] && return 0
+  [[ "$1" =~ ^PR#[0-9]+$ ]] && return 0
+  [[ "$1" =~ ^[0-9a-f]{7,40}$ ]] && return 0
+  return 1
+}
+is_counter_only_payload() {        # $1 = payload path or empty -> 0 if a counter-only update
+  payload_has_field "$1" uses && ! payload_has_field "$1" rule \
+    && ! payload_has_field "$1" agent && ! payload_has_field "$1" trigger
+}
+validate_rule_payload_schema() {   # $1 = payload path or empty; dies on a non-7-field-shaped payload
+  local payload="$1" trig trig_n rule_val evidence_val evidence_n item IFS_OLD
+  trig="$(payload_fm "$payload" trigger "")"
+  trig_n="$(csv_len "$trig")"
+  { [ "$trig_n" -ge 1 ] && [ "$trig_n" -le 6 ]; } \
+    || die "capture-learning.sh: payload trigger must have 1-6 items, got $trig_n; wrote nothing"
+
+  rule_val="$(payload_fm "$payload" rule "")"
+  [ -n "$rule_val" ] \
+    || die "capture-learning.sh: payload rule is empty; wrote nothing"
+  [ "${#rule_val}" -le 200 ] \
+    || die "capture-learning.sh: payload rule exceeds 200 chars (${#rule_val}); wrote nothing"
+
+  evidence_val="$(payload_fm "$payload" evidence "")"
+  evidence_n="$(csv_len "$evidence_val")"
+  [ "$evidence_n" -ge 1 ] \
+    || die "capture-learning.sh: payload evidence must have >= 1 item, got $evidence_n; wrote nothing"
+  IFS_OLD="$IFS"; IFS=','
+  for item in $evidence_val; do
+    valid_evidence_item "$item" \
+      || { IFS="$IFS_OLD"; die "capture-learning.sh: payload evidence item '$item' is not a Jira key, PR#n, or 7-40 char SHA; wrote nothing"; }
+  done
+  IFS="$IFS_OLD"
+}
 
 root="$(resolve_capture_root)" || exit 1
 ensure_capture_root "$root"
@@ -99,20 +136,22 @@ case "$kind" in
       n="$(basename "$a" .md)"; [ "$n" = "principal-engineer" ] || valid="$valid$n "
     done
     case "$valid" in *" $dir "*) : ;; *) die "capture-learning.sh: unknown target dir '$dir'; wrote nothing" ;; esac
+    counter_only=0
+    is_counter_only_payload "$payload" && counter_only=1
     if [ "$dir" = "shared" ]; then
       agents="$(payload_fm "$payload" agent "")"
-      counter_only=0
-      payload_has_field "$payload" uses && ! payload_has_field "$payload" rule \
-        && ! payload_has_field "$payload" agent && counter_only=1
       if [ "$counter_only" -eq 0 ]; then
-        agents_n=0
-        [ -n "$agents" ] && agents_n="$(printf '%s' "$agents" | awk -F',' '{print NF}')"
+        agents_n="$(csv_len "$agents")"
         [ "$agents_n" -ge 2 ] \
           || die "capture-learning.sh: agents/shared/ capture needs >= 2 agents in the payload's 'agent:' list (got [$agents]); wrote nothing"
       fi
     else
       agents="$dir"
     fi
+    # 7-field rule schema (trigger/rule/evidence) is validated at write time — a counter-only
+    # update (uses+evidence only, re-incrementing an already-promoted rule) is exempt, since it
+    # deliberately carries no trigger/rule content of its own; distill merges it into the target.
+    [ "$counter_only" -eq 0 ] && validate_rule_payload_schema "$payload"
     dest="$root/rules/$story--$rid.md"
     content="$(
       printf -- '---\n'

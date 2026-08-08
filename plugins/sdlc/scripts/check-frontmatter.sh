@@ -162,7 +162,7 @@ add_offender() { offenders+="$1"$'\n'; }
 add_warning() { warnings+="$1"$'\n'; }
 
 if [ -z "$mem_roots" ] && [ "$resolver_failed" -eq 0 ]; then
-  echo "check-frontmatter: OK — no memory root present (0 files validated)"
+  echo "check-frontmatter: SKIP: no memory root — nothing to validate (0 files)"
   exit 0
 fi
 
