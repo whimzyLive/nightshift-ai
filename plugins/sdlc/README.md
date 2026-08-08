@@ -77,7 +77,7 @@ Decision Record curation under `docs/adr/**`. Runs behind `/sdlc:docs` in two mo
 accumulated learnings corpus for promotable candidates) — through one shared draft →
 propose-tags → founder-confirm → write → regenerate-index → commit/PR pipeline defined once in
 `refs/adr-pipeline.md`. It also owns the founder-gated deletion of promoted raw learning entries
-from `.claude/memories/**` during a distill PR, sanctioned as Exception 2 in
+from `<memory-root>/**` during a distill PR, sanctioned as Exception 2 in
 `analyze-protocol.md`'s memory-ownership rules. Domain agents (and `qa-engineer`) read their own
 section of the deterministically-regenerated `docs/adr/index.md` instead of re-deriving
 conventions or re-appending a learning an accepted ADR already covers.
@@ -95,7 +95,7 @@ ADR only — the confirmed rule entries' `status: promoted` flip and eventual de
 to the `ai-enablement-engineer` maintenance op (`refs/memory-maintenance.md`), not done in the
 ADR-authoring PR. `/sdlc:docs seed adr "<pattern>"` seeds inline with no corpus read;
 `/sdlc:docs distill ["<focus>"]` consumes the maintenance op's mechanically-nominated rule
-candidate list plus per-round review files (`.claude/memories/reviews/*.md`), PR review threads,
+candidate list plus per-round review files (`<memory-root>/reviews/*.md`), PR review threads,
 commit history, and claude-mem observations, promoting a candidate only on recurrence, cross-agent
 relevance, or durable convention. Both are special routes on `/sdlc:docs` — `seed adr` branches
 before the generic seed machinery and `distill` is not a member of the four generic doc-generation

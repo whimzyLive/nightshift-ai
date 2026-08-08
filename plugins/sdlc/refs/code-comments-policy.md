@@ -9,7 +9,7 @@ the displaced content belongs.
 ## Why
 
 This project's SDLC already captures evolving, non-obvious context as per-rule memory files
-(`.claude/memories/agents/<agent>/<rule-id>.md`, or `agents/shared/` for cross-domain rules) — a
+(`<memory-root>/agents/<agent>/<rule-id>.md`, or `agents/shared/` for cross-domain rules) — a
 record that is actively kept current across stories. A code comment that narrates or explains
 carries the same kind of information through a second, uncoordinated channel: it has no update
 discipline of its own, drifts out of sync with the code around it, and can end up silently
@@ -55,7 +55,7 @@ slightly less narrated, it's informative — don't add it; move any real content
 
 Anything a comment would have explained that's actually worth keeping — a non-obvious decision, a
 workaround and its reason, a gotcha future work would otherwise re-discover the hard way — becomes
-a rule entry (`.claude/memories/agents/<agent>/<rule-id>.md`, or `agents/shared/` when it binds
+a rule entry (`<memory-root>/agents/<agent>/<rule-id>.md`, or `agents/shared/` when it binds
 more than one agent) per `domain-agent-handoff.md`'s "Memory write" step and admission test, not
 left inline in the diff. Not every displaced comment clears the admission test — when it doesn't,
 the content is simply dropped, not force-fit into a rule entry.

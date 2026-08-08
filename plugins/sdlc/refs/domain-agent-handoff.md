@@ -21,7 +21,7 @@ If either check fails → return immediately (full 5-line blocked shape — see 
 
 ## Branch and PR — do not create
 
-The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Your responsibility is to add commits on this branch — nothing else.
+The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Add commits on this branch only.
 
 ## Context reuse
 
@@ -71,13 +71,15 @@ and read the returned paths yourself. Never paste rule text into a prompt — a 
 than the content it points at.
 
 ```text
-own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<payload-file>]
+own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> <payload-file>
 cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared/<rule-id> <STORY-KEY> <payload-file>   # the payload file's `agent:` lists every agent it binds
 <rule-id> := kebab-case, MUST equal the capture's `id`
+<payload-file> := REQUIRED (NA-103) — the 7-field schema only comes from one
 ```
 
-Prints `CAPTURED=<path>` into the gitignored staging area in the primary checkout. You never write
-`.claude/memories/agents/**` directly — a file lands there only once a human promotes a capture
+Prints `CAPTURED=<path>` into the gitignored staging area. Non-zero exit = refused; read the
+message, fix, retry — never move on. You never write `<memory-root>/agents/**` (see
+`refs/memory-maintenance.md`) directly — a file lands there only once a human promotes a capture
 through `/sdlc:docs distill`.
 
 `<payload-file>` carries YAML frontmatter — `trigger`/`rule`/`evidence`/`uses` (`agent` too for
@@ -88,7 +90,7 @@ Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, v
 
 ```yaml
 ---
-id: <kebab-case, equals the filename stem, unique across .claude/memories/agents/**>
+id: <kebab-case, equals the filename stem, unique across <memory-root>/agents/**>
 agent: [<agent-name>, ...] # exactly [<your-name>] under your own dir; length >= 2 under shared/
 trigger: [<phrase>, ...] # 1-6 lowercase keyword phrases naming the situation this fires in
 rule: When <condition>, <action>. # ONE line, <= 200 chars
@@ -123,6 +125,7 @@ of existing config, and any entry that only makes sense with the originating sto
 
 ```text
 rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <payload-file: `uses: 1`, `evidence: [<STORY-KEY>]`>   # promotion merges into the target's count
+shared/ counter-only STILL needs `agent:` >= 2 (NA-103) — only trigger/rule is exempt
 ```
 
 ## Domain verification

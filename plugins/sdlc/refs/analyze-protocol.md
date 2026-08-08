@@ -4,6 +4,9 @@ Shared scan/apply protocol for the `ai-enablement-engineer` agent and the `/sdlc
 Neither file duplicates this logic — both reference the anchor headings below. This ref exists so
 the drift/gap rules, ownership resolution, and apply flow are defined exactly once.
 
+`<memory-root>` := `bash ${CLAUDE_PLUGIN_ROOT}/scripts/memory-root.sh --print-root` (see
+`refs/memory-maintenance.md`).
+
 ## Ownership-resolution rules
 
 **Runtime rule (verbatim):** effective write-scope = (config-driven AI-config surface ∪
@@ -37,7 +40,7 @@ scan protocol, `/sdlc:analyze`) resolves against this one definition.
   - `.claude/project/project-context.md` (source of ownership truth; rewriting it would be
     circular)
   - `.claude/.*-plugin-root` pointers (environment wiring written by init)
-  - `.claude/memories/agents/<other-agent>/**` (each agent owns its own rule directory; the two
+  - `<memory-root>/agents/<other-agent>/**` (each agent owns its own rule directory; the two
     sanctioned exceptions — the human-arbitrated memory-conflict reset and the founder-gated
     maintenance-op promotion-and-deletion — are enumerated in
     [Memory-ownership exceptions](#memory-ownership-exceptions); both apply only as a reviewable
@@ -82,14 +85,14 @@ write-scope above.
 | Workspace→agent table vs disk | Table lists a path that no longer exists, or an area with no owner |
 | AI-config-file freshness | Documented structure in any owned AI-config convention diverges from disk |
 | Plugin/skill metadata | `SKILL.md` missing required front-matter; `plugin.json`/`marketplace.json` referencing a missing plugin path |
-| **Config-vs-memory semantic conflict** | An owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/etc.) asserts one semantic while agent-learning memory (`.claude/memories/agents/**`) records a contradictory one — see [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution) |
+| **Config-vs-memory semantic conflict** | An owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/etc.) asserts one semantic while agent-learning memory (`<memory-root>/agents/**`) records a contradictory one — see [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution) |
 | Vendored-skill staleness (advisory) | Recorded pinned ref (README) older than reachable upstream — advisory only; refresh is manual |
 | **Skill gaps (AC-6)** | For gaps, run `find-skills` to surface candidates (see [Skill usage guardrails](#skill-usage-guardrails)); if none fit, note `skill-creator` can scaffold one |
 | ~~**Memory bloat (recommendation-only)**~~ | **SUPERSEDED by `memory-gc-overdue` below** (NA-73) — the old recommendation-only "run `/sdlc:docs distill`" finding is replaced by a real gated apply path (the maintenance op) keyed on the retention window, rather than a size/duplication heuristic |
-| **`legacy-memory-layout`** | `.claude/memories/agents/<name>.md` exists as a regular file, and/or `.claude/memories/reviews/patterns.md` exists — v1 flat-diary layout not yet migrated (NA-74). Gated apply path, with the migration instructions inline in the finding |
-| **`malformed-memory-frontmatter`** | `bash plugins/sdlc/scripts/check-frontmatter.sh` exits non-zero against this repo's `.claude/memories/**`. Gated apply — fix the offending frontmatter the script names |
+| **`legacy-memory-layout`** | `<memory-root>/agents/<name>.md` exists as a regular file, and/or `<memory-root>/reviews/patterns.md` exists — v1 flat-diary layout not yet migrated (NA-74). Gated apply path, with the migration instructions inline in the finding |
+| **`malformed-memory-frontmatter`** | `bash plugins/sdlc/scripts/check-frontmatter.sh` exits non-zero against this repo's `<memory-root>/**`. Gated apply — fix the offending frontmatter the script names |
 | **`memory-gc-overdue`** | Any review round file, `deprecated` rule, or `active` rule with `uses: 0` is older than the project's `Review retention window` (`.claude/project/project-context.md` Memory section; dual-form `<n> months` \| `<n> stories`, see `refs/memory-maintenance.md`). Gated apply — run the maintenance op. An active rule with `uses: 0` is NOT GC-eligible while an unpromoted rule capture with the same id exists |
-| **`story-merged-without-review-entry`** | A story key merged into `<BASE-BRANCH>` has no matching `.claude/memories/reviews/*-<KEY>*.md` review round file. Report-only (no write) — surfaces a QA-loop gap, never auto-fabricates a review record. A captured round file for the merged key satisfies this check exactly as a committed one does; report only when neither exists |
+| **`story-merged-without-review-entry`** | A story key merged into `<BASE-BRANCH>` has no matching `<memory-root>/reviews/*-<KEY>*.md` review round file. Report-only (no write) — surfaces a QA-loop gap, never auto-fabricates a review record. A captured round file for the merged key satisfies this check exactly as a committed one does; report only when neither exists |
 
 ## Skill usage guardrails
 
@@ -105,7 +108,7 @@ here, in the agent's own usage of the skill, not in the vendored skill's instruc
 
 ## Memory-ownership exceptions
 
-Each agent owns its own rule directory (`.claude/memories/agents/<name>/**`); writing another
+Each agent owns its own rule directory (`<memory-root>/agents/<name>/**`); writing another
 agent's rule directory is refused by default (see the read-only carve-outs above). Exactly two
 documented, human/founder-gated exceptions are sanctioned — never a silent write, always a
 reviewable diff/PR — plus two further carve-outs that are not cross-agent writes at all and so
@@ -132,11 +135,11 @@ need no gate:
 Two further carve-outs are **not** cross-agent writes and need no gate:
 
 - **Counter-only writes.** A counter-only update is now written as a **capture**
-  (`capture-learning.sh rule ... <payload-file with uses: 1>`, which must omit `agent:` — see the
-  counter-only exemption in `capture-learning.sh`) by any agent that applied the rule under
-  `agents/shared/` — it changes no semantics, so the capture write, and the maintenance op's later
-  promotion-merge of that capture into the target rule, are not treated as writing "another agent's"
-  rule directory.
+  (`capture-learning.sh rule ... <payload-file with uses: 1>`; a `shared/` target still needs
+  `agent:` with >= 2 entries — NA-103, see the counter-only exemption in `capture-learning.sh`) by
+  any agent that applied the rule under `agents/shared/` — it changes no semantics, so the capture
+  write, and the maintenance op's later promotion-merge of that capture into the target rule, are
+  not treated as writing "another agent's" rule directory.
 - **QA rule authorship for the fixing agent.** `qa-engineer` Step 5 (`refs/qa-engineer-playbook.md`)
   now creates `captured/rules/*.md` carrying `agent: [<fixing-agent>]` — **never** a file under
   `agents/<fixing-agent>/` directly — from that round's findings, still bounded to creation only.
@@ -148,7 +151,7 @@ exceptions above (and outside the two no-gate carve-outs) is refused per
 ## Memory-conflict analysis & resolution
 
 Detects where an owned AI-config file asserts one semantic while agent-learning memory
-(`.claude/memories/agents/**`, including `agents/shared/`) records a contradictory one. Neither
+(`<memory-root>/agents/**`, including `agents/shared/`) records a contradictory one. Neither
 side is presumed correct.
 
 **Report format:** conflicts appear in their own section of the analyze report — one entry per
@@ -162,7 +165,7 @@ and each source's file path.
 2. Reset the wrong side to match the chosen source of truth:
    - Wrong side is an owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/…) → edit it via the
      normal [Apply flow](#apply-flow) (reviewable diff/PR).
-   - Wrong side is the agent's **own** memory (`.claude/memories/agents/ai-enablement-engineer/**`
+   - Wrong side is the agent's **own** memory (`<memory-root>/agents/ai-enablement-engineer/**`
      or a rule it owns under `agents/shared/`) → edit it via the same reviewable flow.
    - Wrong side is **another agent's** memory → **Exception 1** in
      [Memory-ownership exceptions](#memory-ownership-exceptions): apply the human-confirmed reset

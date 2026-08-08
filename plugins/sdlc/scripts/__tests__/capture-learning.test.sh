@@ -70,19 +70,28 @@ wt_repo="$(cd "$wt_repo" && pwd -P)"  # canonicalise: git worktree list --porcel
 git -C "$wt_repo" init -q
 git -C "$wt_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 git -C "$wt_repo" worktree add -q "$tmp/linked" -b linked >/dev/null 2>&1
-got="$(cd "$tmp/linked" && bash "$cap" --print-root)"
+wt_mem="$tmp/wt-memroot"
+got="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" --print-root )"
 case "$got" in
-  "$wt_repo"/.claude/memories/captured) ok "(T2e) linked worktree resolves to main checkout" ;;
-  *) bad "(T2e) linked worktree resolves to main checkout" "got '$got'" ;;
+  "$wt_mem"/captured) ok "(T2e) linked worktree resolves to the resolved memory root" ;;
+  *) bad "(T2e) linked worktree resolves to the resolved memory root" "got '$got'" ;;
 esac
 
-# T2e2: a capture written from the linked worktree survives `git worktree remove --force` of
-# that worktree (spec D3's central claim — the staging root is the PRIMARY checkout, never the
-# linked worktree, so removing the worktree must not touch it).
-wt_cap_out="$(cd "$tmp/linked" && bash "$cap" rule web-engineer/survives-worktree-removal AB-1)"
-wt_cap_file="$wt_repo/.claude/memories/captured/rules/AB-1--survives-worktree-removal.md"
+# T2e2: a capture written from the linked worktree lands in the RESOLVED root, which is outside
+# the git tree entirely — so it necessarily survives `git worktree remove --force` (NA-101
+# strengthens spec D3's claim: the staging root is no longer any checkout).
+cat > "$tmp/wt-payload.md" <<'EOF'
+---
+trigger: [worktree removal]
+rule: When a worktree is removed, the capture must still be found afterward.
+evidence: [AB-1]
+uses: 0
+---
+EOF
+wt_cap_out="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" rule web-engineer/survives-worktree-removal AB-1 "$tmp/wt-payload.md" )"
+wt_cap_file="$wt_mem/captured/rules/AB-1--survives-worktree-removal.md"
 [ "$wt_cap_out" = "CAPTURED=$wt_cap_file" ] && [ -f "$wt_cap_file" ] \
-  && ok "(T2e2) capture written from the linked worktree lands in the main checkout" \
+  && ok "(T2e2) capture written from the linked worktree lands in the resolved root" \
   || bad "(T2e2) capture from linked worktree" "got '$wt_cap_out'"
 git -C "$wt_repo" worktree remove --force "$tmp/linked"
 [ ! -d "$tmp/linked" ] \
@@ -128,13 +137,13 @@ p="$(extract_fm "$f" | parse_frontmatter)"
 [ "$(field_value "$p" id)" = "capture-before-commit" ] && ok "(T3b) id derived from arg" || bad "(T3b) id" "got '$(field_value "$p" id)'"
 [ "$(field_value "$p" status)" = "captured" ] && ok "(T3c) status captured" || bad "(T3c) status" "got '$(field_value "$p" status)'"
 [ "$(field_value "$p" agent)" = "web-engineer" ] && ok "(T3d) agent = target dir" || bad "(T3d) agent" "got '$(field_value "$p" agent)'"
-[ "$(field_value "$p" promote-target)" = ".claude/memories/agents/web-engineer/capture-before-commit.md" ] \
+[ "$(field_value "$p" promote-target)" = "agents/web-engineer/capture-before-commit.md" ] \
   && ok "(T3e) promote-target own dir" || bad "(T3e) promote-target own dir" "got '$(field_value "$p" promote-target)'"
 grep -q '^## Why' "$f" && ok "(T3f) body appended" || bad "(T3f) body appended" "## Why missing"
 
 run_cap rule shared/cross-cutting-thing AB-1 "$tmp/payload-shared.md" >/dev/null
 p2="$(extract_fm "$root/rules/AB-1--cross-cutting-thing.md" | parse_frontmatter)"
-[ "$(field_value "$p2" promote-target)" = ".claude/memories/agents/shared/cross-cutting-thing.md" ] \
+[ "$(field_value "$p2" promote-target)" = "agents/shared/cross-cutting-thing.md" ] \
   && ok "(T3g) promote-target shared" || bad "(T3g) promote-target shared" "got '$(field_value "$p2" promote-target)'"
 [ "$(field_value "$p2" agent)" = "web-engineer,mobile-engineer" ] \
   && ok "(T3g2) shared agent list comes from the payload, never the literal 'shared'" \
@@ -146,9 +155,12 @@ run_cap rule shared/under-agented AB-1 "$tmp/payload.md" >/dev/null 2>&1 \
 [ ! -e "$root/rules/AB-1--under-agented.md" ] \
   && ok "(T3g4) rejected shared capture wrote no file" || bad "(T3g4) rejected shared capture wrote no file" "file exists"
 
-# --- T3g5-7: shared/ counter-only exemption ---------------------------------
+# --- T3g5-7: shared/ counter-only exemption (NA-103: the exemption covers trigger/rule CONTENT
+# only — the >= 2 agents format check on shared/ is UNCONDITIONAL, so the payload still needs a
+# real agent: list even though it carries no trigger/rule of its own).
 cat > "$tmp/counter-only.md" <<'EOF'
 ---
+agent: [web-engineer, mobile-engineer]
 uses: 1
 evidence: [AB-1]
 ---
@@ -156,13 +168,28 @@ EOF
 run_cap rule shared/counter-only-target AB-1 "$tmp/counter-only.md" >/dev/null 2>"$tmp/counter_err"
 counter_rc=$?
 [ "$counter_rc" -eq 0 ] \
-  && ok "(T3g5) shared/ counter-only payload (uses set, rule absent) is exempt from the >= 2 agents guard" \
+  && ok "(T3g5) shared/ counter-only payload (uses set, rule absent) is exempt from the trigger/rule content check" \
   || bad "(T3g5) shared counter-only exemption" "exited $counter_rc: $(cat "$tmp/counter_err")"
 [ -f "$root/rules/AB-1--counter-only-target.md" ] \
   && ok "(T3g6) shared/ counter-only capture is written" || bad "(T3g6) shared counter-only written" "file missing"
 p3="$(extract_fm "$root/rules/AB-1--counter-only-target.md" | parse_frontmatter)"
 [ "$(field_value "$p3" uses)" = "1" ] \
   && ok "(T3g7) shared/ counter-only capture carries the payload's uses" || bad "(T3g7) counter-only uses" "got '$(field_value "$p3" uses)'"
+
+# --- T3g5b-c (NA-103 Important 3): a shared/ counter-only payload WITHOUT a real agent: list is
+# now refused — the old exemption used to also waive the >= 2 agents format check, letting
+# `agent: []` through silently. Verified to fail against pre-NA-103-Important-3 (74a3bdc) below.
+cat > "$tmp/counter-only-no-agent.md" <<'EOF'
+---
+uses: 1
+evidence: [AB-1]
+---
+EOF
+run_cap rule shared/counter-only-no-agent AB-1 "$tmp/counter-only-no-agent.md" >/dev/null 2>&1 \
+  && bad "(T3g5b) shared/ counter-only WITHOUT agent: is rejected" "exited 0" \
+  || ok "(T3g5b) shared/ counter-only WITHOUT agent: is rejected"
+[ ! -e "$root/rules/AB-1--counter-only-no-agent.md" ] \
+  && ok "(T3g5c) rejected agent-less shared counter-only wrote no file" || bad "(T3g5c) rejected agent-less shared counter-only wrote no file" "file exists"
 
 # --- T3g8-9: the counter-only exemption cannot be smuggled via a single-agent payload --------
 cat > "$tmp/smuggled.md" <<'EOF'
@@ -179,10 +206,23 @@ run_cap rule shared/smuggled AB-1 "$tmp/smuggled.md" >/dev/null 2>&1 \
 [ ! -e "$root/rules/AB-1--smuggled.md" ] \
   && ok "(T3g9) rejected smuggle attempt wrote no file" || bad "(T3g9) rejected smuggle attempt" "file exists"
 
-run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null
-[ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3h) '-' writes frontmatter only" || bad "(T3h) frontmatter only" "body present after '-' capture"
-run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
-[ "$(grep -c '^---$' "$f")" -eq 2 ] && ok "(T3i) omitted payload writes frontmatter only" || bad "(T3i) omitted payload" "body present"
+# T3h/T3i (NA-103): '-' and an omitted payload both mean "no content" — for an EXISTING rule
+# capture this is now a malformed (schema-empty) re-capture and is refused by the 7-field schema
+# check, leaving the already-captured file (with its real trigger/rule/evidence) untouched rather
+# than blanked out. Pre-NA-103 these silently overwrote the file with empty fields; verified below.
+before_body="$(cat "$f")"
+run_cap rule web-engineer/capture-before-commit AB-1 - >/dev/null 2>&1 \
+  && bad "(T3h) '-' (no content) re-capture of an existing rule is refused" "exited 0" \
+  || ok "(T3h) '-' (no content) re-capture of an existing rule is refused"
+[ "$(cat "$f")" = "$before_body" ] \
+  && ok "(T3h2) the existing capture is left untouched by the refused '-' re-capture" \
+  || bad "(T3h2) existing capture untouched by refused '-' re-capture" "content changed"
+run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null 2>&1 \
+  && bad "(T3i) an omitted-payload re-capture of an existing rule is refused" "exited 0" \
+  || ok "(T3i) an omitted-payload re-capture of an existing rule is refused"
+[ "$(cat "$f")" = "$before_body" ] \
+  && ok "(T3i2) the existing capture is left untouched by the refused omitted-payload re-capture" \
+  || bad "(T3i2) existing capture untouched by refused omitted-payload re-capture" "content changed"
 
 run_cap rule web-engineer/Not_Kebab AB-1 >/dev/null 2>&1 \
   && bad "(T3j) non-kebab rule id rejected" "exited 0" || ok "(T3j) non-kebab rule id rejected"
@@ -196,6 +236,71 @@ run_cap bogus foo AB-1 >/dev/null 2>&1 \
   && bad "(T3l) unknown kind rejected" "exited 0" || ok "(T3l) unknown kind rejected"
 run_cap rule web-engineer/some-rule AB-1 "$tmp/missing-file.md" >/dev/null 2>&1 \
   && bad "(T3m) missing payload file rejected" "exited 0" || ok "(T3m) missing payload file rejected"
+
+# --- T3m2-5 (NA-103 Critical 2): the payload is now genuinely REQUIRED for `rule`, and the
+# usage/doc contract agrees. Pre-fix (74a3bdc), an omitted or '-' payload was ALSO refused, but
+# only incidentally (it fell through to the generic 7-field schema error, "trigger must have 1-6
+# items, got 0") — the die message never said a payload was required, and
+# refs/domain-agent-handoff.md's own-domain line still showed `[<payload-file>]` as optional,
+# actively contradicting the actual behaviour. These pin the NEW, dedicated messages.
+run_cap rule web-engineer/some-rule AB-1 >/dev/null 2>"$tmp/no_payload_err"
+grep -qF "rule needs a <payload-file>" "$tmp/no_payload_err" \
+  && ok "(T3m2) an omitted payload dies with the dedicated 'needs a <payload-file>' message" \
+  || bad "(T3m2) omitted-payload message" "got '$(cat "$tmp/no_payload_err")'"
+run_cap rule web-engineer/some-rule AB-1 - >/dev/null 2>"$tmp/dash_payload_err"
+grep -qF "no longer accepts '-'" "$tmp/dash_payload_err" \
+  && ok "(T3m3) a '-' payload dies with the dedicated 'no longer accepts -' message" \
+  || bad "(T3m3) '-'-payload message" "got '$(cat "$tmp/dash_payload_err")'"
+[ ! -e "$root/rules/AB-1--some-rule.md" ] \
+  && ok "(T3m4) neither refusal wrote a file" || bad "(T3m4) neither refusal wrote a file" "file exists"
+handoff="$scripts/../refs/domain-agent-handoff.md"
+own_domain_line="$(grep -F 'own-domain rule ->' "$handoff")"
+case "$own_domain_line" in
+  *'[<payload-file>]'*) bad "(T3m5) domain-agent-handoff.md's own-domain line no longer shows the optional-payload brackets" "still shows '[<payload-file>]': $own_domain_line" ;;
+  *'<payload-file>'*)   ok "(T3m5) domain-agent-handoff.md's own-domain line shows <payload-file> as required" ;;
+  *)                    bad "(T3m5) domain-agent-handoff.md's own-domain line" "payload-file not found at all: $own_domain_line" ;;
+esac
+
+# --- T3m6 (NA-103 re-review, round 2): whole-plugins/sdlc/refs/ CONTRACT sweep, not a phrasing
+# grep. Round 1's version matched specific old wording ("must omit agent:", "carries an empty
+# agent") and missed qa-engineer-playbook.md, which never used either phrase — it just described
+# the counter-only payload shape (uses:/evidence:) without ever mentioning agent: at all. This
+# version instead flags any refs/ PARAGRAPH (blank-line-delimited, so a fenced code block or a
+# multi-line bullet counts as one) that is INSTRUCTIONAL about constructing a counter-only capture
+# (mentions capture-learning.sh, a literal `uses: 1`, or "payload") but never mentions `agent:` —
+# regardless of which words it uses to do so. A paragraph that merely references the counter-only
+# concept in passing (concurrency notes, write-scope tables) has none of those three markers and is
+# correctly left alone — verified below to actually flag the pre-fix qa-engineer-playbook.md text.
+refs_dir="$scripts/../refs"
+inconsistent=""
+for f in "$refs_dir"/*.md; do
+  bad_para="$(awk -v RS='' '
+    tolower($0) ~ /counter-only/ \
+      && ($0 ~ /capture-learning\.sh/ || $0 ~ /uses: 1/ || $0 ~ /payload/) \
+      && $0 !~ /agent:/ { print "X" }
+  ' "$f")"
+  [ -n "$bad_para" ] && inconsistent="$inconsistent $(basename "$f")"
+done
+[ -z "$inconsistent" ] \
+  && ok "(T3m6) every instructional counter-only paragraph under plugins/sdlc/refs/ also names agent:" \
+  || bad "(T3m6) counter-only/agent: contract sweep" "inconsistent file(s):$inconsistent"
+
+# T3m6b: prove the sweep is a real contract check, not vacuous — feed it the ACTUAL pre-fix
+# qa-engineer-playbook.md paragraph (which never used "omit" or "empty", the words T3m6's round-1
+# version matched on) and confirm it is flagged.
+cat > "$tmp/qa-old-counter-only.md" <<'EOF'
+**3. Counter-only updates** — for any existing rule a finding proves was violated, capture a
+counter-only record with `uses: 1` and `evidence: [<STORY-KEY>]`; promotion merges it into the
+target's existing count. You never edit the committed rule file.
+EOF
+mutant_bad="$(awk -v RS='' '
+  tolower($0) ~ /counter-only/ \
+    && ($0 ~ /capture-learning\.sh/ || $0 ~ /uses: 1/ || $0 ~ /payload/) \
+    && $0 !~ /agent:/ { print "X" }
+' "$tmp/qa-old-counter-only.md")"
+[ -n "$mutant_bad" ] \
+  && ok "(T3m6b) the sweep flags the actual pre-fix qa-engineer-playbook.md paragraph" \
+  || bad "(T3m6b) sweep does not catch the historical defect" "the check is vacuous"
 
 cat > "$tmp/round.md" <<'EOF'
 ---
@@ -213,12 +318,14 @@ rf="$root/reviews/2026-08-04-AB-1-r2.md"
 [ "$out_r" = "CAPTURED=$rf" ] && ok "(T3n) review path with -r2" || bad "(T3n) review path" "got '$out_r'"
 pr="$(extract_fm "$rf" | parse_frontmatter)"
 [ "$(field_value "$pr" origin)" = "qa-round" ] && ok "(T3o) review origin fixed" || bad "(T3o) review origin" "got '$(field_value "$pr" origin)'"
-[ "$(field_value "$pr" promote-target)" = ".claude/memories/reviews/2026-08-04-AB-1-r2.md" ] \
+[ "$(field_value "$pr" promote-target)" = "reviews/2026-08-04-AB-1-r2.md" ] \
   && ok "(T3p) review promote-target" || bad "(T3p) review promote-target" "got '$(field_value "$pr" promote-target)'"
 run_cap review AB-1 2026-08-04 1 >/dev/null
 [ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
 
-run_cap rule web-engineer/capture-before-commit AB-1 >/dev/null
+# A genuine re-capture (same id, a valid full payload again) is a same-path overwrite, not a
+# second file — NA-103's schema check doesn't change this, since this payload is well-formed.
+run_cap rule web-engineer/capture-before-commit AB-1 "$tmp/payload.md" >/dev/null
 [ "$(ls "$root/rules" | wc -l | tr -d ' ')" -eq 3 ] && ok "(T3r) re-capture is idempotent overwrite" || bad "(T3r) idempotent overwrite" "extra files created"
 
 # --- T3s: a failed write is reported as a failure, never a false CAPTURED= (Critical 1) -----
@@ -236,19 +343,36 @@ printf '%s' "$wf_out" | grep -q '^CAPTURED=' \
   && ok "(T3s4) a failed write leaves no partial/final file behind" || bad "(T3s4) no file left behind" "file exists"
 
 # --- T3t: story-key validation, both kinds (Critical 2) --------------------------------------
-run_cap rule web-engineer/story-key-check '../../escaped' >/dev/null 2>&1 \
+# NA-103 Important 4: T3t1/T3t3/T3t4 previously called run_cap with NO payload at all — since
+# NA-103 made the payload mandatory for `rule`, that missing-payload die fires FIRST regardless of
+# the story key, and these tests stayed green even with validate_story_key's body deleted
+# (mutation-tested against 74a3bdc's Important-4 predecessor). Both fixes now: pass a schema-valid
+# payload so the story-key check is what actually runs, and pin the die MESSAGE via stderr so a
+# wrong-reason rejection can't pass silently.
+run_cap rule web-engineer/story-key-check '../../escaped' "$tmp/payload.md" >/dev/null 2>"$tmp/t3t1_err" \
   && bad "(T3t1) path-traversal story key rejected (rule)" "exited 0" \
   || ok "(T3t1) path-traversal story key rejected (rule)"
+grep -qF "story key '../../escaped' is not <PROJECT>-<N>" "$tmp/t3t1_err" \
+  && ok "(T3t1b) rejection is pinned to the story-key die message" \
+  || bad "(T3t1b) story-key die message" "got '$(cat "$tmp/t3t1_err")'"
 [ -z "$(find "$tmp" -maxdepth 2 -name 'escaped--story-key-check.md')" ] \
   && ok "(T3t2) rejected story key escaped nothing onto disk (rule)" \
   || bad "(T3t2) rejected story key wrote nothing" "escaped file exists"
-run_cap rule web-engineer/story-key-check 'feat/NA-98' >/dev/null 2>&1 \
+run_cap rule web-engineer/story-key-check 'feat/NA-98' "$tmp/payload.md" >/dev/null 2>"$tmp/t3t3_err" \
   && bad "(T3t3) a branch name is rejected as a story key (rule)" "exited 0" \
   || ok "(T3t3) a branch name is rejected as a story key (rule)"
-run_cap rule web-engineer/story-key-check 'ab-1' >/dev/null 2>&1 \
+grep -qF "story key 'feat/NA-98' is not <PROJECT>-<N>" "$tmp/t3t3_err" \
+  && ok "(T3t3b) rejection is pinned to the story-key die message" \
+  || bad "(T3t3b) story-key die message" "got '$(cat "$tmp/t3t3_err")'"
+run_cap rule web-engineer/story-key-check 'ab-1' "$tmp/payload.md" >/dev/null 2>"$tmp/t3t4_err" \
   && bad "(T3t4) a lowercase story key is rejected (rule)" "exited 0" \
   || ok "(T3t4) a lowercase story key is rejected (rule)"
-run_cap rule web-engineer/story-key-check 'AB-1' >/dev/null 2>&1 \
+grep -qF "story key 'ab-1' is not <PROJECT>-<N>" "$tmp/t3t4_err" \
+  && ok "(T3t4b) rejection is pinned to the story-key die message" \
+  || bad "(T3t4b) story-key die message" "got '$(cat "$tmp/t3t4_err")'"
+# NA-103: a well-formed-story-key write also needs a schema-valid payload now — use payload.md
+# (already valid trigger/rule/evidence) so this test isolates the story-key assertion alone.
+run_cap rule web-engineer/story-key-check 'AB-1' "$tmp/payload.md" >/dev/null 2>&1 \
   && ok "(T3t5) a well-formed story key is accepted (rule)" \
   || bad "(T3t5) well-formed story key accepted (rule)" "exited non-zero"
 run_cap review '../../escaped' 2026-08-04 1 >/dev/null 2>&1 \
@@ -290,6 +414,205 @@ r1_after2="$(field_value "$(extract_fm "$r1f" | parse_frontmatter)" issue_count)
   && ok "(T3u6) round 1's capture survives a rejected overflowing round" \
   || bad "(T3u6) round 1 survives overflow round" "issue_count changed from '$r1_before' to '$r1_after2'"
 
+# --- T3v (NA-103): the 7-field rule schema (trigger/rule/evidence) is validated on the payload
+# at write time — a malformed capture is refused, never silently written with blank/bad fields.
+# Uses its own root + story AB-2 so it never perturbs T4's AB-1-scoped counts below.
+schema_root="$tmp/schema-root"
+run_schema() { SDLC_CAPTURE_ROOT="$schema_root" bash "$cap" "$@"; }
+
+cat > "$tmp/schema-good.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-good AB-2 "$tmp/schema-good.md" >/dev/null 2>&1 \
+  && ok "(T3v0) a well-formed 7-field payload is accepted" \
+  || bad "(T3v0) well-formed payload accepted" "exited non-zero"
+[ -f "$schema_root/rules/AB-2--schema-good.md" ] \
+  && ok "(T3v0b) well-formed payload file written" || bad "(T3v0b) well-formed payload file written" "file missing"
+
+cat > "$tmp/schema-no-trigger.md" <<'EOF'
+---
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-no-trigger AB-2 "$tmp/schema-no-trigger.md" >/dev/null 2>&1 \
+  && bad "(T3v1) a payload with no trigger is rejected" "exited 0" \
+  || ok "(T3v1) a payload with no trigger is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-no-trigger.md" ] \
+  && ok "(T3v1b) rejected no-trigger capture wrote no file" || bad "(T3v1b) rejected no-trigger wrote no file" "file exists"
+
+cat > "$tmp/schema-too-many-triggers.md" <<'EOF'
+---
+trigger: [a, b, c, d, e, f, g]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-too-many-triggers AB-2 "$tmp/schema-too-many-triggers.md" >/dev/null 2>&1 \
+  && bad "(T3v2) a 7-item trigger list is rejected" "exited 0" \
+  || ok "(T3v2) a 7-item trigger list is rejected"
+
+cat > "$tmp/schema-no-rule.md" <<'EOF'
+---
+trigger: [one situation]
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-no-rule AB-2 "$tmp/schema-no-rule.md" >/dev/null 2>&1 \
+  && bad "(T3v3) an empty rule is rejected" "exited 0" \
+  || ok "(T3v3) an empty rule is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-no-rule.md" ] \
+  && ok "(T3v3b) rejected empty-rule capture wrote no file" || bad "(T3v3b) rejected empty-rule wrote no file" "file exists"
+
+long_rule="When $(printf 'x%.0s' $(seq 1 220)), do Y."
+cat > "$tmp/schema-long-rule.md" <<EOF
+---
+trigger: [one situation]
+rule: $long_rule
+evidence: [AB-2]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-long-rule AB-2 "$tmp/schema-long-rule.md" >/dev/null 2>&1 \
+  && bad "(T3v4) a rule over 200 chars is rejected" "exited 0" \
+  || ok "(T3v4) a rule over 200 chars is rejected"
+
+cat > "$tmp/schema-no-evidence.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-no-evidence AB-2 "$tmp/schema-no-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v5) empty evidence is rejected" "exited 0" \
+  || ok "(T3v5) empty evidence is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-no-evidence.md" ] \
+  && ok "(T3v5b) rejected empty-evidence capture wrote no file" || bad "(T3v5b) rejected empty-evidence wrote no file" "file exists"
+
+cat > "$tmp/schema-bad-evidence.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [not-a-real-evidence-token]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-bad-evidence AB-2 "$tmp/schema-bad-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v6) a malformed evidence item is rejected" "exited 0" \
+  || ok "(T3v6) a malformed evidence item is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-bad-evidence.md" ] \
+  && ok "(T3v6b) rejected bad-evidence capture wrote no file" || bad "(T3v6b) rejected bad-evidence wrote no file" "file exists"
+
+# --- T3v6c-f (PR #237 review, Important 2): uses was validated on the counter-only path but not
+# the full-rule path — a full capture with `uses: banana` or `uses: -5` wrote successfully, then
+# broke check-frontmatter.sh's hard-fail on those SAME values once promoted (Copilot flagged the
+# same gap independently at capture-learning.sh:125).
+cat > "$tmp/schema-bad-uses-word.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: banana
+---
+EOF
+run_schema rule web-engineer/schema-bad-uses-word AB-2 "$tmp/schema-bad-uses-word.md" >/dev/null 2>&1 \
+  && bad "(T3v6c) a full-rule payload with uses: banana is rejected" "exited 0" \
+  || ok "(T3v6c) a full-rule payload with uses: banana is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-bad-uses-word.md" ] \
+  && ok "(T3v6d) rejected uses:-banana capture wrote no file" || bad "(T3v6d) rejected uses:-banana wrote no file" "file exists"
+
+cat > "$tmp/schema-bad-uses-negative.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: -5
+---
+EOF
+run_schema rule web-engineer/schema-bad-uses-negative AB-2 "$tmp/schema-bad-uses-negative.md" >/dev/null 2>&1 \
+  && bad "(T3v6e) a full-rule payload with uses: -5 is rejected" "exited 0" \
+  || ok "(T3v6e) a full-rule payload with uses: -5 is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-bad-uses-negative.md" ] \
+  && ok "(T3v6f) rejected uses:--5 capture wrote no file" || bad "(T3v6f) rejected uses:--5 wrote no file" "file exists"
+
+# a counter-only update (uses+evidence only, no rule/agent) is exempt from the 7-field content
+# check on BOTH own-dir and shared/ targets — this re-increments an already-promoted rule, whose
+# trigger/rule content lives at the promotion target, not in this staged capture.
+cat > "$tmp/schema-counter-only.md" <<'EOF'
+---
+uses: 3
+evidence: [AB-2]
+---
+EOF
+run_schema rule web-engineer/schema-good AB-2 "$tmp/schema-counter-only.md" >/dev/null 2>&1 \
+  && ok "(T3v7) an own-dir counter-only update is exempt from the 7-field content check" \
+  || bad "(T3v7) own-dir counter-only exemption" "exited non-zero"
+
+# --- T3v8-13 (NA-103 Important 3): the counter-only exemption is NOT a blanket bypass — its own
+# uses/evidence content is still validated. Pre-fix, all three of these wrote at rc=0 (verified
+# against 74a3bdc below); post-fix they are refused.
+cat > "$tmp/schema-counter-only-bad-uses.md" <<'EOF'
+---
+uses: not-a-number
+evidence: [AB-2]
+---
+EOF
+run_schema rule web-engineer/schema-counter-only-bad-uses AB-2 "$tmp/schema-counter-only-bad-uses.md" >/dev/null 2>&1 \
+  && bad "(T3v8) a counter-only payload with non-numeric uses is rejected" "exited 0" \
+  || ok "(T3v8) a counter-only payload with non-numeric uses is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-counter-only-bad-uses.md" ] \
+  && ok "(T3v8b) rejected bad-uses counter-only capture wrote no file" || bad "(T3v8b) rejected bad-uses wrote no file" "file exists"
+
+cat > "$tmp/schema-counter-only-no-evidence.md" <<'EOF'
+---
+uses: 3
+---
+EOF
+run_schema rule web-engineer/schema-counter-only-no-evidence AB-2 "$tmp/schema-counter-only-no-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v9) a counter-only payload with no evidence is rejected" "exited 0" \
+  || ok "(T3v9) a counter-only payload with no evidence is rejected"
+
+cat > "$tmp/schema-counter-only-bad-evidence.md" <<'EOF'
+---
+uses: 3
+evidence: [total-garbage-token]
+---
+EOF
+run_schema rule web-engineer/schema-counter-only-bad-evidence AB-2 "$tmp/schema-counter-only-bad-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v10) a counter-only payload with a garbage evidence token is rejected" "exited 0" \
+  || ok "(T3v10) a counter-only payload with a garbage evidence token is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-counter-only-bad-evidence.md" ] \
+  && ok "(T3v10b) rejected garbage-evidence counter-only capture wrote no file" || bad "(T3v10b) rejected garbage-evidence wrote no file" "file exists"
+
+# --- T3v11-13 (NA-103 Minor 6): a single-letter Jira project key is accepted as BOTH a story key
+# and an evidence item — the two regexes previously disagreed ([A-Z0-9]+ vs [A-Z0-9]*).
+cat > "$tmp/schema-single-letter-key.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [A-1]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-single-letter-key A-2 "$tmp/schema-single-letter-key.md" >/dev/null 2>"$tmp/single_letter_err" \
+  && ok "(T3v11) a single-letter story key is accepted" \
+  || bad "(T3v11) single-letter story key accepted" "exited non-zero: $(cat "$tmp/single_letter_err")"
+[ -f "$schema_root/rules/A-2--schema-single-letter-key.md" ] \
+  && ok "(T3v12) single-letter-key capture file written" || bad "(T3v12) single-letter-key file written" "file missing"
+p_slk="$(extract_fm "$schema_root/rules/A-2--schema-single-letter-key.md" | parse_frontmatter)"
+[ "$(field_value "$p_slk" evidence)" = "A-1" ] \
+  && ok "(T3v13) a single-letter-key evidence item ('A-1') is accepted, not rejected" \
+  || bad "(T3v13) single-letter evidence accepted" "evidence field got '$(field_value "$p_slk" evidence)'"
+
 # --- T4: list-captured --------------------------------------------------------
 lst="$scripts/list-captured.sh"
 run_lst() { SDLC_CAPTURE_ROOT="$root" bash "$lst" "$@"; }
@@ -321,7 +644,7 @@ empty="$tmp/empty-root"
 # --- T4j2-3: root-resolution failure (vs T4i/T4j's resolved-but-empty root) --------------------
 nongit="$tmp/not-a-repo"; mkdir -p "$nongit"
 nongit_out="$tmp/nongit_out"; nongit_err="$tmp/nongit_err"
-( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT -u SDLC_MEMORY_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
 nongit_rc=$?
 if [ "$nongit_rc" -ne 0 ] && [ -z "$(cat "$nongit_out")" ] && [ -s "$nongit_err" ]; then
   pass_lst=1
@@ -330,7 +653,7 @@ else
 fi
 [ "$pass_lst" -eq 1 ] && ok "(T4j2) resolution failure outside a git checkout is a hard error" \
   || bad "(T4j2) resolution failure hard error" "rc=$nongit_rc stdout='$(cat "$nongit_out")' stderr='$(cat "$nongit_err")'"
-( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT -u SDLC_MEMORY_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
 nongit_json_rc=$?
 [ "$nongit_json_rc" -ne 0 ] && ! grep -q '"entries"' "$nongit_out" \
   && ok "(T4j3) resolution failure (--json) is a hard error, not a quiet empty corpus" \
@@ -370,7 +693,7 @@ status: captured
 captured: 2026-08-04T00:00:00Z
 story: AB-1
 origin: domain-agent
-promote-target: .claude/memories/agents/web-engineer/bad-capture.md
+promote-target: agents/web-engineer/bad-capture.md
 ---
 EOF
 cf_out="$(bash "$scripts/check-frontmatter.sh" "$cf_repo" 2>&1)"; cf_rc=$?
@@ -398,12 +721,65 @@ root_causes: []
 issue_count: 2
 captured: 2026-08-04T00:00:00Z
 origin: qa-round
-promote-target: .claude/memories/reviews/2026-08-04-AB-2.md
+promote-target: reviews/2026-08-04-AB-2.md
 ---
 EOF
 cf3_out="$(bash "$scripts/check-frontmatter.sh" "$bad_marker_repo" 2>&1)"
 printf '%s' "$cf3_out" | grep -qi "empty field 'domains'" \
   && ok "(T6e) issue_count > 0 with empty domains/root_causes still warns" \
   || bad "(T6e) genuinely malformed review still warns" "$cf3_out"
+
+# --- T6f (NA-101): a legacy `.claude/memories/...` promote-target warns, never fails ---------
+legacy_pt_repo="$tmp/legacyptrepo"; mkdir -p "$legacy_pt_repo/.claude/memories/captured/rules"
+cat > "$legacy_pt_repo/.claude/memories/captured/rules/AB-3--legacy-promote-target.md" <<'EOF'
+---
+id: legacy-promote-target
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: A rule.
+evidence: [AB-3]
+uses: 0
+status: captured
+captured: 2026-08-04T00:00:00Z
+story: AB-3
+origin: domain-agent
+promote-target: .claude/memories/agents/web-engineer/legacy-promote-target.md
+---
+EOF
+cf6_out="$(bash "$scripts/check-frontmatter.sh" "$legacy_pt_repo" 2>&1)"; cf6_rc=$?
+{ [ "$cf6_rc" -eq 0 ] && printf '%s' "$cf6_out" | grep -qi 'promote-target'; } \
+  && ok "(T6f) a legacy absolute promote-target warns but never fails the gate" \
+  || bad "(T6f) legacy promote-target warning" "rc=$cf6_rc out='$cf6_out'"
+
+# --- T4l/T4m/T4n (NA-101): dual-root listing — resolved root + legacy primary-checkout root --
+dr_repo="$tmp/dualrepo"; mkdir -p "$dr_repo"
+dr_repo="$(cd "$dr_repo" && pwd -P)"
+git -C "$dr_repo" init -q
+git -C "$dr_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+# SDLC_MEMORY_ROOT names the memory ROOT; its staging area is <root>/captured. Seed one capture in
+# the LEGACY in-repo staging root and one in the RESOLVED root's staging area.
+dr_root="$tmp/dual-root"
+SDLC_CAPTURE_ROOT="$dr_repo/.claude/memories/captured" bash "$cap" rule web-engineer/legacy-only AB-1 "$tmp/payload.md" >/dev/null
+SDLC_CAPTURE_ROOT="$dr_root/captured" bash "$cap" rule web-engineer/resolved-only AB-1 "$tmp/payload.md" >/dev/null
+dr_out="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$dr_root" bash "$lst" --kind rule 2>/dev/null )"
+{ printf '%s' "$dr_out" | grep -q 'legacy-only' && printf '%s' "$dr_out" | grep -q 'resolved-only'; } \
+  && ok "(T4l) both the resolved root and the legacy in-repo root are listed" \
+  || bad "(T4l) dual-root listing" "got '$dr_out'"
+
+# T4m: the same <kind>/<basename> in both roots is emitted ONCE, resolved root winning
+SDLC_CAPTURE_ROOT="$dr_repo/.claude/memories/captured" bash "$cap" rule web-engineer/dupe-both AB-1 "$tmp/payload.md" >/dev/null
+SDLC_CAPTURE_ROOT="$dr_root/captured" bash "$cap" rule web-engineer/dupe-both AB-1 "$tmp/payload.md" >/dev/null
+dupe_all="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$dr_root" bash "$lst" --kind rule 2>/dev/null | grep 'AB-1--dupe-both.md' )"
+dupe_n="$(printf '%s\n' "$dupe_all" | grep -c 'AB-1--dupe-both.md')"
+dupe_win="$(printf '%s\n' "$dupe_all" | head -1 | cut -f1)"
+{ [ "$dupe_n" -eq 1 ] && [ "$dupe_win" = "$dr_root/captured/rules/AB-1--dupe-both.md" ]; } \
+  && ok "(T4m) a capture present in both roots is emitted once, resolved root winning" \
+  || bad "(T4m) dedupe precedence" "count=$dupe_n winner='$dupe_win'"
+
+# T4n: resolver failure WITH a legacy root -> warning on stderr, legacy-only listing, exit 0
+n_out="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT -u XDG_DATA_HOME SDLC_MEMORY_ROOT="relative-path" bash "$lst" --kind rule 2>"$tmp/dr_warn" )"; n_rc=$?
+{ [ "$n_rc" -eq 0 ] && [ -s "$tmp/dr_warn" ] && printf '%s' "$n_out" | grep -q 'legacy-only'; } \
+  && ok "(T4n) resolver failure with a legacy root warns and lists the legacy root alone" \
+  || bad "(T4n) resolver-failure fallback" "rc=$n_rc out='$n_out'"
 
 exit "$fail"

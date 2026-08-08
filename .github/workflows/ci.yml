@@ -89,6 +89,8 @@ jobs:
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/capture-budget.test.sh
       - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/memory-root.test.sh
+      - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash .claude/hooks/__tests__/rtk-line-scan.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh

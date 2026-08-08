@@ -48,7 +48,7 @@ same split `/sdlc:analyze` uses for its scan-then-apply flow.
 
 2. Propose `agents:` routing tags for each candidate — the sdlc agent identifier(s) whose future
    work the decision constrains. **Review-file tagging rule:** a candidate nominated from a
-   `.claude/memories/reviews/*.md` round file MUST always include `qa-engineer` in its proposed
+   `<memory-root>/reviews/*.md` round file MUST always include `qa-engineer` in its proposed
    `agents:` list, in addition to whichever agent(s) the decision otherwise constrains — see
    [§7 review-file tagging rule](#7-agentsshared-and-review-file-audience-preservation-rules).
 3. **(distill only)** Build the per-candidate deletion list: for each candidate, the exact rule
@@ -166,7 +166,7 @@ Evidence sources (cluster across all of these):
 | Source | Access |
 | --- | --- |
 | The `ai-enablement-engineer` maintenance-op nomination list (`refs/memory-maintenance.md`) | Read (mechanically-nominated rule candidates) |
-| `.claude/memories/reviews/*.md` | Read (per-round review files, corroborating evidence) |
+| `<memory-root>/reviews/*.md` | Read (per-round review files, corroborating evidence) |
 | The capture corpus (`bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --json`) | Read — **nomination input** |
 | PR review threads | `gh` (e.g. `gh pr list` / `gh api` for review comments) |
 | Commit history | `git log` |
@@ -177,7 +177,7 @@ thread / SHA carried in the capture's evidence field, so a candidate stays verif
 capture is deleted on promotion.
 
 Distill **consumes** the maintenance op's nomination list — it does not re-derive candidates by
-mining `.claude/memories/agents/**` itself. The nomination list already applied the promotion
+mining `<memory-root>/agents/**` itself. The nomination list already applied the promotion
 threshold (`uses >= 3` OR `agent` length >= 2 — see `refs/memory-maintenance.md`); distill's job is
 to cluster nominated rules with the other evidence sources above, draft the ADR, and (per §6) apply
 the Recurrence / Cross-agent / Durable-convention test to decide which nominated candidates
@@ -243,7 +243,7 @@ gates ADR promotion only. skip leaves the capture staged.
 
 ## 7. `agents/shared/` and review-file audience-preservation rules
 
-`.claude/memories/agents/shared/*.md` rules are readable by every agent named in their `agent`
+`<memory-root>/agents/shared/*.md` rules are readable by every agent named in their `agent`
 list (length >= 2 by schema); a per-agent ADR index section is read only by the agent(s) named in
 its `agents:` tag. Deleting a shared rule and replacing it with an ADR routed to only a subset of
 its agents would narrow its visibility from that whole list down to tag-list-only. Therefore:
@@ -258,7 +258,7 @@ its agents would narrow its visibility from that whole list down to tag-list-onl
   offered only when the audience-preservation condition holds.
 
 **Review-file tagging rule (same audience-preservation concern, applied at tagging time rather
-than deletion time).** `.claude/memories/reviews/*.md` round files, **and captured round files not
+than deletion time).** `<memory-root>/reviews/*.md` round files, **and captured round files not
 yet committed**, are `qa-engineer`'s working evidence — every QA round's Step 1 pre-review scan
 reads both (see `qa-engineer-playbook.md` Step 1/5). A candidate nominated from a rule that a
 committed OR **captured** round file's `## Rules written` cited, whose proposed `agents:` tags name
@@ -280,7 +280,7 @@ On write of a confirmed promoted candidate (phase 2, step 7), `knowledge-enginee
 and **marks nothing else — T1 deletion no longer happens in this pipeline at all.** The founder-
 approved deletion list from §2 step 3 still records which rule files a confirmed ADR supersedes
 (named in the ADR body, e.g. under Alternatives Considered / Consequences), but `knowledge-
-engineer`'s phase-2 write touches only `docs/adr/**`, never `.claude/memories/**`.
+engineer`'s phase-2 write touches only `docs/adr/**`, never `<memory-root>/**`.
 
 **T1 deletion is reassigned to the `ai-enablement-engineer` maintenance op**
 (`refs/memory-maintenance.md`'s T1 deletion-on-promotion operation): on its next run, the
@@ -301,7 +301,7 @@ This cross-agent memory write (marking and deleting another agent's rule) is san
 
 **Capture promotion is a second phase-2 dispatch.** Every `memory` choice is executed by
 `ai-enablement-engineer` running the capture-promotion operation in `refs/memory-maintenance.md`;
-`knowledge-engineer` still writes `docs/adr/**` only and never `.claude/memories/**`. Both
+`knowledge-engineer` still writes `docs/adr/**` only and never `<memory-root>/**`. Both
 dispatches commit to the **same** distill branch, so the founder gets one PR from one interaction.
 This cross-agent memory write is sanctioned as the widened **Exception 2** in
 [`analyze-protocol.md`'s memory-ownership rules](analyze-protocol.md#memory-ownership-exceptions).
