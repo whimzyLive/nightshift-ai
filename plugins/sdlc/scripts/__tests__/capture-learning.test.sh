@@ -261,17 +261,46 @@ case "$own_domain_line" in
   *)                    bad "(T3m5) domain-agent-handoff.md's own-domain line" "payload-file not found at all: $own_domain_line" ;;
 esac
 
-# --- T3m6 (NA-103 re-review): whole-plugins/sdlc/refs/ sweep — no ref may instruct a shared/
-# counter-only payload to omit `agent:`. This was the actual QA re-review finding: the shared/ >= 2
-# agents check is unconditional post-Important-3, so any ref still telling an agent to omit
-# `agent:` (or claiming a counter-only capture "legitimately carries an empty agent") sends every
-# reader of that ref into a guaranteed rc=1/lost-capture, exactly as capture-learning.sh's own
-# behaviour changed underneath it.
+# --- T3m6 (NA-103 re-review, round 2): whole-plugins/sdlc/refs/ CONTRACT sweep, not a phrasing
+# grep. Round 1's version matched specific old wording ("must omit agent:", "carries an empty
+# agent") and missed qa-engineer-playbook.md, which never used either phrase — it just described
+# the counter-only payload shape (uses:/evidence:) without ever mentioning agent: at all. This
+# version instead flags any refs/ PARAGRAPH (blank-line-delimited, so a fenced code block or a
+# multi-line bullet counts as one) that is INSTRUCTIONAL about constructing a counter-only capture
+# (mentions capture-learning.sh, a literal `uses: 1`, or "payload") but never mentions `agent:` —
+# regardless of which words it uses to do so. A paragraph that merely references the counter-only
+# concept in passing (concurrency notes, write-scope tables) has none of those three markers and is
+# correctly left alone — verified below to actually flag the pre-fix qa-engineer-playbook.md text.
 refs_dir="$scripts/../refs"
-stale_hits="$(grep -rlE 'must omit .?agent:|omit `?agent:`?|carries an empty `?agent`?' "$refs_dir" 2>/dev/null)"
-[ -z "$stale_hits" ] \
-  && ok "(T3m6) no plugins/sdlc/refs/ file instructs omitting agent: for a counter-only capture" \
-  || bad "(T3m6) stale omit-agent instruction survives in refs/" "found in: $stale_hits"
+inconsistent=""
+for f in "$refs_dir"/*.md; do
+  bad_para="$(awk -v RS='' '
+    tolower($0) ~ /counter-only/ \
+      && ($0 ~ /capture-learning\.sh/ || $0 ~ /uses: 1/ || $0 ~ /payload/) \
+      && $0 !~ /agent:/ { print "X" }
+  ' "$f")"
+  [ -n "$bad_para" ] && inconsistent="$inconsistent $(basename "$f")"
+done
+[ -z "$inconsistent" ] \
+  && ok "(T3m6) every instructional counter-only paragraph under plugins/sdlc/refs/ also names agent:" \
+  || bad "(T3m6) counter-only/agent: contract sweep" "inconsistent file(s):$inconsistent"
+
+# T3m6b: prove the sweep is a real contract check, not vacuous — feed it the ACTUAL pre-fix
+# qa-engineer-playbook.md paragraph (which never used "omit" or "empty", the words T3m6's round-1
+# version matched on) and confirm it is flagged.
+cat > "$tmp/qa-old-counter-only.md" <<'EOF'
+**3. Counter-only updates** — for any existing rule a finding proves was violated, capture a
+counter-only record with `uses: 1` and `evidence: [<STORY-KEY>]`; promotion merges it into the
+target's existing count. You never edit the committed rule file.
+EOF
+mutant_bad="$(awk -v RS='' '
+  tolower($0) ~ /counter-only/ \
+    && ($0 ~ /capture-learning\.sh/ || $0 ~ /uses: 1/ || $0 ~ /payload/) \
+    && $0 !~ /agent:/ { print "X" }
+' "$tmp/qa-old-counter-only.md")"
+[ -n "$mutant_bad" ] \
+  && ok "(T3m6b) the sweep flags the actual pre-fix qa-engineer-playbook.md paragraph" \
+  || bad "(T3m6b) sweep does not catch the historical defect" "the check is vacuous"
 
 cat > "$tmp/round.md" <<'EOF'
 ---
@@ -482,6 +511,38 @@ run_schema rule web-engineer/schema-bad-evidence AB-2 "$tmp/schema-bad-evidence.
   || ok "(T3v6) a malformed evidence item is rejected"
 [ ! -e "$schema_root/rules/AB-2--schema-bad-evidence.md" ] \
   && ok "(T3v6b) rejected bad-evidence capture wrote no file" || bad "(T3v6b) rejected bad-evidence wrote no file" "file exists"
+
+# --- T3v6c-f (PR #237 review, Important 2): uses was validated on the counter-only path but not
+# the full-rule path — a full capture with `uses: banana` or `uses: -5` wrote successfully, then
+# broke check-frontmatter.sh's hard-fail on those SAME values once promoted (Copilot flagged the
+# same gap independently at capture-learning.sh:125).
+cat > "$tmp/schema-bad-uses-word.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: banana
+---
+EOF
+run_schema rule web-engineer/schema-bad-uses-word AB-2 "$tmp/schema-bad-uses-word.md" >/dev/null 2>&1 \
+  && bad "(T3v6c) a full-rule payload with uses: banana is rejected" "exited 0" \
+  || ok "(T3v6c) a full-rule payload with uses: banana is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-bad-uses-word.md" ] \
+  && ok "(T3v6d) rejected uses:-banana capture wrote no file" || bad "(T3v6d) rejected uses:-banana wrote no file" "file exists"
+
+cat > "$tmp/schema-bad-uses-negative.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [AB-2]
+uses: -5
+---
+EOF
+run_schema rule web-engineer/schema-bad-uses-negative AB-2 "$tmp/schema-bad-uses-negative.md" >/dev/null 2>&1 \
+  && bad "(T3v6e) a full-rule payload with uses: -5 is rejected" "exited 0" \
+  || ok "(T3v6e) a full-rule payload with uses: -5 is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-bad-uses-negative.md" ] \
+  && ok "(T3v6f) rejected uses:--5 capture wrote no file" || bad "(T3v6f) rejected uses:--5 wrote no file" "file exists"
 
 # a counter-only update (uses+evidence only, no rule/agent) is exempt from the 7-field content
 # check on BOTH own-dir and shared/ targets — this re-increments an already-promoted rule, whose

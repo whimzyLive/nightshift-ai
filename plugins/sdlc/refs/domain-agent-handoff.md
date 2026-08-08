@@ -21,7 +21,7 @@ If either check fails → return immediately (full 5-line blocked shape — see 
 
 ## Branch and PR — do not create
 
-The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Your responsibility is to add commits on this branch — nothing else.
+The Principal Engineer has already created branch `<BRANCH_PREFIX>/<STORY-KEY>` on origin and will open the PR after all phases complete. Add commits on this branch only.
 
 ## Context reuse
 
@@ -77,9 +77,10 @@ cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared
 <payload-file> := REQUIRED (NA-103) — the 7-field schema only comes from one
 ```
 
-Prints `CAPTURED=<path>` into the gitignored staging area. You never write
-`<memory-root>/agents/**` (see `refs/memory-maintenance.md`) directly — a file lands there
-only once a human promotes a capture through `/sdlc:docs distill`.
+Prints `CAPTURED=<path>` into the gitignored staging area. Non-zero exit = refused; read the
+message, fix, retry — never move on. You never write `<memory-root>/agents/**` (see
+`refs/memory-maintenance.md`) directly — a file lands there only once a human promotes a capture
+through `/sdlc:docs distill`.
 
 `<payload-file>` carries YAML frontmatter — `trigger`/`rule`/`evidence`/`uses` (`agent` too for
 `shared/`); `id`/`status`/`captured`/`story`/`promote-target` are script-derived. **The 7-field

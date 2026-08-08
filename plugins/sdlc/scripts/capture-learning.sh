@@ -100,7 +100,7 @@ is_counter_only_payload() {        # $1 = payload path or empty -> 0 if a counte
   payload_has_field "$1" uses && ! payload_has_field "$1" rule && ! payload_has_field "$1" trigger
 }
 validate_rule_payload_schema() {   # $1 = payload path or empty; dies on a non-7-field-shaped payload
-  local payload="$1" trig trig_n rule_val evidence_val evidence_n item IFS_OLD
+  local payload="$1" trig trig_n rule_val evidence_val evidence_n uses_val item IFS_OLD
   trig="$(payload_fm "$payload" trigger "")"
   trig_n="$(csv_len "$trig")"
   { [ "$trig_n" -ge 1 ] && [ "$trig_n" -le 6 ]; } \
@@ -111,6 +111,13 @@ validate_rule_payload_schema() {   # $1 = payload path or empty; dies on a non-7
     || die "capture-learning.sh: payload rule is empty; wrote nothing"
   [ "${#rule_val}" -le 200 ] \
     || die "capture-learning.sh: payload rule exceeds 200 chars (${#rule_val}); wrote nothing"
+
+  # NA-103 (PR #237 review, Important 2): uses was validated on the counter-only path but not
+  # here — a full-rule payload could write `uses: banana` or `uses: -5` successfully, then break
+  # check-frontmatter.sh's hard-fail on the SAME values once promoted. Same check, both paths.
+  uses_val="$(payload_fm "$payload" uses 0)"
+  [[ "$uses_val" =~ ^[0-9]+$ ]] \
+    || die "capture-learning.sh: payload uses '$uses_val' is not a non-negative integer; wrote nothing"
 
   evidence_val="$(payload_fm "$payload" evidence "")"
   evidence_n="$(csv_len "$evidence_val")"
