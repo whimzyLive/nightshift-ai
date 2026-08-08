@@ -183,7 +183,7 @@ repo5="$tmp/repo5"; mk_memory_repo "$repo5"
 dest5="$tmp/dest5"
 real_cp="$(command -v cp)"
 stub_bin="$tmp/corrupt-bin"; mkdir -p "$stub_bin"
-for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp; do
+for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp ls sort; do
   real="$(command -v "$c" 2>/dev/null)" || continue
   ln -sf "$real" "$stub_bin/$c"
 done
@@ -312,23 +312,25 @@ git -C "$repo10" cat-file -e "HEAD:.claude/memories/agents/agent-b/two.md" 2>/de
   || bad "(T10) uncommitted delete" "rc=$rc10 out='$out10' still_tracked=$still_tracked10"
 
 # ============================================================================================
-# T11 (IMPORTANT 3 regression): the working-tree delete (`rm -rf`) fails after `git rm --cached`
-# already succeeded. Independently verified against the pre-fix script BEFORE writing this fix:
-# it printed the `rm` permission error but then committed anyway and reported success (rc=0).
-# The fixed script must fail loudly AND restore the index (`git reset`) rather than leave a
-# half-staged, uncommitted removal.
+# T11 (IMPORTANT 3 regression): the working-tree delete fails after `git rm --cached` already
+# succeeded — denying write on a tracked file's immediate parent directory blocks THAT file's
+# `rm -f` specifically (deletion is per-file now, not a directory-level `rm -rf`; see T-I2).
+# Independently verified against the pre-fix script BEFORE writing this fix: it printed the `rm`
+# permission error but then committed anyway and reported success (rc=0). The fixed script must
+# fail loudly AND attempt to restore the index (`git reset`) rather than leave a half-staged,
+# uncommitted removal.
 # ============================================================================================
 repo11="$tmp/repo11"; mk_memory_repo "$repo11"
-chmod 555 "$repo11/.claude/memories/agents"
+chmod 555 "$repo11/.claude/memories/agents/agent-a"
 dest11="$tmp/dest11"
 before_head11="$(git -C "$repo11" rev-parse HEAD)"
 out11="$(run_migrate "$repo11" "$dest11" 2>&1)"; rc11=$?
-chmod 755 "$repo11/.claude/memories/agents" 2>/dev/null || true
+chmod -R u+w "$repo11/.claude/memories" "$dest11" 2>/dev/null || true
 after_head11="$(git -C "$repo11" rev-parse HEAD)"
 staged11="$(git -C "$repo11" diff --cached --name-only)"
 { [ "$rc11" -ne 0 ] && [ "$before_head11" = "$after_head11" ] && [ -z "$staged11" ] \
-  && printf '%s' "$out11" | grep -qi 'restoring the index'; } \
-  && ok "(T11) an rm -rf failure after git rm --cached surfaces as a failure with the index restored" \
+  && printf '%s' "$out11" | grep -qi 'restore the index'; } \
+  && ok "(T11) a per-file delete failure after git rm --cached surfaces as a failure with the index restored" \
   || bad "(T11) rm -rf failure" "rc=$rc11 out='$out11' staged='$staged11'"
 rm -rf "$repo11/.claude/memories/agents" 2>/dev/null || true
 
@@ -406,5 +408,133 @@ after_head15="$(git -C "$repo15" rev-parse HEAD)"
   && printf '%s' "$out15" | grep -qi 'symlink'; } \
   && ok "(T15) a symlinked tracked corpus entry is refused, not silently migrated structurally" \
   || bad "(T15) symlinked entry" "rc=$rc15 out='$out15'"
+
+# ============================================================================================
+# T16 (CRITICAL regression, round 2): the destination-occupancy probe must not be fooled by
+# `dest/agents` itself being a SYMLINK to a populated external directory. `find $dest -type f`
+# does not descend into a symlinked directory, so the prior probe read this as empty. Verified
+# independently against the pre-fix script (round-2 HEAD, commit 5e992e2) BEFORE writing this
+# fix: WITHOUT --force it proceeded anyway, clobbered the external file, printed "verification
+# passed", and committed — rc=0. The fixed probe (`ls -A`, not `find`) must refuse instead.
+# ============================================================================================
+repo16="$tmp/repo16"; mk_memory_repo "$repo16"
+dest16="$tmp/dest16"
+mkdir -p "$dest16"
+mkdir -p "$tmp/agents-real16/agent-a"
+printf 'PRECIOUS EXTERNAL DATA\n' > "$tmp/agents-real16/agent-a/one.md"
+ln -s "$tmp/agents-real16" "$dest16/agents"
+out16="$(run_migrate "$repo16" "$dest16" 2>&1)"; rc16=$?
+after16="$(cat "$tmp/agents-real16/agent-a/one.md" 2>/dev/null)"
+{ [ "$rc16" -ne 0 ] && [ "$after16" = "PRECIOUS EXTERNAL DATA" ] \
+  && printf '%s' "$out16" | grep -qi -- '--force'; } \
+  && ok "(T16) a destination that is a symlink to a populated dir is detected as occupied, not clobbered" \
+  || bad "(T16) symlinked destination occupancy" "rc=$rc16 out='$out16' external_content='$after16'"
+
+# T16b: the same scenario WITH --force must still refuse — via the now-unconditional collision
+# scan — rather than clobbering. Verified independently against the pre-fix script BEFORE
+# writing this fix: identical clobber, rc=0, under --force too.
+repo16b="$tmp/repo16b"; mk_memory_repo "$repo16b"
+dest16b="$tmp/dest16b"
+mkdir -p "$dest16b"
+mkdir -p "$tmp/agents-real16b/agent-a"
+printf 'PRECIOUS EXTERNAL DATA 2\n' > "$tmp/agents-real16b/agent-a/one.md"
+ln -s "$tmp/agents-real16b" "$dest16b/agents"
+out16b="$(run_migrate "$repo16b" "$dest16b" --force 2>&1)"; rc16b=$?
+after16b="$(cat "$tmp/agents-real16b/agent-a/one.md" 2>/dev/null)"
+{ [ "$rc16b" -ne 0 ] && [ "$after16b" = "PRECIOUS EXTERNAL DATA 2" ]; } \
+  && ok "(T16b) --force against a symlinked, colliding destination still refuses rather than clobbering" \
+  || bad "(T16b) symlinked destination + force" "rc=$rc16b out='$out16b' external_content='$after16b'"
+
+# ============================================================================================
+# T17 (IMPORTANT 1 regression, round 2): when the working-tree delete fails AND the subsequent
+# `git reset` restore ALSO fails, the script must say so honestly rather than unconditionally
+# printing "index restored". A PATH-shadowed `git` passes every subcommand through to the real
+# binary except `reset`, which it forces to fail. Independently verified against the pre-fix
+# script (5e992e2) BEFORE writing this fix: it printed "index restored" while the removal was
+# demonstrably still staged — a false success claim precisely where the operator is most likely
+# to trust the message and run `git commit -a`.
+# ============================================================================================
+repo17="$tmp/repo17"; mk_memory_repo "$repo17"
+chmod 555 "$repo17/.claude/memories/agents/agent-a"
+real_git="$(command -v git)"
+reset_fail_bin="$tmp/reset-fail-bin"; mkdir -p "$reset_fail_bin"
+for c in bash sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp cp ls sort; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$reset_fail_bin/$c"
+done
+cat > "$reset_fail_bin/git" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do
+  [ "\$a" = "reset" ] && exit 7
+done
+exec "$real_git" "\$@"
+EOF
+chmod +x "$reset_fail_bin/git"
+dest17="$tmp/dest17"
+before_head17="$(git -C "$repo17" rev-parse HEAD)"
+out17="$( cd "$repo17" && PATH="$reset_fail_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest17" bash "$mm" 2>&1 )"; rc17=$?
+chmod -R u+w "$repo17/.claude/memories" "$dest17" 2>/dev/null || true
+after_head17="$(git -C "$repo17" rev-parse HEAD)"
+staged17="$(git -C "$repo17" diff --cached --name-only)"
+{ [ "$rc17" -ne 0 ] && [ "$before_head17" = "$after_head17" ] && [ -n "$staged17" ] \
+  && printf '%s' "$out17" | grep -qi 'restoration FAILED' \
+  && ! printf '%s' "$out17" | grep -qi 'index restored;'; } \
+  && ok "(T17) a git reset failure after a delete failure is reported honestly, not claimed as restored" \
+  || bad "(T17) git reset failure" "rc=$rc17 out='$out17' staged='$staged17'"
+
+# ============================================================================================
+# T18 (IMPORTANT 2 regression, round 2): deletion must operate over the ENUMERATED set, not a
+# fresh directory-level walk/rm -rf — a file staged into agents/ during the copy step (after
+# enumeration already completed) must survive on disk and stay reachable, never silently
+# vanish from both the destination and HEAD. A PATH-shadowed `cp` performs the real copy and
+# then simulates a concurrent `git add` of a brand-new tracked file. Independently verified
+# against the pre-fix script (5e992e2) BEFORE writing this fix: the raced-in file ended up at
+# NEITHER the destination NOR the new HEAD NOR on disk — a silent, unrecoverable loss (content
+# survives only as a dangling blob). The fix (list-driven `git rm --cached --pathspec-from-file`
+# AND a list-driven per-file working-tree delete, never a directory-level `rm -rf`) must leave
+# it reachable.
+# ============================================================================================
+repo18="$tmp/repo18"; mk_memory_repo "$repo18"
+dest18="$tmp/dest18"
+real_cp="$(command -v cp)"
+race_bin="$tmp/race-bin"; mkdir -p "$race_bin"
+for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp ls sort touch; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$race_bin/$c"
+done
+cat > "$race_bin/cp" <<EOF
+#!/usr/bin/env bash
+"$real_cp" "\$@"
+rc=\$?
+if [ ! -f "$repo18/raced.marker" ]; then
+  touch "$repo18/raced.marker"
+  printf 'RACED CONTENT\n' > "$repo18/.claude/memories/agents/agent-a/raced.md"
+  ( cd "$repo18" && git add .claude/memories/agents/agent-a/raced.md )
+fi
+exit "\$rc"
+EOF
+chmod +x "$race_bin/cp"
+out18="$( cd "$repo18" && PATH="$race_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest18" bash "$mm" 2>&1 )"; rc18=$?
+raced_at_head18="NO"
+git -C "$repo18" cat-file -e "HEAD:.claude/memories/agents/agent-a/raced.md" 2>/dev/null && raced_at_head18="YES"
+raced_on_disk18="NO"; [ -f "$repo18/.claude/memories/agents/agent-a/raced.md" ] && raced_on_disk18="YES"
+{ [ "$rc18" -eq 0 ] && { [ "$raced_at_head18" = "YES" ] || [ "$raced_on_disk18" = "YES" ]; }; } \
+  && ok "(T18) a file staged during the copy window is never silently dropped from both HEAD and disk" \
+  || bad "(T18) deletion race" "rc=$rc18 out='$out18' at_head=$raced_at_head18 on_disk=$raced_on_disk18"
+
+# ============================================================================================
+# T19 (MINOR regression, round 2): the collision pre-scan must treat a DANGLING symlink sitting
+# at a tracked file's destination path as a collision (`-e` alone is false for a dangling
+# symlink; `-L` catches it) — matching the exact `[ -e ] || [ -L ]` pattern memory-root.sh
+# already uses at its own equivalent guard.
+# ============================================================================================
+repo19="$tmp/repo19"; mk_memory_repo "$repo19"
+dest19="$tmp/dest19"
+mkdir -p "$dest19/agents/agent-a"
+ln -s "$dest19/nowhere-target" "$dest19/agents/agent-a/one.md"
+out19="$(run_migrate "$repo19" "$dest19" --force 2>&1)"; rc19=$?
+{ [ "$rc19" -ne 0 ] && printf '%s' "$out19" | grep -qi 'already has agents/agent-a/one.md'; } \
+  && ok "(T19) a dangling symlink at a tracked file's destination path is treated as a collision" \
+  || bad "(T19) dangling symlink collision" "rc=$rc19 out='$out19'"
 
 exit "$fail"

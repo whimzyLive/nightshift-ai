@@ -18,18 +18,27 @@
 #   4. Verify EVERY tracked path individually: present at the destination AND checksum-equal.
 #      A verification pass requires the matched count to equal the tracked count — an empty or
 #      partially-enumerated set can never pass vacuously, because step 2 already refused it.
-#   5. Only if verification passes: git rm -r --cached the two trees, delete the working
-#      copies (checking its exit status), and commit — scoped to just those two paths, so an
-#      operator's unrelated staged work is never swept in. A failure anywhere before step 5
-#      completes leaves the repo's commit history untouched; a failure WITHIN step 5 (e.g. the
-#      working-tree delete fails after the index removal already landed) restores the index via
-#      `git reset` rather than leaving a half-staged, uncommitted mess.
+#   5. Only if verification passes: `git rm --cached --pathspec-from-file` the SAME enumerated
+#      list from step 1 (never a directory pathspec, which `git rm` would re-glob against the
+#      live index at execution time), delete the working copies (checking its exit status), and
+#      commit — scoped to just those two paths, so an operator's unrelated staged work is never
+#      swept in. A failure anywhere before step 5 completes leaves the repo's commit history
+#      untouched; a failure WITHIN step 5 (e.g. the working-tree delete fails after the index
+#      removal already landed) attempts to restore the index via `git reset` and reports whether
+#      that restoration itself succeeded, rather than assuming it did.
 #
 # Never a raw `mv` — the source stays intact on disk until verification has already succeeded.
 #
+# Every "is X occupied/empty" check in this script (the destination-occupancy probe, the
+# collision pre-scan) is written so that an EMPTY result can only mean "confirmed nothing is
+# there" — never "a directory walk didn't happen to find anything" (`find` does not descend into
+# a symlinked directory, so a destination that IS a symlink to a populated external directory
+# would read as empty to a `find`-based probe). The collision pre-scan runs unconditionally,
+# never gated behind that occupancy flag.
+#
 # --force additionally allows merging into an already non-empty destination (AC4), but still
 # refuses if any tracked file would collide with — and silently clobber — existing destination
-# content.
+# content, checked via `-e || -L` so a dangling symlink squatting on the path still counts.
 #
 # Idempotent: once the corpus has been migrated, nothing is left tracked under those two paths,
 # so a re-run finds nothing to do and exits 0 without touching anything.
@@ -85,6 +94,68 @@ sdlc_mm_realpath() {
   done
   existing="$(cd "$p" 2>/dev/null && pwd -P)" || existing="$p"
   printf '%s%s\n' "$existing" "$tail"
+}
+
+# sdlc_mm_dir_occupied <path> -> 0 (true) iff <path> is "not safely empty": either it exists as
+# a directory (or a symlink to one) holding at least one entry, or it exists as anything else at
+# all (a stray file, a dangling symlink squatting on the name). 1 (false) only for "does not
+# exist" or "exists as a genuinely empty directory".
+#
+# Deliberately NOT `find $path -type f | wc -l` (or any recursive walk): `find` does not descend
+# into a directory reached via a symlink, so a destination that IS a symlink to a populated
+# external directory reads as empty — the exact gap that let an unguarded `cp -R` clobber real
+# external data with neither --force nor a warning. `ls -A` resolves the given path exactly the
+# way `cp`/`git rm --cached`/every other tool here will, so its emptiness answer cannot diverge
+# from theirs the way `find`'s can.
+sdlc_mm_dir_occupied() {
+  local p="$1"
+  if [ -d "$p" ]; then
+    [ -n "$(ls -A "$p" 2>/dev/null)" ] && return 0
+    return 1
+  fi
+  { [ -e "$p" ] || [ -L "$p" ]; } && return 0
+  return 1
+}
+
+# sdlc_mm_prune_empty_dirs <repo_root> <list_file> — best-effort, deepest-first removal of any
+# ancestor directory (under .claude/memories/agents or .claude/memories/reviews) left empty by
+# the per-file deletes that precede it. Every candidate is derived from the SAME enumerated
+# list_file — never a fresh directory walk. `rmdir` only ever removes a directory that is
+# ALREADY empty and never forces anything, so a directory still holding something (e.g. a file
+# that raced its way in after enumeration — see sdlc_mm_main) is silently left alone. This
+# cleanup can therefore only ever remove less than intended, never more; its failure is not
+# itself treated as a delete failure.
+sdlc_mm_prune_empty_dirs() {
+  local repo_root="$1" list_file="$2" relpath d dirs_file
+  dirs_file="$(mktemp 2>/dev/null)" || return 0
+  while IFS= read -r -d '' relpath; do
+    d="$(dirname "$relpath")"
+    while :; do
+      case "$d" in
+        .claude/memories/agents|.claude/memories/reviews)
+          printf '%s\n' "$d" >> "$dirs_file"
+          break
+          ;;
+        .claude/memories|.|/)
+          break
+          ;;
+        *)
+          printf '%s\n' "$d" >> "$dirs_file"
+          d="$(dirname "$d")"
+          ;;
+      esac
+    done
+  done < "$list_file"
+  # Deepest-first by slash count (not lexicographic — a plain `sort -r` orders "z" ahead of
+  # "a/b" despite "a/b" being deeper), so a child directory is always rmdir'd before its parent.
+  awk '{ n = gsub(/\//, "&"); print n "\t" $0 }' "$dirs_file" 2>/dev/null \
+    | sort -t "$(printf '\t')" -k1,1nr \
+    | cut -f2- \
+    | while IFS= read -r d; do
+        rmdir -- "$repo_root/$d" 2>/dev/null
+      done
+  rm -f "$dirs_file"
+  return 0
 }
 
 # sdlc_mm_verify_entry <repo_root> <dest_root> <tracked-relpath> -> 0 iff the tracked path is a
@@ -192,8 +263,8 @@ sdlc_mm_main() {
   local dest_agents="$dest_root/agents"
   local dest_reviews="$dest_root/reviews"
   local dest_nonempty=0
-  [ -d "$dest_agents" ] && [ -n "$(find "$dest_agents" -type f 2>/dev/null)" ] && dest_nonempty=1
-  [ -d "$dest_reviews" ] && [ -n "$(find "$dest_reviews" -type f 2>/dev/null)" ] && dest_nonempty=1
+  sdlc_mm_dir_occupied "$dest_agents" && dest_nonempty=1
+  sdlc_mm_dir_occupied "$dest_reviews" && dest_nonempty=1
   if [ "$dest_nonempty" -eq 1 ] && [ "$force" -eq 0 ]; then
     printf 'migrate-memory-root: destination already has content under %s (agents/ or reviews/) — pass --force to merge into it\n' \
       "$dest_root" >&2
@@ -220,21 +291,25 @@ sdlc_mm_main() {
     return 1
   fi
 
-  # --force merging into a non-empty destination must never silently clobber a colliding file.
-  if [ "$force" -eq 1 ] && [ "$dest_nonempty" -eq 1 ]; then
-    local collision=0 dest_relpath dest_abs
-    while IFS= read -r -d '' relpath; do
-      dest_relpath="${relpath#.claude/memories/}"
-      dest_abs="$dest_root/$dest_relpath"
-      if [ -e "$dest_abs" ]; then
-        printf 'migrate-memory-root: --force collision — destination already has %s\n' "$dest_relpath" >&2
-        collision=1
-      fi
-    done < "$list_file"
-    if [ "$collision" -eq 1 ]; then
-      printf 'migrate-memory-root: refusing to overwrite colliding destination file(s) under --force; repo left untouched\n' >&2
-      return 1
+  # A per-file collision pre-scan against the destination — run UNCONDITIONALLY, never gated
+  # behind the dest_nonempty flag above (or behind --force). That flag answering "empty" only
+  # means the occupancy probe found nothing at the top two levels; it must never be the SOLE
+  # reason a real per-tracked-file collision goes unscanned before a copy that can silently
+  # overwrite irreplaceable external data with no git history to recover it from. Checks
+  # `-e || -L` (not `-e` alone), so a dangling symlink squatting on the exact destination path
+  # still counts as a collision rather than reading as "nothing there".
+  local collision=0 dest_relpath dest_abs
+  while IFS= read -r -d '' relpath; do
+    dest_relpath="${relpath#.claude/memories/}"
+    dest_abs="$dest_root/$dest_relpath"
+    if [ -e "$dest_abs" ] || [ -L "$dest_abs" ]; then
+      printf 'migrate-memory-root: destination already has %s\n' "$dest_relpath" >&2
+      collision=1
     fi
+  done < "$list_file"
+  if [ "$collision" -eq 1 ]; then
+    printf 'migrate-memory-root: refusing — one or more tracked files already exist at the destination (even under --force, a collision is never overwritten); repo left untouched\n' >&2
+    return 1
   fi
 
   if [ "$dry_run" -eq 1 ]; then
@@ -242,10 +317,10 @@ sdlc_mm_main() {
     printf '[dry-run] would copy %s tracked file(s): %s -> %s and %s -> %s\n' \
       "$total" "$repo_root/.claude/memories/agents" "$dest_agents" "$repo_root/.claude/memories/reviews" "$dest_reviews"
     printf '[dry-run] would verify every tracked path exists at the destination with a matching checksum\n'
-    printf '[dry-run] would run: git -C %s rm -r --cached -- .claude/memories/agents .claude/memories/reviews\n' \
-      "$repo_root"
-    printf '[dry-run] would delete the working copies: %s %s\n' \
-      "$repo_root/.claude/memories/agents" "$repo_root/.claude/memories/reviews"
+    printf '[dry-run] would run: git -C %s rm --cached --pathspec-from-file=<the enumerated %s tracked paths> --pathspec-file-nul\n' \
+      "$repo_root" "$total"
+    printf '[dry-run] would delete the %s enumerated working-tree files individually, then prune any directory left empty (never a directory-level rm -rf)\n' \
+      "$total"
     printf '[dry-run] would commit the removal, scoped to those two paths\n'
     return 0
   fi
@@ -276,20 +351,43 @@ sdlc_mm_main() {
   fi
   printf 'migrate-memory-root: verification passed — all %s tracked files match at the destination\n' "$total"
 
-  git -C "$repo_root" rm -r --cached --quiet -- .claude/memories/agents .claude/memories/reviews || {
+  # --pathspec-from-file on the SAME enumerated list_file used for verification — not a
+  # directory pathspec (`-- .claude/memories/agents .claude/memories/reviews`), which `git rm`
+  # would re-glob against the LIVE index at execution time. A file staged into that directory
+  # after enumeration but before this point would then be removed having never been enumerated,
+  # copied, or verified. Reading from the same list makes the verified set and the deleted set
+  # identical by construction, matching this script's own stated invariant. No `-r` needed —
+  # the list already names individual files, not directories.
+  git -C "$repo_root" rm --cached --quiet --pathspec-from-file="$list_file" --pathspec-file-nul || {
     printf 'migrate-memory-root: git rm --cached failed — repo left in its prior committed state; nothing further touched\n' >&2
     return 1
   }
 
-  local rm_rc
-  rm -rf "$repo_root/.claude/memories/agents" "$repo_root/.claude/memories/reviews"
-  rm_rc=$?
+  # Per-file `rm -f` over the SAME enumerated list_file — never a directory-level `rm -rf`,
+  # which would delete EVERYTHING physically under those two directories regardless of whether
+  # it was ever enumerated, copied, or verified (the same "operate over the exact verified set,
+  # nothing broader" discipline as the `git rm --cached` call above, applied to the working-tree
+  # side too). Empty ancestor directories are then pruned best-effort; anything left non-empty
+  # (e.g. a file that raced its way in after enumeration) is silently left in place rather than
+  # forced.
+  local rm_rc=0
+  while IFS= read -r -d '' relpath; do
+    rm -f -- "$repo_root/$relpath" || rm_rc=1
+  done < "$list_file"
+  sdlc_mm_prune_empty_dirs "$repo_root" "$list_file"
   if [ "$rm_rc" -ne 0 ]; then
-    printf 'migrate-memory-root: deleting the working copies failed (rc=%s) — restoring the index so nothing is staged uncommitted\n' \
+    printf 'migrate-memory-root: deleting the working copies failed (rc=%s) — attempting to restore the index so nothing is staged uncommitted\n' \
       "$rm_rc" >&2
-    git -C "$repo_root" reset -q -- .claude/memories/agents .claude/memories/reviews 2>/dev/null
-    printf 'migrate-memory-root: index restored; inspect %s manually (some files may already be gone) and re-run once the underlying issue is fixed\n' \
-      "$repo_root/.claude/memories" >&2
+    local reset_rc
+    git -C "$repo_root" reset -q --pathspec-from-file="$list_file" --pathspec-file-nul 2>/dev/null
+    reset_rc=$?
+    if [ "$reset_rc" -eq 0 ]; then
+      printf 'migrate-memory-root: index restored; inspect %s manually (some files may already be gone) and re-run once the underlying issue is fixed\n' \
+        "$repo_root/.claude/memories" >&2
+    else
+      printf 'migrate-memory-root: index restoration FAILED (git reset exit=%s) — the removal may still be staged; run `git reset -- .claude/memories/agents .claude/memories/reviews` manually before doing anything else, then re-run once the underlying issue is fixed\n' \
+        "$reset_rc" >&2
+    fi
     return 1
   fi
 
