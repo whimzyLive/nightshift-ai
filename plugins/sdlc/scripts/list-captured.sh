@@ -46,7 +46,10 @@ else
   # NA-101 transition shim: capture-learning.sh wrote into the PRIMARY checkout before this story,
   # and those files are untracked + gitignored, so a `git rev-parse --show-toplevel` probe from a
   # linked worktree would make every already-staged capture invisible. Use sdlc_primary_worktree,
-  # never git-toplevel. NA-102 removes this fallback with the corpus move.
+  # never git-toplevel. NA-102 migrates the TRACKED agents/reviews corpus only —
+  # `.claude/memories/captured/` is untracked/gitignored and explicitly out of that migration's
+  # scope, so this fallback is untouched by it; removing it (if ever warranted) is a separate,
+  # unscheduled follow-up.
   legacy=""
   primary="$(sdlc_primary_worktree 2>/dev/null)" || primary=""
   [ -n "$primary" ] && legacy="$primary/.claude/memories/captured"

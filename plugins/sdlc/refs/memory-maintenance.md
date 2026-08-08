@@ -6,6 +6,26 @@ auto-triggered.
 
 `<memory-root>` := the path printed by `bash ${CLAUDE_PLUGIN_ROOT}/scripts/memory-root.sh --print-root`.
 
+## One-time corpus migration (`migrate-memory-root.sh`)
+
+`${CLAUDE_PLUGIN_ROOT}/scripts/migrate-memory-root.sh` is a **separate, one-shot** tool from the
+five ongoing ops below — it is what gets a repo's in-repo `.claude/memories/{agents,reviews}`
+corpus INTO `<memory-root>` in the first place (NA-102), a prerequisite that has to happen exactly
+once per repo before any of the ongoing ops below have an external root to operate on. It is
+founder-run, not agent-dispatched, and not wired into any command or CI step — invoke it directly:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/migrate-memory-root.sh --dry-run   # ALWAYS first: read the output, mutates nothing
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/migrate-memory-root.sh             # the real run, once the dry-run output looks right
+```
+
+It copies the tracked corpus to `<memory-root>`, verifies every file (count AND checksum) before
+touching anything, then `git rm --cached`s, deletes the working copies, and commits — refusing
+outright (never guessing, never partially applying) on a non-empty destination without `--force`,
+a partial or inconsistent corpus, a symlinked entry, or a destination inside the repo itself. Full
+contract and every refusal condition are documented in the script's own header comment; `-h`
+documents `--force`'s exact (narrow) scope. Idempotent — once migrated, a re-run is a no-op.
+
 **Always founder-gated, always a reviewable PR, never a silent write.** This op has no auto-apply
 path: every proposed change (a demotion, a deletion, a promotion) is presented to the founder and
 applied only after explicit confirmation, exactly like every other apply flow in this plugin

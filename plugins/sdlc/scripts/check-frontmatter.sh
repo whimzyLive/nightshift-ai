@@ -23,7 +23,10 @@ fi
 # PRIMARY checkout. From a linked worktree, <git-toplevel>/captured is empty even when the primary
 # has staged captures list-captured.sh can see, so column 2 resolves via sdlc_primary_worktree
 # (matching list-captured.sh), falling back to column 1 if that fails.
-# The legacy entry is the NA-101 transition shim; NA-102 removes it.
+# The legacy entry is the NA-101 transition shim. NA-102 ships migrate-memory-root.sh (the
+# one-shot corpus move) but deliberately does NOT remove this shim — it stays a harmless no-op
+# once the tree is empty; removing it is explicitly out of NA-102's scope and left to a
+# follow-up story.
 mem_roots=""
 resolver_failed=0
 if [ -n "$explicit_root" ]; then

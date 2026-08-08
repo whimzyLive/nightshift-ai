@@ -7,14 +7,18 @@
 #
 # SAFETY CONTRACT — copy, then verify, then delete, in that order, no exceptions:
 #   1. Enumerate the tracked corpus via `git ls-files` — this is the EXACT set `git rm --cached`
-#      will later remove. Verification and deletion always operate over this same set, never
-#      over a directory walk that could silently diverge from it (a tracked-but-locally-deleted
-#      file, a broken `find`, a symlinked directory `find` won't descend into, ...).
+#      will later remove. Every subsequent step (the disk-presence check, the collision
+#      pre-scan, the copy, verification, `git rm --cached`, the per-file delete, the prune) reads
+#      from this SAME list — never a directory walk that could silently diverge from it (a
+#      tracked-but-locally-deleted file, a broken `find`, a symlinked directory `find` won't
+#      descend into, an untracked or gitignored file sitting alongside the corpus, ...).
 #   2. Refuse outright if that set is empty but the working tree still holds something at those
 #      paths (inconsistent state), if it is non-empty in only one of agents/ or reviews/
 #      (partial corpus), if any listed path is missing from disk or is a symlink, or if the
 #      resolved destination sits inside this repository.
-#   3. cp -R the two tracked trees to the resolved external root.
+#   3. Copy each enumerated path individually to the resolved external root (never a
+#      directory-level `cp -R`, which would also copy anything untracked/gitignored sitting
+#      alongside the corpus, entirely bypassing the collision pre-scan in step 2).
 #   4. Verify EVERY tracked path individually: present at the destination AND checksum-equal.
 #      A verification pass requires the matched count to equal the tracked count — an empty or
 #      partially-enumerated set can never pass vacuously, because step 2 already refused it.
@@ -55,6 +59,13 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 usage() {
   printf 'usage: migrate-memory-root.sh [--dry-run] [--force]\n' >&2
+  printf '\n' >&2
+  printf '  --dry-run  report exactly what would be copied, verified, deleted and committed;\n' >&2
+  printf '             mutates nothing. Recommended before every real run.\n' >&2
+  printf '  --force    allow the destination to already be non-empty (merge into it). It does\n' >&2
+  printf '             NOT relax any other check: a per-tracked-file collision at the\n' >&2
+  printf '             destination is refused unconditionally either way, so --force can never\n' >&2
+  printf '             overwrite existing destination content.\n' >&2
 }
 
 # sdlc_mm_checksum <file> -> a content checksum, portable across the same hasher fallback chain
@@ -68,7 +79,12 @@ sdlc_mm_checksum() {
   elif command -v sha256sum >/dev/null 2>&1; then
     line="$(sha256sum -- "$f" 2>/dev/null)"; rc=$?
   elif command -v cksum >/dev/null 2>&1; then
-    line="$(cksum -- "$f" 2>/dev/null)"; rc=$?
+    # Stdin redirection, not `cksum -- "$f"`: GNU coreutils' cksum does not support `--` as an
+    # option terminator (it would try to checksum a file literally named `--`, then `$f`,
+    # contradicting memory-root.sh's own cksum call, which never passes `--`). Reading via stdin
+    # sidesteps the whole question — no filename argument is ever passed to cksum at all, which
+    # is also inherently safe for a filename that starts with `-`.
+    line="$(cksum < "$f" 2>/dev/null)"; rc=$?
   else
     printf 'migrate-memory-root: no shasum, sha256sum or cksum available — cannot verify\n' >&2
     return 1
@@ -323,6 +339,9 @@ sdlc_mm_main() {
   fi
 
   if [ "$dry_run" -eq 1 ]; then
+    local dry_branch
+    dry_branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null)" || dry_branch="?"
+    printf '[dry-run] repo: %s (branch %s)\n' "$repo_root" "$dry_branch"
     printf '[dry-run] would resolve memory root: %s\n' "$dest_root"
     printf '[dry-run] would copy %s tracked file(s): %s -> %s and %s -> %s\n' \
       "$total" "$repo_root/.claude/memories/agents" "$dest_agents" "$repo_root/.claude/memories/reviews" "$dest_reviews"
@@ -337,14 +356,33 @@ sdlc_mm_main() {
 
   sdlc_memory_ensure "$dest_root" || return 1
 
-  cp -R "$repo_root/.claude/memories/agents/." "$dest_agents/" || {
-    printf 'migrate-memory-root: copy of %s failed — repo left untouched\n' "$repo_root/.claude/memories/agents" >&2
+  # Per-file copy from the SAME enumerated list_file — never a directory-level `cp -R`, which
+  # would copy EVERYTHING physically present under those two trees, tracked or not. An untracked
+  # (or gitignored) file sitting alongside the corpus would then be copied to the destination
+  # having never been collision-scanned above — the one operation in this script that wasn't
+  # already list-driven, and exactly the divergence the header at L9-L12 says this script
+  # eliminates. Copying only the enumerated set closes it: the scanned, copied, verified,
+  # deleted and pruned set is now the same set everywhere, by construction.
+  local copy_bad=0 dest_relpath dest_abs dest_parent
+  while IFS= read -r -d '' relpath; do
+    dest_relpath="${relpath#.claude/memories/}"
+    dest_abs="$dest_root/$dest_relpath"
+    dest_parent="$(dirname "$dest_abs")"
+    if ! mkdir -p -- "$dest_parent" 2>/dev/null; then
+      printf 'migrate-memory-root: cannot create destination directory for %s\n' "$dest_relpath" >&2
+      copy_bad=1
+      continue
+    fi
+    if ! cp -- "$repo_root/$relpath" "$dest_abs"; then
+      printf 'migrate-memory-root: copy failed: %s\n' "$dest_relpath" >&2
+      copy_bad=1
+    fi
+  done < "$list_file"
+  if [ "$copy_bad" -eq 1 ]; then
+    printf 'migrate-memory-root: copy FAILED — the destination at %s may now hold a PARTIAL copy. Recovery: clear %s and re-run this script (do not simply retry without clearing it — a partial destination refuses at the occupancy gate, and --force would then refuse at the collision scan against that same partial content)\n' \
+      "$dest_root" "$dest_root" >&2
     return 1
-  }
-  cp -R "$repo_root/.claude/memories/reviews/." "$dest_reviews/" || {
-    printf 'migrate-memory-root: copy of %s failed — repo left untouched\n' "$repo_root/.claude/memories/reviews" >&2
-    return 1
-  }
+  fi
 
   local matched=0 verify_bad=0
   while IFS= read -r -d '' relpath; do
@@ -355,8 +393,8 @@ sdlc_mm_main() {
     fi
   done < "$list_file"
   if [ "$verify_bad" -eq 1 ] || [ "$matched" -ne "$total" ]; then
-    printf 'migrate-memory-root: verification FAILED — %s of %s tracked files verified at the destination; repo left untouched, the destination copy is not authoritative, safe to retry\n' \
-      "$matched" "$total" >&2
+    printf 'migrate-memory-root: verification FAILED — %s of %s tracked files verified at the destination; repo left untouched, but the destination at %s now holds an UNVERIFIED copy. Recovery: clear %s and re-run (do not simply retry — a re-run refuses at the occupancy gate, and --force would then refuse at the collision scan against that same unverified content)\n' \
+      "$matched" "$total" "$dest_root" "$dest_root" >&2
     return 1
   fi
   printf 'migrate-memory-root: verification passed — all %s tracked files match at the destination\n' "$total"
@@ -369,7 +407,8 @@ sdlc_mm_main() {
   # identical by construction, matching this script's own stated invariant. No `-r` needed —
   # the list already names individual files, not directories.
   git -C "$repo_root" rm --cached --quiet --pathspec-from-file="$list_file" --pathspec-file-nul || {
-    printf 'migrate-memory-root: git rm --cached failed — repo left in its prior committed state; nothing further touched\n' >&2
+    printf 'migrate-memory-root: git rm --cached failed — the repo itself is untouched (still at its prior committed state), but the destination at %s already holds a full VERIFIED copy from this run. Recovery: clear %s and re-run (do not simply retry — a re-run refuses at the occupancy gate, and --force would then refuse at the collision scan against that same verified copy)\n' \
+      "$dest_root" "$dest_root" >&2
     return 1
   }
 
@@ -422,12 +461,15 @@ sdlc_mm_main() {
 
   git -C "$repo_root" commit --quiet -m 'chore(memory): migrate agent and review memory corpus to the external memory root' \
     -- .claude/memories/agents .claude/memories/reviews || {
-    printf 'migrate-memory-root: commit failed — the removal is staged; inspect git status under %s and commit manually\n' \
+    printf 'migrate-memory-root: commit failed — the removal is staged (repo otherwise untouched). This ran WITHOUT --no-verify, so a local pre-commit/commit-msg hook may have rejected it — check the hook output above. Once resolved (or if skipping the hook is intentional), commit manually: git -C %s commit -m "chore(memory): migrate agent and review memory corpus to the external memory root" -- .claude/memories/agents .claude/memories/reviews (add --no-verify to that command only if skipping the hook is intentional)\n' \
       "$repo_root" >&2
     return 1
   }
 
-  printf 'migrate-memory-root: migrated %s tracked files to %s; repo committed\n' "$total" "$dest_root"
+  local branch
+  branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null)" || branch="?"
+  printf 'migrate-memory-root: migrated %s tracked files from %s (branch %s) to %s; repo committed\n' \
+    "$total" "$repo_root" "$branch" "$dest_root"
   return 0
 }
 

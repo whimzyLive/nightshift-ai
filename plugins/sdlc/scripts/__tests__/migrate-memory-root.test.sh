@@ -168,7 +168,7 @@ out4b="$(run_migrate "$repo4" "$dest4")"; rc4b=$?
 head4b="$(git -C "$repo4" rev-parse HEAD)"
 dest4_after="$(find "$dest4" -type f | sort)"
 { [ "$rc4b" -eq 0 ] && [ "$head4a" = "$head4b" ] && [ "$dest4_snapshot" = "$dest4_after" ] \
-  && printf '%s' "$out4b" | grep -qi -- 'no-op\|already migrated\|nothing to migrate'; } \
+  && printf '%s' "$out4b" | grep -Eqi -- 'no-op|already migrated|nothing to migrate'; } \
   && ok "(T4) re-running after a successful migration is a safe no-op" \
   || bad "(T4) idempotent re-run" "rc=$rc4b out='$out4b' head1=$head4a head2=$head4b"
 
@@ -579,5 +579,226 @@ chmod -R u+w "$repo21/.claude/memories" "$dest21" 2>/dev/null || true
   && printf '%s' "$out21" | grep -q 'rm -r --cached'; } \
   && ok "(T21) the delete-failure recovery message states the real cause and a concrete recovery path" \
   || bad "(T21) recovery message actionability" "rc=$rc21 out='$out21'"
+
+# ============================================================================================
+# T22 (Copilot regression, PR #235 round 1): `cksum -- "$f"` is not portable — GNU coreutils'
+# cksum does NOT treat `--` as an option terminator (it is parsed as a literal filename operand),
+# so verification would fail wherever cksum is the only available hasher. A stub `cksum` models
+# that exact documented behaviour (delegates to the real binary per-operand, but treats a `--`
+# operand as a missing file) regardless of what this host's own cksum actually does. Independently
+# verified against the pre-fix script (commit 3eaa173) BEFORE writing this fix: with shasum and
+# sha256sum hidden, the migration fails entirely (verification cannot read either tracked file).
+# The fix reads via stdin redirection instead (`cksum < "$f"`), which never passes cksum a
+# filename argument at all — sidestepping the `--` question, and safe for dash-prefixed names too.
+# ============================================================================================
+repo22="$tmp/repo22"; mk_memory_repo "$repo22"
+dest22="$tmp/dest22"
+real_cksum="$(command -v cksum)"
+cksum_bin="$tmp/cksum-bin"; mkdir -p "$cksum_bin"
+for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf mktemp ls sort cp; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$cksum_bin/$c"
+done
+cat > "$cksum_bin/cksum" <<EOF
+#!/usr/bin/env bash
+# Models GNU coreutils cksum: a bare "--" operand is NOT an option terminator, it is parsed as
+# a literal (nonexistent) filename.
+if [ "\$#" -eq 0 ]; then
+  exec "$real_cksum"
+fi
+bad=0
+for a in "\$@"; do
+  if [ ! -e "\$a" ]; then
+    printf 'cksum: %s: No such file or directory\n' "\$a" >&2
+    bad=1
+    continue
+  fi
+  "$real_cksum" "\$a"
+done
+exit "\$bad"
+EOF
+chmod +x "$cksum_bin/cksum"
+out22="$( cd "$repo22" && PATH="$cksum_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest22" bash "$mm" 2>&1 )"; rc22=$?
+{ [ "$rc22" -eq 0 ] && [ -f "$dest22/agents/agent-a/one.md" ]; } \
+  && ok "(T22) cksum-only verification (no shasum/sha256sum) succeeds without relying on '--'" \
+  || bad "(T22) cksum portability" "rc=$rc22 out='$out22'"
+
+# ============================================================================================
+# T23 (IMPORTANT regression, PR #235 round 1): the copy itself must be list-driven, not a
+# directory-level `cp -R` — the one operation in the pipeline that wasn't already scoped to the
+# enumerated tracked set. An UNTRACKED file sitting alongside the corpus must never be copied
+# (and so can never collide with, and clobber, distinct destination content that the tracked-set
+# collision scan never even looks at). Independently verified against the pre-fix script
+# (3eaa173) BEFORE writing this fix: under --force, the untracked file overwrote distinct
+# destination content with rc=0 and "verification passed" — the same harm class as T13/T16b,
+# reached through the one path the collision scan could not see.
+# ============================================================================================
+repo23="$tmp/repo23"; mk_memory_repo "$repo23"
+printf 'SOURCE UNTRACKED JUNK\n' > "$repo23/.claude/memories/agents/agent-a/secret.md"
+dest23="$tmp/dest23"
+mkdir -p "$dest23/agents/agent-a"
+printf 'PRECIOUS EXTERNAL DATA\n' > "$dest23/agents/agent-a/secret.md"
+out23="$(run_migrate "$repo23" "$dest23" --force 2>&1)"; rc23=$?
+after23="$(cat "$dest23/agents/agent-a/secret.md" 2>/dev/null)"
+{ [ "$after23" = "PRECIOUS EXTERNAL DATA" ] && [ ! -f "$dest23/agents/agent-a/secret.md.orig" ]; } \
+  && ok "(T23) an untracked source file is never copied and cannot clobber destination content" \
+  || bad "(T23) untracked-file copy divergence" "rc=$rc23 out='$out23' dest_content='$after23'"
+
+# ============================================================================================
+# T24 (IMPORTANT regression, PR #235 round 1): the verification-FAILED message must not claim
+# "safe to retry" — by that point the destination already holds an unverified copy, so a bare
+# retry refuses at the occupancy gate and --force then refuses at the collision scan.
+# Independently verified against the pre-fix script (3eaa173) BEFORE writing this fix: the
+# message said exactly "safe to retry". The fix states the real cause (destination holds an
+# unverified copy) and the real recovery (clear the destination, then re-run).
+# ============================================================================================
+repo24="$tmp/repo24"; mk_memory_repo "$repo24"
+dest24="$tmp/dest24"
+real_cp24="$(command -v cp)"
+verify_bin="$tmp/verify-bin"; mkdir -p "$verify_bin"
+for c in bash git sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp ls sort; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$verify_bin/$c"
+done
+corrupt24="$dest24/agents/agent-a/one.md"
+cat > "$verify_bin/cp" <<EOF
+#!/usr/bin/env bash
+"$real_cp24" "\$@"
+rc=\$?
+[ -f "$corrupt24" ] && printf 'CORRUPTED\n' > "$corrupt24"
+exit "\$rc"
+EOF
+chmod +x "$verify_bin/cp"
+out24="$( cd "$repo24" && PATH="$verify_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest24" bash "$mm" 2>&1 )"; rc24=$?
+{ [ "$rc24" -ne 0 ] && printf '%s' "$out24" | grep -qi 'unverified copy' \
+  && printf '%s' "$out24" | grep -qi -- 'clear .* and re-run' \
+  && ! printf '%s' "$out24" | grep -qi 'safe to retry'; } \
+  && ok "(T24) the verification-failure message states the destination holds an unverified copy, not 'safe to retry'" \
+  || bad "(T24) verify-failure message" "rc=$rc24 out='$out24'"
+
+# ============================================================================================
+# T25 (IMPORTANT regression, PR #235 round 1): the git-rm-cached-failure message must say the
+# destination already holds a VERIFIED copy from this run (verification runs before git rm
+# --cached) and how to recover — not just "nothing further touched", which is true of the repo
+# but silent about the destination. A PATH-shadowed `git` fails only on the `rm` subcommand.
+# Independently verified against the pre-fix script (3eaa173) BEFORE writing this fix: the
+# message never mentioned the destination at all.
+# ============================================================================================
+repo25="$tmp/repo25"; mk_memory_repo "$repo25"
+dest25="$tmp/dest25"
+real_git25="$(command -v git)"
+rmfail_bin="$tmp/rmfail-bin"; mkdir -p "$rmfail_bin"
+for c in bash sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp cp ls sort; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$rmfail_bin/$c"
+done
+cat > "$rmfail_bin/git" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do
+  [ "\$a" = "rm" ] && exit 11
+done
+exec "$real_git25" "\$@"
+EOF
+chmod +x "$rmfail_bin/git"
+out25="$( cd "$repo25" && PATH="$rmfail_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest25" bash "$mm" 2>&1 )"; rc25=$?
+{ [ "$rc25" -ne 0 ] && printf '%s' "$out25" | grep -qi 'verified copy' \
+  && printf '%s' "$out25" | grep -qi -- 'clear .* and re-run'; } \
+  && ok "(T25) the git-rm-cached-failure message names the destination's verified copy and recovery" \
+  || bad "(T25) git-rm-cached-failure message" "rc=$rc25 out='$out25'"
+
+# ============================================================================================
+# T26 (MINOR regression, PR #235 round 1): `-h`/`--help` must document --force's actual (narrow)
+# scope — merging into a non-empty destination only, never relaxing the collision check.
+# Independently verified against the pre-fix script (3eaa173) BEFORE writing this fix: `-h`
+# printed one bare usage line with no mention of --force's scope at all.
+# ============================================================================================
+out26="$(bash "$mm" -h 2>&1)"; rc26=$?
+{ [ "$rc26" -eq 0 ] && printf '%s' "$out26" | grep -qi -- '--force' \
+  && printf '%s' "$out26" | grep -qi 'not.*relax\|never overwrite\|does not relax'; } \
+  && ok "(T26) -h documents --force's actual scope, not just its name" \
+  || bad "(T26) -h help text" "rc=$rc26 out='$out26'"
+
+# ============================================================================================
+# T27 (MINOR regression, PR #235 round 1): the commit-failure message must hint that an
+# un-`--no-verify`'d local hook may be the cause, and that --no-verify is available if skipping
+# it is intentional — this is the one path where a real (non-fixture) run exercises this repo's
+# own husky/lint-staged hook, which no fixture in this suite has. A PATH-shadowed `git` fails
+# only on the `commit` subcommand. Independently verified against the pre-fix script (3eaa173)
+# BEFORE writing this fix: the message said only "commit failed — the removal is staged;
+# inspect git status ... and commit manually", with no mention of hooks or --no-verify.
+# ============================================================================================
+repo27="$tmp/repo27"; mk_memory_repo "$repo27"
+dest27="$tmp/dest27"
+real_git27="$(command -v git)"
+commitfail_bin="$tmp/commitfail-bin"; mkdir -p "$commitfail_bin"
+for c in bash sed cut basename dirname tr head awk mkdir grep find wc rm printf shasum sha256sum cksum mktemp cp ls sort; do
+  real="$(command -v "$c" 2>/dev/null)" || continue
+  ln -sf "$real" "$commitfail_bin/$c"
+done
+cat > "$commitfail_bin/git" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do
+  [ "\$a" = "commit" ] && exit 13
+done
+exec "$real_git27" "\$@"
+EOF
+chmod +x "$commitfail_bin/git"
+out27="$( cd "$repo27" && PATH="$commitfail_bin" HOME="$tmp/home" SDLC_MEMORY_ROOT="$dest27" bash "$mm" 2>&1 )"; rc27=$?
+{ [ "$rc27" -ne 0 ] && printf '%s' "$out27" | grep -qi 'hook' && printf '%s' "$out27" | grep -qi -- '--no-verify'; } \
+  && ok "(T27) the commit-failure message names a possible hook rejection and --no-verify" \
+  || bad "(T27) commit-failure message" "rc=$rc27 out='$out27'"
+
+# ============================================================================================
+# T28 (coverage, PR #235 round 1 Minor — reachable branch, no prior test): total=0 (nothing
+# tracked) with an UNTRACKED directory of that name still present is a hard refusal, distinct
+# from T4's sibling no-op arm (both directories absent). This behaviour is UNCHANGED by this
+# round's fixes — it is new coverage of an already-correct branch, not a regression fix, so it
+# is not expected to (and does not) behave differently against the pre-fix script.
+# ============================================================================================
+repo28="$tmp/repo28"; mkdir -p "$repo28/.claude/memories/agents/agent-a"
+git -C "$repo28" init -q
+git -C "$repo28" config user.email t@t
+git -C "$repo28" config user.name test
+git -C "$repo28" commit -q --allow-empty -m seed
+printf 'untracked leftover\n' > "$repo28/.claude/memories/agents/agent-a/leftover.md"
+dest28="$tmp/dest28"
+out28="$(run_migrate "$repo28" "$dest28" 2>&1)"; rc28=$?
+{ [ "$rc28" -ne 0 ] && printf '%s' "$out28" | grep -qi 'untracked directory'; } \
+  && ok "(T28) total=0 with an untracked leftover directory refuses, distinct from the no-op arm" \
+  || bad "(T28) total=0 refusal arm" "rc=$rc28 out='$out28'"
+
+# ============================================================================================
+# T29 (coverage, PR #235 round 1 Minor — reachable branch, no prior test): a memory-root
+# RESOLVER failure (HOME, XDG_DATA_HOME and SDLC_MEMORY_ROOT all unset) surfaces the resolver's
+# own error and exits non-zero, before anything is copied. Unchanged by this round's fixes — new
+# coverage of an already-correct branch, not a regression fix.
+# ============================================================================================
+repo29="$tmp/repo29"; mk_memory_repo "$repo29"
+out29="$( cd "$repo29" && env -u SDLC_MEMORY_ROOT -u XDG_DATA_HOME -u HOME bash "$mm" 2>&1 )"; rc29=$?
+{ [ "$rc29" -ne 0 ] && printf '%s' "$out29" | grep -qi 'cannot resolve the memory root'; } \
+  && ok "(T29) a memory-root resolver failure surfaces its own error and exits non-zero" \
+  || bad "(T29) resolver failure" "rc=$rc29 out='$out29'"
+
+# ============================================================================================
+# T30 (MINOR regression, PR #235 round 1): the success message (and --dry-run) must name which
+# repo and branch were committed to, not just the destination — `sdlc_memory_root` keys off the
+# PRIMARY worktree while repo_root is the CURRENT worktree, so running from a linked worktree
+# migrates and commits there while resolving a destination keyed to the primary, with nothing in
+# the old output to reveal it. Independently verified against the pre-fix script (3eaa173)
+# BEFORE writing this fix: the final line named only the destination.
+# ============================================================================================
+repo30="$tmp/repo30"; mk_memory_repo "$repo30"
+dest30="$tmp/dest30"
+out30="$(run_migrate "$repo30" "$dest30")"; rc30=$?
+{ [ "$rc30" -eq 0 ] && printf '%s' "$out30" | grep -qF "$repo30" && printf '%s' "$out30" | grep -qi 'branch'; } \
+  && ok "(T30) the success message names the repo and branch committed to" \
+  || bad "(T30) success message repo/branch" "rc=$rc30 out='$out30'"
+
+dest30b="$tmp/dest30b"
+repo30b="$tmp/repo30b"; mk_memory_repo "$repo30b"
+out30b="$(run_migrate "$repo30b" "$dest30b" --dry-run)"
+printf '%s' "$out30b" | grep -qF "$repo30b" && printf '%s' "$out30b" | grep -qi 'branch' \
+  && ok "(T30b) --dry-run also names the repo and branch" \
+  || bad "(T30b) dry-run repo/branch" "out='$out30b'"
 
 exit "$fail"
