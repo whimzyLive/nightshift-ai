@@ -71,9 +71,10 @@ and read the returned paths yourself. Never paste rule text into a prompt — a 
 than the content it points at.
 
 ```text
-own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> [<payload-file>]
+own-domain rule -> bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-learning.sh rule <your-name>/<rule-id> <STORY-KEY> <payload-file>
 cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared/<rule-id> <STORY-KEY> <payload-file>   # the payload file's `agent:` lists every agent it binds
 <rule-id> := kebab-case, MUST equal the capture's `id`
+<payload-file> := REQUIRED (NA-103) — the 7-field schema only comes from one
 ```
 
 Prints `CAPTURED=<path>` into the gitignored staging area. You never write
@@ -123,6 +124,7 @@ of existing config, and any entry that only makes sense with the originating sto
 
 ```text
 rule cited in `trigger` AND actually applied this dispatch (own, or a `shared/` one) -> capture-learning.sh rule <its dir>/<its id> <STORY-KEY> <payload-file: `uses: 1`, `evidence: [<STORY-KEY>]`>   # promotion merges into the target's count
+shared/ counter-only STILL needs `agent:` >= 2 (NA-103) — only trigger/rule is exempt
 ```
 
 ## Domain verification

@@ -155,9 +155,12 @@ run_cap rule shared/under-agented AB-1 "$tmp/payload.md" >/dev/null 2>&1 \
 [ ! -e "$root/rules/AB-1--under-agented.md" ] \
   && ok "(T3g4) rejected shared capture wrote no file" || bad "(T3g4) rejected shared capture wrote no file" "file exists"
 
-# --- T3g5-7: shared/ counter-only exemption ---------------------------------
+# --- T3g5-7: shared/ counter-only exemption (NA-103: the exemption covers trigger/rule CONTENT
+# only — the >= 2 agents format check on shared/ is UNCONDITIONAL, so the payload still needs a
+# real agent: list even though it carries no trigger/rule of its own).
 cat > "$tmp/counter-only.md" <<'EOF'
 ---
+agent: [web-engineer, mobile-engineer]
 uses: 1
 evidence: [AB-1]
 ---
@@ -165,13 +168,28 @@ EOF
 run_cap rule shared/counter-only-target AB-1 "$tmp/counter-only.md" >/dev/null 2>"$tmp/counter_err"
 counter_rc=$?
 [ "$counter_rc" -eq 0 ] \
-  && ok "(T3g5) shared/ counter-only payload (uses set, rule absent) is exempt from the >= 2 agents guard" \
+  && ok "(T3g5) shared/ counter-only payload (uses set, rule absent) is exempt from the trigger/rule content check" \
   || bad "(T3g5) shared counter-only exemption" "exited $counter_rc: $(cat "$tmp/counter_err")"
 [ -f "$root/rules/AB-1--counter-only-target.md" ] \
   && ok "(T3g6) shared/ counter-only capture is written" || bad "(T3g6) shared counter-only written" "file missing"
 p3="$(extract_fm "$root/rules/AB-1--counter-only-target.md" | parse_frontmatter)"
 [ "$(field_value "$p3" uses)" = "1" ] \
   && ok "(T3g7) shared/ counter-only capture carries the payload's uses" || bad "(T3g7) counter-only uses" "got '$(field_value "$p3" uses)'"
+
+# --- T3g5b-c (NA-103 Important 3): a shared/ counter-only payload WITHOUT a real agent: list is
+# now refused — the old exemption used to also waive the >= 2 agents format check, letting
+# `agent: []` through silently. Verified to fail against pre-NA-103-Important-3 (74a3bdc) below.
+cat > "$tmp/counter-only-no-agent.md" <<'EOF'
+---
+uses: 1
+evidence: [AB-1]
+---
+EOF
+run_cap rule shared/counter-only-no-agent AB-1 "$tmp/counter-only-no-agent.md" >/dev/null 2>&1 \
+  && bad "(T3g5b) shared/ counter-only WITHOUT agent: is rejected" "exited 0" \
+  || ok "(T3g5b) shared/ counter-only WITHOUT agent: is rejected"
+[ ! -e "$root/rules/AB-1--counter-only-no-agent.md" ] \
+  && ok "(T3g5c) rejected agent-less shared counter-only wrote no file" || bad "(T3g5c) rejected agent-less shared counter-only wrote no file" "file exists"
 
 # --- T3g8-9: the counter-only exemption cannot be smuggled via a single-agent payload --------
 cat > "$tmp/smuggled.md" <<'EOF'
@@ -219,6 +237,30 @@ run_cap bogus foo AB-1 >/dev/null 2>&1 \
 run_cap rule web-engineer/some-rule AB-1 "$tmp/missing-file.md" >/dev/null 2>&1 \
   && bad "(T3m) missing payload file rejected" "exited 0" || ok "(T3m) missing payload file rejected"
 
+# --- T3m2-5 (NA-103 Critical 2): the payload is now genuinely REQUIRED for `rule`, and the
+# usage/doc contract agrees. Pre-fix (74a3bdc), an omitted or '-' payload was ALSO refused, but
+# only incidentally (it fell through to the generic 7-field schema error, "trigger must have 1-6
+# items, got 0") — the die message never said a payload was required, and
+# refs/domain-agent-handoff.md's own-domain line still showed `[<payload-file>]` as optional,
+# actively contradicting the actual behaviour. These pin the NEW, dedicated messages.
+run_cap rule web-engineer/some-rule AB-1 >/dev/null 2>"$tmp/no_payload_err"
+grep -qF "rule needs a <payload-file>" "$tmp/no_payload_err" \
+  && ok "(T3m2) an omitted payload dies with the dedicated 'needs a <payload-file>' message" \
+  || bad "(T3m2) omitted-payload message" "got '$(cat "$tmp/no_payload_err")'"
+run_cap rule web-engineer/some-rule AB-1 - >/dev/null 2>"$tmp/dash_payload_err"
+grep -qF "no longer accepts '-'" "$tmp/dash_payload_err" \
+  && ok "(T3m3) a '-' payload dies with the dedicated 'no longer accepts -' message" \
+  || bad "(T3m3) '-'-payload message" "got '$(cat "$tmp/dash_payload_err")'"
+[ ! -e "$root/rules/AB-1--some-rule.md" ] \
+  && ok "(T3m4) neither refusal wrote a file" || bad "(T3m4) neither refusal wrote a file" "file exists"
+handoff="$scripts/../refs/domain-agent-handoff.md"
+own_domain_line="$(grep -F 'own-domain rule ->' "$handoff")"
+case "$own_domain_line" in
+  *'[<payload-file>]'*) bad "(T3m5) domain-agent-handoff.md's own-domain line no longer shows the optional-payload brackets" "still shows '[<payload-file>]': $own_domain_line" ;;
+  *'<payload-file>'*)   ok "(T3m5) domain-agent-handoff.md's own-domain line shows <payload-file> as required" ;;
+  *)                    bad "(T3m5) domain-agent-handoff.md's own-domain line" "payload-file not found at all: $own_domain_line" ;;
+esac
+
 cat > "$tmp/round.md" <<'EOF'
 ---
 domains: [web-engineer]
@@ -260,18 +302,33 @@ printf '%s' "$wf_out" | grep -q '^CAPTURED=' \
   && ok "(T3s4) a failed write leaves no partial/final file behind" || bad "(T3s4) no file left behind" "file exists"
 
 # --- T3t: story-key validation, both kinds (Critical 2) --------------------------------------
-run_cap rule web-engineer/story-key-check '../../escaped' >/dev/null 2>&1 \
+# NA-103 Important 4: T3t1/T3t3/T3t4 previously called run_cap with NO payload at all — since
+# NA-103 made the payload mandatory for `rule`, that missing-payload die fires FIRST regardless of
+# the story key, and these tests stayed green even with validate_story_key's body deleted
+# (mutation-tested against 74a3bdc's Important-4 predecessor). Both fixes now: pass a schema-valid
+# payload so the story-key check is what actually runs, and pin the die MESSAGE via stderr so a
+# wrong-reason rejection can't pass silently.
+run_cap rule web-engineer/story-key-check '../../escaped' "$tmp/payload.md" >/dev/null 2>"$tmp/t3t1_err" \
   && bad "(T3t1) path-traversal story key rejected (rule)" "exited 0" \
   || ok "(T3t1) path-traversal story key rejected (rule)"
+grep -qF "story key '../../escaped' is not <PROJECT>-<N>" "$tmp/t3t1_err" \
+  && ok "(T3t1b) rejection is pinned to the story-key die message" \
+  || bad "(T3t1b) story-key die message" "got '$(cat "$tmp/t3t1_err")'"
 [ -z "$(find "$tmp" -maxdepth 2 -name 'escaped--story-key-check.md')" ] \
   && ok "(T3t2) rejected story key escaped nothing onto disk (rule)" \
   || bad "(T3t2) rejected story key wrote nothing" "escaped file exists"
-run_cap rule web-engineer/story-key-check 'feat/NA-98' >/dev/null 2>&1 \
+run_cap rule web-engineer/story-key-check 'feat/NA-98' "$tmp/payload.md" >/dev/null 2>"$tmp/t3t3_err" \
   && bad "(T3t3) a branch name is rejected as a story key (rule)" "exited 0" \
   || ok "(T3t3) a branch name is rejected as a story key (rule)"
-run_cap rule web-engineer/story-key-check 'ab-1' >/dev/null 2>&1 \
+grep -qF "story key 'feat/NA-98' is not <PROJECT>-<N>" "$tmp/t3t3_err" \
+  && ok "(T3t3b) rejection is pinned to the story-key die message" \
+  || bad "(T3t3b) story-key die message" "got '$(cat "$tmp/t3t3_err")'"
+run_cap rule web-engineer/story-key-check 'ab-1' "$tmp/payload.md" >/dev/null 2>"$tmp/t3t4_err" \
   && bad "(T3t4) a lowercase story key is rejected (rule)" "exited 0" \
   || ok "(T3t4) a lowercase story key is rejected (rule)"
+grep -qF "story key 'ab-1' is not <PROJECT>-<N>" "$tmp/t3t4_err" \
+  && ok "(T3t4b) rejection is pinned to the story-key die message" \
+  || bad "(T3t4b) story-key die message" "got '$(cat "$tmp/t3t4_err")'"
 # NA-103: a well-formed-story-key write also needs a schema-valid payload now — use payload.md
 # (already valid trigger/rule/evidence) so this test isolates the story-key assertion alone.
 run_cap rule web-engineer/story-key-check 'AB-1' "$tmp/payload.md" >/dev/null 2>&1 \
@@ -426,6 +483,62 @@ EOF
 run_schema rule web-engineer/schema-good AB-2 "$tmp/schema-counter-only.md" >/dev/null 2>&1 \
   && ok "(T3v7) an own-dir counter-only update is exempt from the 7-field content check" \
   || bad "(T3v7) own-dir counter-only exemption" "exited non-zero"
+
+# --- T3v8-13 (NA-103 Important 3): the counter-only exemption is NOT a blanket bypass — its own
+# uses/evidence content is still validated. Pre-fix, all three of these wrote at rc=0 (verified
+# against 74a3bdc below); post-fix they are refused.
+cat > "$tmp/schema-counter-only-bad-uses.md" <<'EOF'
+---
+uses: not-a-number
+evidence: [AB-2]
+---
+EOF
+run_schema rule web-engineer/schema-counter-only-bad-uses AB-2 "$tmp/schema-counter-only-bad-uses.md" >/dev/null 2>&1 \
+  && bad "(T3v8) a counter-only payload with non-numeric uses is rejected" "exited 0" \
+  || ok "(T3v8) a counter-only payload with non-numeric uses is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-counter-only-bad-uses.md" ] \
+  && ok "(T3v8b) rejected bad-uses counter-only capture wrote no file" || bad "(T3v8b) rejected bad-uses wrote no file" "file exists"
+
+cat > "$tmp/schema-counter-only-no-evidence.md" <<'EOF'
+---
+uses: 3
+---
+EOF
+run_schema rule web-engineer/schema-counter-only-no-evidence AB-2 "$tmp/schema-counter-only-no-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v9) a counter-only payload with no evidence is rejected" "exited 0" \
+  || ok "(T3v9) a counter-only payload with no evidence is rejected"
+
+cat > "$tmp/schema-counter-only-bad-evidence.md" <<'EOF'
+---
+uses: 3
+evidence: [total-garbage-token]
+---
+EOF
+run_schema rule web-engineer/schema-counter-only-bad-evidence AB-2 "$tmp/schema-counter-only-bad-evidence.md" >/dev/null 2>&1 \
+  && bad "(T3v10) a counter-only payload with a garbage evidence token is rejected" "exited 0" \
+  || ok "(T3v10) a counter-only payload with a garbage evidence token is rejected"
+[ ! -e "$schema_root/rules/AB-2--schema-counter-only-bad-evidence.md" ] \
+  && ok "(T3v10b) rejected garbage-evidence counter-only capture wrote no file" || bad "(T3v10b) rejected garbage-evidence wrote no file" "file exists"
+
+# --- T3v11-13 (NA-103 Minor 6): a single-letter Jira project key is accepted as BOTH a story key
+# and an evidence item — the two regexes previously disagreed ([A-Z0-9]+ vs [A-Z0-9]*).
+cat > "$tmp/schema-single-letter-key.md" <<'EOF'
+---
+trigger: [one situation]
+rule: When X happens, do Y.
+evidence: [A-1]
+uses: 0
+---
+EOF
+run_schema rule web-engineer/schema-single-letter-key A-2 "$tmp/schema-single-letter-key.md" >/dev/null 2>"$tmp/single_letter_err" \
+  && ok "(T3v11) a single-letter story key is accepted" \
+  || bad "(T3v11) single-letter story key accepted" "exited non-zero: $(cat "$tmp/single_letter_err")"
+[ -f "$schema_root/rules/A-2--schema-single-letter-key.md" ] \
+  && ok "(T3v12) single-letter-key capture file written" || bad "(T3v12) single-letter-key file written" "file missing"
+p_slk="$(extract_fm "$schema_root/rules/A-2--schema-single-letter-key.md" | parse_frontmatter)"
+[ "$(field_value "$p_slk" evidence)" = "A-1" ] \
+  && ok "(T3v13) a single-letter-key evidence item ('A-1') is accepted, not rejected" \
+  || bad "(T3v13) single-letter evidence accepted" "evidence field got '$(field_value "$p_slk" evidence)'"
 
 # --- T4: list-captured --------------------------------------------------------
 lst="$scripts/list-captured.sh"

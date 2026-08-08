@@ -332,6 +332,61 @@ rm -rf "$li_tmp"
 
 rm -rf "$cf_tmp"
 
+# --- NA-103 Critical 1: AC5 + AC2 combined to kill AC3 — a fresh CI checkout has NOTHING tracked
+# under `.claude/memories/` (AC5 deletes the last tracked file), so the resolver's SKIP path used
+# to `exit 0` BEFORE the docs/adr/*.md frontmatter loop ever ran, silently disabling the only ADR
+# frontmatter guard in the repo. This is a base-vs-head comparison against the actual commit the
+# defect shipped in (74a3bdc), not a message assertion — it proves the OLD script misses a planted
+# violation and the CURRENT script catches it, on the identical fixture.
+c1_tmp="$(mktemp -d)"; c1_tmp="$(cd "$c1_tmp" && pwd -P)"
+
+# Fresh-CI-checkout fixture: a git repo with NOTHING under .claude/memories/ (not even the
+# directory) and one ADR whose frontmatter opens on line 2, not line 1.
+c1_repo="$c1_tmp/repo"; mkdir -p "$c1_repo/docs/adr"
+git -C "$c1_repo" init -q
+cat > "$c1_repo/docs/adr/0099-bad-adr.md" <<'EOF'
+
+---
+status: accepted
+agents: [web-engineer]
+---
+
+# 0099. A bad ADR whose frontmatter does not open on line 1
+EOF
+git -C "$c1_repo" -c user.email=t@t -c user.name=t add -A
+git -C "$c1_repo" -c user.email=t@t -c user.name=t commit -q -m "fresh checkout fixture"
+
+# Base (74a3bdc): extract check-frontmatter.sh as it shipped, alongside the (unchanged since)
+# memory-root.sh it sources — both scripts are hermetic, no `../agents/` dependency.
+c1_base_dir="$c1_tmp/base-scripts"; mkdir -p "$c1_base_dir"
+git -C "$here" show 74a3bdc:plugins/sdlc/scripts/check-frontmatter.sh > "$c1_base_dir/check-frontmatter.sh"
+cp "$scripts_dir/memory-root.sh" "$c1_base_dir/memory-root.sh"
+chmod +x "$c1_base_dir/check-frontmatter.sh"
+
+# HEAD: the currently checked-out (fixed) script.
+c1_home="$c1_tmp/home"; mkdir -p "$c1_home"          # hermetic; never resolves to a real corpus
+run_c1() { # $1 = script path
+  ( cd "$c1_repo" && env -i HOME="$c1_home" PATH="$PATH" XDG_DATA_HOME="$c1_tmp/never-created" \
+      SDLC_MEMORY_ROOT="$c1_tmp/never-created" bash "$1" )
+}
+
+base_out="$(run_c1 "$c1_base_dir/check-frontmatter.sh" 2>&1)"; base_rc=$?
+if [ "$base_rc" -eq 0 ]; then
+  echo "PASS: base (74a3bdc) reproduces the defect — exits 0, missing the planted bad ADR"
+else
+  echo "FAIL: base (74a3bdc) did not reproduce the defect — expected exit 0, got $base_rc: $base_out"
+  failures=$((failures + 1))
+fi
+
+head_out="$(run_c1 "$check_frontmatter" 2>&1)"; head_rc=$?
+if [ "$head_rc" -eq 1 ] && printf '%s' "$head_out" | grep -qF "0099-bad-adr.md"; then
+  echo "PASS: head (fixed) catches the planted bad ADR — exits 1, names the file"
+else
+  echo "FAIL: head did not catch the planted bad ADR — rc=$head_rc out='$head_out'"
+  failures=$((failures + 1))
+fi
+rm -rf "$c1_tmp"
+
 if [ "$failures" -ne 0 ]; then
   echo
   echo "memory-frontmatter.test.sh: FAILED ($failures assertion(s) failed)"

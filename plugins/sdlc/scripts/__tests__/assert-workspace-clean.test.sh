@@ -234,11 +234,16 @@ else
   fail "F8 regression — assert from different cwd got assert_rc=$assert_rc integrity=$integrity violation=$violation (want OK/none)"
 fi
 
-# seed_initialised_memories <repo-dir> — commits a placeholder file under .claude/memories/ so the
-# repo matches a real post-`/sdlc:init` checkout (where agents/**/.gitkeep, reviews/.gitkeep etc.
-# are already tracked). Without this, git's untracked-directory collapse in a bare scratch repo
-# stops at the highest never-tracked ancestor (`.claude/`), not at `.claude/memories/captured/` —
-# a fixture artifact that does not reproduce the real repo shape the fix targets.
+# seed_initialised_memories <repo-dir> — commits a placeholder file under .claude/memories/ so a
+# tracked path exists there for these Case 10-13 fixtures to anchor an in-repo SDLC_CAPTURE_ROOT
+# under. NA-103 Minor 5: this no longer "matches a real post-`/sdlc:init` checkout" — NA-101
+# already stopped `/sdlc:init` from scaffolding anything under `.claude/memories/agents/**` (the
+# memory root lives outside the repo now), and NA-103 deletes the last tracked file the pre-NA-101
+# scaffold left behind (`.claude/memories/captured/.gitignore`). A genuinely fresh checkout today
+# has NOTHING tracked under `.claude/memories/` at all, so git's untracked-directory collapse stops
+# at `.claude/` itself (or higher), not at `.claude/memories/captured/` — the in-repo
+# capture_root_rel entry in assert-workspace-clean.sh only ever matches when something IS tracked
+# there, which this fixture manufactures but a real repo no longer provides by default.
 seed_initialised_memories() {
   local repo="$1"
   mkdir -p "$repo/.claude/memories/agents/shared"
