@@ -22,9 +22,11 @@ fi
 # mem_roots — newline-delimited, in precedence order.
 #   arg2 present -> LEGACY-ONLY (keeps memory-frontmatter.test.sh fixtures hermetic)
 #   arg2 absent  -> DUAL: resolved root, then <git-toplevel>/.claude/memories
-# The legacy entry is the NA-101 transition shim; NA-102 removes it with the corpus move. Unlike
-# list-captured.sh this one correctly uses git-toplevel: the legacy corpus is TRACKED, so it is
-# present in every worktree.
+# The legacy entry is the NA-101 transition shim. NA-102 ships migrate-memory-root.sh (the
+# one-shot corpus move) but deliberately does NOT remove this shim — it stays a harmless no-op
+# once the tree is empty; removing it is explicitly out of NA-102's scope and left to a
+# follow-up story. Unlike list-captured.sh this one correctly uses git-toplevel: the legacy
+# corpus is TRACKED, so it is present in every worktree.
 mem_roots=""
 if [ -n "$explicit_root" ]; then
   mem_roots="$explicit_root/.claude/memories"
