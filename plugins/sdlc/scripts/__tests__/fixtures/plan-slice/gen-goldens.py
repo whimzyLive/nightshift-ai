@@ -8,6 +8,10 @@ NA-93 A3 lesson). Author-run, not CI-run; its OUTPUT is committed and CI only re
 
 Python 3.9 stdlib only — no `match`, no PEP 604 runtime unions.
 
+Run this only against a CLEAN docs/superpowers/plans/ tree — sha comes from `git rev-parse HEAD`,
+bytes come from the working tree, and a dirty tree makes those two disagree. main() enforces this
+with a refusal, not just this note.
+
 Provenance note: the .slice / .checklist golden files are compared BYTE-FOR-BYTE against
 plan-slice.sh's real stdout-named file (cmp -s), so they carry no header of their own — a header
 would make that comparison fail by construction. Provenance (# sourceSha / # sourceBytes) is
@@ -113,7 +117,27 @@ def git_sha():
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(REPO_ROOT)).decode().strip()
 
 
+def assert_clean_corpus_tree():
+    """sourceSha is measured from HEAD but sourceBytes is measured from the WORKING TREE — the two
+    only agree when CORPUS_DIR has no uncommitted changes. Running this against a dirty corpus tree
+    silently stamps a sha that cannot reproduce the recorded bytes (the NA-101 review-round bug:
+    sourceSha=<pre-edit HEAD>, NA-101.md=<post-edit, uncommitted bytes>). Refuse rather than warn —
+    a warning is easy to miss in scrollback; a refusal cannot be.
+    """
+    out = subprocess.check_output(
+        ["git", "status", "--porcelain", "--", str(CORPUS_DIR)], cwd=str(REPO_ROOT)
+    ).decode()
+    if out.strip():
+        raise SystemExit(
+            "gen-goldens.py: refusing to run — {} has uncommitted changes:\n{}\n"
+            "sourceSha (git rev-parse HEAD) and sourceBytes (working-tree read) would be measured "
+            "from DIFFERENT states. Commit or stash the changes under docs/superpowers/plans/, "
+            "then re-run against a clean tree.".format(CORPUS_DIR, out.rstrip("\n"))
+        )
+
+
 def main():
+    assert_clean_corpus_tree()
     sha = git_sha()
     GOLDENS_DIR.mkdir(parents=True, exist_ok=True)
 

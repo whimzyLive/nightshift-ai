@@ -22,14 +22,14 @@ tot=$((hb + qb))
 [ "$tot" -le 41214 ] && ok "(B1) combined surfaces $tot <= 41214" \
   || bad "(B1) combined surfaces <= 41214" "actual $tot (handoff=$hb qa=$qb) — NEVER raise this constant"
 
-grep -qF 'git add .claude/memories/' "$qa" \
-  && bad "(B2) QA Step 5 no longer stages .claude/memories/" "the git add block survives" \
-  || ok "(B2) QA Step 5 no longer stages .claude/memories/"
+grep -qF 'git add <memory-root>/' "$qa" \
+  && bad "(B2) QA Step 5 no longer stages the memory root" "the git add block survives" \
+  || ok "(B2) QA Step 5 no longer stages the memory root"
 
 grep -qF 'capture-learning.sh' "$handoff" \
   && ok "(B3) handoff names capture-learning.sh" || bad "(B3) handoff names capture-learning.sh" "not found"
 
-grep -qE '^[^#]*\.claude/memories/agents/<' "$handoff" \
+grep -qE '^[^#]*<memory-root>/agents/<' "$handoff" \
   && bad "(B4) handoff no longer instructs a direct agents/ write" "a direct write target survives" \
   || ok "(B4) handoff no longer instructs a direct agents/ write"
 

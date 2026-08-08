@@ -2,16 +2,50 @@
 set -uo pipefail
 shopt -s nullglob
 
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/memory-root.sh"
+
 agent="${1:-}"
 if [ -z "$agent" ]; then
   echo "usage: collect-memory.sh <agent> [<repo-root>]" >&2
   exit 1
 fi
 
-repo_root="${2:-}"
+explicit_root="${2:-}"
+repo_root="$explicit_root"
 if [ -z "$repo_root" ]; then
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
   [ -z "$repo_root" ] && repo_root="$(pwd)"
+fi
+
+# mem_roots — newline-delimited, in precedence order.
+#   arg2 present -> LEGACY-ONLY (keeps memory-frontmatter.test.sh fixtures hermetic)
+#   arg2 absent  -> DUAL: resolved root, then <git-toplevel>/.claude/memories
+# The legacy entry is the NA-101 transition shim; NA-102 removes it with the corpus move. Unlike
+# list-captured.sh this one correctly uses git-toplevel: the legacy corpus is TRACKED, so it is
+# present in every worktree.
+mem_roots=""
+if [ -n "$explicit_root" ]; then
+  mem_roots="$explicit_root/.claude/memories"
+else
+  # A hasher on the success path can write to stderr while still exiting 0 (e.g. macOS
+  # /usr/bin/shasum is Perl and warns on a locale mismatch) — 2>&1 on the success call would
+  # contaminate $resolved with that warning text. Only re-invoke with 2>&1 to capture the reason
+  # AFTER a plain 2>/dev/null call has already established failure; the resolver is side-effect
+  # free on --print-root, so a second call is safe.
+  resolver_err=""
+  if ! resolved="$(sdlc_memory_root 2>/dev/null)" || [ -z "$resolved" ]; then
+    resolver_err="$(sdlc_memory_root 2>&1 >/dev/null)"
+    resolved=""
+  fi
+  if [ -z "$resolved" ]; then
+    echo "collect-memory: WARNING — ${resolver_err:-cannot resolve the memory root}; using the legacy in-repo root only" >&2
+  elif [ -d "$resolved" ]; then
+    mem_roots="$resolved"
+  fi
+  [ -d "$repo_root/.claude/memories" ] && mem_roots="$mem_roots${mem_roots:+
+}$repo_root/.claude/memories"
 fi
 
 extract_fm() {
@@ -99,6 +133,11 @@ csv_to_display() {
   printf '%s' "$1" | sed 's/,/, /g'
 }
 
+emitted_ids=""
+id_seen() { printf '%s' "$emitted_ids" | grep -qxF "$1"; }
+id_mark() { emitted_ids="$emitted_ids$1
+"; }
+
 process_rule_file() {
   local file="$1"
   local fm parsed
@@ -120,8 +159,10 @@ process_rule_file() {
   rule_val="$(field_value "$parsed" rule)"
 
   [ -z "$id" ] && return 0
+  id_seen "$id" && return 0
 
   if list_contains "$agent_list" "$agent" && [ "$status_val" = "active" ]; then
+    id_mark "$id"
     printf 'RULE %s [%s] %s\n' "$id" "$(csv_to_display "$trig")" "$rule_val"
   fi
 }
@@ -163,26 +204,26 @@ process_adr_file() {
   printf 'ADR %s [%s] %s\n' "$nnnn" "$(csv_to_display "$trig")" "$title"
 }
 
-legacy_file="$repo_root/.claude/memories/agents/$agent.md"
-if [ -f "$legacy_file" ]; then
-  printf 'LEGACY\n'
-  cat "$legacy_file"
-  echo "collect-memory: WARNING — $legacy_file is a v1 flat diary; migrate to .claude/memories/agents/$agent/<rule-id>.md (NA-74)." >&2
-fi
+legacy_banner_done=0
 
-rule_dir="$repo_root/.claude/memories/agents/$agent"
-if [ -d "$rule_dir" ]; then
-  for f in "$rule_dir"/*.md; do
-    process_rule_file "$f"
-  done
-fi
+while IFS= read -r mem_root; do
+  [ -n "$mem_root" ] || continue
 
-shared_dir="$repo_root/.claude/memories/agents/shared"
-if [ -d "$shared_dir" ]; then
-  for f in "$shared_dir"/*.md; do
-    process_rule_file "$f"
+  legacy_file="$mem_root/agents/$agent.md"
+  if [ "$legacy_banner_done" -eq 0 ] && [ -f "$legacy_file" ]; then
+    printf 'LEGACY\n'
+    cat "$legacy_file"
+    echo "collect-memory: WARNING — $legacy_file is a v1 flat diary; migrate to <memory-root>/agents/$agent/<rule-id>.md (NA-74)." >&2
+    legacy_banner_done=1
+  fi
+
+  for d in "$mem_root/agents/$agent" "$mem_root/agents/shared"; do
+    [ -d "$d" ] || continue
+    for f in "$d"/*.md; do
+      process_rule_file "$f"
+    done
   done
-fi
+done <<< "$mem_roots"
 
 adr_dir="$repo_root/docs/adr"
 if [ -d "$adr_dir" ]; then

@@ -11,6 +11,8 @@ shopt -s nullglob
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/frontmatter-lib.sh"
+# shellcheck source=/dev/null
+. "$here/memory-root.sh"
 
 as_json=0; f_story=""; f_kind=""; f_agent=""
 while [ $# -gt 0 ]; do
@@ -25,23 +27,42 @@ while [ $# -gt 0 ]; do
 done
 case "$f_kind" in ""|rule|review) : ;; *) printf 'list-captured.sh: --kind must be rule or review\n' >&2; exit 1 ;; esac
 
+# Root list, newline-delimited, in precedence order. SDLC_CAPTURE_ROOT stays FIRST and unmodified:
+# when it is set it is the only root, exactly as before.
+roots=""
 if [ -n "${SDLC_CAPTURE_ROOT:-}" ]; then
-  root="$SDLC_CAPTURE_ROOT"
+  roots="$SDLC_CAPTURE_ROOT"
 else
-  porcelain="$(git worktree list --porcelain 2>/dev/null)" || {
-    printf "list-captured.sh: 'git worktree list --porcelain' failed — cannot resolve the staging root\n" >&2
-    exit 1
-  }
-  printf '%s\n' "$porcelain" | head -3 | grep -q '^bare$' && {
-    printf 'list-captured.sh: main repository is bare — no primary checkout to enumerate\n' >&2
-    exit 1
-  }
-  main="$(printf '%s\n' "$porcelain" | sed -n 's/^worktree //p' | head -1)"
-  [ -n "$main" ] || {
-    printf "list-captured.sh: no 'worktree ' entry in git worktree list output — cannot resolve the staging root\n" >&2
-    exit 1
-  }
-  root="$main/.claude/memories/captured"
+  # A hasher on the success path can write to stderr while still exiting 0 (e.g. macOS
+  # /usr/bin/shasum is Perl and warns on a locale mismatch) — 2>&1 on the success call would
+  # contaminate $resolved with that warning text. Only re-invoke with 2>&1 to capture the reason
+  # AFTER a plain 2>/dev/null call has already established failure; the resolver is side-effect
+  # free on --print-root, so a second call is safe.
+  resolver_err=""
+  if ! resolved="$(sdlc_memory_root 2>/dev/null)" || [ -z "$resolved" ]; then
+    resolver_err="$(sdlc_memory_root 2>&1 >/dev/null)"
+    resolved=""
+  fi
+  # NA-101 transition shim: capture-learning.sh wrote into the PRIMARY checkout before this story,
+  # and those files are untracked + gitignored, so a `git rev-parse --show-toplevel` probe from a
+  # linked worktree would make every already-staged capture invisible. Use sdlc_primary_worktree,
+  # never git-toplevel. NA-102 removes this fallback with the corpus move.
+  legacy=""
+  primary="$(sdlc_primary_worktree 2>/dev/null)" || primary=""
+  [ -n "$primary" ] && legacy="$primary/.claude/memories/captured"
+  if [ -z "$resolved" ]; then
+    if [ -n "$legacy" ] && [ -d "$legacy" ]; then
+      printf 'list-captured.sh: WARNING — %s; listing the legacy in-repo staging root only\n' \
+        "${resolver_err:-cannot resolve the memory root}" >&2
+    else
+      printf 'list-captured.sh: cannot resolve the staging root — %s\n' \
+        "${resolver_err:-memory-root.sh could not resolve a root}" >&2
+      exit 1
+    fi
+  fi
+  [ -n "$resolved" ] && [ -d "$resolved/captured" ] && roots="$resolved/captured"
+  [ -n "$legacy" ] && [ -d "$legacy" ] && roots="$roots${roots:+
+}$legacy"
 fi
 
 json_esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
@@ -58,10 +79,17 @@ emit() { # path kind id story captured promote summary agents
   count=$((count + 1))
 }
 
-scan() { # $1 = rule|review
-  local d="$root/$1s" file p id story cap promote summary agents
+seen=""
+seen_has() { printf '%s' "$seen" | grep -qxF "$1"; }
+seen_add() { seen="$seen$1
+"; }
+
+scan() { # $1 = rule|review, $2 = root
+  local d="$2/$1s" file p id story cap promote summary agents dedupe_key
   [ -d "$d" ] || return 0
   for file in "$d"/*.md; do
+    dedupe_key="$1/$(basename "$file")"
+    seen_has "$dedupe_key" && continue
     p="$(extract_fm "$file" | parse_frontmatter)"
     if [ -z "$p" ]; then printf 'list-captured.sh: skipping malformed capture %s\n' "$file" >&2; continue; fi
     story="$(field_value "$p" story)"; cap="$(field_value "$p" captured)"
@@ -80,13 +108,17 @@ scan() { # $1 = rule|review
       [ -z "$agents" ] && continue
       list_contains "$agents" "$f_agent" || continue
     fi
+    seen_add "$dedupe_key"
     emit "$file" "$1" "$id" "$story" "$cap" "$promote" "$summary" "$agents"
   done
 }
 
-if [ -n "$root" ]; then
-  [ "$f_kind" = "review" ] || scan rule
-  [ "$f_kind" = "rule" ]   || scan review
+if [ -n "$roots" ]; then
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    [ "$f_kind" = "review" ] || scan rule "$r"
+    [ "$f_kind" = "rule" ]   || scan review "$r"
+  done <<< "$roots"
 fi
 [ "$as_json" -eq 1 ] && printf '{"entries":[%s],"count":%s}\n' "$entries" "$count"
 exit 0

@@ -70,19 +70,20 @@ wt_repo="$(cd "$wt_repo" && pwd -P)"  # canonicalise: git worktree list --porcel
 git -C "$wt_repo" init -q
 git -C "$wt_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 git -C "$wt_repo" worktree add -q "$tmp/linked" -b linked >/dev/null 2>&1
-got="$(cd "$tmp/linked" && bash "$cap" --print-root)"
+wt_mem="$tmp/wt-memroot"
+got="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" --print-root )"
 case "$got" in
-  "$wt_repo"/.claude/memories/captured) ok "(T2e) linked worktree resolves to main checkout" ;;
-  *) bad "(T2e) linked worktree resolves to main checkout" "got '$got'" ;;
+  "$wt_mem"/captured) ok "(T2e) linked worktree resolves to the resolved memory root" ;;
+  *) bad "(T2e) linked worktree resolves to the resolved memory root" "got '$got'" ;;
 esac
 
-# T2e2: a capture written from the linked worktree survives `git worktree remove --force` of
-# that worktree (spec D3's central claim — the staging root is the PRIMARY checkout, never the
-# linked worktree, so removing the worktree must not touch it).
-wt_cap_out="$(cd "$tmp/linked" && bash "$cap" rule web-engineer/survives-worktree-removal AB-1)"
-wt_cap_file="$wt_repo/.claude/memories/captured/rules/AB-1--survives-worktree-removal.md"
+# T2e2: a capture written from the linked worktree lands in the RESOLVED root, which is outside
+# the git tree entirely — so it necessarily survives `git worktree remove --force` (NA-101
+# strengthens spec D3's claim: the staging root is no longer any checkout).
+wt_cap_out="$( cd "$tmp/linked" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$wt_mem" bash "$cap" rule web-engineer/survives-worktree-removal AB-1 )"
+wt_cap_file="$wt_mem/captured/rules/AB-1--survives-worktree-removal.md"
 [ "$wt_cap_out" = "CAPTURED=$wt_cap_file" ] && [ -f "$wt_cap_file" ] \
-  && ok "(T2e2) capture written from the linked worktree lands in the main checkout" \
+  && ok "(T2e2) capture written from the linked worktree lands in the resolved root" \
   || bad "(T2e2) capture from linked worktree" "got '$wt_cap_out'"
 git -C "$wt_repo" worktree remove --force "$tmp/linked"
 [ ! -d "$tmp/linked" ] \
@@ -128,13 +129,13 @@ p="$(extract_fm "$f" | parse_frontmatter)"
 [ "$(field_value "$p" id)" = "capture-before-commit" ] && ok "(T3b) id derived from arg" || bad "(T3b) id" "got '$(field_value "$p" id)'"
 [ "$(field_value "$p" status)" = "captured" ] && ok "(T3c) status captured" || bad "(T3c) status" "got '$(field_value "$p" status)'"
 [ "$(field_value "$p" agent)" = "web-engineer" ] && ok "(T3d) agent = target dir" || bad "(T3d) agent" "got '$(field_value "$p" agent)'"
-[ "$(field_value "$p" promote-target)" = ".claude/memories/agents/web-engineer/capture-before-commit.md" ] \
+[ "$(field_value "$p" promote-target)" = "agents/web-engineer/capture-before-commit.md" ] \
   && ok "(T3e) promote-target own dir" || bad "(T3e) promote-target own dir" "got '$(field_value "$p" promote-target)'"
 grep -q '^## Why' "$f" && ok "(T3f) body appended" || bad "(T3f) body appended" "## Why missing"
 
 run_cap rule shared/cross-cutting-thing AB-1 "$tmp/payload-shared.md" >/dev/null
 p2="$(extract_fm "$root/rules/AB-1--cross-cutting-thing.md" | parse_frontmatter)"
-[ "$(field_value "$p2" promote-target)" = ".claude/memories/agents/shared/cross-cutting-thing.md" ] \
+[ "$(field_value "$p2" promote-target)" = "agents/shared/cross-cutting-thing.md" ] \
   && ok "(T3g) promote-target shared" || bad "(T3g) promote-target shared" "got '$(field_value "$p2" promote-target)'"
 [ "$(field_value "$p2" agent)" = "web-engineer,mobile-engineer" ] \
   && ok "(T3g2) shared agent list comes from the payload, never the literal 'shared'" \
@@ -213,7 +214,7 @@ rf="$root/reviews/2026-08-04-AB-1-r2.md"
 [ "$out_r" = "CAPTURED=$rf" ] && ok "(T3n) review path with -r2" || bad "(T3n) review path" "got '$out_r'"
 pr="$(extract_fm "$rf" | parse_frontmatter)"
 [ "$(field_value "$pr" origin)" = "qa-round" ] && ok "(T3o) review origin fixed" || bad "(T3o) review origin" "got '$(field_value "$pr" origin)'"
-[ "$(field_value "$pr" promote-target)" = ".claude/memories/reviews/2026-08-04-AB-1-r2.md" ] \
+[ "$(field_value "$pr" promote-target)" = "reviews/2026-08-04-AB-1-r2.md" ] \
   && ok "(T3p) review promote-target" || bad "(T3p) review promote-target" "got '$(field_value "$pr" promote-target)'"
 run_cap review AB-1 2026-08-04 1 >/dev/null
 [ -f "$root/reviews/2026-08-04-AB-1.md" ] && ok "(T3q) round 1 has no suffix" || bad "(T3q) round 1 suffix" "file not at unsuffixed path"
@@ -321,7 +322,7 @@ empty="$tmp/empty-root"
 # --- T4j2-3: root-resolution failure (vs T4i/T4j's resolved-but-empty root) --------------------
 nongit="$tmp/not-a-repo"; mkdir -p "$nongit"
 nongit_out="$tmp/nongit_out"; nongit_err="$tmp/nongit_err"
-( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT -u SDLC_MEMORY_ROOT bash "$lst" ) >"$nongit_out" 2>"$nongit_err"
 nongit_rc=$?
 if [ "$nongit_rc" -ne 0 ] && [ -z "$(cat "$nongit_out")" ] && [ -s "$nongit_err" ]; then
   pass_lst=1
@@ -330,7 +331,7 @@ else
 fi
 [ "$pass_lst" -eq 1 ] && ok "(T4j2) resolution failure outside a git checkout is a hard error" \
   || bad "(T4j2) resolution failure hard error" "rc=$nongit_rc stdout='$(cat "$nongit_out")' stderr='$(cat "$nongit_err")'"
-( cd "$nongit" && env -u SDLC_CAPTURE_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
+( cd "$nongit" && env -u SDLC_CAPTURE_ROOT -u SDLC_MEMORY_ROOT bash "$lst" --json ) >"$nongit_out" 2>"$nongit_err"
 nongit_json_rc=$?
 [ "$nongit_json_rc" -ne 0 ] && ! grep -q '"entries"' "$nongit_out" \
   && ok "(T4j3) resolution failure (--json) is a hard error, not a quiet empty corpus" \
@@ -370,7 +371,7 @@ status: captured
 captured: 2026-08-04T00:00:00Z
 story: AB-1
 origin: domain-agent
-promote-target: .claude/memories/agents/web-engineer/bad-capture.md
+promote-target: agents/web-engineer/bad-capture.md
 ---
 EOF
 cf_out="$(bash "$scripts/check-frontmatter.sh" "$cf_repo" 2>&1)"; cf_rc=$?
@@ -398,12 +399,65 @@ root_causes: []
 issue_count: 2
 captured: 2026-08-04T00:00:00Z
 origin: qa-round
-promote-target: .claude/memories/reviews/2026-08-04-AB-2.md
+promote-target: reviews/2026-08-04-AB-2.md
 ---
 EOF
 cf3_out="$(bash "$scripts/check-frontmatter.sh" "$bad_marker_repo" 2>&1)"
 printf '%s' "$cf3_out" | grep -qi "empty field 'domains'" \
   && ok "(T6e) issue_count > 0 with empty domains/root_causes still warns" \
   || bad "(T6e) genuinely malformed review still warns" "$cf3_out"
+
+# --- T6f (NA-101): a legacy `.claude/memories/...` promote-target warns, never fails ---------
+legacy_pt_repo="$tmp/legacyptrepo"; mkdir -p "$legacy_pt_repo/.claude/memories/captured/rules"
+cat > "$legacy_pt_repo/.claude/memories/captured/rules/AB-3--legacy-promote-target.md" <<'EOF'
+---
+id: legacy-promote-target
+agent: [web-engineer]
+trigger: [a trigger phrase]
+rule: A rule.
+evidence: [AB-3]
+uses: 0
+status: captured
+captured: 2026-08-04T00:00:00Z
+story: AB-3
+origin: domain-agent
+promote-target: .claude/memories/agents/web-engineer/legacy-promote-target.md
+---
+EOF
+cf6_out="$(bash "$scripts/check-frontmatter.sh" "$legacy_pt_repo" 2>&1)"; cf6_rc=$?
+{ [ "$cf6_rc" -eq 0 ] && printf '%s' "$cf6_out" | grep -qi 'promote-target'; } \
+  && ok "(T6f) a legacy absolute promote-target warns but never fails the gate" \
+  || bad "(T6f) legacy promote-target warning" "rc=$cf6_rc out='$cf6_out'"
+
+# --- T4l/T4m/T4n (NA-101): dual-root listing — resolved root + legacy primary-checkout root --
+dr_repo="$tmp/dualrepo"; mkdir -p "$dr_repo"
+dr_repo="$(cd "$dr_repo" && pwd -P)"
+git -C "$dr_repo" init -q
+git -C "$dr_repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+# SDLC_MEMORY_ROOT names the memory ROOT; its staging area is <root>/captured. Seed one capture in
+# the LEGACY in-repo staging root and one in the RESOLVED root's staging area.
+dr_root="$tmp/dual-root"
+SDLC_CAPTURE_ROOT="$dr_repo/.claude/memories/captured" bash "$cap" rule web-engineer/legacy-only AB-1 "$tmp/payload.md" >/dev/null
+SDLC_CAPTURE_ROOT="$dr_root/captured" bash "$cap" rule web-engineer/resolved-only AB-1 "$tmp/payload.md" >/dev/null
+dr_out="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$dr_root" bash "$lst" --kind rule 2>/dev/null )"
+{ printf '%s' "$dr_out" | grep -q 'legacy-only' && printf '%s' "$dr_out" | grep -q 'resolved-only'; } \
+  && ok "(T4l) both the resolved root and the legacy in-repo root are listed" \
+  || bad "(T4l) dual-root listing" "got '$dr_out'"
+
+# T4m: the same <kind>/<basename> in both roots is emitted ONCE, resolved root winning
+SDLC_CAPTURE_ROOT="$dr_repo/.claude/memories/captured" bash "$cap" rule web-engineer/dupe-both AB-1 "$tmp/payload.md" >/dev/null
+SDLC_CAPTURE_ROOT="$dr_root/captured" bash "$cap" rule web-engineer/dupe-both AB-1 "$tmp/payload.md" >/dev/null
+dupe_all="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT SDLC_MEMORY_ROOT="$dr_root" bash "$lst" --kind rule 2>/dev/null | grep 'AB-1--dupe-both.md' )"
+dupe_n="$(printf '%s\n' "$dupe_all" | grep -c 'AB-1--dupe-both.md')"
+dupe_win="$(printf '%s\n' "$dupe_all" | head -1 | cut -f1)"
+{ [ "$dupe_n" -eq 1 ] && [ "$dupe_win" = "$dr_root/captured/rules/AB-1--dupe-both.md" ]; } \
+  && ok "(T4m) a capture present in both roots is emitted once, resolved root winning" \
+  || bad "(T4m) dedupe precedence" "count=$dupe_n winner='$dupe_win'"
+
+# T4n: resolver failure WITH a legacy root -> warning on stderr, legacy-only listing, exit 0
+n_out="$( cd "$dr_repo" && env -u SDLC_CAPTURE_ROOT -u XDG_DATA_HOME SDLC_MEMORY_ROOT="relative-path" bash "$lst" --kind rule 2>"$tmp/dr_warn" )"; n_rc=$?
+{ [ "$n_rc" -eq 0 ] && [ -s "$tmp/dr_warn" ] && printf '%s' "$n_out" | grep -q 'legacy-only'; } \
+  && ok "(T4n) resolver failure with a legacy root warns and lists the legacy root alone" \
+  || bad "(T4n) resolver-failure fallback" "rc=$n_rc out='$n_out'"
 
 exit "$fail"

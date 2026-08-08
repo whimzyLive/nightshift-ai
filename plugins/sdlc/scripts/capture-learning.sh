@@ -12,6 +12,8 @@ set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/frontmatter-lib.sh"
+# shellcheck source=/dev/null
+. "$here/memory-root.sh"
 
 die() { printf '%s\n' "$1" >&2; exit 1; }
 
@@ -20,15 +22,10 @@ resolve_capture_root() {
     printf '%s\n' "$SDLC_CAPTURE_ROOT"
     return 0
   fi
-  local porcelain main
-  porcelain="$(git worktree list --porcelain 2>/dev/null)" \
-    || die "capture-learning.sh: 'git worktree list --porcelain' failed — cannot resolve the staging root; wrote nothing"
-  printf '%s\n' "$porcelain" | head -3 | grep -q '^bare$' \
-    && die "capture-learning.sh: main repository is bare — no primary checkout to capture into; wrote nothing"
-  main="$(printf '%s\n' "$porcelain" | sed -n 's/^worktree //p' | head -1)"
-  [ -n "$main" ] \
-    && printf '%s\n' "$main/.claude/memories/captured" \
-    || die "capture-learning.sh: no 'worktree ' entry in git worktree list output; wrote nothing"
+  local root
+  root="$(sdlc_memory_root)" \
+    || die "capture-learning.sh: cannot resolve the memory root (see the memory-root.sh error above); wrote nothing"
+  printf '%s\n' "$root/captured"
 }
 
 ensure_capture_root() {
@@ -129,7 +126,7 @@ case "$kind" in
       printf 'captured: %s\n' "$now"
       printf 'story: %s\n' "$story"
       printf 'origin: %s\n' "$(payload_fm "$payload" origin domain-agent)"
-      printf 'promote-target: .claude/memories/agents/%s/%s.md\n' "$dir" "$rid"
+      printf 'promote-target: agents/%s/%s.md\n' "$dir" "$rid"
       printf -- '---\n'
       payload_body "$payload"
     )"
@@ -157,7 +154,7 @@ case "$kind" in
       printf 'issue_count: %s\n' "$(payload_fm "$payload" issue_count 0)"
       printf 'captured: %s\n' "$now"
       printf 'origin: qa-round\n'
-      printf 'promote-target: .claude/memories/reviews/%s.md\n' "$stem"
+      printf 'promote-target: reviews/%s.md\n' "$stem"
       printf -- '---\n'
       payload_body "$payload"
     )"

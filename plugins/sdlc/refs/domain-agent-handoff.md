@@ -76,9 +76,9 @@ cross-domain rule (binds more than one agent) -> capture-learning.sh rule shared
 <rule-id> := kebab-case, MUST equal the capture's `id`
 ```
 
-Prints `CAPTURED=<path>` into the gitignored staging area in the primary checkout. You never write
-`.claude/memories/agents/**` directly — a file lands there only once a human promotes a capture
-through `/sdlc:docs distill`.
+Prints `CAPTURED=<path>` into the gitignored staging area. You never write
+`<memory-root>/agents/**` (see `refs/memory-maintenance.md`) directly — a file lands there
+only once a human promotes a capture through `/sdlc:docs distill`.
 
 `<payload-file>` carries YAML frontmatter — `trigger`/`rule`/`evidence`/`uses` (`agent` too for
 `shared/`); `id`/`status`/`captured`/`story`/`promote-target` are script-derived. **The 7-field
@@ -88,7 +88,7 @@ Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, v
 
 ```yaml
 ---
-id: <kebab-case, equals the filename stem, unique across .claude/memories/agents/**>
+id: <kebab-case, equals the filename stem, unique across <memory-root>/agents/**>
 agent: [<agent-name>, ...] # exactly [<your-name>] under your own dir; length >= 2 under shared/
 trigger: [<phrase>, ...] # 1-6 lowercase keyword phrases naming the situation this fires in
 rule: When <condition>, <action>. # ONE line, <= 200 chars

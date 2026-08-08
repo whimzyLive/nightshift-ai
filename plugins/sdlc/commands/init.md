@@ -788,24 +788,18 @@ Error / no-op branches:
 | Manifest present, no new (non-declined) rows | No-op on the manifest; print it as unchanged. |
 | `refs/doc-types.md` unreadable or malformed at scaffold time | Surface the failure and **skip** the manifest write — never write a half-filled manifest. |
 
-**4h. Scaffold the memory v2 layout.** Create, if not already present:
+**4h. Scaffold the memory layout.** Run:
 
-- `.claude/memories/agents/shared/.gitkeep`
-- `.claude/memories/agents/<agent>/.gitkeep` for each agent active in this repo (per the active-agent
-  set established in Step 3 / written an override in 4c — a `SdlcAgentName` other than
-  `principal-engineer`, which gets no rule directory)
-- `.claude/memories/reviews/.gitkeep`
-- `.claude/memories/captured/rules/` and `.claude/memories/captured/reviews/`
-- `.claude/memories/captured/.gitignore` containing exactly `*` on line 1 and `!.gitignore` on line 2
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/memory-root.sh --ensure
+```
 
-The marker is self-ignoring, so the staging area is invisible to git in every consumer repo without
-editing that repo's root `.gitignore`. All three are required — `*` ignores the subdirectories, so a
-fresh clone has the marker and nothing else.
-
-This step is additive and idempotent: on the merge/re-init path, backfill any of the five that are
-missing **without touching any existing memory content** (an existing rule file, review file, or
-non-empty directory is left exactly as it is — this step only ever creates an absent `.gitkeep` in
-an absent or genuinely-empty directory).
+It prints the resolved root and creates the layout under it. The `--ensure` contract is already
+idempotent and already self-ignoring (`captured/.gitignore`), and it deliberately creates no
+per-agent directory and no `.gitkeep` — the memory root lives outside the repository, so there is
+nothing for git to track and nothing to backfill. (NA-101: this replaces the pre-NA-101 version of
+this step, which wrote five `.gitkeep`-anchored entries directly under the repo's own
+`.claude/memories/` — no repo-side scaffold remains to keep in sync with `memory-root.sh`.)
 
 ## Step 5 — Post-init checklist (Jira fields you must configure)
 

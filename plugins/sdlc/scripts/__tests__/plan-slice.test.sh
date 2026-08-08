@@ -263,12 +263,26 @@ inner_ok="$(cat "$scratch2/inner-ok" 2>/dev/null || echo 0)"
   || bad "(G-13) no stray side effect" "$canary was created"
 rm -rf "$scratch2"
 
-# --- G-1 provenance: corpus-expectation.tsv's sourceSha resolves NA-93.md's bytes --
+# --- G-1 provenance: EVERY sourceBytes entry resolves against its own file at sourceSha ---------
+# Was NA-93.md only — a single unchanging file cannot catch a manifest stamped with mismatched
+# sha/bytes (sha from a clean-tree git rev-parse HEAD, bytes measured off a DIRTY working tree)
+# unless the one file it checks happens to be the one that drifted. Check every entry instead.
 sha="$(sed -n 's/^# sourceSha: //p' "$exp" | head -1)"
-recorded="$(sed -n 's/.*NA-93.md=\([0-9]*\).*/\1/p' "$exp" | head -1)"
-actual_bytes="$(cd "$root" && git show "$sha:docs/superpowers/plans/NA-93.md" 2>/dev/null | wc -c | tr -d ' ')"
-[ -n "$sha" ] && [ -n "$recorded" ] && [ "$actual_bytes" = "$recorded" ] \
-  && ok "(provenance) git show \$sha:NA-93.md bytes ($actual_bytes) == recorded sourceBytes" \
-  || bad "(provenance) recorded sourceBytes matches git show at sourceSha" "sha='$sha' recorded='$recorded' actual='$actual_bytes'"
+bytes_line="$(sed -n 's/^# sourceBytes: //p' "$exp" | head -1)"
+prov_checked=0
+prov_mismatch=0
+for pair in $bytes_line; do
+  fname="${pair%%=*}"
+  recorded="${pair##*=}"
+  actual="$(cd "$root" && git show "$sha:docs/superpowers/plans/$fname" 2>/dev/null | wc -c | tr -d ' ')"
+  prov_checked=$((prov_checked + 1))
+  if [ "$actual" != "$recorded" ]; then
+    prov_mismatch=$((prov_mismatch + 1))
+    printf '     provenance mismatch: %s recorded=%s actual=%s\n' "$fname" "$recorded" "$actual"
+  fi
+done
+[ -n "$sha" ] && [ "$prov_checked" -gt 0 ] && [ "$prov_mismatch" -eq 0 ] \
+  && ok "(provenance) all $prov_checked sourceBytes entries resolve at \$sha" \
+  || bad "(provenance) every sourceBytes entry resolves at sourceSha" "sha='$sha' checked=$prov_checked mismatches=$prov_mismatch"
 
 exit "$fail"
