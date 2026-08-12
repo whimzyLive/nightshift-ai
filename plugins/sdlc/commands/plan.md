@@ -78,7 +78,7 @@ Applies only when `/plan` is the **top-level** command. Nested under `/auto` Wor
 
 **Plan never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
 that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at
-PR raise: the plan doc is on a branch and the Jira comment is posted (step 12), so nothing resident
+PR raise: the plan doc is on a branch and the Jira comment is posted (step 11), so nothing resident
 is still load-bearing — release directly, with the PR URL:
 
 ```bash

@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
-# auto-merge-pr.test.sh — regression test pinning the gh `pr merge --yes` removal (NA-45).
+# auto-merge-pr.test.sh — regression test pinning the gh `pr merge --yes` removal (NA-45) and the
+# `--auto` branch (NA-104).
 #
 # gh >=2.90 dropped the `--yes` flag from `gh pr merge` ("unknown flag: --yes"). This test mocks
 # `gh` to reproduce that exact contract and covers:
 #   1. Happy path — the 1-arg back-compat call must print MERGED and exit 0 through a gh that
 #      rejects --yes. The mock `gh api` pipes a realistic repos/<slug> JSON payload through the
-#      REAL `jq` binary using the exact --jq expression auto-merge-pr.sh passes (line 67), so the
-#      script's own method-resolution logic actually runs here rather than being stubbed out.
+#      REAL `jq` binary using the exact --jq expression auto-merge-pr.sh passes, so the script's
+#      own method-resolution logic actually runs here rather than being stubbed out.
 #   2. Failure contract — on a merge rejection (branch protection / conflict / checks not met),
 #      the script must exit non-zero and print an `ERROR: gh pr merge ... failed` line to stderr
 #      so sdlc:loop can detect it (the bug's own Expected Result).
+#   3. `--auto` enable — armed but not yet merged: prints AUTO-MERGE-ENABLED, exit 0.
+#   4. `--auto` + "clean status" rejection (NA-104 round-2 Critical 1) — falls back to an
+#      immediate merge instead of hard-failing.
+#   5. `--auto` + merged inside the confirmation window (NA-104 round-2 Important 1) — accepts
+#      `state == MERGED` as success instead of erroring because `autoMergeRequest` is null.
+#   6. `--auto` + a genuine (non-"clean status") rejection — exits non-zero, does NOT fall back.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -29,12 +36,20 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                realistic repo-settings payload,
 #                                                                so a broken expr fails the test.
 #   - `gh pr merge <pr> <method> --yes`                       -> "unknown flag: --yes", exit 1
-#   - `gh pr merge <pr> <method>` (no --yes)                  -> exit 0, unless
+#   - `gh pr merge <pr> <method>` (no --auto, no --yes)       -> exit 0, unless
 #                                                                MOCK_GH_MERGE_REJECT=1 is set, in
 #                                                                which case it exits 1 with a
 #                                                                realistic rejection message on
 #                                                                stderr (branch protection etc.).
-#   - `gh pr view <pr> --json state -q .state`                -> MERGED
+#   - `gh pr merge <pr> <method> --auto`                      -> behaviour selected by
+#                                                                MOCK_GH_AUTO_MODE (enable |
+#                                                                clean-status | reject; default
+#                                                                enable).
+#   - `gh pr view <pr> --json <field> -q <expr>`              -> <expr> evaluated (by the real jq
+#                                                                binary) against
+#                                                                {state: MOCK_GH_STATE (default
+#                                                                MERGED), autoMergeRequest:
+#                                                                MOCK_GH_AUTOMERGE (default null)}
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -69,8 +84,8 @@ case "${1:-}" in
           fi
         done
         # Validate the resolved method flag the same way real gh would reject an unrecognized
-        # one — this is what makes a broken method-resolution jq expression (line 67) actually
-        # fail the test instead of merging "successfully" with a bogus flag.
+        # one — this is what makes a broken method-resolution jq expression fail the test instead
+        # of merging "successfully" with a bogus flag.
         case "${4:-}" in
           --merge|--squash|--rebase) : ;;
           *)
@@ -78,6 +93,24 @@ case "${1:-}" in
             exit 1
             ;;
         esac
+        auto=0
+        for arg in "$@"; do [ "$arg" = "--auto" ] && auto=1; done
+        if [ "$auto" = 1 ]; then
+          case "${MOCK_GH_AUTO_MODE:-enable}" in
+            clean-status)
+              echo "GraphQL: Pull request is in clean status (enablePullRequestAutoMerge)" >&2
+              exit 1
+              ;;
+            reject)
+              echo "GraphQL: auto-merge is not allowed for this repository (enablePullRequestAutoMerge)" >&2
+              exit 1
+              ;;
+            *)
+              echo "Auto-merge enabled for pull request #${3:-}"
+              exit 0
+              ;;
+          esac
+        fi
         if [ "${MOCK_GH_MERGE_REJECT:-}" = "1" ]; then
           echo "GraphQL: Pull Request is not mergeable: at least 1 approving review is required by reviewers with write access (mergePullRequest)" >&2
           exit 1
@@ -86,7 +119,22 @@ case "${1:-}" in
         exit 0
         ;;
       view)
-        echo "MERGED"
+        jqexpr=""
+        prev=""
+        for arg in "$@"; do
+          if [ "$prev" = "-q" ]; then
+            jqexpr="$arg"
+          fi
+          prev="$arg"
+        done
+        state="${MOCK_GH_STATE:-MERGED}"
+        automerge="${MOCK_GH_AUTOMERGE:-null}"
+        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge}"
+        if [ -n "$jqexpr" ]; then
+          echo "$payload" | jq -r "$jqexpr"
+        else
+          echo "$payload"
+        fi
         exit 0
         ;;
     esac
@@ -133,6 +181,63 @@ else
   echo "FAIL: merge-rejection — exit=$reject_status output=${reject_out:-<empty>}"
   echo "--- script stderr ---"
   cat "$reject_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 3: --auto enable — armed but not yet merged (state stays OPEN, autoMergeRequest set).
+auto_stderr="$mockdir/stderr-auto.log"
+auto_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=OPEN MOCK_GH_AUTOMERGE=true \
+  bash "$script" --auto 999999 2>"$auto_stderr")"
+auto_status=$?
+if [ "$auto_status" -eq 0 ] && [ "$auto_out" = "AUTO-MERGE-ENABLED" ]; then
+  echo "PASS: --auto enable — exits 0 and prints AUTO-MERGE-ENABLED when armed but not yet merged"
+else
+  echo "FAIL: --auto enable — exit=$auto_status output=${auto_out:-<empty>}"
+  cat "$auto_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 4: --auto + "clean status" rejection (round-2 Critical 1) — must fall back to an immediate
+# merge rather than hard-failing. Default MOCK_GH_STATE=MERGED makes the fallback merge succeed.
+clean_stderr="$mockdir/stderr-clean.log"
+clean_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=clean-status bash "$script" --auto 999999 2>"$clean_stderr")"
+clean_status=$?
+if [ "$clean_status" -eq 0 ] && [ "$clean_out" = "MERGED" ] && grep -q 'falling back to an immediate merge' "$clean_stderr"; then
+  echo "PASS: --auto clean-status — falls back to an immediate merge and prints MERGED"
+else
+  echo "FAIL: --auto clean-status — exit=$clean_status output=${clean_out:-<empty>}"
+  cat "$clean_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 5: --auto + merged inside the confirmation window (round-2 Important 1) — state flips to
+# MERGED before autoMergeRequest ever shows enabled; must accept MERGED, not error.
+window_stderr="$mockdir/stderr-window.log"
+window_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=MERGED MOCK_GH_AUTOMERGE=null \
+  bash "$script" --auto 999999 2>"$window_stderr")"
+window_status=$?
+if [ "$window_status" -eq 0 ] && [ "$window_out" = "MERGED" ]; then
+  echo "PASS: --auto merged-in-window — accepts state=MERGED and prints MERGED, not an error"
+else
+  echo "FAIL: --auto merged-in-window — exit=$window_status output=${window_out:-<empty>}"
+  cat "$window_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 6: --auto + a genuine (non-"clean status") rejection — must exit non-zero and must NOT
+# fall back to an immediate merge (MOCK_GH_MERGE_REJECT=1 would make a wrongful fallback visible
+# via a DIFFERENT stderr message, proving no fallback occurred).
+autoreject_stderr="$mockdir/stderr-autoreject.log"
+autoreject_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=reject MOCK_GH_MERGE_REJECT=1 \
+  bash "$script" --auto 999999 2>"$autoreject_stderr")"
+autoreject_status=$?
+if [ "$autoreject_status" -ne 0 ] && [ -z "$autoreject_out" ] \
+  && grep -q '^ERROR: gh pr merge .* --auto failed' "$autoreject_stderr" \
+  && ! grep -q 'falling back' "$autoreject_stderr"; then
+  echo "PASS: --auto genuine rejection — exits non-zero without falling back to an immediate merge"
+else
+  echo "FAIL: --auto genuine rejection — exit=$autoreject_status output=${autoreject_out:-<empty>}"
+  cat "$autoreject_stderr"
   failures=$((failures + 1))
 fi
 

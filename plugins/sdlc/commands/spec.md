@@ -74,7 +74,7 @@ terminal action — do **not** run this final action nested.
 
 **Spec never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
 that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at
-PR raise: the spec is on a branch and the Jira comment is posted (step 9), so nothing resident is
+PR raise: the spec is on a branch and the Jira comment is posted (step 8), so nothing resident is
 still load-bearing — release directly, with the PR URL:
 
 ```bash

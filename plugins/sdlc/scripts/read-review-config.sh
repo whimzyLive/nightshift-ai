@@ -14,7 +14,7 @@ set -euo pipefail
 #
 #   Review agent : github-copilot | claude-inline | claude-superpowers   (default: github-copilot)
 #   Review mode  : none | on-create | on-update      (default: on-update)
-#   Review gate  : comma-separated subset of {spec,plan,impl}  (default: empty = all phases)
+#   Review gate  : comma-separated subset of {spec,plan,impl}  (default: empty = impl reviews)
 #
 # - Review agent selects WHO reviews: the GitHub Copilot bot (assigned as a PR
 #   reviewer, async), Claude inline (the loop runs /code-review in-session), or
@@ -22,9 +22,12 @@ set -euo pipefail
 #   in-session — a focused reviewer subagent — instead of native /code-review).
 # - Review mode selects the cadence (request once / per-update / not at all) and
 #   is orthogonal to the agent.
-# - Review gate selects WHICH phases trigger the configured review. It is a
-#   comma-separated list of phase names drawn from {spec,plan,impl}. The current
-#   phase is supplied by the caller via the OPTIONAL `--phase <p>` flag.
+# - Review gate selects WHICH phases trigger the configured review, AS COMPUTED BY THIS READER. It
+#   is a comma-separated list of phase names drawn from {spec,plan,impl}; the current phase is
+#   supplied by the caller via the OPTIONAL `--phase <p>` flag. This reader's own computation is
+#   unchanged, but since NA-104 `raise-pr.sh` and `commands/auto.md` ignore it for `spec`/`plan`
+#   and treat those two UNCONDITIONALLY as ungated — only `impl` still consults this reader's
+#   answer.
 #
 # --phase semantics (effective REVIEW_MODE):
 #   The flag must be passed literally on the command line (NOT via an env var) so
@@ -120,8 +123,8 @@ case "$REVIEW_MODE" in none|on-create|on-update) ;; *) REVIEW_MODE=on-update ;; 
 
 # Review gate — normalise the raw CSV into a clean, comma-separated set drawn from
 # {spec,plan,impl}. Strip backticks/spaces, split on commas, keep only known phase
-# tokens (warn-and-ignore the rest). An empty/absent gate means "all phases review"
-# (the default) and must NOT downgrade any phase.
+# tokens (warn-and-ignore the rest). An empty/absent gate means this reader downgrades
+# no phase (the default) — only `impl` still consults it (NA-104; see the header).
 REVIEW_GATE=""
 if [ -n "$REVIEW_GATE_RAW" ]; then
   cleaned="$(printf '%s' "$REVIEW_GATE_RAW" | tr -d '` ' )"
@@ -139,7 +142,8 @@ fi
 
 # Effective REVIEW_MODE for THIS phase: if a phase was supplied AND the gate is
 # non-empty AND the phase is NOT in the gate set, downgrade to `none` (skip the
-# review for this phase). An empty gate never downgrades (all phases review).
+# review for this phase). An empty gate never downgrades — this computation runs
+# regardless of phase, but only an `impl` caller still consults the result (NA-104).
 if [ -n "$PHASE" ] && [ -n "$REVIEW_GATE" ]; then
   case ",$REVIEW_GATE," in
     *",$PHASE,"*) ;;  # phase is gated — review runs as configured

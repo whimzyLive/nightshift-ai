@@ -3,16 +3,11 @@ set -euo pipefail
 # auto-merge-pr.sh [--auto] <pr> [<story-key> <done-status>]
 #
 # Merge a pull request using the repository's allowed merge method, resolved DYNAMICALLY at
-# merge time — never a hard-coded flag. Used by /auto's Full-Auto terminal action. Two modes:
-#   - default (no --auto): an IMMEDIATE merge. Used by A2/B1, where the caller has already driven
-#     the PR to a clean, checks-green state first (the review-fix loop).
-#   - `--auto`: ENABLES GitHub's native auto-merge on the PR and returns as soon as it is queued,
-#     without waiting for checks. Used by A1's spec PR (NA-104), which never enters the
-#     review-fix loop and so has no prior guarantee the PR is already mergeable — attempting an
-#     immediate merge there would race the CI run `raise-pr.sh` just triggered. GitHub itself
-#     completes the merge once required checks turn green and the PR is mergeable.
-# Either way, merging emits the GitHub `pull_request closed+merged` event that the automation
-# service consumes to advance the pipeline.
+# merge time — never a hard-coded flag. Used by /auto's Full-Auto terminal action, after the
+# review-fix loop has driven the PR to a clean state (Copilot approved on the reviewed head +
+# checks green) — default mode; `--auto` is the exception (A1's spec PR, no prior loop; see Args
+# below). Merging emits the GitHub `pull_request closed+merged` event that the automation service
+# consumes to advance the pipeline.
 #
 # Why a script: the resolve-method -> merge -> verify sequence is multi-step gh logic that gets
 # dropped or mis-flagged when typed inline, and a bare `gh pr merge` prompts interactively for the
@@ -32,9 +27,8 @@ set -euo pipefail
 #   $2 story-key    OPTIONAL — the Jira story key to transition after a story-COMPLETING merge
 #                   (Workflow B impl PR, or Workflow A Phase-2 plan+impl PR). Omit for a
 #                   non-completing merge (e.g. Workflow A Phase-1 spec PR) — the story stays
-#                   in progress and no transition is attempted. Not used with `--auto` — the
-#                   merge hasn't happened yet when this script returns, so there is nothing to
-#                   transition; A1 never passes these.
+#                   in progress and no transition is attempted. A1 never passes these with `--auto`
+#                   (a spec PR never completes the story, merged immediately or not).
 #   $3 done-status  OPTIONAL — the consuming project's pipeline done status (e.g. `Done`), read
 #                   by the caller from `.claude/project/project-context.md`'s `Pipeline done
 #                   status` token. Both $2 and $3 must be supplied together to enable the
@@ -58,8 +52,9 @@ set -euo pipefail
 # identical to the original merge-only version — no transition block runs, nothing new is printed.
 #
 # Output:
-#   - On success: prints `MERGED` (default mode) or `AUTO-MERGE-ENABLED` (`--auto` mode) to
-#     stdout; progress/warnings go to stderr.
+#   - On success: prints `MERGED` (already merged, or `--auto` fell back to an immediate merge) or
+#     `AUTO-MERGE-ENABLED` (`--auto`, armed but not yet merged) to stdout; progress/warnings go to
+#     stderr.
 #   - On failure: non-zero exit, reason on stderr, nothing on stdout. (The transition block never
 #     causes a non-zero exit — see Best-effort above.)
 
@@ -91,24 +86,31 @@ fi
 echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 
 if [ "$AUTO" = true ]; then
-  # --auto mode (A1's spec PR, NA-104): ENABLE GitHub auto-merge and return promptly — do NOT
-  # wait for MERGED, which may not happen for minutes/hours (GitHub merges it once required
-  # checks turn green and it's mergeable). Skips the Jira-transition block below entirely: the
-  # merge hasn't happened yet, so there is nothing to transition here.
-  if ! MERGE_OUT=$(gh pr merge "$PR" "$METHOD" --auto 2>&1); then
+  if MERGE_OUT=$(gh pr merge "$PR" "$METHOD" --auto 2>&1); then
+    STATE=""
+    ENABLED=""
+    for _ in 1 2 3; do
+      STATE=$(gh pr view "$PR" --json state -q .state 2>/dev/null || echo "")
+      [ "$STATE" = "MERGED" ] && break
+      ENABLED=$(gh pr view "$PR" --json autoMergeRequest -q 'if .autoMergeRequest then "yes" else "" end' 2>/dev/null || true)
+      [ "$ENABLED" = "yes" ] && break
+      sleep 2
+    done
+    if [ "$STATE" = "MERGED" ]; then
+      echo "merged: PR $PR (checks were already green)" >&2
+      printf 'MERGED\n'
+      exit 0
+    fi
+    [ "$ENABLED" = "yes" ] || { echo "ERROR: PR $PR auto-merge not confirmed enabled after gh pr merge --auto; merge output: $MERGE_OUT" >&2; exit 1; }
+    echo "auto-merge-enabled: PR $PR (GitHub will merge it once checks pass)" >&2
+    printf 'AUTO-MERGE-ENABLED\n'
+    exit 0
+  elif printf '%s' "$MERGE_OUT" | grep -qi 'clean status'; then
+    echo "auto-merge: PR $PR already mergeable — falling back to an immediate merge" >&2
+  else
     echo "ERROR: gh pr merge $PR $METHOD --auto failed (auto-merge disabled on repo / branch protection / conflict): $MERGE_OUT" >&2
     exit 1
   fi
-  ENABLED=""
-  for _ in 1 2 3; do
-    ENABLED=$(gh pr view "$PR" --json autoMergeRequest -q 'if .autoMergeRequest then "yes" else "" end' 2>/dev/null || true)
-    [ "$ENABLED" = "yes" ] && break
-    sleep 2
-  done
-  [ "$ENABLED" = "yes" ] || { echo "ERROR: PR $PR auto-merge not confirmed enabled after gh pr merge --auto; merge output: $MERGE_OUT" >&2; exit 1; }
-  echo "auto-merge-enabled: PR $PR (GitHub will merge it once checks pass)" >&2
-  printf 'AUTO-MERGE-ENABLED\n'
-  exit 0
 fi
 
 # Merge with the explicit resolved flag. `gh pr merge` only prompts interactively for the merge
