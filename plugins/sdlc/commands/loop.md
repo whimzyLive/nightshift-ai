@@ -16,36 +16,34 @@ description: >
 
 <!-- notation: `:=` define, `->` leads-to, `⊆` drawn-from-set, ASSERT/ELSE guard, first-match-wins ordering. Full legend: refs/pseudocode-notation.md -->
 
-**Note:** This command surfaces as `sdlc:loop` (plugin-namespaced) and is
-distinct from the native `/loop`; it is designed as the per-pass body driven
-BY native `/loop`, not a competing loop engine.
+**Note:** This command surfaces as `sdlc:loop` (plugin-namespaced), distinct
+from the native `/loop` — the per-pass body native `/loop` drives, not a
+competing loop engine.
 
 Drive **one pass** of the post-PR review-fix cycle for the PR in **`$ARGUMENTS`**
 (a GitHub PR number or URL, optionally followed by `--on-clean "<command>"`). The
-native `/loop` command handles iteration and pacing (self-paced mode — it
-re-invokes this command after each pass and terminates the loop when this pass
-does not schedule a next iteration). This command NEVER merges the PR **itself**
-and ignores non-Copilot reviewers.
+native `/loop` command handles iteration and pacing (self-paced — it re-invokes
+this command each pass and terminates the loop when this pass schedules no next
+iteration). This command NEVER merges the PR **itself** and ignores non-Copilot
+reviewers.
 
 **Arguments.** `$ARGUMENTS` is `<PR> [--phase <p>] [--on-clean "<command>"]`:
 
 - `<PR>` — the PR number or URL to loop on.
-- `--phase <p>` — OPTIONAL. A single phase-name token — in practice only `impl` today
-  (NA-104: `/spec` and `/plan` no longer invoke `/sdlc:loop` at all, so `spec`/`plan`
-  have no remaining caller here) — threaded through to the review-config reader
-  (step 0) so the per-repo **Review gate** can downgrade this phase's effective
-  `REVIEW_MODE` to `none`. The phase is passed literally per-invocation (NOT an env
-  var) so it survives `/loop` re-invocation. Capture it as `PHASE` (empty when the
-  flag is absent).
+- `--phase <p>` — OPTIONAL. A single phase-name token (only `impl` today has a
+  caller — NA-104 dropped `spec`/`plan`) threaded through to the review-config
+  reader (step 0) so the per-repo **Review gate** can downgrade this phase's
+  effective `REVIEW_MODE` to `none`. The phase is passed literally per-invocation
+  (NOT an env var) so it survives `/loop` re-invocation. Capture it as `PHASE`
+  (empty when the flag is absent).
 - `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
   rule-4 clean exit** (head Copilot-reviewed, zero unresolved comments, checks
   green), immediately before the session release. It is **NOT** run on any halt
   (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
   `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
   whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
-  command for a Full Auto story; standalone `/impl` passes nothing — `/spec` and
-  `/plan` never invoke `/sdlc:loop` at all, NA-104). If `--on-clean` is absent,
-  rule 4 simply stops.
+  command for a Full Auto story; standalone `/impl` passes nothing, `spec`/`plan`
+  never call `/sdlc:loop`, NA-104). If `--on-clean` is absent, rule 4 simply stops.
 
 **Parsing `$ARGUMENTS`.** Split it explicitly — do NOT pass the whole string to
 `gh`:
@@ -88,11 +86,10 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/loop-budget.sh check "$CUR_HEAD" "$CUR_UNRESO
 ```
 
 `CUR_HEAD` / `CUR_UNRESOLVED` come from this pass's status probe (below); default
-to `-` if a field is somehow unavailable, so progress detection still runs. The
-budget covers ALL wait states — it is a single, unified bound regardless of which
-WAIT rule is active, and is NOT checked on rule 4 (clean exit) or on halt paths
-(rules 3 fail / step 5) — those have their own exit logic, so a converged PR is
-never held open by the timer.
+to `-` if a field is unavailable, so progress detection still runs. The budget
+covers ALL wait states — a single, unified bound regardless of which WAIT rule is
+active — and is NOT checked on rule 4 (clean exit) or on halt paths (rules 3 fail
+/ step 5), which have their own exit logic, so a converged PR is never held open.
 
 ---
 
@@ -114,7 +111,7 @@ eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh --phase "$PHASE
 ```
 
 When a **Review gate** is configured and the current `PHASE` is **not** in it, the
-reader returns `REVIEW_MODE=none` — the existing `none` path below then runs
+reader returns `REVIEW_MODE=none` — the existing `none` path below runs
 `--on-clean` exactly once and releases. The phase's review is skipped and the
 pipeline advances; this is handled entirely by the existing `none` handling (no
 new decision-table rule).
