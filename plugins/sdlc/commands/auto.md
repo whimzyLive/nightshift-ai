@@ -100,18 +100,20 @@ inline, not the `/triage` command — so `/auto` and `/impl` share one definitio
 
 ---
 
-## Loop-after-raise + mode-conditioned terminal action (shared by A1, A2, B1)
+## Loop-after-raise + mode-conditioned terminal action (shared by A2, B1)
 
-Every phase that raises a PR drives the Copilot review-fix loop on it **before** the phase finishes,
-then takes a terminal action that depends on the story's mode. A1, A2, and B1 below each invoke this
-procedure with their just-raised `<PR_URL>` and a `<PHASE>` of `spec` (advances to Phase 2 on
-merge), `plan+impl`, or `impl` (completes the story on merge).
+Every phase that raises an **implementation-bearing** PR drives the Copilot review-fix loop on it
+**before** the phase finishes, then takes a terminal action that depends on the story's mode. A2
+and B1 below each invoke this procedure with their just-raised `<PR_URL>` and a `<PHASE>` of
+`plan+impl` or `impl` (both complete the story on merge). **A1's spec PR never reaches this
+procedure (NA-104)** — spec is unconditionally exempt from the review-fix loop, regardless of the
+per-repo Review gate token; see A1's own completion steps below.
 
 The loop is also handed a **`--phase <GATE_PHASE>`** flag so the per-repo **Review gate** can skip
 this phase's review (see **Review Gate** below). The gate-phase maps from the workflow branch:
-**A1 spec PR → `spec`**, **A2 combined plan+impl PR → `impl`**, **B impl PR → `impl`**. (The combined
-plan+impl PR uses `impl`: there is no separate plan PR in `/auto`.) `<GATE_PHASE>` is passed
-literally per-invocation, so there is no cross-phase state bleed.
+**A2 combined plan+impl PR → `impl`**, **B impl PR → `impl`**. (The combined plan+impl PR uses
+`impl`: there is no separate plan PR in `/auto`.) `<GATE_PHASE>` is passed literally per-invocation,
+so there is no cross-phase state bleed.
 
 ### Resolving the working issue's mode
 
@@ -199,15 +201,19 @@ was handed; `/auto` decides (via `MODE`) whether to attach the auto-merge hook.
 ### Review Gate
 
 The optional **`Review gate`** token in the repo's `## Code Review` section is a comma-separated
-subset of `spec,plan,impl` listing which phases trigger the configured automated review:
+subset of `spec,plan,impl`. **Only `impl` still governs the review-fix loop (NA-104)** — the loop
+never runs against the spec PR (A1) or a standalone plan PR (`/sdlc:plan`), no matter what this
+token holds; `spec`/`plan` entries do not re-enable it.
 
-- A phase listed in the gate reviews as usual; a phase **not** listed has its review skipped (the
-  reader returns effective `REVIEW_MODE=none`, so `raise-pr.sh` requests no reviewer and the tail
-  loop runs `--on-clean` once and releases — the pipeline advances without waiting for a review).
-- **Token absent or empty ⇒ all phases review** — the default, fully back-compatible behaviour
-  (no regression).
-- The combined plan+impl PR is gated by the **`impl`** value (there is no separate plan PR in
-  `/auto`); the spec PR is gated by `spec`.
+- A gated `impl` phase reviews as usual; an ungated one has its review skipped (the reader returns
+  effective `REVIEW_MODE=none`, so `raise-pr.sh` requests no reviewer and the tail loop runs
+  `--on-clean` once and releases — the pipeline advances without waiting for a review).
+- **Token absent or empty ⇒ `impl` reviews** — the default, back-compatible behaviour.
+- The combined plan+impl PR (A2) is gated by the **`impl`** value (there is no separate plan PR in
+  `/auto`).
+- `spec`/`plan` entries still reach `raise-pr.sh` via each phase's own `--phase` flag and keep
+  gating that phase's PR-creation-time **reviewer request** only (unchanged, out of this story's
+  scope) — never the review-fix loop.
 - The phase is passed per-invocation as `--phase <GATE_PHASE>`, so each PR is gated independently and
   there is no cross-phase state bleed.
 
@@ -277,42 +283,47 @@ curl -s --retry 3 -X POST http://localhost:9001 \
 
 **Exit.** Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
 
-**If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then run the
-**Loop-after-raise** procedure (above) for the spec PR as the session **tail** (`<PR_URL>`=`SPEC_PR_URL`,
-`<PHASE>`=`spec`). The comment is posted **before** the loop (the loop is the last act). Run the site
-guard once before either branch below:
+**If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then complete the
+phase directly, right here. **Spec never enters the review-fix loop (NA-104)** — that loop is
+reserved for the implementation PR (see **Loop-after-raise**, above) — so there is no loop tail to
+hand to a new session. Run the site guard once before either branch below:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 ```
 
-- **`MODE`=`Full Auto`** → post an intent note, then run the tail loop **with** the auto-merge hook
-  (it auto-merges the spec PR on clean exit; that merge webhook then resumes Phase 2 automatically):
+- **`MODE`=`Full Auto`** → post an intent note, then merge the spec PR immediately (no review/CI
+  wait first — nothing drives it to a clean state); the merge webhook then resumes Phase 2
+  automatically. A merge that doesn't take (e.g. required checks not yet green) exits non-zero and
+  leaves the PR open — surface that, never retry silently:
 
 ```bash
 acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
 
-Driving Copilot review-fix now; will auto-merge once review + checks pass, then advance to plan + implementation automatically."
+Merging now (spec is exempt from the review-fix loop); will advance to plan + implementation automatically once merged."
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh SPEC_PR_URL
 ```
 
-- **Any other mode** → post the human-merge note, then run the tail loop **without** a hook (drives
-  the PR to Copilot-clean, leaves it open for a human merge):
+- **Any other mode** → post the human-merge note; leave the PR open. No automated loop runs against
+  it (a bot reviewer may still be requested per the repo's Review gate/agent config — unchanged,
+  see **Review Gate** — but nothing here drives fixes):
 
 ```bash
 acli jira workitem comment create --key STORY_KEY --body "Spec PR ready for review.
 
 Spec PR: SPEC_PR_URL
 
-Driven to Copilot-clean. Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
+Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
 ```
 
 Tell the user:
 
-> Spec PR raised; driving it to Copilot-clean as the session tail. Review and merge it to `develop`, then re-run `/auto STORY_KEY`.
+> Spec PR raised. Full Auto: merging automatically. Otherwise: review and merge it to `develop`, then re-run `/auto STORY_KEY`.
 
-Terminal action: apply **Session boundary at PR raise**. Do **not** proceed to A2
-in this run; Phase 2 is resumed by the spec-PR merge (human, or the Full-Auto auto-merge) as a fresh
-`/auto STORY_KEY` invocation (A0 detects the merged spec).
+Terminal action: run `session-complete.sh` directly — no **Session boundary at PR raise** applies
+here (there is no loop tail). Do **not** proceed to A2 in this run; Phase 2 is resumed by the
+spec-PR merge (human, or the Full-Auto auto-merge) as a fresh `/auto STORY_KEY` invocation (A0
+detects the merged spec).
 
 ---
 
@@ -474,6 +485,8 @@ SDLC_BOUNDARY_ON unset (default)     -> the tail loop owns the single release, e
 SDLC_BOUNDARY_ON set + harness       -> the PHASE releases at PR raise (Session boundary at PR
                                          raise); the re-invoked loop session releases its own slot
 SDLC_BOUNDARY_ON set + interactive   -> the tail loop owns the single release, exactly as before
+A1 spec phase (any mode)             -> spec never loops (NA-104); release directly here, right
+                                         after the comment/merge step
 no PR was raised at all              -> run session-complete.sh directly here
 ```
 
@@ -487,7 +500,9 @@ as the very last action, or the slot leaks until the idle timeout:
   loop); **and**
 - the Step 2 missing-points stop, a triage failure, or any early error (no PR raised); **and**
 - the **`ASYNC_REVIEW=true`** branches (A1, A2, B-phase), which raise a PR, fire the `phase/*`
-  JSON-RPC event, and **stop without looping** — they still need the explicit release.
+  JSON-RPC event, and **stop without looping** — they still need the explicit release; **and**
+- **A1's `ASYNC_REVIEW=false` branch (NA-104)** — spec is unconditionally exempt from the
+  review-fix loop, so there is no tail loop to own the release.
 
 In those cases run this as the very last action:
 

@@ -72,16 +72,17 @@ The agent should:
 Applies only when `/spec` is the **top-level** command. Nested under `/auto`, `/auto` owns the
 terminal action — do **not** run this final action nested.
 
-The phase closed at PR raise: the spec is on a branch and the Jira comment is posted, so nothing
-resident is still load-bearing. Apply the **Session boundary at PR raise** block in
-`${CLAUDE_PLUGIN_ROOT}/commands/auto.md` with `<NEXT>` = `/loop /sdlc:loop <PR_URL>` (`<PR_URL>` =
-the spec PR from step 9). It decides: harness → emit `<NEXT>` and release here; interactive →
-run `<NEXT>` inline as the tail, which owns the release.
+**Spec never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
+that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at
+PR raise: the spec is on a branch and the Jira comment is posted (step 9), so nothing resident is
+still load-bearing — release directly:
 
-> - If the harness cannot invoke the native `/loop`, drive `sdlc:loop`'s pass-cycle via
->   `ScheduleWakeup` instead — same effect.
-> - If the command hit a terminal STOP **before** a PR was raised (nothing to loop on), run
->   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` directly to release.
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+```
+
+It prints the completion signal the automation worker watches for. Outside the worker
+(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
 Jira story key (e.g. CER-123):
 $ARGUMENTS
