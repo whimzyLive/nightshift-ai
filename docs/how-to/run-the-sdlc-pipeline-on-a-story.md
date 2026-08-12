@@ -19,7 +19,7 @@ Drive one Jira story from a raw ticket to a merged PR. Two routes get you there:
 - `acli` authenticated against the Jira instance, and `gh` authenticated against the repo (both set up by `/sdlc:init`). acli's active site is checked against this repo's configured `Jira site` (in `project-context.md`) and switched automatically when it differs, so keeping more than one acli account signed in is safe in normal use — but an account must exist for this repo's site, or a command stops with `run: acli jira auth login --site <site>`.
 - A Jira story key (e.g. `NA-123`). A Bug key also works and routes to the defect path automatically.
 - Story points set on the story. Routing depends on them: `<= 3` points (inclusive, per-repo threshold) triages **lightweight**, above triages **full**. A Bug needs no points (it forces lightweight).
-- For `/sdlc:auto` to auto-merge unattended, the story's **AI Workflow** field set to `Full Auto`. Any other value (or unset) drives the PR to review-clean and leaves it open for a human merge.
+- For `/sdlc:auto` to auto-merge unattended, the story's **AI Workflow** field set to `Full Auto`. Any other value (or unset) leaves the PR open for a human merge instead — driven to review-clean first when the phase is reviewed (the implementation PR), or left as-is when it isn't (the spec PR).
 
 ## Route A: one-shot with `/sdlc:auto`
 
@@ -33,12 +33,12 @@ Use this when you want the pipeline to pick the flow and run it.
 
 - **Lightweight story** (`<= 3` pts, or any Bug) implements directly. No spec, no plan doc, no review gate. It derives tasks inline from the story, runs implementation, raises one `feat/NA-123` (or `fix/NA-123` for a Bug) PR, and drives the review-fix loop.
 - **Full story** runs in two phases:
-  1. **Spec.** Generates the spec only, raises a `spec/NA-123` PR, drives it review-clean, then stops.
-  2. **Plan + impl.** Re-run `/sdlc:auto NA-123` after the spec PR merges to `develop`. `/auto` detects the merged spec and continues: it generates the plan and the implementation on **one** `feat/NA-123` branch and raises a **single** PR containing both.
+  1. **Spec.** Generates the spec only, raises a `spec/NA-123` PR, then stops. The spec PR never enters the review-fix loop and no reviewer is requested for it — Copilot review is reserved for the implementation PR.
+  2. **Plan + impl.** Re-run `/sdlc:auto NA-123` after the spec PR merges to `develop`. `/auto` detects the merged spec and continues: it generates the plan and the implementation on **one** `feat/NA-123` branch and raises a **single** PR containing both, which does run the review-fix loop.
 
 The spec PR merge is the resume point. In `Full Auto` mode the merge is automatic and Phase 2 kicks off on its own; otherwise merge the spec PR yourself, then re-run the command.
 
-At each phase `/auto` posts a Jira comment with the clickable PR link before it enters the review loop. On a `Full Auto` clean loop exit it auto-merges the PR and, for the story-completing PR, transitions the story to the pipeline done status.
+At each phase `/auto` posts a Jira comment with the clickable PR link. The plan+impl PR then enters the review-fix loop (the spec PR does not); on a `Full Auto` clean loop exit it auto-merges the PR and, for the story-completing PR, transitions the story to the pipeline done status. A `Full Auto` spec PR instead auto-merges directly (or arms auto-merge) with no review loop.
 
 To drive a whole **Epic** and every child story in dependency order, pass the epic key instead: `/sdlc:auto NA-100`. Child stories each run their own single-story `/auto` flow.
 
@@ -52,7 +52,7 @@ Use this for a full story when you want to review and merge each artifact before
    /sdlc:refine-issue NA-123
    ```
 
-2. **Spec.** Produces the design spec on a `spec/NA-123` branch, raises the PR, comments it on the story, and drives it review-clean:
+2. **Spec.** Produces the design spec on a `spec/NA-123` branch, raises the PR, and comments it on the story. No reviewer is requested and the spec PR never enters the review-fix loop:
 
    ```
    /sdlc:spec NA-123
@@ -60,7 +60,7 @@ Use this for a full story when you want to review and merge each artifact before
 
    Review and **merge the spec PR to `develop`** before continuing.
 
-3. **Plan.** Reads the merged spec and produces the implementation plan on a `plan/NA-123` branch, raises the PR, and drives it review-clean:
+3. **Plan.** Reads the merged spec and produces the implementation plan on a `plan/NA-123` branch and raises the PR. Like spec, no reviewer is requested and the plan PR never enters the review-fix loop:
 
    ```
    /sdlc:plan NA-123
@@ -88,7 +88,7 @@ Once the impl PR is review-clean and checks pass, merge it to `develop`.
 ## Verify
 
 - **Jira gate comments.** Each phase posts a comment on the story with the PR link and phase status (`Spec PR ready`, `Plan ready`, `Implementation complete`). A missing comment means the phase did not reach its PR step.
-- **PR links.** Every comment carries a full `https://github.com/...` URL, not a placeholder. Follow it to confirm the PR is open, Copilot-reviewed, and checks are green.
+- **PR links.** Every comment carries a full `https://github.com/...` URL, not a placeholder. Follow it to confirm the PR is open and checks are green. Only the implementation PR (Route A's plan+impl PR, or Route B's impl PR) is Copilot-reviewed; the spec and plan PRs are never gated on review.
 - **Story status.** In `Full Auto`, a completed story transitions to the pipeline done status after the final merge. If it is still open, the loop halted (review-fix blocked, CI red, or idle budget) and the PR was left open for a human.
 
 See the [/sdlc:auto](plugins/sdlc/commands/auto.md), [/sdlc:spec](plugins/sdlc/commands/spec.md), [/sdlc:plan](plugins/sdlc/commands/plan.md), [/sdlc:impl](plugins/sdlc/commands/impl.md), and [/sdlc:loop](plugins/sdlc/commands/loop.md) command references for the full flag list, review-gate configuration, and async-review options — this guide covers only the path from a story to a merged PR.
