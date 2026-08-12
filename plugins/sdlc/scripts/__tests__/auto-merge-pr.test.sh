@@ -11,19 +11,26 @@
 #   2. Failure contract — on a merge rejection (branch protection / conflict / checks not met),
 #      the script must exit non-zero and print an `ERROR: gh pr merge ... failed` line to stderr
 #      so sdlc:loop can detect it (the bug's own Expected Result).
-#   3. `--auto` eligible + enable — armed but not yet merged: prints AUTO-MERGE-ENABLED, exit 0.
-#   4. `--auto` + `allow_auto_merge=false` (NA-104 round-3 Critical A) — decided UP FRONT from
-#      repo settings, never attempts `gh pr merge --auto` at all, merges immediately instead.
-#   5. `--auto` + `mergeStateStatus=CLEAN` (NA-104 round-3 Critical A) — decided UP FRONT from PR
-#      state, never attempts `gh pr merge --auto`, merges immediately instead.
-#   6. `--auto` eligible per the up-front checks, but `gh pr merge --auto` itself still rejects
+#   3. `--auto` eligible (`allow_auto_merge=true`, not yet clean) + enable — armed but not yet
+#      merged: prints AUTO-MERGE-ENABLED, exit 0.
+#   4. `--auto` + `allow_auto_merge=false` + NOT clean (NA-104 round-4 Important 1) — refuses
+#      rather than merging immediately (which would race CI) or arming auto-merge (not allowed):
+#      exit 1 with an actionable message. This is the real GitHub-default configuration.
+#   5. `--auto` + `allow_auto_merge=false` + `mergeStateStatus=CLEAN` — merges immediately; CLEAN
+#      means already mergeable, so there is no CI to race regardless of `allow_auto_merge`.
+#   6. `--auto` + `mergeStateStatus=CLEAN` with `allow_auto_merge=true` too (NA-104 round-3
+#      Critical A) — decided UP FRONT from PR state, never attempts `gh pr merge --auto`.
+#   7. `--auto` eligible per the up-front checks, but `gh pr merge --auto` itself still rejects
 #      with "clean status" (defensive backstop for the race the up-front check can't close) —
 #      falls back to an immediate merge instead of hard-failing.
-#   7. `--auto` + merged inside the confirmation window (NA-104 round-2 Important 1) — accepts
+#   8. `--auto` + merged inside the confirmation window (NA-104 round-2 Important 1) — accepts
 #      `state == MERGED` as success instead of erroring because `autoMergeRequest` is null.
-#   8. `--auto` eligible, but a genuine (non-"clean status") rejection — exits non-zero, does NOT
+#   9. `--auto` eligible, but a genuine (non-"clean status") rejection — exits non-zero, does NOT
 #      fall back.
-#   9. `--auto` + story-key/done-status together — rejected as an invalid combination (a spec PR
+#  10. `--auto` + `allow_auto_merge=true` + `mergeStateStatus=UNKNOWN` (common seconds after a PR
+#      is raised, while GitHub is still computing mergeability) — arms `--auto` same as case 3;
+#      UNKNOWN must never be treated as CLEAN.
+#  11. `--auto` + story-key/done-status together — rejected as an invalid combination (a spec PR
 #      never completes the story), enforced rather than merely documented.
 #
 # Self-runnable, no test harness/framework dependency:
@@ -215,28 +222,47 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 4: --auto + allow_auto_merge=false (round-3 Critical A — the default on every new GitHub
-# repo) — must be decided UP FRONT and never even attempt `gh pr merge --auto`; merges
-# immediately instead. MOCK_GH_AUTO_MODE=reject would make a wrongful --auto attempt visible via
-# a DIFFERENT (non-MERGED) outcome, proving the up-front check actually skipped it.
+# Case 4: --auto + allow_auto_merge=false + NOT clean (round-4 Important 1 — the real GitHub
+# default: allow_auto_merge=false AND a fresh PR's checks still pending/computing). Must REFUSE
+# — neither merge immediately (would race CI) nor arm auto-merge (not allowed) — with an
+# actionable message naming the remedy. MOCK_GH_AUTO_MODE=reject would make a wrongful --auto
+# attempt visible via its own distinct ERROR text, proving the up-front check skipped it.
 noauto_stderr="$mockdir/stderr-noauto.log"
-noauto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED \
-  bash "$script" --auto 999999 2>"$noauto_stderr")"
+noauto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$noauto_stderr")"
 noauto_status=$?
-if [ "$noauto_status" -eq 0 ] && [ "$noauto_out" = "MERGED" ] \
-  && grep -q 'allow_auto_merge=no' "$noauto_stderr"; then
-  echo "PASS: --auto + allow_auto_merge=false — skips the --auto attempt entirely, merges immediately"
+if [ "$noauto_status" -ne 0 ] && [ -z "$noauto_out" ] \
+  && grep -q '^ERROR: PR 999999 is not mergeable yet' "$noauto_stderr" \
+  && grep -qi "Allow auto-merge" "$noauto_stderr"; then
+  echo "PASS: --auto + allow_auto_merge=false + not clean — refuses with an actionable message"
 else
-  echo "FAIL: --auto + allow_auto_merge=false — exit=$noauto_status output=${noauto_out:-<empty>}"
+  echo "FAIL: --auto + allow_auto_merge=false + not clean — exit=$noauto_status output=${noauto_out:-<empty>}"
   cat "$noauto_stderr"
   failures=$((failures + 1))
 fi
 
-# Case 5: --auto + mergeStateStatus=CLEAN (round-3 Critical A / Important B) — must be decided UP
-# FRONT from PR state and never attempt `gh pr merge --auto`; merges immediately instead. Note:
-# a real GitHub PR in this state would ALSO be correctly handled by round-2's reactive
-# clean-status fallback (case 6 below), so this specific case is not expected to go red against
-# round-2's code — it verifies the DETERMINISTIC mechanism (I-B) works, not a new failure mode.
+# Case 5: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — still merges immediately;
+# CLEAN means already mergeable right now, so there is no CI left to race regardless of whether
+# GitHub auto-merge is allowed on this repo.
+falseclean_stderr="$mockdir/stderr-falseclean.log"
+falseclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=CLEAN \
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$falseclean_stderr")"
+falseclean_status=$?
+if [ "$falseclean_status" -eq 0 ] && [ "$falseclean_out" = "MERGED" ] \
+  && grep -q 'mergeStateStatus=CLEAN' "$falseclean_stderr"; then
+  echo "PASS: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — merges immediately"
+else
+  echo "FAIL: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — exit=$falseclean_status output=${falseclean_out:-<empty>}"
+  cat "$falseclean_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 6: --auto + mergeStateStatus=CLEAN with allow_auto_merge=true too (round-3 Critical A) —
+# must be decided UP FRONT from PR state and never attempt `gh pr merge --auto`; merges
+# immediately instead. Note: a real GitHub PR in this state would ALSO be correctly handled by
+# round-2's reactive clean-status fallback (case 7 below), so this specific case is not expected
+# to go red against round-2's code — it verifies the DETERMINISTIC mechanism (I-B) works, not a
+# new failure mode.
 alreadyclean_stderr="$mockdir/stderr-alreadyclean.log"
 alreadyclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=CLEAN \
   MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$alreadyclean_stderr")"
@@ -250,7 +276,7 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 6: --auto eligible per the up-front checks, but gh itself still rejects with "clean
+# Case 7: --auto eligible per the up-front checks, but gh itself still rejects with "clean
 # status" (the defensive backstop for the race the up-front check can't close) — falls back to
 # an immediate merge rather than hard-failing.
 clean_stderr="$mockdir/stderr-clean.log"
@@ -265,7 +291,7 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 7: --auto eligible + merged inside the confirmation window (round-2 Important 1) — state
+# Case 8: --auto eligible + merged inside the confirmation window (round-2 Important 1) — state
 # flips to MERGED before autoMergeRequest ever shows enabled; must accept MERGED, not error.
 window_stderr="$mockdir/stderr-window.log"
 window_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
@@ -280,7 +306,7 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 8: --auto eligible, but a genuine (non-"clean status") rejection — must exit non-zero and
+# Case 9: --auto eligible, but a genuine (non-"clean status") rejection — must exit non-zero and
 # must NOT fall back to an immediate merge (MOCK_GH_MERGE_REJECT=1 would make a wrongful
 # fallback visible via a DIFFERENT stderr message, proving no fallback occurred).
 autoreject_stderr="$mockdir/stderr-autoreject.log"
@@ -298,7 +324,24 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 9: --auto + story-key/done-status together — enforced as an invalid combination (a spec
+# Case 10: --auto + allow_auto_merge=true + mergeStateStatus=UNKNOWN (round-4 Important 1 —
+# common seconds after a PR is raised, while GitHub is still computing mergeability). UNKNOWN
+# must arm --auto exactly like BLOCKED (case 3), never be treated as CLEAN and merged
+# immediately, and never trip the new allow_auto_merge=false refusal path (case 4) either.
+unknown_stderr="$mockdir/stderr-unknown.log"
+unknown_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=UNKNOWN \
+  MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=OPEN MOCK_GH_AUTOMERGE=true \
+  bash "$script" --auto 999999 2>"$unknown_stderr")"
+unknown_status=$?
+if [ "$unknown_status" -eq 0 ] && [ "$unknown_out" = "AUTO-MERGE-ENABLED" ]; then
+  echo "PASS: --auto + mergeStateStatus=UNKNOWN — arms auto-merge, same as any other non-CLEAN state"
+else
+  echo "FAIL: --auto + mergeStateStatus=UNKNOWN — exit=$unknown_status output=${unknown_out:-<empty>}"
+  cat "$unknown_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 11: --auto + story-key/done-status together — enforced as an invalid combination (a spec
 # PR never completes the story), not merely documented.
 badargs_stderr="$mockdir/stderr-badargs.log"
 badargs_out="$(PATH="$mockdir:$PATH" bash "$script" --auto 999999 STORY-1 Done 2>"$badargs_stderr")"

@@ -54,11 +54,14 @@ set -euo pipefail
 # identical to the original merge-only version — no transition block runs, nothing new is printed.
 #
 # Output:
-#   - On success: prints `MERGED` (already merged, or `--auto` fell back to an immediate merge) or
-#     `AUTO-MERGE-ENABLED` (`--auto`, armed but not yet merged) to stdout; progress/warnings go to
-#     stderr.
-#   - On failure: non-zero exit, reason on stderr, nothing on stdout. (The transition block never
-#     causes a non-zero exit — see Best-effort above.)
+#   - On success: prints `MERGED` (an immediate merge succeeded, whether by default or via
+#     `--auto` falling back to one) or `AUTO-MERGE-ENABLED` (`--auto`, armed but not yet merged) to
+#     stdout; progress/warnings go to stderr.
+#   - On failure: non-zero exit, reason on stderr, nothing on stdout. `--auto` additionally refuses
+#     (exit 1) rather than merge immediately when the PR is not `mergeStateStatus=CLEAN` and
+#     `allow_auto_merge` is unset on the repo — neither an immediate merge nor arming GitHub
+#     auto-merge would be safe there. (The transition block never causes a non-zero exit — see
+#     Best-effort above.)
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -95,8 +98,7 @@ echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 
 if [ "$AUTO" = true ]; then
   ALLOW_AUTO=$(printf '%s' "$REPO_JSON" | jq -r 'if .allow_auto_merge then "yes" else "" end')
-  MSS=""
-  [ "$ALLOW_AUTO" = "yes" ] && MSS=$(gh pr view "$PR" --json mergeStateStatus -q .mergeStateStatus 2>/dev/null || echo "")
+  MSS=$(gh pr view "$PR" --json mergeStateStatus -q .mergeStateStatus 2>/dev/null || echo "")
   if [ "$ALLOW_AUTO" = "yes" ] && [ "$MSS" != "CLEAN" ]; then
     if MERGE_OUT=$(gh pr merge "$PR" "$METHOD" --auto 2>&1); then
       STATE="" ENABLED=""
@@ -113,7 +115,7 @@ if [ "$AUTO" = true ]; then
         exit 0
       fi
       [ "$ENABLED" = "yes" ] || { echo "ERROR: PR $PR auto-merge not confirmed enabled after gh pr merge --auto; merge output: $MERGE_OUT" >&2; exit 1; }
-      echo "auto-merge-enabled: PR $PR (GitHub will merge it once checks pass)" >&2
+      echo "auto-merge-enabled: PR $PR (GitHub will merge it once eligible)" >&2
       printf 'AUTO-MERGE-ENABLED\n'
       exit 0
     elif ! printf '%s' "$MERGE_OUT" | grep -qi 'clean status'; then
@@ -121,8 +123,11 @@ if [ "$AUTO" = true ]; then
       exit 1
     fi
     echo "auto-merge: PR $PR already mergeable — falling back to an immediate merge" >&2
+  elif [ "$MSS" = "CLEAN" ]; then
+    echo "auto-merge: PR $PR already mergeable (mergeStateStatus=CLEAN) — merging immediately" >&2
   else
-    echo "auto-merge: PR $PR not eligible for GitHub auto-merge (allow_auto_merge=${ALLOW_AUTO:-no}, mergeStateStatus=${MSS:-n/a}) — merging immediately" >&2
+    echo "ERROR: PR $PR is not mergeable yet (mergeStateStatus=${MSS:-unknown}) and allow_auto_merge=${ALLOW_AUTO:-no} on $SLUG — cannot merge immediately without risking a race against CI, and cannot arm GitHub auto-merge either. Enable 'Allow auto-merge' in the repo settings, or wait for checks and merge PR $PR manually." >&2
+    exit 1
   fi
 fi
 

@@ -52,9 +52,10 @@ The agent should:
     git commit -m "docs(plan): <STORY-KEY> <story summary>"
     # Push BEFORE creating PR — PR creation fails if branch not on remote
     git push -u origin plan/<STORY-KEY>
-    # Raise the PR atomically via raise-pr.sh (create + mark-ready + request @copilot + verify the
-    # request attached). NEVER hand-roll gh pr create + add-reviewer separately — that is how the
-    # reviewer step gets dropped. Write the body to the session-scoped temp dir, then pass by file.
+    # Raise the PR atomically via raise-pr.sh (create + mark-ready). With --phase plan it never
+    # requests a reviewer (NA-104 — unconditional, regardless of the Review gate token). NEVER
+    # hand-roll gh pr create separately — that bypasses this script's idempotent PR reuse. Write
+    # the body to the session-scoped temp dir, then pass by file.
     dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
     # write "$dir/pr-body.md" with your file-write tool, e.g.:
     #   Plan for <STORY-KEY>. See docs/superpowers/plans/<STORY-KEY>.md.

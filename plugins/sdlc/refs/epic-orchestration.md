@@ -16,8 +16,9 @@ parent's release sentinel and each child's completion sentinel never collide.
 ## E0 — Epic precondition: the Epic's AI Workflow mode (`epicFallback`)
 
 Read the **Epic's own** AI Workflow mode **once**, at loop start, using
-`resolve-ai-workflow-mode.sh` (the same shared implementation the single-story flow uses — see
-`refs/ai-workflow-mode-resolution.md`) applied to `EPIC_KEY`:
+`resolve-ai-workflow-mode.sh` (the same shared implementation the single-story flow uses — full
+ladder in `${CLAUDE_PLUGIN_ROOT}/refs/ai-workflow-mode-resolution.md`, read it the first time this
+section is reached) applied to `EPIC_KEY`:
 
 ```bash
 eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-ai-workflow-mode.sh EPIC_KEY)"
@@ -128,15 +129,15 @@ Story S is gated (mode=<effectiveMode(S)>). PR: <url>. Review + merge, then type
   the direct `session-complete.sh` release and exit. (Re-running `/auto EPIC_KEY` later resumes —
   E2a skips every already-done story and picks up where the abort left off.)
 
-`gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> the child succeeded, but for a spec-only
-A1 completion (NA-104) that means auto-merge was ARMED, or already merged if the PR was
+`gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> the child succeeded, but for a
+spec-only A1 completion (NA-104) that means auto-merge was ARMED, or already merged if the PR was
 immediately mergeable — **not necessarily a landed PR** either way; only an impl-completing
 phase's own tail loop verifies an actual merge before the child's sentinel fires. **No suspend**
-either way — advance straight to the next
-story; A1's eventual merge (and Phase 2) resumes independently via the webhook-triggered
-`/auto STORY_KEY` re-invocation, not via anything the epic loop tracks here. The
-all-Full-Auto epic is therefore **emergent**: no story is ever gated, so the suspend primitive is
-never invoked, so the whole epic runs to completion in this single epic session, hands-free.
+either way — advance straight to the next story; A1's eventual merge (and Phase 2) resumes
+independently via the webhook-triggered `/auto STORY_KEY` re-invocation, not via anything the
+epic loop tracks here. The all-Full-Auto epic is therefore **emergent**: no story is ever gated,
+so the suspend primitive is never invoked, so the whole epic runs to completion in this single
+epic session, hands-free.
 
 ## E4 — HALT on child failure
 

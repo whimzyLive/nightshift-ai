@@ -273,7 +273,7 @@ if OUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --auto SPEC_PR_URL)
   if [ "$OUT" = "MERGED" ]; then
     BODY="Spec PR merged automatically (Full Auto): SPEC_PR_URL. Advancing to plan + implementation."
   else
-    BODY="Spec PR raised (Full Auto): SPEC_PR_URL. GitHub will merge it once checks pass; this then advances automatically."
+    BODY="Spec PR raised (Full Auto): SPEC_PR_URL. GitHub will merge it once eligible (checks pass and it's up to date); this then advances automatically."
   fi
 else
   BODY="Could not auto-merge the spec PR: SPEC_PR_URL. Please review and merge it manually, then re-run /auto STORY_KEY."
@@ -468,6 +468,8 @@ the missing path; never continue on a half-loaded contract.
 first-match-wins:
 
 ```text
+ASYNC_REVIEW=true (A1, A2, or B)     -> raises a PR, fires the phase/* JSON-RPC event, and stops
+                                         without looping — release directly, WITH that PR URL
 A1's ASYNC_REVIEW=false branch       -> spec never loops (NA-104), regardless of SDLC_BOUNDARY_ON
                                          (A1 has no tail loop) — release directly here, right after
                                          the comment/merge step, WITH the spec PR URL

@@ -17,8 +17,8 @@ The mode has two sources, in strict precedence order:
    field doesn't exist on the instance**. Projects that cannot add custom fields opt in via a label
    instead: `AI-Workflow:full-auto`, `AI-Workflow:auto`, or `AI-Workflow:assisted` (lowercase mode
    tokens). When a story carries **multiple** `AI-Workflow:*` labels, the **most conservative** one
-   wins (`assisted` > `auto` > `full-auto`) — the label probes below check most-conservative first,
-   so the ladder's order encodes that rule.
+   wins (`assisted` > `auto` > `full-auto`) — the label probes inside `resolve-ai-workflow-mode.sh`
+   check most-conservative first, so the ladder's order encodes that rule.
 
 `MODE` always resolves to a **real mode string** (`Full Auto` / `Auto` / `Assisted`), or empty when
 **neither source is set** — never a placeholder — because callers interpolate it into
