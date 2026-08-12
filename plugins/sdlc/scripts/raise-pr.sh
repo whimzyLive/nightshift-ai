@@ -44,6 +44,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 set -- "${ARGS[@]}"
+PHASE="$(printf '%s' "$PHASE" | tr '[:upper:]' '[:lower:]')"
 
 HEAD="${1:?head branch required}"
 BASE="${2:?base branch required}"
