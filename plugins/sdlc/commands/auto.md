@@ -175,9 +175,10 @@ none), regardless of this token.
 - A gated `impl` phase reviews as usual; an ungated one still gets `@copilot` requested — the impl
   PR is raised by the Principal Engineer playbook's own `gh pr create` + unconditional
   `--add-reviewer`, never through `raise-pr.sh` (`refs/principal-engineer-playbook.md`). Gating
-  `impl` out only stops the LOOP (`REVIEW_MODE=none` — `--on-clean` once, release) from waiting on
-  that already-open review, which then sits unaddressed — unlike spec/plan, this is a real
-  per-repo config trap, not suppressed.
+  `impl` out downgrades it to `REVIEW_MODE=none` (`--on-clean` once, release — skips EVERY wait,
+  including checks-green): under `Full Auto` the impl PR then auto-merges unreviewed and without
+  waiting for CI, while the already-open `@copilot` request sits unaddressed on a PR that already
+  merged — unlike spec/plan, this is a real per-repo config trap, not suppressed.
 - **Token absent or empty ⇒ `impl` reviews** — the default, back-compatible behaviour.
 - The combined plan+impl PR (A2) is gated by `impl` (no separate plan PR in `/auto`) — see A2's
   review-scope note below for its plan-doc exclusion.

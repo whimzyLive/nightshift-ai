@@ -113,11 +113,15 @@ generated file — every slot must be replaced with an actual value.
   review-fix loop and the PR-creation-time reviewer request (`raise-pr.sh`
   unconditionally skips that request for those two phases regardless of this
   token), so listing them here has no effect. The only value that changes
-  anything is one that **excludes** `impl` (e.g. `Review gate | spec`): that
-  stops the LOOP from waiting on impl's review, but the impl PR's `@copilot`
-  request is itself unconditional (raised by the Principal Engineer playbook,
-  never through `raise-pr.sh`) and is NOT suppressed — that request then sits
-  unaddressed, a real per-repo config trap, not a skip.
+  anything is one that **excludes** `impl` (e.g. `Review gate | spec`) — **read
+  this before writing it:** excluding `impl` downgrades it to
+  `REVIEW_MODE=none`, which skips the review-fix loop's wait entirely,
+  including its checks-green requirement, so under `Full Auto` the impl PR
+  **auto-merges unreviewed and without waiting for CI**. The impl PR's
+  `@copilot` request is itself unconditional (raised by the Principal Engineer
+  playbook, never through `raise-pr.sh`) and is NOT suppressed either — it
+  sits unaddressed on a PR that already merged. A real per-repo config trap,
+  not a skip.
   **OMIT the row entirely when not gating** — an omitted/empty gate means `impl`
   reviews, the default and back-compatible behaviour.
 - **Pipeline done status** — the consuming project's terminal/Done status, exactly

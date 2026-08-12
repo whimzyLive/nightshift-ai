@@ -23,16 +23,17 @@ themselves the mode-specific body.
 
 Detect whether @copilot is already a requested reviewer by inspecting the `reviewRequests` field
 returned by `gh pr view`. **Note:** `reviewRequests` may not list the Copilot bot (GitHub does not
-reliably expose bot reviewers here), so this detection is best-effort. When in doubt the loop treats
+reliably expose bot reviewers here), so detection is best-effort. When in doubt the loop treats
 the current HEAD as not-yet-reviewed and waits or re-requests (rule 2a/2b in the fast path's decision
 table).
 
 If @copilot is not detected as a pending reviewer, add it best-effort — **but only in `on-update`
-mode** (the fast path's rule 2a/2b action cells already give the exact command):
+mode** (the fast path's rule 2a/2b action cells give the exact command):
 
 ```bash
 # Re-request only when the mode asks for per-update reviews. `on-create` relies on the
-# single create-time request (raise-pr.sh) and must NOT re-request; `none` never reaches here.
+# single create-time request (raise-pr.sh, impl via the playbook) and must NOT re-request;
+# `none` never reaches here.
 [ "$REVIEW_MODE" = "on-update" ] && gh pr edit <PR> --add-reviewer @copilot
 ```
 
@@ -40,10 +41,9 @@ Proceed without exiting regardless of outcome.
 
 ### Step 5 — Halt on /review-fix failure (AC-4)
 
-If the `/review-fix` run (fast-path rule 3) errors or returns `Status: blocked`, stop the loop
-immediately. Print the failure details (which comment / what error) to stdout and do NOT schedule a
-next iteration. Surface the error to the user. Budget is NOT checked here — this is an immediate
-halt.
+If the `/review-fix` run (fast-path rule 3) errors or returns `Status: blocked`, stop the loop.
+Print the failure details (which comment / what error) to stdout and do NOT schedule a next
+iteration. Surface the error to the user. Budget is NOT checked here — this is an immediate halt.
 
 ### Row rationale (why the fast-path decision table is ordered and worded this way)
 

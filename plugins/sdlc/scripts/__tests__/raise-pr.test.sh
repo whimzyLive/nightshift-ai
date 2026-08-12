@@ -11,14 +11,24 @@
 #   2. `--phase PLAN` (upper case) still suppresses the reviewer request.
 #   3. `--phase impl` (an unaffected phase, lower case) still requests the reviewer — proving
 #      the fix didn't overcorrect into suppressing every phase.
+#   4. `--phase impl` under a `claude-inline` fixture requests NO reviewer — closing a vacuous
+#      axis case 3 alone leaves open (see below).
 #
 # Hermeticity: raise-pr.sh -> read-review-config.sh resolves `.claude/project/project-context.md`
 # RELATIVE TO CWD, with no way to pass a context-file override through raise-pr.sh. Every case
-# below therefore runs from an ISOLATED cwd carrying its own pinned fixture context (Review
-# agent: github-copilot, Review mode: on-update, no Review gate) — never this repo's own
-# `.claude/project/project-context.md`. Without this, case 3 (which depends on the reader
-# reaching the github-copilot request path) would silently depend on whatever this host repo's
-# config happens to say.
+# below therefore runs from an ISOLATED cwd carrying its own pinned fixture context — never this
+# repo's own `.claude/project/project-context.md`.
+#
+# Two DISTINCT fixtures, deliberately:
+#   - $fixture (cases 1-3): Review agent github-copilot / Review mode on-update — happens to be
+#     BYTE-IDENTICAL to raise-pr.sh:76-77's own belt-and-suspenders fallback defaults. That makes
+#     case 3 alone vacuous on the "did the reader actually run" axis: if read-review-config.sh
+#     were broken or missing, the eval would set nothing, raise-pr.sh's fallback would apply the
+#     SAME values, and case 3 would still (wrongly) PASS.
+#   - $fixture_inline (case 4 only): Review agent claude-inline — deliberately DIFFERENT from the
+#     fallback default, so a broken/stubbed reader would leave REVIEW_AGENT at its
+#     github-copilot fallback and case 4 would (correctly) go red requesting a reviewer it should
+#     have suppressed. This is the case that actually proves the reader ran.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/raise-pr.test.sh
@@ -32,8 +42,8 @@ mockdir="$(mktemp -d)"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$mockdir" "$workdir"' EXIT
 
-# Fixture repo root: raise-pr.sh is run with this as cwd, so read-review-config.sh resolves
-# ./.claude/project/project-context.md to THIS fixture, never the host repo's.
+# Fixture repo roots: raise-pr.sh is run with one of these as cwd, so read-review-config.sh
+# resolves ./.claude/project/project-context.md to THAT fixture, never the host repo's.
 fixture="$workdir/fixture-repo"
 mkdir -p "$fixture/.claude/project"
 cat >"$fixture/.claude/project/project-context.md" <<'FIXTURE_CTX'
@@ -44,6 +54,17 @@ cat >"$fixture/.claude/project/project-context.md" <<'FIXTURE_CTX'
 | Review agent | `github-copilot` |
 | Review mode  | `on-update`    |
 FIXTURE_CTX
+
+fixture_inline="$workdir/fixture-repo-inline"
+mkdir -p "$fixture_inline/.claude/project"
+cat >"$fixture_inline/.claude/project/project-context.md" <<'FIXTURE_CTX_INLINE'
+## Code Review
+
+| Token        | Value           |
+| ------------ | --------------- |
+| Review agent | `claude-inline` |
+| Review mode  | `on-update`     |
+FIXTURE_CTX_INLINE
 
 # Mock `gh`: pr create/ready/view always succeed; pr edit --add-reviewer records the attempt to
 # $MOCK_MARKER_FILE so the test can assert whether a reviewer request was ever made, without
@@ -83,11 +104,11 @@ printf 'PR body.\n' > "$workdir/body.md"
 failures=0
 
 run_case() {
-  # $1 = phase arg, $2 = expect ('requested' | 'not-requested'), $3 = label
-  local phase="$1" expect="$2" label="$3"
+  # $1 = fixture dir, $2 = phase arg, $3 = expect ('requested' | 'not-requested'), $4 = label
+  local fx="$1" phase="$2" expect="$3" label="$4"
   local marker="$workdir/marker-$RANDOM"
   : > "$marker"
-  ( cd "$fixture" && PATH="$mockdir:$PATH" MOCK_MARKER_FILE="$marker" \
+  ( cd "$fx" && PATH="$mockdir:$PATH" MOCK_MARKER_FILE="$marker" \
       bash "$script" --phase "$phase" "headbranch" "develop" "title" "$workdir/body.md" \
       >/dev/null 2>"$workdir/stderr.log" )
   local status=$?
@@ -103,14 +124,19 @@ run_case() {
 }
 
 # Case 1: mixed-case phase must still suppress the reviewer request (the fix).
-run_case "Spec" "not-requested" "--phase Spec (mixed case) suppresses the reviewer request"
+run_case "$fixture" "Spec" "not-requested" "--phase Spec (mixed case) suppresses the reviewer request"
 
 # Case 2: upper-case phase must still suppress the reviewer request.
-run_case "PLAN" "not-requested" "--phase PLAN (upper case) suppresses the reviewer request"
+run_case "$fixture" "PLAN" "not-requested" "--phase PLAN (upper case) suppresses the reviewer request"
 
 # Case 3: an unaffected phase, unaffected case, must still request a reviewer — proves the fix
 # didn't overcorrect into suppressing every phase.
-run_case "impl" "requested" "--phase impl (unaffected) still requests the reviewer"
+run_case "$fixture" "impl" "requested" "--phase impl (unaffected) still requests the reviewer"
+
+# Case 4: same unaffected phase, but under a claude-inline fixture — the reviewer must NOT be
+# requested. Unlike case 3, this fixture value differs from raise-pr.sh's own fallback default,
+# so a broken/stubbed read-review-config.sh cannot silently produce the same (wrong) outcome.
+run_case "$fixture_inline" "impl" "not-requested" "--phase impl under claude-inline requests no reviewer"
 
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all raise-pr.sh regression cases passed"

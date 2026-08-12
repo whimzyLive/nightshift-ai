@@ -38,7 +38,7 @@ reviewers.
   (empty when the flag is absent).
 - `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
   rule-4 clean exit** (head Copilot-reviewed, 0 unresolved comments, checks
-  green), immediately before the session release. It is **NOT** run on any halt
+  green), right before the session release. It is **NOT** run on any halt
   (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
   `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
   whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
@@ -112,7 +112,7 @@ eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh --phase "$PHASE
 
 When a **Review gate** is configured and the current `PHASE` is **not** in it, the
 reader returns `REVIEW_MODE=none` — the existing `none` path below runs
-`--on-clean` exactly once and releases. The phase's review is skipped and the
+`--on-clean` once and releases. The phase's review is skipped and the
 pipeline advances; this is handled entirely by the existing `none` handling (no
 new decision-table rule).
 
@@ -135,13 +135,13 @@ unrecognised ⇒ `github-copilot` + a WARNING on stderr — emitted by the reade
 **`REVIEW_MODE`** selects the cadence (orthogonal to the agent):
 
 - **`none`** — do NOT request a review and do NOT wait for one. Run the
-  `--on-clean` command (if any) exactly once, then go straight to the **Final
+  `--on-clean` command (if any) once, then go straight to the **Final
   action — release the session**. The PR is still raised; `none` simply turns the
   review-fix loop into a no-op (no review gate). Skip every step below, for BOTH
   agents.
 - **`on-create`** — review is requested/produced ONCE: for `github-copilot` the
-  bot is requested at PR creation (by `raise-pr.sh`) and the loop does NOT
-  re-request; for the in-session agents (`claude-inline`/`claude-superpowers`) the
+  bot is requested at PR creation (`raise-pr.sh` or the playbook for impl) and
+  the loop does NOT re-request; for the in-session agents (`claude-inline`/`claude-superpowers`) the
   loop runs `REVIEW_CMD` once. Either way it runs `/review-fix` **at most once**
   (rule 3), then completes — it never waits for a re-review of the fix. (See the
   **Review-mode modifiers** note in `refs/loop-modes.md` for the full detail.)
