@@ -112,8 +112,12 @@ generated file — every slot must be replaced with an actual value.
   `impl` is read (NA-104) — `spec`/`plan` are ignored entirely, both for the
   review-fix loop and the PR-creation-time reviewer request (`raise-pr.sh`
   unconditionally skips that request for those two phases regardless of this
-  token), so listing them here has no effect (e.g. `Review gate | impl`). An
-  `impl` not listed skips its request too (effective review-mode `none`).
+  token), so listing them here has no effect. The only value that changes
+  anything is one that **excludes** `impl` (e.g. `Review gate | spec`): that
+  stops the LOOP from waiting on impl's review, but the impl PR's `@copilot`
+  request is itself unconditional (raised by the Principal Engineer playbook,
+  never through `raise-pr.sh`) and is NOT suppressed — that request then sits
+  unaddressed, a real per-repo config trap, not a skip.
   **OMIT the row entirely when not gating** — an omitted/empty gate means `impl`
   reviews, the default and back-compatible behaviour.
 - **Pipeline done status** — the consuming project's terminal/Done status, exactly

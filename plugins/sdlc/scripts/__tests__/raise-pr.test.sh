@@ -12,6 +12,14 @@
 #   3. `--phase impl` (an unaffected phase, lower case) still requests the reviewer — proving
 #      the fix didn't overcorrect into suppressing every phase.
 #
+# Hermeticity: raise-pr.sh -> read-review-config.sh resolves `.claude/project/project-context.md`
+# RELATIVE TO CWD, with no way to pass a context-file override through raise-pr.sh. Every case
+# below therefore runs from an ISOLATED cwd carrying its own pinned fixture context (Review
+# agent: github-copilot, Review mode: on-update, no Review gate) — never this repo's own
+# `.claude/project/project-context.md`. Without this, case 3 (which depends on the reader
+# reaching the github-copilot request path) would silently depend on whatever this host repo's
+# config happens to say.
+#
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/raise-pr.test.sh
 # Exit 0 = PASS (all cases), non-zero = FAIL (any case).
@@ -23,6 +31,19 @@ script="$(cd "$here/.." && pwd)/raise-pr.sh"
 mockdir="$(mktemp -d)"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$mockdir" "$workdir"' EXIT
+
+# Fixture repo root: raise-pr.sh is run with this as cwd, so read-review-config.sh resolves
+# ./.claude/project/project-context.md to THIS fixture, never the host repo's.
+fixture="$workdir/fixture-repo"
+mkdir -p "$fixture/.claude/project"
+cat >"$fixture/.claude/project/project-context.md" <<'FIXTURE_CTX'
+## Code Review
+
+| Token        | Value          |
+| ------------ | -------------- |
+| Review agent | `github-copilot` |
+| Review mode  | `on-update`    |
+FIXTURE_CTX
 
 # Mock `gh`: pr create/ready/view always succeed; pr edit --add-reviewer records the attempt to
 # $MOCK_MARKER_FILE so the test can assert whether a reviewer request was ever made, without
@@ -66,9 +87,9 @@ run_case() {
   local phase="$1" expect="$2" label="$3"
   local marker="$workdir/marker-$RANDOM"
   : > "$marker"
-  PATH="$mockdir:$PATH" MOCK_MARKER_FILE="$marker" \
-    bash "$script" --phase "$phase" "headbranch" "develop" "title" "$workdir/body.md" \
-    >/dev/null 2>"$workdir/stderr.log"
+  ( cd "$fixture" && PATH="$mockdir:$PATH" MOCK_MARKER_FILE="$marker" \
+      bash "$script" --phase "$phase" "headbranch" "develop" "title" "$workdir/body.md" \
+      >/dev/null 2>"$workdir/stderr.log" )
   local status=$?
   local requested="not-requested"
   [ -s "$marker" ] && requested="requested"
