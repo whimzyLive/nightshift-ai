@@ -117,44 +117,20 @@ so there is no cross-phase state bleed.
 
 ### Resolving the working issue's mode
 
-The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode. Do
-**not** parse `acli workitem view` text output — that format is not stable across acli
-versions/flags, and a parse miss would silently disable Full Auto. Instead probe **definitively**
-with a JQL match (the repo's established custom-field-read pattern — see `refs/jira-fetch.md`), so
-auto-merge is enabled **only** when Jira itself confirms the mode is `Full Auto`.
-
-The mode has two sources, in strict precedence order:
-
-1. **The `"AI Workflow"` custom field** — always wins when it is set to anything.
-2. **An `AI-Workflow:<mode>` label fallback** — consulted **only when the field is unset or the
-   field doesn't exist on the instance**. Projects that cannot add custom fields opt in via a label
-   instead: `AI-Workflow:full-auto`, `AI-Workflow:auto`, or `AI-Workflow:assisted` (lowercase mode
-   tokens). When a story carries **multiple** `AI-Workflow:*` labels, the **most conservative** one
-   wins (`assisted` > `auto` > `full-auto`) — the label probes below check most-conservative first,
-   so the ladder's order encodes that rule.
-
-`MODE` always resolves to a **real mode string** (`Full Auto` / `Auto` / `Assisted`), or empty when
-**neither source is set** — never a placeholder — because callers interpolate it into
-operator-facing text (e.g. the epic loop's E2b gate prompt via `storyMode(S)`).
-
-Resolve it via the shared ladder script (collapses this ladder and E0's `epicFallback` ladder into
-one implementation — NA-86 A6):
+The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode,
+resolved via the shared ladder script — never by parsing `acli workitem view` text (unstable
+across versions). Full ladder (custom field → label fallback, precedence, why JQL not text) lives
+in `${CLAUDE_PLUGIN_ROOT}/refs/ai-workflow-mode-resolution.md` — read it the first time this
+section is reached.
 
 ```bash
 eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-ai-workflow-mode.sh STORY_KEY)"
-# -> sets MODE ('Full Auto' | 'Auto' | 'Assisted' | '') and MODE_SOURCE (additive
-#    observability only — D9, no caller branches on it)
+# -> sets MODE ('Full Auto' | 'Auto' | 'Assisted' | '') and MODE_SOURCE (additive, D9)
 ```
 
-`MODE="Full Auto"` is the **only** value that enables auto-merge. Any other outcome (`Auto`,
-`Assisted`, empty, or a JQL/auth error that yields no match) → the **human-merge** path. Defaulting
-to the human path is the safe failure mode: a transient read error must never trigger an unattended
-merge. (The `"AI Workflow"` field name is the consuming repo's single-select; the JQL match is
-case- and format-stable, unlike scraping view output. On an instance where the field doesn't exist
-at all, the field probes error → no match → the label probes still run, which is exactly the
-fallback's target case. The label tokens deliberately mirror the mode values the consuming repo's
-trigger service resolves from the same labels, so webhook-side triggering and `/auto`-side gating
-agree.)
+`MODE="Full Auto"` is the **only** value that enables auto-merge; any other outcome (including
+empty or a read error) takes the **human-merge** path — defaulting to human is the safe failure
+mode.
 
 ### The procedure (release at PR raise; the loop is a NEW session)
 
@@ -196,10 +172,15 @@ never runs against the spec PR (A1) or a standalone plan PR (`/sdlc:plan`), and 
 requests a reviewer for `spec`/`plan` either (an unaddressed review left open forever is worse than
 none), regardless of this token.
 
-- A gated `impl` phase reviews as usual; an ungated one skips review (effective `REVIEW_MODE=none`
-  — `raise-pr.sh` requests no reviewer, the tail loop runs `--on-clean` once and releases).
+- A gated `impl` phase reviews as usual; an ungated one still gets `@copilot` requested — the impl
+  PR is raised by the Principal Engineer playbook's own `gh pr create` + unconditional
+  `--add-reviewer`, never through `raise-pr.sh` (`refs/principal-engineer-playbook.md`). Gating
+  `impl` out only stops the LOOP (`REVIEW_MODE=none` — `--on-clean` once, release) from waiting on
+  that already-open review, which then sits unaddressed — unlike spec/plan, this is a real
+  per-repo config trap, not suppressed.
 - **Token absent or empty ⇒ `impl` reviews** — the default, back-compatible behaviour.
-- The combined plan+impl PR (A2) is gated by `impl` (no separate plan PR in `/auto`).
+- The combined plan+impl PR (A2) is gated by `impl` (no separate plan PR in `/auto`) — see A2's
+  review-scope note below for its plan-doc exclusion.
 - `--phase <GATE_PHASE>` is passed per-invocation, so the `impl` PR is gated independently of any
   other phase.
 
@@ -267,33 +248,37 @@ curl -s --retry 3 -X POST http://localhost:9001 \
   -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/pr_raised\",\"params\":{\"storyKey\":\"STORY_KEY\",\"type\":\"spec\",\"url\":\"SPEC_PR_URL\"},\"id\":1}"
 ```
 
-**Exit.** Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
+**Exit** (release directly, per **Final action** below — this branch raised a PR but never loops).
+Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
 
-**If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then complete the
-phase directly, right here. **Spec never enters the review-fix loop (NA-104)** — reserved for the
-implementation PR (see **Loop-after-raise**, above) — so there is no loop tail to hand to a new
-session. Run the site guard once before either branch below — the PR is already raised, so a guard
-failure must still release (with the PR URL), never bare-`exit`:
+**If ASYNC_REVIEW=false** — resolve `MODE`, run the site guard, then complete the phase directly,
+right here. **Spec never enters the review-fix loop (NA-104)** — reserved for the implementation
+PR (see **Loop-after-raise**, above) — so there is no loop tail to hand to a new session:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || { bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh SPEC_PR_URL; exit 1; }
 ```
 
-- **`MODE`=`Full Auto`** → post an intent note, then **enable** GitHub auto-merge on the spec PR
-  (`auto-merge-pr.sh --auto`) rather than merging immediately — it returns once queued, never
-  waiting on checks, so it can't race the CI `raise-pr.sh` just triggered. GitHub merges it once
-  checks pass; that webhook resumes Phase 2. If enabling fails, post a follow-up comment for a
-  human to merge manually — either way, fall through to the terminal action below:
+A guard failure means **STOP HERE** — the release above already ran; do NOT continue into either
+`MODE` branch below (nothing past this point may write to a possibly-wrong Jira instance), and do
+NOT run the terminal action again.
+
+- **`MODE`=`Full Auto`** → merge FIRST, comment SECOND, so the comment matches what really
+  happened (`auto-merge-pr.sh --auto` decides deterministically, from repo settings and PR state,
+  whether to arm GitHub auto-merge or merge immediately — never from parsing gh's error text, and
+  never racing the CI `raise-pr.sh` just triggered):
 
 ```bash
-acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
-
-Enabling auto-merge (spec is exempt from the review-fix loop); GitHub will merge it once checks pass, then this advances to plan + implementation automatically."
-if ! bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --auto SPEC_PR_URL; then
-  acli jira workitem comment create --key STORY_KEY --body "Could not enable auto-merge on the spec PR: SPEC_PR_URL
-
-Please review and merge it manually, then re-run /auto STORY_KEY to generate the plan and implementation."
+if OUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --auto SPEC_PR_URL); then
+  if [ "$OUT" = "MERGED" ]; then
+    BODY="Spec PR merged automatically (Full Auto): SPEC_PR_URL. Advancing to plan + implementation."
+  else
+    BODY="Spec PR raised (Full Auto): SPEC_PR_URL. GitHub will merge it once checks pass; this then advances automatically."
+  fi
+else
+  BODY="Could not auto-merge the spec PR: SPEC_PR_URL. Please review and merge it manually, then re-run /auto STORY_KEY."
 fi
+acli jira workitem comment create --key STORY_KEY --body "$BODY"
 ```
 
 - **Any other mode** → post the human-merge note; leave the PR open. No automated loop runs against
@@ -309,9 +294,11 @@ Review and merge to develop, then re-run /auto STORY_KEY to generate the plan an
 
 Tell the user:
 
-> Spec PR raised. Full Auto: enabling auto-merge. Otherwise: review and merge it to `develop`, then re-run `/auto STORY_KEY`.
+> Spec PR raised. Full Auto: merged, or armed to auto-merge (see the Jira comment for which).
+> Otherwise: review and merge it to `develop`, then re-run `/auto STORY_KEY`.
 
-**Terminal action (unconditional — either branch above):** release right here, with the PR URL:
+**Terminal action (either `MODE` branch above only** — the guard-failure path already released and
+stopped, above): release right here, with the PR URL:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh SPEC_PR_URL
@@ -349,6 +336,8 @@ curl -s --retry 3 -X POST http://localhost:9001 \
    hook (auto-merges on clean → the plan+impl PR landing on `develop` **completes** the story, then
    best-effort transitions it to the pipeline done status); any other mode → tail loop **without** a
    hook (leave open for human merge). Terminal action: apply **Session boundary at PR raise**.
+   **Review scope (NA-104 AC-2):** the loop reviews this PR's code, not its plan prose — triage any
+   finding against `docs/superpowers/plans/STORY_KEY.md` as out of scope during `/review-fix`.
 
 ### A3 — Complete (comment posted BEFORE the tail loop)
 

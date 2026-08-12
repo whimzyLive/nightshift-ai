@@ -5,18 +5,26 @@
 # gh >=2.90 dropped the `--yes` flag from `gh pr merge` ("unknown flag: --yes"). This test mocks
 # `gh` to reproduce that exact contract and covers:
 #   1. Happy path — the 1-arg back-compat call must print MERGED and exit 0 through a gh that
-#      rejects --yes. The mock `gh api` pipes a realistic repos/<slug> JSON payload through the
-#      REAL `jq` binary using the exact --jq expression auto-merge-pr.sh passes, so the script's
-#      own method-resolution logic actually runs here rather than being stubbed out.
+#      rejects --yes. The mock `gh api` returns a realistic repos/<slug> JSON payload; the script
+#      pipes it through the REAL `jq` binary itself, so its own method-resolution logic actually
+#      runs here rather than being stubbed out.
 #   2. Failure contract — on a merge rejection (branch protection / conflict / checks not met),
 #      the script must exit non-zero and print an `ERROR: gh pr merge ... failed` line to stderr
 #      so sdlc:loop can detect it (the bug's own Expected Result).
-#   3. `--auto` enable — armed but not yet merged: prints AUTO-MERGE-ENABLED, exit 0.
-#   4. `--auto` + "clean status" rejection (NA-104 round-2 Critical 1) — falls back to an
-#      immediate merge instead of hard-failing.
-#   5. `--auto` + merged inside the confirmation window (NA-104 round-2 Important 1) — accepts
+#   3. `--auto` eligible + enable — armed but not yet merged: prints AUTO-MERGE-ENABLED, exit 0.
+#   4. `--auto` + `allow_auto_merge=false` (NA-104 round-3 Critical A) — decided UP FRONT from
+#      repo settings, never attempts `gh pr merge --auto` at all, merges immediately instead.
+#   5. `--auto` + `mergeStateStatus=CLEAN` (NA-104 round-3 Critical A) — decided UP FRONT from PR
+#      state, never attempts `gh pr merge --auto`, merges immediately instead.
+#   6. `--auto` eligible per the up-front checks, but `gh pr merge --auto` itself still rejects
+#      with "clean status" (defensive backstop for the race the up-front check can't close) —
+#      falls back to an immediate merge instead of hard-failing.
+#   7. `--auto` + merged inside the confirmation window (NA-104 round-2 Important 1) — accepts
 #      `state == MERGED` as success instead of erroring because `autoMergeRequest` is null.
-#   6. `--auto` + a genuine (non-"clean status") rejection — exits non-zero, does NOT fall back.
+#   8. `--auto` eligible, but a genuine (non-"clean status") rejection — exits non-zero, does NOT
+#      fall back.
+#   9. `--auto` + story-key/done-status together — rejected as an invalid combination (a spec PR
+#      never completes the story), enforced rather than merely documented.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -31,10 +39,14 @@ trap 'rm -rf "$mockdir"' EXIT
 
 # Mock `gh` mirroring the real gh (>=2.90) contract this script depends on:
 #   - `gh repo view --json nameWithOwner -q .nameWithOwner`  -> a repo slug
-#   - `gh api repos/<slug> --jq '<expr>'`                     -> the script's own <expr> evaluated
-#                                                                (by the real jq binary) against a
-#                                                                realistic repo-settings payload,
-#                                                                so a broken expr fails the test.
+#   - `gh api repos/<slug>` [--jq '<expr>']                   -> a repo-settings payload with
+#                                                                `allow_auto_merge` selected by
+#                                                                MOCK_GH_ALLOW_AUTO_MERGE (default
+#                                                                true); piped through the REAL jq
+#                                                                binary when --jq is given
+#                                                                (back-compat with an older
+#                                                                script that still passes it),
+#                                                                otherwise returned as raw JSON.
 #   - `gh pr merge <pr> <method> --yes`                       -> "unknown flag: --yes", exit 1
 #   - `gh pr merge <pr> <method>` (no --auto, no --yes)       -> exit 0, unless
 #                                                                MOCK_GH_MERGE_REJECT=1 is set, in
@@ -46,10 +58,12 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                clean-status | reject; default
 #                                                                enable).
 #   - `gh pr view <pr> --json <field> -q <expr>`              -> <expr> evaluated (by the real jq
-#                                                                binary) against
-#                                                                {state: MOCK_GH_STATE (default
-#                                                                MERGED), autoMergeRequest:
-#                                                                MOCK_GH_AUTOMERGE (default null)}
+#                                                                binary) against {state:
+#                                                                MOCK_GH_STATE (default MERGED),
+#                                                                autoMergeRequest: MOCK_GH_AUTOMERGE
+#                                                                (default null), mergeStateStatus:
+#                                                                MOCK_GH_MERGE_STATE_STATUS
+#                                                                (default BLOCKED)}
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -66,7 +80,8 @@ case "${1:-}" in
       fi
       prev="$arg"
     done
-    payload='{"allow_merge_commit":true,"allow_squash_merge":true,"allow_rebase_merge":true}'
+    allow_auto="${MOCK_GH_ALLOW_AUTO_MERGE:-true}"
+    payload="{\"allow_merge_commit\":true,\"allow_squash_merge\":true,\"allow_rebase_merge\":true,\"allow_auto_merge\":$allow_auto}"
     if [ -n "$jqexpr" ]; then
       echo "$payload" | jq -r "$jqexpr"
     else
@@ -129,7 +144,8 @@ case "${1:-}" in
         done
         state="${MOCK_GH_STATE:-MERGED}"
         automerge="${MOCK_GH_AUTOMERGE:-null}"
-        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge}"
+        mss="${MOCK_GH_MERGE_STATE_STATUS:-BLOCKED}"
+        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge,\"mergeStateStatus\":\"$mss\"}"
         if [ -n "$jqexpr" ]; then
           echo "$payload" | jq -r "$jqexpr"
         else
@@ -184,36 +200,76 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 3: --auto enable — armed but not yet merged (state stays OPEN, autoMergeRequest set).
+# Case 3: --auto eligible (allow_auto_merge=true, mergeStateStatus!=CLEAN) + enable — armed but
+# not yet merged (state stays OPEN, autoMergeRequest set).
 auto_stderr="$mockdir/stderr-auto.log"
-auto_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=OPEN MOCK_GH_AUTOMERGE=true \
+auto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=OPEN MOCK_GH_AUTOMERGE=true \
   bash "$script" --auto 999999 2>"$auto_stderr")"
 auto_status=$?
 if [ "$auto_status" -eq 0 ] && [ "$auto_out" = "AUTO-MERGE-ENABLED" ]; then
-  echo "PASS: --auto enable — exits 0 and prints AUTO-MERGE-ENABLED when armed but not yet merged"
+  echo "PASS: --auto eligible + enable — exits 0 and prints AUTO-MERGE-ENABLED when armed but not yet merged"
 else
-  echo "FAIL: --auto enable — exit=$auto_status output=${auto_out:-<empty>}"
+  echo "FAIL: --auto eligible + enable — exit=$auto_status output=${auto_out:-<empty>}"
   cat "$auto_stderr"
   failures=$((failures + 1))
 fi
 
-# Case 4: --auto + "clean status" rejection (round-2 Critical 1) — must fall back to an immediate
-# merge rather than hard-failing. Default MOCK_GH_STATE=MERGED makes the fallback merge succeed.
+# Case 4: --auto + allow_auto_merge=false (round-3 Critical A — the default on every new GitHub
+# repo) — must be decided UP FRONT and never even attempt `gh pr merge --auto`; merges
+# immediately instead. MOCK_GH_AUTO_MODE=reject would make a wrongful --auto attempt visible via
+# a DIFFERENT (non-MERGED) outcome, proving the up-front check actually skipped it.
+noauto_stderr="$mockdir/stderr-noauto.log"
+noauto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED \
+  bash "$script" --auto 999999 2>"$noauto_stderr")"
+noauto_status=$?
+if [ "$noauto_status" -eq 0 ] && [ "$noauto_out" = "MERGED" ] \
+  && grep -q 'allow_auto_merge=no' "$noauto_stderr"; then
+  echo "PASS: --auto + allow_auto_merge=false — skips the --auto attempt entirely, merges immediately"
+else
+  echo "FAIL: --auto + allow_auto_merge=false — exit=$noauto_status output=${noauto_out:-<empty>}"
+  cat "$noauto_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 5: --auto + mergeStateStatus=CLEAN (round-3 Critical A / Important B) — must be decided UP
+# FRONT from PR state and never attempt `gh pr merge --auto`; merges immediately instead. Note:
+# a real GitHub PR in this state would ALSO be correctly handled by round-2's reactive
+# clean-status fallback (case 6 below), so this specific case is not expected to go red against
+# round-2's code — it verifies the DETERMINISTIC mechanism (I-B) works, not a new failure mode.
+alreadyclean_stderr="$mockdir/stderr-alreadyclean.log"
+alreadyclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=CLEAN \
+  MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$alreadyclean_stderr")"
+alreadyclean_status=$?
+if [ "$alreadyclean_status" -eq 0 ] && [ "$alreadyclean_out" = "MERGED" ] \
+  && grep -q 'mergeStateStatus=CLEAN' "$alreadyclean_stderr"; then
+  echo "PASS: --auto + mergeStateStatus=CLEAN — skips the --auto attempt entirely, merges immediately"
+else
+  echo "FAIL: --auto + mergeStateStatus=CLEAN — exit=$alreadyclean_status output=${alreadyclean_out:-<empty>}"
+  cat "$alreadyclean_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 6: --auto eligible per the up-front checks, but gh itself still rejects with "clean
+# status" (the defensive backstop for the race the up-front check can't close) — falls back to
+# an immediate merge rather than hard-failing.
 clean_stderr="$mockdir/stderr-clean.log"
-clean_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=clean-status bash "$script" --auto 999999 2>"$clean_stderr")"
+clean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$clean_stderr")"
 clean_status=$?
 if [ "$clean_status" -eq 0 ] && [ "$clean_out" = "MERGED" ] && grep -q 'falling back to an immediate merge' "$clean_stderr"; then
-  echo "PASS: --auto clean-status — falls back to an immediate merge and prints MERGED"
+  echo "PASS: --auto backstop clean-status rejection — falls back to an immediate merge and prints MERGED"
 else
-  echo "FAIL: --auto clean-status — exit=$clean_status output=${clean_out:-<empty>}"
+  echo "FAIL: --auto backstop clean-status rejection — exit=$clean_status output=${clean_out:-<empty>}"
   cat "$clean_stderr"
   failures=$((failures + 1))
 fi
 
-# Case 5: --auto + merged inside the confirmation window (round-2 Important 1) — state flips to
-# MERGED before autoMergeRequest ever shows enabled; must accept MERGED, not error.
+# Case 7: --auto eligible + merged inside the confirmation window (round-2 Important 1) — state
+# flips to MERGED before autoMergeRequest ever shows enabled; must accept MERGED, not error.
 window_stderr="$mockdir/stderr-window.log"
-window_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=MERGED MOCK_GH_AUTOMERGE=null \
+window_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_AUTO_MODE=enable MOCK_GH_STATE=MERGED MOCK_GH_AUTOMERGE=null \
   bash "$script" --auto 999999 2>"$window_stderr")"
 window_status=$?
 if [ "$window_status" -eq 0 ] && [ "$window_out" = "MERGED" ]; then
@@ -224,11 +280,12 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 6: --auto + a genuine (non-"clean status") rejection — must exit non-zero and must NOT
-# fall back to an immediate merge (MOCK_GH_MERGE_REJECT=1 would make a wrongful fallback visible
-# via a DIFFERENT stderr message, proving no fallback occurred).
+# Case 8: --auto eligible, but a genuine (non-"clean status") rejection — must exit non-zero and
+# must NOT fall back to an immediate merge (MOCK_GH_MERGE_REJECT=1 would make a wrongful
+# fallback visible via a DIFFERENT stderr message, proving no fallback occurred).
 autoreject_stderr="$mockdir/stderr-autoreject.log"
-autoreject_out="$(PATH="$mockdir:$PATH" MOCK_GH_AUTO_MODE=reject MOCK_GH_MERGE_REJECT=1 \
+autoreject_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_MERGE_REJECT=1 \
   bash "$script" --auto 999999 2>"$autoreject_stderr")"
 autoreject_status=$?
 if [ "$autoreject_status" -ne 0 ] && [ -z "$autoreject_out" ] \
@@ -238,6 +295,19 @@ if [ "$autoreject_status" -ne 0 ] && [ -z "$autoreject_out" ] \
 else
   echo "FAIL: --auto genuine rejection — exit=$autoreject_status output=${autoreject_out:-<empty>}"
   cat "$autoreject_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 9: --auto + story-key/done-status together — enforced as an invalid combination (a spec
+# PR never completes the story), not merely documented.
+badargs_stderr="$mockdir/stderr-badargs.log"
+badargs_out="$(PATH="$mockdir:$PATH" bash "$script" --auto 999999 STORY-1 Done 2>"$badargs_stderr")"
+badargs_status=$?
+if [ "$badargs_status" -ne 0 ] && [ -z "$badargs_out" ] && grep -q '^ERROR: --auto does not accept' "$badargs_stderr"; then
+  echo "PASS: --auto + story-key/done-status — rejected as an invalid combination"
+else
+  echo "FAIL: --auto + story-key/done-status — exit=$badargs_status output=${badargs_out:-<empty>}"
+  cat "$badargs_stderr"
   failures=$((failures + 1))
 fi
 

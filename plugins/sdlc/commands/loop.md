@@ -30,19 +30,22 @@ and ignores non-Copilot reviewers.
 **Arguments.** `$ARGUMENTS` is `<PR> [--phase <p>] [--on-clean "<command>"]`:
 
 - `<PR>` — the PR number or URL to loop on.
-- `--phase <p>` — OPTIONAL. A single phase-name token (`spec` | `plan` | `impl`)
-  threaded through to the review-config reader (step 0) so the per-repo **Review
-  gate** can downgrade this phase's effective `REVIEW_MODE` to `none`. The phase is
-  passed literally per-invocation (NOT an env var) so it survives `/loop`
-  re-invocation. Capture it as `PHASE` (empty when the flag is absent).
+- `--phase <p>` — OPTIONAL. A single phase-name token — in practice only `impl` today
+  (NA-104: `/spec` and `/plan` no longer invoke `/sdlc:loop` at all, so `spec`/`plan`
+  have no remaining caller here) — threaded through to the review-config reader
+  (step 0) so the per-repo **Review gate** can downgrade this phase's effective
+  `REVIEW_MODE` to `none`. The phase is passed literally per-invocation (NOT an env
+  var) so it survives `/loop` re-invocation. Capture it as `PHASE` (empty when the
+  flag is absent).
 - `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
   rule-4 clean exit** (head Copilot-reviewed, zero unresolved comments, checks
   green), immediately before the session release. It is **NOT** run on any halt
   (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
   `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
   whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
-  command for a Full Auto story; standalone `/spec`/`/plan`/`/impl` pass nothing).
-  If `--on-clean` is absent, rule 4 simply stops.
+  command for a Full Auto story; standalone `/impl` passes nothing — `/spec` and
+  `/plan` never invoke `/sdlc:loop` at all, NA-104). If `--on-clean` is absent,
+  rule 4 simply stops.
 
 **Parsing `$ARGUMENTS`.** Split it explicitly — do NOT pass the whole string to
 `gh`:

@@ -95,21 +95,23 @@ if [ -f "$auto" ]; then
   fi
 fi
 
-# --- Assertion (d): exactly one pointer per standalone command ---------------------
-for f in $standalone; do
-  if [ ! -f "$f" ]; then
-    echo "FAIL: assertion d — file not found: $f" >&2
-    failures=$((failures + 1))
-    continue
-  fi
-  count="$(grep -Fc -- 'Session boundary at PR raise' "$f")"
+# --- Assertion (d): impl.md carries exactly one POINTER (positive form) ------------
+# Scoped to impl.md only (round-3 Minor): a bare phrase count can't distinguish a pointer from a
+# negation, so it no longer runs against spec.md/plan.md — those carry a NEGATION since NA-104
+# and are accurately covered by assertions (h)/(j) below instead.
+impl_standalone="plugins/sdlc/commands/impl.md"
+if [ ! -f "$impl_standalone" ]; then
+  echo "FAIL: assertion d — file not found: $impl_standalone" >&2
+  failures=$((failures + 1))
+else
+  count="$(grep -Fc -- 'Session boundary at PR raise' "$impl_standalone")"
   if [ "$count" -eq 1 ]; then
-    echo "PASS: assertion d — $f carries exactly one pointer to the canonical block"
+    echo "PASS: assertion d — $impl_standalone carries exactly one pointer to the canonical block"
   else
-    echo "FAIL: assertion d — $f carries $count reference(s) to 'Session boundary at PR raise', expected exactly 1" >&2
+    echo "FAIL: assertion d — $impl_standalone carries $count reference(s) to 'Session boundary at PR raise', expected exactly 1" >&2
     failures=$((failures + 1))
   fi
-done
+fi
 
 # --- Assertion (e): always-loaded surface must not grow (NON-POSITIVE) -------------
 # The four command files totalled 49,571 bytes at 4c3ad88. F is required to land non-positive
