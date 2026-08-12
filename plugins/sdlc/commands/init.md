@@ -200,7 +200,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
 | Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
-| Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` still governs the review-fix loop (NA-104) — `spec`/`plan` gate that phase's PR-creation-time reviewer request only. Default (omitted) = `impl` reviews. Not an interactive picker — write the `Review gate` token only if the repo wants per-phase gating. |
+| Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` is read (NA-104) — `spec`/`plan` are ignored entirely (no reviewer request either, unconditionally). Default (omitted) = `impl` reviews. Not an interactive picker — write the `Review gate` token only if the repo wants to gate `impl`'s review. |
 | Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)

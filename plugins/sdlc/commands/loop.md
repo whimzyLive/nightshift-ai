@@ -37,13 +37,13 @@ reviewers.
   (NOT an env var) so it survives `/loop` re-invocation. Capture it as `PHASE`
   (empty when the flag is absent).
 - `--on-clean "<command>"` — OPTIONAL. A shell command run **once, only at the
-  rule-4 clean exit** (head Copilot-reviewed, zero unresolved comments, checks
+  rule-4 clean exit** (head Copilot-reviewed, 0 unresolved comments, checks
   green), immediately before the session release. It is **NOT** run on any halt
   (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
   `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
   whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
   command for a Full Auto story; standalone `/impl` passes nothing, `spec`/`plan`
-  never call `/sdlc:loop`, NA-104). If `--on-clean` is absent, rule 4 simply stops.
+  never call `/sdlc:loop` — NA-104). If `--on-clean` is absent, rule 4 simply stops.
 
 **Parsing `$ARGUMENTS`.** Split it explicitly — do NOT pass the whole string to
 `gh`:

@@ -108,11 +108,12 @@ generated file — every slot must be replaced with an actual value.
   preferred for low-activity repos, where wall-clock decay would expire still-relevant rules
   between infrequent commits) — no other grammar. Consumed by
   `${CLAUDE_PLUGIN_ROOT}/refs/memory-maintenance.md`'s decay/demotion and review-file GC ops.
-- **Review gate** — OPTIONAL. A comma-separated subset of `spec,plan,impl`; only `impl`
-  still governs the review-fix loop (NA-104) — the loop never runs against a spec or
-  plan PR regardless of this token. `spec`/`plan` gate only that phase's
-  PR-creation-time reviewer request (e.g. `Review gate | spec, impl`); a phase not
-  listed there skips that request (effective review-mode `none` for that phase).
+- **Review gate** — OPTIONAL. A comma-separated subset of `spec,plan,impl`; only
+  `impl` is read (NA-104) — `spec`/`plan` are ignored entirely, both for the
+  review-fix loop and the PR-creation-time reviewer request (`raise-pr.sh`
+  unconditionally skips that request for those two phases regardless of this
+  token), so listing them here has no effect (e.g. `Review gate | impl`). An
+  `impl` not listed skips its request too (effective review-mode `none`).
   **OMIT the row entirely when not gating** — an omitted/empty gate means `impl`
   reviews, the default and back-compatible behaviour.
 - **Pipeline done status** — the consuming project's terminal/Done status, exactly
