@@ -129,7 +129,8 @@ Story S is gated (mode=<effectiveMode(S)>). PR: <url>. Review + merge, then type
   E2a skips every already-done story and picks up where the abort left off.)
 
 `gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> the child already drove its PR to
-auto-merge via its own tail loop — **no suspend**, advance straight to the next story. The
+auto-merge — via its own tail loop for an impl-completing phase, or directly for a spec-only A1
+completion (NA-104) — **no suspend**, advance straight to the next story. The
 all-Full-Auto epic is therefore **emergent**: no story is ever gated, so the suspend primitive is
 never invoked, so the whole epic runs to completion in this single epic session, hands-free.
 

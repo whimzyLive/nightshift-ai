@@ -79,11 +79,15 @@ Applies only when `/plan` is the **top-level** command. Nested under `/auto` Wor
 **Plan never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
 that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at
 PR raise: the plan doc is on a branch and the Jira comment is posted (step 12), so nothing resident
-is still load-bearing — release directly:
+is still load-bearing — release directly, with the PR URL:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh <PR_URL>
 ```
+
+> If the command hit a terminal STOP **before** a PR was raised (e.g. Step 0's defects-skip-plan
+> guard, or step 2's missing-spec STOP — nothing to release with a PR URL), run the same script
+> **bare** (no argument) instead.
 
 It prints the completion signal the automation worker watches for. Outside the worker
 (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
