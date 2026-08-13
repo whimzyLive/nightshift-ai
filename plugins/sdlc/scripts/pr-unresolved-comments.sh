@@ -13,7 +13,7 @@ set -euo pipefail
 # (`Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)`) matches. Same pattern as pr-resolve-comment.sh.
 #
 # Args:
-#   $1 pr        PR number
+#   $1 pr        PR number or PR URL (trailing slash/#fragment/?query tolerated)
 #   $2 out_file  optional path to write the NDJSON to (default: stdout only)
 #
 # Output: NDJSON, one object per line, for each unresolved-thread inline comment:
@@ -22,7 +22,13 @@ set -euo pipefail
 # reply + resolve. Prints a one-line count summary to stderr.
 
 PR="$1"; OUT="${2:-}"
-PR="${PR##*/}"
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/pr-number-lib.sh"
+if ! PR="$(normalize_pr_number "$PR")"; then
+  echo "pr-unresolved-comments.sh: not a valid PR number or URL: $1" >&2
+  exit 1
+fi
 
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER="${SLUG%/*}"; REPO="${SLUG#*/}"

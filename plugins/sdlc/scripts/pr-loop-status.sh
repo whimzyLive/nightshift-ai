@@ -39,9 +39,15 @@ set -euo pipefail
 # always exits 0; a probe failure prints zeros and is handled by the loop.
 
 PR="$1"; OUT="${2:-}"
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "$here/pr-number-lib.sh"
+if ! PR_NUM="$(normalize_pr_number "$PR")"; then
+  echo "pr-loop-status.sh: not a valid PR number or URL: $1" >&2
+  exit 0
+fi
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "unknown/unknown")
 OWNER="${SLUG%/*}"; REPO="${SLUG#*/}"
-PR_NUM="${PR##*/}"
 
 # Copilot review-bot login(s). GitHub's Copilot reviewer posts as this bot login.
 COPILOT_LOGIN_RE='^(copilot-pull-request-reviewer|copilot)(\[bot\])?$'
@@ -120,9 +126,9 @@ unresolved=$(printf '%s' "$copilot" | jq -rs '[.[].thread] | unique | length' 2>
 # or flaky checks cannot wedge the loop. Best-effort — zeros on failure.
 checks=$(gh pr checks "$PR_NUM" --required --json bucket 2>/dev/null || echo '[]')
 
-# No branch protection => no required checks => the gate would be a no-op.
+# No required checks reported (for any reason) => the required-only gate would be a no-op.
 # Fall back to all checks so the loop still waits for CI.
-if [ "$checks" = "[]" ]; then
+if [ "$(printf '%s' "$checks" | jq 'length' 2>/dev/null || echo 0)" -eq 0 ]; then
   checks=$(gh pr checks "$PR_NUM" --json bucket 2>/dev/null || echo '[]')
 fi
 pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)

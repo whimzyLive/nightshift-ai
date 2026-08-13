@@ -25,10 +25,12 @@ trap 'rm -rf "$mockdir"' EXIT
 
 # Mock `gh` mirroring the real gh contract this script depends on. The reviewThreads payload is
 # read from $MOCK_THREADS_JSON (a JSON array of thread nodes) so each case below can supply its
-# own fixture without touching the mock.
+# own fixture without touching the mock. Every invocation is appended to $GH_CALL_LOG (when set)
+# so the malformed-input case can assert `gh` was never reached.
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
+[ -n "${GH_CALL_LOG:-}" ] && printf '%s\n' "$*" >>"$GH_CALL_LOG"
 case "${1:-}" in
   repo)
     [ "${2:-}" = "view" ] && { echo "example-org/example-repo"; exit 0; }
@@ -142,6 +144,63 @@ if [ "$zero_status" -eq 0 ] && [ -z "$zero_out" ] && grep -q '^unresolved-inline
 else
   echo "FAIL: (4) zero unresolved threads returns cleanly — exit=$zero_status output=${zero_out:-<empty>}"
   echo "--- script stderr ---"; cat "$zero_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 5 (regression pin): a PR URL with a trailing slash (e.g. a pasted "/pull/239/") must still
+# resolve — ${PR##*/} alone leaves this empty and re-triggers the GraphQL Int! failure.
+slash_stderr="$mockdir/stderr-slash.log"
+slash_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239/" 2>"$slash_stderr")"
+slash_status=$?
+slash_count=$(printf '%s' "$slash_out" | grep -c . || true)
+if [ "$slash_status" -eq 0 ] && [ "$slash_count" -eq 3 ]; then
+  echo "PASS: (5) a PR URL with a trailing slash resolves and succeeds (regression pin)"
+else
+  echo "FAIL: (5) trailing-slash PR URL — exit=$slash_status lines=$slash_count"
+  echo "--- script stderr ---"; cat "$slash_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 6 (regression pin): a PR URL with a #fragment (e.g. "/pull/239#discussion_r1") must resolve.
+frag_stderr="$mockdir/stderr-frag.log"
+frag_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239#discussion_r1" 2>"$frag_stderr")"
+frag_status=$?
+frag_count=$(printf '%s' "$frag_out" | grep -c . || true)
+if [ "$frag_status" -eq 0 ] && [ "$frag_count" -eq 3 ]; then
+  echo "PASS: (6) a PR URL with a #fragment resolves and succeeds (regression pin)"
+else
+  echo "FAIL: (6) #fragment PR URL — exit=$frag_status lines=$frag_count"
+  echo "--- script stderr ---"; cat "$frag_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 7 (regression pin): a PR URL with a ?query resolves too.
+query_stderr="$mockdir/stderr-query.log"
+query_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239?tab=files" 2>"$query_stderr")"
+query_status=$?
+query_count=$(printf '%s' "$query_out" | grep -c . || true)
+if [ "$query_status" -eq 0 ] && [ "$query_count" -eq 3 ]; then
+  echo "PASS: (7) a PR URL with a ?query resolves and succeeds (regression pin)"
+else
+  echo "FAIL: (7) ?query PR URL — exit=$query_status lines=$query_count"
+  echo "--- script stderr ---"; cat "$query_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 8: a genuinely malformed input (no trailing digits at all) is rejected with a clear error
+# BEFORE it ever reaches `gh` — proven via the call log, not inferred from exit status alone.
+malformed_stderr="$mockdir/stderr-malformed.log"
+malformed_call_log="$mockdir/gh-calls-malformed.log"
+: >"$malformed_call_log"
+malformed_out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$malformed_call_log" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/" 2>"$malformed_stderr")"
+malformed_status=$?
+if [ "$malformed_status" -ne 0 ] && [ -z "$malformed_out" ] \
+  && grep -q 'not a valid PR number or URL' "$malformed_stderr" \
+  && [ ! -s "$malformed_call_log" ]; then
+  echo "PASS: (8) malformed input is rejected with a clear error, never reaching gh"
+else
+  echo "FAIL: (8) malformed input — exit=$malformed_status output=${malformed_out:-<empty>} gh-calls=$(cat "$malformed_call_log" 2>/dev/null)"
+  echo "--- script stderr ---"; cat "$malformed_stderr"
   failures=$((failures + 1))
 fi
 

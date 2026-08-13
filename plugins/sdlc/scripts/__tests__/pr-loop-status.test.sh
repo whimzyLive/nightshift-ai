@@ -25,10 +25,12 @@ trap 'rm -rf "$mockdir"' EXIT
 
 # Mock `gh`. Fixtures are supplied via env vars so each case below only needs to set the checks
 # ones — everything else (head oid, review requests, reviews, review threads) defaults to an
-# empty/neutral state.
+# empty/neutral state. Every invocation is appended to $GH_CALL_LOG (when set) so the
+# malformed-input case can assert `gh` was never reached.
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
+[ -n "${GH_CALL_LOG:-}" ] && printf '%s\n' "$*" >>"$GH_CALL_LOG"
 case "${1:-}" in
   repo)
     [ "${2:-}" = "view" ] && { echo "example-org/example-repo"; exit 0; }
@@ -132,6 +134,59 @@ if [ "$status4" -eq 0 ] && [ "$p4" = "0" ] && [ "$f4" = "0" ] && [ "$s4" = "0" ]
   echo "PASS: (4) no checks at all -> zeros, no crash"
 else
   echo "FAIL: (4) no checks at all — exit=$status4 pending=$p4 failing=$f4 passing=$s4 (line: $out4)"
+  failures=$((failures + 1))
+fi
+
+# Cases 5-7 (regression pin): this script's own best-effort/always-zeros contract means a
+# `loop-status:` line appears EVEN WITH A BLANK PR_NUM pre-fix (every gh call it makes falls back
+# to zeros on failure) — asserting only "a loop-status: line appeared" would not pin the bug. The
+# real pin is that `gh` must be called with the correctly normalised PR number threaded through,
+# not a blank one (e.g. `pulls//reviews` / `pr checks ` pre-fix vs `pulls/999999/reviews` /
+# `pr checks 999999` post-fix) — checked via the call log.
+assert_pr_num_threaded() { # <label> <call_log> <stderr_log> <status> <expect_pr_num>
+  local label="$1" call_log="$2" stderr_log="$3" status="$4" want="$5"
+  if [ "$status" -eq 0 ] && grep -q "pulls/${want}/reviews" "$call_log" && grep -q "checks ${want} " "$call_log"; then
+    echo "PASS: $label"
+  else
+    echo "FAIL: $label — status=$status"
+    echo "--- gh call log ---"; cat "$call_log"
+    echo "--- script stderr ---"; cat "$stderr_log"
+    failures=$((failures + 1))
+  fi
+}
+
+slash_stderr="$mockdir/stderr-slash.log"; slash_calls="$mockdir/gh-calls-slash.log"; : >"$slash_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$slash_calls" bash "$script" "https://github.com/o/r/pull/999999/" >/dev/null 2>"$slash_stderr"
+assert_pr_num_threaded "(5) a PR URL with a trailing slash normalises and threads PR_NUM=999999 through to gh" \
+  "$slash_calls" "$slash_stderr" "$?" "999999"
+
+frag_stderr="$mockdir/stderr-frag.log"; frag_calls="$mockdir/gh-calls-frag.log"; : >"$frag_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$frag_calls" bash "$script" "https://github.com/o/r/pull/999999#discussion_r1" >/dev/null 2>"$frag_stderr"
+assert_pr_num_threaded "(6) a PR URL with a #fragment normalises and threads PR_NUM=999999 through to gh" \
+  "$frag_calls" "$frag_stderr" "$?" "999999"
+
+query_stderr="$mockdir/stderr-query.log"; query_calls="$mockdir/gh-calls-query.log"; : >"$query_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$query_calls" bash "$script" "https://github.com/o/r/pull/999999?tab=files" >/dev/null 2>"$query_stderr"
+assert_pr_num_threaded "(7) a PR URL with a ?query normalises and threads PR_NUM=999999 through to gh" \
+  "$query_calls" "$query_stderr" "$?" "999999"
+
+# Case 8: a genuinely malformed input (no trailing digits at all) must be rejected with a clear
+# error BEFORE it ever reaches `gh`, and must NOT print a loop-status: line — matching this
+# script's own "best-effort, always exits 0, a probe failure prints zeros" contract, the ABSENCE
+# of the line (not a fabricated all-zero one) is what routes loop-decide.sh to "unresolvable".
+malformed_stderr="$mockdir/stderr-malformed.log"
+malformed_call_log="$mockdir/gh-calls-malformed.log"
+: >"$malformed_call_log"
+malformed_out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$malformed_call_log" bash "$script" "https://github.com/o/r/pull/" 2>"$malformed_stderr")"
+malformed_status=$?
+if [ "$malformed_status" -eq 0 ] \
+  && ! printf '%s\n' "$malformed_out" | grep -q '^loop-status:' \
+  && grep -q 'not a valid PR number or URL' "$malformed_stderr" \
+  && [ ! -s "$malformed_call_log" ]; then
+  echo "PASS: (8) malformed input is rejected with a clear error, never reaching gh, no loop-status: line"
+else
+  echo "FAIL: (8) malformed input — exit=$malformed_status output=${malformed_out:-<empty>} gh-calls=$(cat "$malformed_call_log" 2>/dev/null)"
+  echo "--- script stderr ---"; cat "$malformed_stderr"
   failures=$((failures + 1))
 fi
 
