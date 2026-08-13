@@ -22,6 +22,7 @@ set -euo pipefail
 # reply + resolve. Prints a one-line count summary to stderr.
 
 PR="$1"; OUT="${2:-}"
+PR="${PR##*/}"
 
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER="${SLUG%/*}"; REPO="${SLUG#*/}"

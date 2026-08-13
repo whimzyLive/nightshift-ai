@@ -119,6 +119,12 @@ unresolved=$(printf '%s' "$copilot" | jq -rs '[.[].thread] | unique | length' 2>
 # --required limits to checks required by branch-protection rules so optional
 # or flaky checks cannot wedge the loop. Best-effort — zeros on failure.
 checks=$(gh pr checks "$PR_NUM" --required --json bucket 2>/dev/null || echo '[]')
+
+# No branch protection => no required checks => the gate would be a no-op.
+# Fall back to all checks so the loop still waits for CI.
+if [ "$checks" = "[]" ]; then
+  checks=$(gh pr checks "$PR_NUM" --json bucket 2>/dev/null || echo '[]')
+fi
 pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
 failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
 passing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass")]|length' 2>/dev/null || echo 0)
