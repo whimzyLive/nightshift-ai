@@ -204,6 +204,55 @@ else
   failures=$((failures + 1))
 fi
 
+# Cases 9-12 (regression pin): ordinary GitHub PR URLs copied from a PR sub-tab (Files
+# changed/Commits), a double trailing slash, and whitespace-padded input must all resolve.
+accept_case() { # <n> <label> <input>
+  local n="$1" label="$2" input="$3" stderr out status count
+  stderr="$mockdir/stderr-$n.log"
+  out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "$input" 2>"$stderr")"
+  status=$?
+  count=$(printf '%s' "$out" | grep -c . || true)
+  if [ "$status" -eq 0 ] && [ "$count" -eq 3 ]; then
+    echo "PASS: ($n) $label"
+  else
+    echo "FAIL: ($n) $label — exit=$status lines=$count"
+    echo "--- script stderr ---"; cat "$stderr"
+    failures=$((failures + 1))
+  fi
+}
+accept_case 9  "a /pull/N/files URL (Files changed tab) resolves and succeeds" \
+  "https://github.com/whimzyLive/nightshift-ai/pull/239/files"
+accept_case 10 "a /pull/N/commits URL (Commits tab) resolves and succeeds" \
+  "https://github.com/whimzyLive/nightshift-ai/pull/239/commits"
+accept_case 11 "a PR URL with a double trailing slash resolves and succeeds" \
+  "https://github.com/whimzyLive/nightshift-ai/pull/239//"
+accept_case 12 "whitespace-padded input resolves and succeeds" \
+  " 239 "
+
+# Cases 13-14: widening acceptance must not regress the rejection path — genuinely malformed
+# input (/pull/abc, a bare non-numeric string) is still rejected before reaching gh.
+reject_case() { # <n> <label> <input>
+  local n="$1" label="$2" input="$3" stderr call_log out status
+  stderr="$mockdir/stderr-$n.log"
+  call_log="$mockdir/gh-calls-$n.log"
+  : >"$call_log"
+  out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$call_log" bash "$script" "$input" 2>"$stderr")"
+  status=$?
+  if [ "$status" -ne 0 ] && [ -z "$out" ] \
+    && grep -q 'not a valid PR number or URL' "$stderr" \
+    && [ ! -s "$call_log" ]; then
+    echo "PASS: ($n) $label"
+  else
+    echo "FAIL: ($n) $label — exit=$status output=${out:-<empty>} gh-calls=$(cat "$call_log" 2>/dev/null)"
+    echo "--- script stderr ---"; cat "$stderr"
+    failures=$((failures + 1))
+  fi
+}
+reject_case 13 "a /pull/abc URL (non-numeric PR segment) is still rejected, never reaching gh" \
+  "https://github.com/whimzyLive/nightshift-ai/pull/abc"
+reject_case 14 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
+  "notaurl"
+
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all pr-unresolved-comments.sh regression cases passed"
   exit 0

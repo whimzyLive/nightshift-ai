@@ -190,6 +190,55 @@ else
   failures=$((failures + 1))
 fi
 
+# Cases 9-12 (regression pin): ordinary GitHub PR URLs copied from a PR sub-tab (Files
+# changed/Commits), a double trailing slash, and whitespace-padded input must all normalise and
+# thread PR_NUM=999999 through to gh (same call-log discipline as cases 5-7 — see their comment).
+files_stderr="$mockdir/stderr-files.log"; files_calls="$mockdir/gh-calls-files.log"; : >"$files_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$files_calls" bash "$script" "https://github.com/o/r/pull/999999/files" >/dev/null 2>"$files_stderr"
+assert_pr_num_threaded "(9) a /pull/N/files URL (Files changed tab) normalises and threads PR_NUM=999999 through to gh" \
+  "$files_calls" "$files_stderr" "$?" "999999"
+
+commits_stderr="$mockdir/stderr-commits.log"; commits_calls="$mockdir/gh-calls-commits.log"; : >"$commits_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$commits_calls" bash "$script" "https://github.com/o/r/pull/999999/commits" >/dev/null 2>"$commits_stderr"
+assert_pr_num_threaded "(10) a /pull/N/commits URL (Commits tab) normalises and threads PR_NUM=999999 through to gh" \
+  "$commits_calls" "$commits_stderr" "$?" "999999"
+
+dblslash_stderr="$mockdir/stderr-dblslash.log"; dblslash_calls="$mockdir/gh-calls-dblslash.log"; : >"$dblslash_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$dblslash_calls" bash "$script" "https://github.com/o/r/pull/999999//" >/dev/null 2>"$dblslash_stderr"
+assert_pr_num_threaded "(11) a PR URL with a double trailing slash normalises and threads PR_NUM=999999 through to gh" \
+  "$dblslash_calls" "$dblslash_stderr" "$?" "999999"
+
+ws_stderr="$mockdir/stderr-ws.log"; ws_calls="$mockdir/gh-calls-ws.log"; : >"$ws_calls"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$ws_calls" bash "$script" " 999999 " >/dev/null 2>"$ws_stderr"
+assert_pr_num_threaded "(12) whitespace-padded input normalises and threads PR_NUM=999999 through to gh" \
+  "$ws_calls" "$ws_stderr" "$?" "999999"
+
+# Cases 13-14: widening acceptance must not regress the rejection path — genuinely malformed
+# input (/pull/abc, a bare non-numeric string) is still rejected before reaching gh, with no
+# loop-status: line.
+reject_case() { # <n> <label> <input>
+  local n="$1" label="$2" input="$3" stderr call_log out status
+  stderr="$mockdir/stderr-$n.log"
+  call_log="$mockdir/gh-calls-$n.log"
+  : >"$call_log"
+  out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$call_log" bash "$script" "$input" 2>"$stderr")"
+  status=$?
+  if [ "$status" -eq 0 ] \
+    && ! printf '%s\n' "$out" | grep -q '^loop-status:' \
+    && grep -q 'not a valid PR number or URL' "$stderr" \
+    && [ ! -s "$call_log" ]; then
+    echo "PASS: ($n) $label"
+  else
+    echo "FAIL: ($n) $label — exit=$status output=${out:-<empty>} gh-calls=$(cat "$call_log" 2>/dev/null)"
+    echo "--- script stderr ---"; cat "$stderr"
+    failures=$((failures + 1))
+  fi
+}
+reject_case 13 "a /pull/abc URL (non-numeric PR segment) is still rejected, never reaching gh" \
+  "https://github.com/o/r/pull/abc"
+reject_case 14 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
+  "notaurl"
+
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all pr-loop-status.sh regression cases passed"
   exit 0
