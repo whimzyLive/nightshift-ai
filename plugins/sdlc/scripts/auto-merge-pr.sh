@@ -8,7 +8,7 @@ set -euo pipefail
 # checks green) — default mode; `--auto` is the exception (A1's spec PR, no prior loop; see Args
 # below). `--auto` decides UP FRONT, from repo settings + PR state (never from parsing gh's error
 # text), whether GitHub auto-merge is even usable here; when it isn't, `--auto` waits (bounded —
-# see Env below) for the PR's own required checks to settle before merging, so a spec PR is never
+# see Env below) for the PR's own checks to settle before merging, so a spec PR is never
 # merged before or without CI. Merging emits the GitHub `pull_request closed+merged` event that
 # the automation service consumes to advance the pipeline.
 #
@@ -41,7 +41,7 @@ set -euo pipefail
 #                   drive a transition.
 #
 # Env (consulted only on --auto's non-arming wait-for-checks path — see below):
-#   AUTO_MERGE_CHECKS_TIMEOUT_SECS  OPTIONAL — bounded wait for required checks to settle before
+#   AUTO_MERGE_CHECKS_TIMEOUT_SECS  OPTIONAL — bounded wait for checks to settle before
 #                                   merging (default 720s / 12 min). Never waits unbounded.
 #   AUTO_MERGE_CHECKS_POLL_SECS     OPTIONAL — poll interval while waiting (default 15s).
 #
@@ -66,7 +66,7 @@ set -euo pipefail
 #     stdout; progress/warnings go to stderr.
 #   - On failure: non-zero exit, reason on stderr, nothing on stdout. `--auto`'s non-arming path
 #     (repo doesn't allow GitHub auto-merge, or the PR is already `mergeStateStatus=CLEAN` —
-#     see the false-CLEAN note below) waits for required checks instead of guessing: **exit 1**
+#     see the false-CLEAN note below) waits for checks instead of guessing: **exit 1**
 #     naming the failing check(s) if any fail; **exit 3** on timeout
 #     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — the distinct code lets a caller tell "fix CI" from
 #     "just wait and re-run" apart. The PR is left open either way. (The transition block never
@@ -111,27 +111,27 @@ wait_for_checks() {
   local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}" elapsed=0
   local checks failing pending names
   while :; do
-    checks=$(gh pr checks "$pr" --required --json bucket,name 2>/dev/null || echo '[]')
+    checks=$(gh pr checks "$pr" --json bucket,name 2>/dev/null || echo '[]')
     failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
     if [ "${failing:-0}" -gt 0 ]; then
       names=$(printf '%s' "$checks" | jq -r '[.[]|select(.bucket=="fail" or .bucket=="cancel")|.name]|join(", ")' 2>/dev/null || echo "unknown")
-      echo "ERROR: PR $pr has failing required check(s): $names — will not merge" >&2
+      echo "ERROR: PR $pr has failing check(s): $names — will not merge" >&2
       CHECKS_RESULT=fail
       return 1
     fi
     pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
     if [ "${pending:-0}" -eq 0 ]; then
       if [ "$checks" = "[]" ]; then
-        echo "checks: PR $pr has no required checks configured — proceeding" >&2
+        echo "checks: PR $pr has no checks reported — proceeding" >&2
         CHECKS_RESULT=none
       else
-        echo "checks: PR $pr required checks all settled and passing — proceeding" >&2
+        echo "checks: PR $pr checks all settled and passing — proceeding" >&2
         CHECKS_RESULT=pass
       fi
       return 0
     fi
     if [ "$elapsed" -ge "$timeout" ]; then
-      echo "ERROR: PR $pr required checks still pending after ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — timed out, leaving PR open" >&2
+      echo "ERROR: PR $pr checks still pending after ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — timed out, leaving PR open" >&2
       CHECKS_RESULT=timeout
       return 1
     fi
@@ -172,7 +172,7 @@ if [ "$AUTO" = true ]; then
       [ "$CHECKS_RESULT" = "timeout" ] && exit 3
       exit 1
     fi
-    echo "auto-merge: PR $PR required checks settled ($CHECKS_RESULT) — merging immediately" >&2
+    echo "auto-merge: PR $PR checks settled ($CHECKS_RESULT) — merging immediately" >&2
   fi
 fi
 

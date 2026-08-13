@@ -266,10 +266,10 @@ NOT run the terminal action again.
 
 - **`MODE`=`Full Auto`** → merge FIRST, comment SECOND, so the comment matches what really
   happened (`auto-merge-pr.sh --auto` decides deterministically, from repo settings and PR state,
-  whether to arm GitHub auto-merge or wait for required checks then merge — never from parsing
-  gh's error text, and never racing the CI `raise-pr.sh` just triggered). Exit 3 means the checks
-  wait timed out (transient — just re-run later); any other failure means a required check is
-  genuinely failing (needs a fix) — the comment distinguishes them:
+  whether to arm GitHub auto-merge or wait for checks then merge — never from parsing gh's error
+  text, and never racing the CI `raise-pr.sh` just triggered). Exit 3 means the checks wait timed
+  out (transient — just re-run later); any other failure means a check is genuinely failing
+  (needs a fix) — the comment distinguishes them:
 
 ```bash
 if OUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --auto SPEC_PR_URL); then
@@ -281,7 +281,7 @@ if OUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --auto SPEC_PR_URL)
 elif [ $? -eq 3 ]; then
   BODY="Spec PR checks still running (Full Auto): SPEC_PR_URL. No action needed — re-run /auto STORY_KEY once they finish."
 else
-  BODY="Could not auto-merge the spec PR: SPEC_PR_URL — a required check may be failing. Review it, or merge manually, then re-run /auto STORY_KEY."
+  BODY="Could not auto-merge the spec PR: SPEC_PR_URL — a check may be failing. Review it, or merge manually, then re-run /auto STORY_KEY."
 fi
 acli jira workitem comment create --key STORY_KEY --body "$BODY"
 ```
