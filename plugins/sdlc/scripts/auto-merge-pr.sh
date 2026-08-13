@@ -7,8 +7,10 @@ set -euo pipefail
 # review-fix loop has driven the PR to a clean state (Copilot approved on the reviewed head +
 # checks green) — default mode; `--auto` is the exception (A1's spec PR, no prior loop; see Args
 # below). `--auto` decides UP FRONT, from repo settings + PR state (never from parsing gh's error
-# text), whether GitHub auto-merge is even usable here; merging emits the GitHub
-# `pull_request closed+merged` event that the automation service consumes to advance the pipeline.
+# text), whether GitHub auto-merge is even usable here; when it isn't, `--auto` waits (bounded —
+# see Env below) for the PR's own required checks to settle before merging, so a spec PR is never
+# merged before or without CI. Merging emits the GitHub `pull_request closed+merged` event that
+# the automation service consumes to advance the pipeline.
 #
 # Why a script: the resolve-method -> merge -> verify sequence is multi-step gh logic that gets
 # dropped or mis-flagged when typed inline, and a bare `gh pr merge` prompts interactively for the
@@ -38,6 +40,11 @@ set -euo pipefail
 #                   behaviour) since a story key with no target status (or vice versa) cannot
 #                   drive a transition.
 #
+# Env (consulted only on --auto's non-arming wait-for-checks path — see below):
+#   AUTO_MERGE_CHECKS_TIMEOUT_SECS  OPTIONAL — bounded wait for required checks to settle before
+#                                   merging (default 720s / 12 min). Never waits unbounded.
+#   AUTO_MERGE_CHECKS_POLL_SECS     OPTIONAL — poll interval while waiting (default 15s).
+#
 # Note: the transition requires the consumer repo's Jira workflow to permit a DIRECT transition
 # from the story's current status to <done-status>; a workflow that forces an intermediate hop
 # (no direct edge) will hit the best-effort warning path below by design (see AC-5).
@@ -57,11 +64,13 @@ set -euo pipefail
 #   - On success: prints `MERGED` (an immediate merge succeeded, whether by default or via
 #     `--auto` falling back to one) or `AUTO-MERGE-ENABLED` (`--auto`, armed but not yet merged) to
 #     stdout; progress/warnings go to stderr.
-#   - On failure: non-zero exit, reason on stderr, nothing on stdout. `--auto` additionally refuses
-#     (exit 1) rather than merge immediately when the PR is not `mergeStateStatus=CLEAN` and
-#     `allow_auto_merge` is unset on the repo — neither an immediate merge nor arming GitHub
-#     auto-merge would be safe there. (The transition block never causes a non-zero exit — see
-#     Best-effort above.)
+#   - On failure: non-zero exit, reason on stderr, nothing on stdout. `--auto`'s non-arming path
+#     (repo doesn't allow GitHub auto-merge, or the PR is already `mergeStateStatus=CLEAN` —
+#     see the false-CLEAN note below) waits for required checks instead of guessing: **exit 1**
+#     naming the failing check(s) if any fail; **exit 3** on timeout
+#     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — the distinct code lets a caller tell "fix CI" from
+#     "just wait and re-run" apart. The PR is left open either way. (The transition block never
+#     causes a non-zero exit — see Best-effort above.)
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -96,6 +105,41 @@ METHOD=$(printf '%s' "$REPO_JSON" | jq -r \
 [ -n "$METHOD" ] || { echo "ERROR: no merge method enabled on $SLUG — cannot auto-merge" >&2; exit 1; }
 echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 
+# wait_for_checks <pr> -> sets CHECKS_RESULT to none|pass on return 0; fail|timeout on return 1
+# (stderr message already printed in the return-1 case).
+wait_for_checks() {
+  local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}" elapsed=0
+  local checks failing pending names
+  while :; do
+    checks=$(gh pr checks "$pr" --required --json bucket,name 2>/dev/null || echo '[]')
+    failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
+    if [ "${failing:-0}" -gt 0 ]; then
+      names=$(printf '%s' "$checks" | jq -r '[.[]|select(.bucket=="fail" or .bucket=="cancel")|.name]|join(", ")' 2>/dev/null || echo "unknown")
+      echo "ERROR: PR $pr has failing required check(s): $names — will not merge" >&2
+      CHECKS_RESULT=fail
+      return 1
+    fi
+    pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
+    if [ "${pending:-0}" -eq 0 ]; then
+      if [ "$checks" = "[]" ]; then
+        echo "checks: PR $pr has no required checks configured — proceeding" >&2
+        CHECKS_RESULT=none
+      else
+        echo "checks: PR $pr required checks all settled and passing — proceeding" >&2
+        CHECKS_RESULT=pass
+      fi
+      return 0
+    fi
+    if [ "$elapsed" -ge "$timeout" ]; then
+      echo "ERROR: PR $pr required checks still pending after ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — timed out, leaving PR open" >&2
+      CHECKS_RESULT=timeout
+      return 1
+    fi
+    sleep "$poll"
+    elapsed=$((elapsed + poll))
+  done
+}
+
 if [ "$AUTO" = true ]; then
   ALLOW_AUTO=$(printf '%s' "$REPO_JSON" | jq -r 'if .allow_auto_merge then "yes" else "" end')
   MSS=$(gh pr view "$PR" --json mergeStateStatus -q .mergeStateStatus 2>/dev/null || echo "")
@@ -123,11 +167,12 @@ if [ "$AUTO" = true ]; then
       exit 1
     fi
     echo "auto-merge: PR $PR already mergeable — falling back to an immediate merge" >&2
-  elif [ "$MSS" = "CLEAN" ]; then
-    echo "auto-merge: PR $PR already mergeable (mergeStateStatus=CLEAN) — merging immediately" >&2
   else
-    echo "ERROR: PR $PR is not mergeable yet (mergeStateStatus=${MSS:-unknown}) and allow_auto_merge=${ALLOW_AUTO:-no} on $SLUG — cannot merge immediately without risking a race against CI, and cannot arm GitHub auto-merge either. Enable 'Allow auto-merge' in the repo settings, or wait for checks and merge PR $PR manually." >&2
-    exit 1
+    if ! wait_for_checks "$PR"; then
+      [ "$CHECKS_RESULT" = "timeout" ] && exit 3
+      exit 1
+    fi
+    echo "auto-merge: PR $PR required checks settled ($CHECKS_RESULT) — merging immediately" >&2
   fi
 fi
 

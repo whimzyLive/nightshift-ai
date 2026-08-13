@@ -13,13 +13,16 @@
 #      so sdlc:loop can detect it (the bug's own Expected Result).
 #   3. `--auto` eligible (`allow_auto_merge=true`, not yet clean) + enable — armed but not yet
 #      merged: prints AUTO-MERGE-ENABLED, exit 0.
-#   4. `--auto` + `allow_auto_merge=false` + NOT clean (NA-104 round-4 Important 1) — refuses
-#      rather than merging immediately (which would race CI) or arming auto-merge (not allowed):
-#      exit 1 with an actionable message. This is the real GitHub-default configuration.
-#   5. `--auto` + `allow_auto_merge=false` + `mergeStateStatus=CLEAN` — merges immediately; CLEAN
-#      means already mergeable, so there is no CI to race regardless of `allow_auto_merge`.
+#   4. `--auto` + `allow_auto_merge=false` + NOT clean (the real GitHub-default configuration) —
+#      waits for required checks to settle (NA-104 founder-directed fix: round-4 made this refuse
+#      outright, which was itself a regression — Full Auto stalling forever on the default repo
+#      config), then merges once they do.
+#   5. `--auto` + `allow_auto_merge=false` + `mergeStateStatus=CLEAN` — also routes through the
+#      checks wait (an initial CLEAN can be a false-CLEAN before CI registers any check) rather
+#      than merging on CLEAN alone.
 #   6. `--auto` + `mergeStateStatus=CLEAN` with `allow_auto_merge=true` too (NA-104 round-3
-#      Critical A) — decided UP FRONT from PR state, never attempts `gh pr merge --auto`.
+#      Critical A) — decided UP FRONT from PR state, never attempts `gh pr merge --auto`; also
+#      routes through the checks wait rather than merging on CLEAN alone.
 #   7. `--auto` eligible per the up-front checks, but `gh pr merge --auto` itself still rejects
 #      with "clean status" (defensive backstop for the race the up-front check can't close) —
 #      falls back to an immediate merge instead of hard-failing.
@@ -32,6 +35,10 @@
 #      UNKNOWN must never be treated as CLEAN.
 #  11. `--auto` + story-key/done-status together — rejected as an invalid combination (a spec PR
 #      never completes the story), enforced rather than merely documented.
+#  12. `--auto`, non-arming path, checks pending then settle passing — waits, then merges.
+#  13. `--auto`, non-arming path, a required check is failing — refuses, exit 1, no merge call.
+#  14. `--auto`, non-arming path, no checks configured at all — merges once mergeable.
+#  15. `--auto`, non-arming path, checks pending forever — bounded timeout, exit 1, PR stays open.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -71,6 +78,15 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                (default null), mergeStateStatus:
 #                                                                MOCK_GH_MERGE_STATE_STATUS
 #                                                                (default BLOCKED)}
+#   - `gh pr checks <pr> --required --json bucket,name`       -> behaviour selected by
+#                                                                MOCK_GH_CHECKS_MODE (none |
+#                                                                fail | pending-forever |
+#                                                                pending-then-pass; default none).
+#                                                                pending-then-pass counts calls via
+#                                                                MOCK_GH_CHECKS_COUNTER_FILE and
+#                                                                flips to passing on call number
+#                                                                MOCK_GH_CHECKS_PASS_AFTER (default
+#                                                                2).
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -160,6 +176,26 @@ case "${1:-}" in
         fi
         exit 0
         ;;
+      checks)
+        case "${MOCK_GH_CHECKS_MODE:-none}" in
+          none) echo '[]' ;;
+          fail) echo '[{"bucket":"fail","name":"ci-main"}]' ;;
+          pending-forever) echo '[{"bucket":"pending","name":"ci-main"}]' ;;
+          pending-then-pass)
+            counter_file="${MOCK_GH_CHECKS_COUNTER_FILE:?}"
+            count=0
+            [ -f "$counter_file" ] && count="$(cat "$counter_file")"
+            count=$((count + 1))
+            echo "$count" > "$counter_file"
+            if [ "$count" -lt "${MOCK_GH_CHECKS_PASS_AFTER:-2}" ]; then
+              echo '[{"bucket":"pending","name":"ci-main"}]'
+            else
+              echo '[{"bucket":"pass","name":"ci-main"}]'
+            fi
+            ;;
+        esac
+        exit 0
+        ;;
     esac
     ;;
 esac
@@ -222,35 +258,35 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 4: --auto + allow_auto_merge=false + NOT clean (round-4 Important 1 — the real GitHub
-# default: allow_auto_merge=false AND a fresh PR's checks still pending/computing). Must REFUSE
-# — neither merge immediately (would race CI) nor arm auto-merge (not allowed) — with an
-# actionable message naming the remedy. MOCK_GH_AUTO_MODE=reject would make a wrongful --auto
-# attempt visible via its own distinct ERROR text, proving the up-front check skipped it.
+# Case 4: --auto + allow_auto_merge=false + NOT clean (the real GitHub default: allow_auto_merge
+# =false AND a fresh PR's checks still pending/computing). Superseded from round-4's "must
+# REFUSE" — that refusal was itself the regression this round fixes (Full Auto stalling forever
+# on the default GitHub configuration). Must now WAIT for required checks and merge once they
+# settle, never merging blind (MOCK_GH_CHECKS_MODE default `none` here — no required checks
+# configured — so it settles immediately).
 noauto_stderr="$mockdir/stderr-noauto.log"
 noauto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
   MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$noauto_stderr")"
 noauto_status=$?
-if [ "$noauto_status" -ne 0 ] && [ -z "$noauto_out" ] \
-  && grep -q '^ERROR: PR 999999 is not mergeable yet' "$noauto_stderr" \
-  && grep -qi "Allow auto-merge" "$noauto_stderr"; then
-  echo "PASS: --auto + allow_auto_merge=false + not clean — refuses with an actionable message"
+if [ "$noauto_status" -eq 0 ] && [ "$noauto_out" = "MERGED" ] \
+  && grep -q 'no required checks configured' "$noauto_stderr"; then
+  echo "PASS: --auto + allow_auto_merge=false + not clean — waits for checks, then merges"
 else
   echo "FAIL: --auto + allow_auto_merge=false + not clean — exit=$noauto_status output=${noauto_out:-<empty>}"
   cat "$noauto_stderr"
   failures=$((failures + 1))
 fi
 
-# Case 5: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — still merges immediately;
-# CLEAN means already mergeable right now, so there is no CI left to race regardless of whether
-# GitHub auto-merge is allowed on this repo.
+# Case 5: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — still routes through the
+# checks wait (an initial CLEAN can be a false-CLEAN before CI registers), which settles
+# immediately here (MOCK_GH_CHECKS_MODE default `none`) and merges.
 falseclean_stderr="$mockdir/stderr-falseclean.log"
 falseclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=CLEAN \
   MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$falseclean_stderr")"
 falseclean_status=$?
 if [ "$falseclean_status" -eq 0 ] && [ "$falseclean_out" = "MERGED" ] \
-  && grep -q 'mergeStateStatus=CLEAN' "$falseclean_stderr"; then
-  echo "PASS: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — merges immediately"
+  && grep -q 'no required checks configured' "$falseclean_stderr"; then
+  echo "PASS: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — waits for checks, then merges"
 else
   echo "FAIL: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — exit=$falseclean_status output=${falseclean_out:-<empty>}"
   cat "$falseclean_stderr"
@@ -258,18 +294,16 @@ else
 fi
 
 # Case 6: --auto + mergeStateStatus=CLEAN with allow_auto_merge=true too (round-3 Critical A) —
-# must be decided UP FRONT from PR state and never attempt `gh pr merge --auto`; merges
-# immediately instead. Note: a real GitHub PR in this state would ALSO be correctly handled by
-# round-2's reactive clean-status fallback (case 7 below), so this specific case is not expected
-# to go red against round-2's code — it verifies the DETERMINISTIC mechanism (I-B) works, not a
-# new failure mode.
+# must be decided UP FRONT from PR state and never attempt `gh pr merge --auto`; routes through
+# the checks wait (settles immediately, MOCK_GH_CHECKS_MODE default `none`) and merges instead of
+# assuming CLEAN alone is enough to skip straight to a merge attempt.
 alreadyclean_stderr="$mockdir/stderr-alreadyclean.log"
 alreadyclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=CLEAN \
   MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$alreadyclean_stderr")"
 alreadyclean_status=$?
 if [ "$alreadyclean_status" -eq 0 ] && [ "$alreadyclean_out" = "MERGED" ] \
-  && grep -q 'mergeStateStatus=CLEAN' "$alreadyclean_stderr"; then
-  echo "PASS: --auto + mergeStateStatus=CLEAN — skips the --auto attempt entirely, merges immediately"
+  && grep -q 'no required checks configured' "$alreadyclean_stderr"; then
+  echo "PASS: --auto + mergeStateStatus=CLEAN — skips the --auto attempt entirely, waits for checks, then merges"
 else
   echo "FAIL: --auto + mergeStateStatus=CLEAN — exit=$alreadyclean_status output=${alreadyclean_out:-<empty>}"
   cat "$alreadyclean_stderr"
@@ -351,6 +385,77 @@ if [ "$badargs_status" -ne 0 ] && [ -z "$badargs_out" ] && grep -q '^ERROR: --au
 else
   echo "FAIL: --auto + story-key/done-status — exit=$badargs_status output=${badargs_out:-<empty>}"
   cat "$badargs_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 12: --auto, non-arming path, checks start pending then settle passing — must wait (not
+# merge on the first pending read, not time out) and merge once they go green.
+pendingpass_stderr="$mockdir/stderr-pendingpass.log"
+pendingpass_counter="$mockdir/checks-counter-pendingpass"
+pendingpass_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=pending-then-pass MOCK_GH_CHECKS_COUNTER_FILE="$pendingpass_counter" MOCK_GH_CHECKS_PASS_AFTER=2 \
+  AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_TIMEOUT_SECS=30 \
+  bash "$script" --auto 999999 2>"$pendingpass_stderr")"
+pendingpass_status=$?
+if [ "$pendingpass_status" -eq 0 ] && [ "$pendingpass_out" = "MERGED" ] \
+  && grep -q 'required checks all settled and passing' "$pendingpass_stderr"; then
+  echo "PASS: --auto checks-pending-then-green — waits, then merges once passing"
+else
+  echo "FAIL: --auto checks-pending-then-green — exit=$pendingpass_status output=${pendingpass_out:-<empty>}"
+  cat "$pendingpass_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 13: --auto, non-arming path, a required check is failing — must refuse with exit 1
+# SPECIFICALLY (not exit 3, which means timeout — auto.md's caller distinguishes "fix CI" from
+# "just wait and re-run" by this exact code) and MUST NOT call `gh pr merge` at all
+# (MOCK_GH_MERGE_REJECT=1 would surface a DIFFERENT stderr message if the script wrongly
+# attempted the merge call anyway, proving it didn't).
+checkfail_stderr="$mockdir/stderr-checkfail.log"
+checkfail_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=fail MOCK_GH_MERGE_REJECT=1 \
+  bash "$script" --auto 999999 2>"$checkfail_stderr")"
+checkfail_status=$?
+if [ "$checkfail_status" -eq 1 ] && [ -z "$checkfail_out" ] \
+  && grep -q '^ERROR: PR 999999 has failing required check(s): ci-main' "$checkfail_stderr" \
+  && ! grep -q '^merged:' "$checkfail_stderr"; then
+  echo "PASS: --auto check-failing — refuses, exit 1, names the failing check, no merge call"
+else
+  echo "FAIL: --auto check-failing — exit=$checkfail_status output=${checkfail_out:-<empty>}"
+  cat "$checkfail_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 14: --auto, non-arming path, no checks configured at all (explicit MOCK_GH_CHECKS_MODE, not
+# relying on the default) — must merge once mergeable, not stall waiting for checks that will
+# never appear.
+nochecks_stderr="$mockdir/stderr-nochecks.log"
+nochecks_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=none bash "$script" --auto 999999 2>"$nochecks_stderr")"
+nochecks_status=$?
+if [ "$nochecks_status" -eq 0 ] && [ "$nochecks_out" = "MERGED" ] \
+  && grep -q 'no required checks configured' "$nochecks_stderr"; then
+  echo "PASS: --auto no-checks-configured — merges once mergeable"
+else
+  echo "FAIL: --auto no-checks-configured — exit=$nochecks_status output=${nochecks_out:-<empty>}"
+  cat "$nochecks_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 15: --auto, non-arming path, checks pending forever — must time out (bounded, never wait
+# unbounded) and exit 3 SPECIFICALLY (distinct from exit 1 — see case 13) leaving the PR open,
+# not merge blind.
+timeout_stderr="$mockdir/stderr-timeout.log"
+timeout_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=pending-forever AUTO_MERGE_CHECKS_TIMEOUT_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
+  bash "$script" --auto 999999 2>"$timeout_stderr")"
+timeout_status=$?
+if [ "$timeout_status" -eq 3 ] && [ -z "$timeout_out" ] \
+  && grep -q '^ERROR: PR 999999 required checks still pending after 1s' "$timeout_stderr"; then
+  echo "PASS: --auto checks-pending timeout — exits 3, leaves the PR open, never waits unbounded"
+else
+  echo "FAIL: --auto checks-pending timeout — exit=$timeout_status output=${timeout_out:-<empty>}"
+  cat "$timeout_stderr"
   failures=$((failures + 1))
 fi
 
