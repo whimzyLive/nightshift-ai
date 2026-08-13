@@ -43,10 +43,17 @@ set -euo pipefail
 #
 # Env (consulted only on --auto's non-arming wait-for-checks path — see below). All three are
 # validated (a non-numeric or empty value resets to its default; poll and none-grace both have a
-# floor of 1s) so a malformed override can never defeat the "never waits unbounded" guarantee:
+# floor of 1s) — this prevents an EMPTY or NON-NUMERIC override from causing a hot-spin or an
+# infinite loop, but it is not a claim that any valid value keeps the wait bounded: a
+# AUTO_MERGE_CHECKS_POLL_SECS larger than the timeout still overruns the deadline by up to one
+# poll interval before the next check runs (see below) — keep it well under the timeout.
 #   AUTO_MERGE_CHECKS_TIMEOUT_SECS     OPTIONAL — bounded wait for checks to settle before
-#                                      merging (default 720s / 12 min). Never waits unbounded.
-#   AUTO_MERGE_CHECKS_POLL_SECS        OPTIONAL — poll interval while waiting (default 15s).
+#                                      merging (default 720s / 12 min).
+#   AUTO_MERGE_CHECKS_POLL_SECS        OPTIONAL — poll interval while waiting (default 15s,
+#                                      floored at 1s). The loop's single `sleep "$poll"` runs
+#                                      before the next timeout check, so a poll set larger than
+#                                      AUTO_MERGE_CHECKS_TIMEOUT_SECS overruns the deadline by up
+#                                      to (poll - 1)s; keep it well under the timeout.
 #   AUTO_MERGE_CHECKS_NONE_GRACE_SECS  OPTIONAL — a PR reporting zero checks must keep reporting
 #                                      zero for this long (default 30s, floored at 1s) before it's
 #                                      trusted, so a single early read (checks can take several
@@ -158,9 +165,15 @@ wait_for_checks() {
       # "Settled and not blocking" is ONLY pass|skipping — anything else (pending, or an
       # unrecognised/future bucket value gh might one day add) is treated as not-yet-settled and
       # falls through to the poll/timeout below rather than being silently counted as passing.
-      total=$(printf '%s' "$checks" | jq 'length' 2>/dev/null || echo 0)
-      settled_ok=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass" or .bucket=="skipping")]|length' 2>/dev/null || echo 0)
-      if [ "${settled_ok:-0}" -eq "${total:-1}" ]; then
+      # Fail-closed on purpose: NO `|| echo 0` fallback here. If either jq call itself fails
+      # (OOM-killed, a shimmed/broken jq, ulimit exhaustion — all non-deterministic, not reachable
+      # from any GitHub payload since the `-e` probe above already gated well-formed JSON), `total`
+      # and `settled_ok` are both left empty, the `-n` guards below short-circuit false, and the
+      # script falls through to the poll/timeout below rather than treating "both counters
+      # defaulted to 0" as "0 -eq 0, therefore settled" and merging past an unread check.
+      total=$(printf '%s' "$checks" | jq 'length' 2>/dev/null) || total=""
+      settled_ok=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass" or .bucket=="skipping")]|length' 2>/dev/null) || settled_ok=""
+      if [ -n "$total" ] && [ -n "$settled_ok" ] && [ "$settled_ok" -eq "$total" ]; then
         passing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass")]|length' 2>/dev/null || echo 0)
         if [ "${passing:-0}" -gt 0 ]; then
           echo "checks: PR $pr checks all settled and passing — proceeding" >&2

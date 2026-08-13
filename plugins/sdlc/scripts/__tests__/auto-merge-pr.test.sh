@@ -56,6 +56,11 @@
 #      once the budget is spent (NA-104 second review round Minor 2 — the fail-open jq-with-
 #      `|| echo 0` fallback that previously counted unparseable input as zero failing/zero pending
 #      and merged anyway).
+#  20. `--auto`, non-arming path, none-grace floor regression pin (NA-104 third review round
+#      Important 2): the first `gh pr checks` read comes back `[]` and a FAILING check appears on
+#      the next read, run with AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 (floored to 1s) — must NOT
+#      merge blind on the first empty read; must still be polling when the failing check appears
+#      and refuse. Deleting the none-grace floor line must turn this case red (mutation-tested).
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -101,8 +106,8 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                pending-then-pass |
 #                                                                nonrequired-pending-then-pass |
 #                                                                fail-query | empty-then-pass |
-#                                                                garbage; default none).
-#                                                                pending-then-pass
+#                                                                garbage | empty-then-fail;
+#                                                                default none). pending-then-pass
 #                                                                counts calls via
 #                                                                MOCK_GH_CHECKS_COUNTER_FILE and
 #                                                                flips to passing on call number
@@ -129,6 +134,17 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                that this is read as a query
 #                                                                failure, not "settled and
 #                                                                passing" (Minor 2 pin).
+#                                                                empty-then-fail is empty-then-pass
+#                                                                with a FAILING check on call
+#                                                                MOCK_GH_CHECKS_PASS_AFTER instead
+#                                                                of a passing one — pins the
+#                                                                none-grace floor (second review
+#                                                                round Important 2): with
+#                                                                AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0
+#                                                                (floored to 1s), the first `[]`
+#                                                                read must not be trusted, so the
+#                                                                script must still be polling when
+#                                                                the failing check appears.
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -274,6 +290,23 @@ case "${1:-}" in
             # array — e.g. a truncated response or an unexpected CLI notice on stdout. Never
             # settles on its own; used to pin that this is read as a query failure, not "passing".
             echo 'not-json'
+            ;;
+          empty-then-fail)
+            # Counter-driven like empty-then-pass, but the real check that shows up on call
+            # MOCK_GH_CHECKS_PASS_AFTER is FAILING, not passing — pins the none-grace floor: with
+            # AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 (floored to 1), the first `[]` read must NOT be
+            # trusted immediately, so the script must still be polling when the failing check
+            # appears, and must refuse rather than merging blind on the first empty read.
+            counter_file="${MOCK_GH_CHECKS_COUNTER_FILE:?}"
+            count=0
+            [ -f "$counter_file" ] && count="$(cat "$counter_file")"
+            count=$((count + 1))
+            echo "$count" > "$counter_file"
+            if [ "$count" -lt "${MOCK_GH_CHECKS_PASS_AFTER:-2}" ]; then
+              echo '[]'
+            else
+              echo '[{"bucket":"fail","name":"ci-main"}]'
+            fi
             ;;
         esac
         exit 0
@@ -635,6 +668,33 @@ if [ "$garbage_status" -eq 3 ] && [ -z "$garbage_out" ] \
 else
   echo "FAIL: --auto gh-checks-unparseable-output — exit=$garbage_status output=${garbage_out:-<empty>}"
   cat "$garbage_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 20 (NA-104 third review round Important 2 — none-grace floor regression pin): the first
+# `gh pr checks` read comes back `[]`, and the NEXT read reports a FAILING check (mock:
+# empty-then-fail, counter-driven), run with AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 explicitly (the
+# floor must clamp this to 1s). Before the floor existed, grace=0 made the first `[]` read
+# authoritative and the script would merge blind, never seeing the failing check that shows up one
+# poll later. Must refuse (exit 1, name the failing check) instead — proving the floor, not just
+# the default, is what's protecting this path. (Mutation-tested: deleting the floor line turns
+# this red — see the round's verification report.)
+floorgrace_stderr="$mockdir/stderr-floorgrace.log"
+floorgrace_counter="$mockdir/checks-counter-floorgrace"
+floorgrace_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=empty-then-fail MOCK_GH_CHECKS_COUNTER_FILE="$floorgrace_counter" MOCK_GH_CHECKS_PASS_AFTER=2 \
+  AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_TIMEOUT_SECS=30 \
+  MOCK_GH_MERGE_REJECT=1 \
+  bash "$script" --auto 999999 2>"$floorgrace_stderr")"
+floorgrace_status=$?
+if [ "$floorgrace_status" -eq 1 ] && [ -z "$floorgrace_out" ] \
+  && grep -q '^ERROR: PR 999999 has failing check(s): ci-main' "$floorgrace_stderr" \
+  && ! grep -q 'has reported no checks' "$floorgrace_stderr" \
+  && ! grep -q '^merged:' "$floorgrace_stderr"; then
+  echo "PASS: --auto none-grace-floor — AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 does not re-open the single-[]-read race"
+else
+  echo "FAIL: --auto none-grace-floor — exit=$floorgrace_status output=${floorgrace_out:-<empty>}"
+  cat "$floorgrace_stderr"
   failures=$((failures + 1))
 fi
 
