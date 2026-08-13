@@ -50,6 +50,12 @@
 #      read reports a real (passing) check — must NOT treat the first empty read as authoritative
 #      and merge immediately; must wait through the none-grace window and merge once the real
 #      check settles (NA-104 review round Critical 2).
+#  19. `--auto`, non-arming path, `gh pr checks` exits 0 but the payload is unparseable/not a JSON
+#      array (e.g. truncated output) — must NOT be read as "settled and passing" and must NOT
+#      merge; retries within the poll/timeout budget the same as a non-zero gh exit, and exits 3
+#      once the budget is spent (NA-104 second review round Minor 2 — the fail-open jq-with-
+#      `|| echo 0` fallback that previously counted unparseable input as zero failing/zero pending
+#      and merged anyway).
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -94,8 +100,9 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                fail | pending-forever |
 #                                                                pending-then-pass |
 #                                                                nonrequired-pending-then-pass |
-#                                                                fail-query | empty-then-pass;
-#                                                                default none). pending-then-pass
+#                                                                fail-query | empty-then-pass |
+#                                                                garbage; default none).
+#                                                                pending-then-pass
 #                                                                counts calls via
 #                                                                MOCK_GH_CHECKS_COUNTER_FILE and
 #                                                                flips to passing on call number
@@ -116,7 +123,12 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                first N-1 calls, then a real
 #                                                                passing check (Critical 2 pin — a
 #                                                                single early `[]` read must not be
-#                                                                treated as authoritative).
+#                                                                treated as authoritative). garbage
+#                                                                always exits 0 with unparseable
+#                                                                (non-JSON, non-`[]`) stdout — pins
+#                                                                that this is read as a query
+#                                                                failure, not "settled and
+#                                                                passing" (Minor 2 pin).
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -257,6 +269,12 @@ case "${1:-}" in
               echo '[{"bucket":"pass","name":"ci-main"}]'
             fi
             ;;
+          garbage)
+            # gh exits 0 (unlike fail-query) but the payload is neither `[]` nor a parseable JSON
+            # array — e.g. a truncated response or an unexpected CLI notice on stdout. Never
+            # settles on its own; used to pin that this is read as a query failure, not "passing".
+            echo 'not-json'
+            ;;
         esac
         exit 0
         ;;
@@ -330,7 +348,7 @@ fi
 # it settles immediately).
 noauto_stderr="$mockdir/stderr-noauto.log"
 noauto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
-  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
   bash "$script" --auto 999999 2>"$noauto_stderr")"
 noauto_status=$?
 if [ "$noauto_status" -eq 0 ] && [ "$noauto_out" = "MERGED" ] \
@@ -347,7 +365,7 @@ fi
 # immediately here (MOCK_GH_CHECKS_MODE default `none`) and merges.
 falseclean_stderr="$mockdir/stderr-falseclean.log"
 falseclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=CLEAN \
-  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
   bash "$script" --auto 999999 2>"$falseclean_stderr")"
 falseclean_status=$?
 if [ "$falseclean_status" -eq 0 ] && [ "$falseclean_out" = "MERGED" ] \
@@ -365,7 +383,7 @@ fi
 # assuming CLEAN alone is enough to skip straight to a merge attempt.
 alreadyclean_stderr="$mockdir/stderr-alreadyclean.log"
 alreadyclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=CLEAN \
-  MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
   bash "$script" --auto 999999 2>"$alreadyclean_stderr")"
 alreadyclean_status=$?
 if [ "$alreadyclean_status" -eq 0 ] && [ "$alreadyclean_out" = "MERGED" ] \
@@ -498,7 +516,7 @@ fi
 # never appear.
 nochecks_stderr="$mockdir/stderr-nochecks.log"
 nochecks_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
-  MOCK_GH_CHECKS_MODE=none AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  MOCK_GH_CHECKS_MODE=none AUTO_MERGE_CHECKS_NONE_GRACE_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
   bash "$script" --auto 999999 2>"$nochecks_stderr")"
 nochecks_status=$?
 if [ "$nochecks_status" -eq 0 ] && [ "$nochecks_out" = "MERGED" ] \
@@ -594,6 +612,29 @@ if [ "$emptypass_status" -eq 0 ] && [ "$emptypass_out" = "MERGED" ] \
 else
   echo "FAIL: --auto empty-check-read-then-real-check — exit=$emptypass_status output=${emptypass_out:-<empty>}"
   cat "$emptypass_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 19 (NA-104 second review round Minor 2): `gh pr checks` exits 0 but the payload is
+# unparseable/not a JSON array (mock: garbage — always `not-json` on stdout). Must NOT be counted
+# as "zero failing, zero pending" and merged (the fail-open `|| echo 0` jq fallback the reviewer
+# demonstrated) — must be read as a query failure, retried within the poll/timeout budget, and
+# time out at exit 3 (transient, same code as cases 15/17), never calling `gh pr merge` at all.
+garbage_stderr="$mockdir/stderr-garbage.log"
+garbage_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=garbage MOCK_GH_MERGE_REJECT=1 \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
+  bash "$script" --auto 999999 2>"$garbage_stderr")"
+garbage_status=$?
+if [ "$garbage_status" -eq 3 ] && [ -z "$garbage_out" ] \
+  && grep -q 'gh pr checks returned unparseable output' "$garbage_stderr" \
+  && grep -q '^ERROR: PR 999999 checks did not settle within 1s' "$garbage_stderr" \
+  && ! grep -q 'settled and passing' "$garbage_stderr" \
+  && ! grep -q '^merged:' "$garbage_stderr"; then
+  echo "PASS: --auto gh-checks-unparseable-output — does NOT merge, retries, exits 3 (transient) once the budget is spent"
+else
+  echo "FAIL: --auto gh-checks-unparseable-output — exit=$garbage_status output=${garbage_out:-<empty>}"
+  cat "$garbage_stderr"
   failures=$((failures + 1))
 fi
 

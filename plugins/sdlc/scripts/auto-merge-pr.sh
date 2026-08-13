@@ -42,16 +42,19 @@ set -euo pipefail
 #                   drive a transition.
 #
 # Env (consulted only on --auto's non-arming wait-for-checks path — see below). All three are
-# validated (a non-numeric or empty value resets to its default; poll has a floor of 1s) so a
-# malformed override can never defeat the "never waits unbounded" guarantee:
+# validated (a non-numeric or empty value resets to its default; poll and none-grace both have a
+# floor of 1s) so a malformed override can never defeat the "never waits unbounded" guarantee:
 #   AUTO_MERGE_CHECKS_TIMEOUT_SECS     OPTIONAL — bounded wait for checks to settle before
 #                                      merging (default 720s / 12 min). Never waits unbounded.
 #   AUTO_MERGE_CHECKS_POLL_SECS        OPTIONAL — poll interval while waiting (default 15s).
 #   AUTO_MERGE_CHECKS_NONE_GRACE_SECS  OPTIONAL — a PR reporting zero checks must keep reporting
-#                                      zero for this long (default 30s) before it's trusted, so a
-#                                      single early read (checks can take several seconds to
-#                                      register after the PR is raised) can't misread "not yet
-#                                      created" as "will never exist" and merge unchecked.
+#                                      zero for this long (default 30s, floored at 1s) before it's
+#                                      trusted, so a single early read (checks can take several
+#                                      seconds to register after the PR is raised) can't misread
+#                                      "not yet created" as "will never exist" and merge unchecked.
+#                                      If set higher than AUTO_MERGE_CHECKS_TIMEOUT_SECS,
+#                                      "genuinely no checks" becomes unreachable and the PR always
+#                                      exits 3 instead — fail-closed, not a bug.
 #
 # Note: the transition requires the consumer repo's Jira workflow to permit a DIRECT transition
 # from the story's current status to <done-status>; a workflow that forces an intermediate hop
@@ -79,8 +82,7 @@ set -euo pipefail
 #     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — including a timeout caused by the checks query itself
 #     repeatedly failing (transient — never treated as a failing check) — the distinct code lets
 #     a caller tell "fix CI" from "just wait and re-run" apart. The PR is left open either way.
-#     (The transition block never
-#     causes a non-zero exit — see Best-effort above.)
+#     (The transition block never causes a non-zero exit — see Best-effort above.)
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -120,11 +122,12 @@ echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 wait_for_checks() {
   local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}"
   local none_grace="${AUTO_MERGE_CHECKS_NONE_GRACE_SECS:-30}" elapsed=0 first_empty_at=""
-  local checks failing pending names query_rc
+  local checks failing names query_rc total settled_ok passing
   case "$timeout" in ''|*[!0-9]*) timeout=720 ;; esac
   case "$poll" in ''|*[!0-9]*) poll=15 ;; esac
   [ "$poll" -lt 1 ] && poll=1
   case "$none_grace" in ''|*[!0-9]*) none_grace=30 ;; esac
+  [ "$none_grace" -lt 1 ] && none_grace=1
   while :; do
     if checks=$(gh pr checks "$pr" --json bucket,name 2>/dev/null); then
       query_rc=0
@@ -143,7 +146,7 @@ wait_for_checks() {
         return 0
       fi
       echo "checks: PR $pr reports no checks yet — confirming for ${none_grace}s before proceeding" >&2
-    else
+    elif printf '%s' "$checks" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
       first_empty_at=""
       failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
       if [ "${failing:-0}" -gt 0 ]; then
@@ -152,12 +155,28 @@ wait_for_checks() {
         CHECKS_RESULT=fail
         return 1
       fi
-      pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
-      if [ "${pending:-0}" -eq 0 ]; then
-        echo "checks: PR $pr checks all settled and passing — proceeding" >&2
+      # "Settled and not blocking" is ONLY pass|skipping — anything else (pending, or an
+      # unrecognised/future bucket value gh might one day add) is treated as not-yet-settled and
+      # falls through to the poll/timeout below rather than being silently counted as passing.
+      total=$(printf '%s' "$checks" | jq 'length' 2>/dev/null || echo 0)
+      settled_ok=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass" or .bucket=="skipping")]|length' 2>/dev/null || echo 0)
+      if [ "${settled_ok:-0}" -eq "${total:-1}" ]; then
+        passing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass")]|length' 2>/dev/null || echo 0)
+        if [ "${passing:-0}" -gt 0 ]; then
+          echo "checks: PR $pr checks all settled and passing — proceeding" >&2
+        else
+          echo "checks: PR $pr checks all settled (skipped/non-blocking only, none required to pass) — proceeding" >&2
+        fi
         CHECKS_RESULT=pass
         return 0
       fi
+    else
+      # gh exited 0 but the output isn't `[]` and isn't a parseable non-empty JSON array either
+      # (empty stdout, garbage/non-JSON text, etc.) — this is a query-shaped failure, not "checks
+      # settled", so treat it exactly like a non-zero gh exit: retry within the budget, never merge
+      # on it.
+      echo "checks: PR $pr — gh pr checks returned unparseable output; retrying within the timeout budget" >&2
+      first_empty_at=""
     fi
     if [ "$elapsed" -ge "$timeout" ]; then
       echo "ERROR: PR $pr checks did not settle within ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — still pending, empty, or the checks query kept failing; timed out, leaving PR open" >&2
