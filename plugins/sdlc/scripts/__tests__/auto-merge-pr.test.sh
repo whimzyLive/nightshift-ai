@@ -42,6 +42,14 @@
 #  16. `--auto` waits on a PENDING NON-REQUIRED check instead of treating it as none (regression
 #      pin: `gh pr checks --required` returns `[]` on an unprotected branch/no required checks —
 #      exactly this repo's own configuration — which would silently skip the wait).
+#  17. `--auto`, non-arming path, the `gh pr checks` query itself keeps failing (network/auth/
+#      rate-limit/5xx) — must NOT be read as "no checks" and must NOT merge; retries within the
+#      poll/timeout budget and exits 3 (transient, same code as case 15) once the budget is spent
+#      (NA-104 review round Critical 1).
+#  18. `--auto`, non-arming path, the first `gh pr checks` read comes back `[]` and only a later
+#      read reports a real (passing) check — must NOT treat the first empty read as authoritative
+#      and merge immediately; must wait through the none-grace window and merge once the real
+#      check settles (NA-104 review round Critical 2).
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -85,7 +93,8 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                MOCK_GH_CHECKS_MODE (none |
 #                                                                fail | pending-forever |
 #                                                                pending-then-pass |
-#                                                                nonrequired-pending-then-pass;
+#                                                                nonrequired-pending-then-pass |
+#                                                                fail-query | empty-then-pass;
 #                                                                default none). pending-then-pass
 #                                                                counts calls via
 #                                                                MOCK_GH_CHECKS_COUNTER_FILE and
@@ -96,6 +105,18 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                `[]` if the caller still passes
 #                                                                `--required` (regression pin —
 #                                                                the script must NOT pass it).
+#                                                                fail-query always exits 1 with no
+#                                                                valid JSON on stdout (Critical 1
+#                                                                pin — a persistently failing gh
+#                                                                call must never be read as "no
+#                                                                checks"). empty-then-pass is
+#                                                                counter-file-driven like
+#                                                                pending-then-pass but returns `[]`
+#                                                                (not a pending bucket) for the
+#                                                                first N-1 calls, then a real
+#                                                                passing check (Critical 2 pin — a
+#                                                                single early `[]` read must not be
+#                                                                treated as authoritative).
 cat >"$mockdir/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -220,6 +241,22 @@ case "${1:-}" in
               fi
             fi
             ;;
+          fail-query)
+            echo "gh: unexpected end of JSON input (or similar transient API failure)" >&2
+            exit 1
+            ;;
+          empty-then-pass)
+            counter_file="${MOCK_GH_CHECKS_COUNTER_FILE:?}"
+            count=0
+            [ -f "$counter_file" ] && count="$(cat "$counter_file")"
+            count=$((count + 1))
+            echo "$count" > "$counter_file"
+            if [ "$count" -lt "${MOCK_GH_CHECKS_PASS_AFTER:-2}" ]; then
+              echo '[]'
+            else
+              echo '[{"bucket":"pass","name":"ci-main"}]'
+            fi
+            ;;
         esac
         exit 0
         ;;
@@ -293,10 +330,11 @@ fi
 # it settles immediately).
 noauto_stderr="$mockdir/stderr-noauto.log"
 noauto_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
-  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$noauto_stderr")"
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  bash "$script" --auto 999999 2>"$noauto_stderr")"
 noauto_status=$?
 if [ "$noauto_status" -eq 0 ] && [ "$noauto_out" = "MERGED" ] \
-  && grep -q 'no checks reported' "$noauto_stderr"; then
+  && grep -q 'has reported no checks' "$noauto_stderr"; then
   echo "PASS: --auto + allow_auto_merge=false + not clean — waits for checks, then merges"
 else
   echo "FAIL: --auto + allow_auto_merge=false + not clean — exit=$noauto_status output=${noauto_out:-<empty>}"
@@ -309,10 +347,11 @@ fi
 # immediately here (MOCK_GH_CHECKS_MODE default `none`) and merges.
 falseclean_stderr="$mockdir/stderr-falseclean.log"
 falseclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=CLEAN \
-  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$falseclean_stderr")"
+  MOCK_GH_AUTO_MODE=reject MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  bash "$script" --auto 999999 2>"$falseclean_stderr")"
 falseclean_status=$?
 if [ "$falseclean_status" -eq 0 ] && [ "$falseclean_out" = "MERGED" ] \
-  && grep -q 'no checks reported' "$falseclean_stderr"; then
+  && grep -q 'has reported no checks' "$falseclean_stderr"; then
   echo "PASS: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — waits for checks, then merges"
 else
   echo "FAIL: --auto + allow_auto_merge=false + mergeStateStatus=CLEAN — exit=$falseclean_status output=${falseclean_out:-<empty>}"
@@ -326,10 +365,11 @@ fi
 # assuming CLEAN alone is enough to skip straight to a merge attempt.
 alreadyclean_stderr="$mockdir/stderr-alreadyclean.log"
 alreadyclean_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=CLEAN \
-  MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED bash "$script" --auto 999999 2>"$alreadyclean_stderr")"
+  MOCK_GH_AUTO_MODE=clean-status MOCK_GH_STATE=MERGED AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  bash "$script" --auto 999999 2>"$alreadyclean_stderr")"
 alreadyclean_status=$?
 if [ "$alreadyclean_status" -eq 0 ] && [ "$alreadyclean_out" = "MERGED" ] \
-  && grep -q 'no checks reported' "$alreadyclean_stderr"; then
+  && grep -q 'has reported no checks' "$alreadyclean_stderr"; then
   echo "PASS: --auto + mergeStateStatus=CLEAN — skips the --auto attempt entirely, waits for checks, then merges"
 else
   echo "FAIL: --auto + mergeStateStatus=CLEAN — exit=$alreadyclean_status output=${alreadyclean_out:-<empty>}"
@@ -458,10 +498,11 @@ fi
 # never appear.
 nochecks_stderr="$mockdir/stderr-nochecks.log"
 nochecks_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
-  MOCK_GH_CHECKS_MODE=none bash "$script" --auto 999999 2>"$nochecks_stderr")"
+  MOCK_GH_CHECKS_MODE=none AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 \
+  bash "$script" --auto 999999 2>"$nochecks_stderr")"
 nochecks_status=$?
 if [ "$nochecks_status" -eq 0 ] && [ "$nochecks_out" = "MERGED" ] \
-  && grep -q 'no checks reported' "$nochecks_stderr"; then
+  && grep -q 'has reported no checks' "$nochecks_stderr"; then
   echo "PASS: --auto no-checks-configured — merges once mergeable"
 else
   echo "FAIL: --auto no-checks-configured — exit=$nochecks_status output=${nochecks_out:-<empty>}"
@@ -478,7 +519,7 @@ timeout_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERG
   bash "$script" --auto 999999 2>"$timeout_stderr")"
 timeout_status=$?
 if [ "$timeout_status" -eq 3 ] && [ -z "$timeout_out" ] \
-  && grep -q '^ERROR: PR 999999 checks still pending after 1s' "$timeout_stderr"; then
+  && grep -q '^ERROR: PR 999999 checks did not settle within 1s' "$timeout_stderr"; then
   echo "PASS: --auto checks-pending timeout — exits 3, leaves the PR open, never waits unbounded"
 else
   echo "FAIL: --auto checks-pending timeout — exit=$timeout_status output=${timeout_out:-<empty>}"
@@ -501,11 +542,58 @@ nonreq_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE
 nonreq_status=$?
 if [ "$nonreq_status" -eq 0 ] && [ "$nonreq_out" = "MERGED" ] \
   && grep -q 'checks all settled and passing' "$nonreq_stderr" \
-  && ! grep -q 'no checks reported' "$nonreq_stderr"; then
+  && ! grep -q 'has reported no checks' "$nonreq_stderr"; then
   echo "PASS: --auto waits on a pending non-required check instead of treating it as none"
 else
   echo "FAIL: --auto waits on a pending non-required check — exit=$nonreq_status output=${nonreq_out:-<empty>}"
   cat "$nonreq_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 17 (NA-104 review round Critical 1): the `gh pr checks` query itself keeps failing (mock:
+# fail-query — exit 1, no valid JSON) — must NOT be silently read as "no checks" and merged. Must
+# retry within the poll/timeout budget and, once the budget is spent, exit 3 (transient — same
+# code as the pending-forever timeout in case 15) with a message distinguishing a failing QUERY
+# from a failing CHECK, and never call `gh pr merge` at all (MOCK_GH_MERGE_REJECT=1 would surface
+# a different stderr message if the script wrongly attempted the merge anyway, proving it didn't).
+queryfail_stderr="$mockdir/stderr-queryfail.log"
+queryfail_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=fail-query MOCK_GH_MERGE_REJECT=1 \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
+  bash "$script" --auto 999999 2>"$queryfail_stderr")"
+queryfail_status=$?
+if [ "$queryfail_status" -eq 3 ] && [ -z "$queryfail_out" ] \
+  && grep -q 'gh pr checks query failed' "$queryfail_stderr" \
+  && grep -q '^ERROR: PR 999999 checks did not settle within 1s' "$queryfail_stderr" \
+  && ! grep -q 'has failing check' "$queryfail_stderr" \
+  && ! grep -q '^merged:' "$queryfail_stderr"; then
+  echo "PASS: --auto gh-checks-query-fails — does NOT merge, retries, exits 3 (transient) once the budget is spent"
+else
+  echo "FAIL: --auto gh-checks-query-fails — exit=$queryfail_status output=${queryfail_out:-<empty>}"
+  cat "$queryfail_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 18 (NA-104 review round Critical 2): the first `gh pr checks` read comes back `[]`, and only
+# a LATER read reports a real (passing) check (mock: empty-then-pass, counter-driven). The first
+# empty read must NOT be treated as authoritative "no checks" and short-circuit into an immediate
+# merge — the script must keep waiting and merge once the real check settles, and must never emit
+# the "has reported no checks" message (which would prove it wrongly concluded "none" from the
+# first read alone).
+emptypass_stderr="$mockdir/stderr-emptypass.log"
+emptypass_counter="$mockdir/checks-counter-emptypass"
+emptypass_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=false MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=empty-then-pass MOCK_GH_CHECKS_COUNTER_FILE="$emptypass_counter" MOCK_GH_CHECKS_PASS_AFTER=2 \
+  AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_TIMEOUT_SECS=30 AUTO_MERGE_CHECKS_NONE_GRACE_SECS=5 \
+  bash "$script" --auto 999999 2>"$emptypass_stderr")"
+emptypass_status=$?
+if [ "$emptypass_status" -eq 0 ] && [ "$emptypass_out" = "MERGED" ] \
+  && grep -q 'checks all settled and passing' "$emptypass_stderr" \
+  && ! grep -q 'has reported no checks' "$emptypass_stderr"; then
+  echo "PASS: --auto empty-check-read-then-real-check — does not treat a single [] read as authoritative, waits then merges"
+else
+  echo "FAIL: --auto empty-check-read-then-real-check — exit=$emptypass_status output=${emptypass_out:-<empty>}"
+  cat "$emptypass_stderr"
   failures=$((failures + 1))
 fi
 

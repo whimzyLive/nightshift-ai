@@ -8,9 +8,10 @@ set -euo pipefail
 # checks green) — default mode; `--auto` is the exception (A1's spec PR, no prior loop; see Args
 # below). `--auto` decides UP FRONT, from repo settings + PR state (never from parsing gh's error
 # text), whether GitHub auto-merge is even usable here; when it isn't, `--auto` waits (bounded —
-# see Env below) for the PR's own checks to settle before merging, so a spec PR is never
-# merged before or without CI. Merging emits the GitHub `pull_request closed+merged` event that
-# the automation service consumes to advance the pipeline.
+# see Env below) for the PR's own checks to settle before merging, so a spec PR on THIS path is
+# never merged before or without CI (the arming path instead relies on GitHub's own auto-merge,
+# which only waits on required checks). Merging emits the GitHub `pull_request closed+merged`
+# event that the automation service consumes to advance the pipeline.
 #
 # Why a script: the resolve-method -> merge -> verify sequence is multi-step gh logic that gets
 # dropped or mis-flagged when typed inline, and a bare `gh pr merge` prompts interactively for the
@@ -40,10 +41,17 @@ set -euo pipefail
 #                   behaviour) since a story key with no target status (or vice versa) cannot
 #                   drive a transition.
 #
-# Env (consulted only on --auto's non-arming wait-for-checks path — see below):
-#   AUTO_MERGE_CHECKS_TIMEOUT_SECS  OPTIONAL — bounded wait for checks to settle before
-#                                   merging (default 720s / 12 min). Never waits unbounded.
-#   AUTO_MERGE_CHECKS_POLL_SECS     OPTIONAL — poll interval while waiting (default 15s).
+# Env (consulted only on --auto's non-arming wait-for-checks path — see below). All three are
+# validated (a non-numeric or empty value resets to its default; poll has a floor of 1s) so a
+# malformed override can never defeat the "never waits unbounded" guarantee:
+#   AUTO_MERGE_CHECKS_TIMEOUT_SECS     OPTIONAL — bounded wait for checks to settle before
+#                                      merging (default 720s / 12 min). Never waits unbounded.
+#   AUTO_MERGE_CHECKS_POLL_SECS        OPTIONAL — poll interval while waiting (default 15s).
+#   AUTO_MERGE_CHECKS_NONE_GRACE_SECS  OPTIONAL — a PR reporting zero checks must keep reporting
+#                                      zero for this long (default 30s) before it's trusted, so a
+#                                      single early read (checks can take several seconds to
+#                                      register after the PR is raised) can't misread "not yet
+#                                      created" as "will never exist" and merge unchecked.
 #
 # Note: the transition requires the consumer repo's Jira workflow to permit a DIRECT transition
 # from the story's current status to <done-status>; a workflow that forces an intermediate hop
@@ -68,8 +76,10 @@ set -euo pipefail
 #     (repo doesn't allow GitHub auto-merge, or the PR is already `mergeStateStatus=CLEAN` —
 #     see the false-CLEAN note below) waits for checks instead of guessing: **exit 1**
 #     naming the failing check(s) if any fail; **exit 3** on timeout
-#     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — the distinct code lets a caller tell "fix CI" from
-#     "just wait and re-run" apart. The PR is left open either way. (The transition block never
+#     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — including a timeout caused by the checks query itself
+#     repeatedly failing (transient — never treated as a failing check) — the distinct code lets
+#     a caller tell "fix CI" from "just wait and re-run" apart. The PR is left open either way.
+#     (The transition block never
 #     causes a non-zero exit — see Best-effort above.)
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -108,30 +118,49 @@ echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 # wait_for_checks <pr> -> sets CHECKS_RESULT to none|pass on return 0; fail|timeout on return 1
 # (stderr message already printed in the return-1 case).
 wait_for_checks() {
-  local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}" elapsed=0
-  local checks failing pending names
+  local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}"
+  local none_grace="${AUTO_MERGE_CHECKS_NONE_GRACE_SECS:-30}" elapsed=0 first_empty_at=""
+  local checks failing pending names query_rc
+  case "$timeout" in ''|*[!0-9]*) timeout=720 ;; esac
+  case "$poll" in ''|*[!0-9]*) poll=15 ;; esac
+  [ "$poll" -lt 1 ] && poll=1
+  case "$none_grace" in ''|*[!0-9]*) none_grace=30 ;; esac
   while :; do
-    checks=$(gh pr checks "$pr" --json bucket,name 2>/dev/null || echo '[]')
-    failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
-    if [ "${failing:-0}" -gt 0 ]; then
-      names=$(printf '%s' "$checks" | jq -r '[.[]|select(.bucket=="fail" or .bucket=="cancel")|.name]|join(", ")' 2>/dev/null || echo "unknown")
-      echo "ERROR: PR $pr has failing check(s): $names — will not merge" >&2
-      CHECKS_RESULT=fail
-      return 1
+    if checks=$(gh pr checks "$pr" --json bucket,name 2>/dev/null); then
+      query_rc=0
+    else
+      query_rc=$?
+      checks=""
     fi
-    pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
-    if [ "${pending:-0}" -eq 0 ]; then
-      if [ "$checks" = "[]" ]; then
-        echo "checks: PR $pr has no checks reported — proceeding" >&2
+    if [ "$query_rc" -ne 0 ]; then
+      echo "checks: PR $pr — gh pr checks query failed (exit $query_rc); retrying within the timeout budget" >&2
+      first_empty_at=""
+    elif [ "$checks" = "[]" ]; then
+      [ -z "$first_empty_at" ] && first_empty_at="$elapsed"
+      if [ $((elapsed - first_empty_at)) -ge "$none_grace" ]; then
+        echo "checks: PR $pr has reported no checks for ${none_grace}s — proceeding" >&2
         CHECKS_RESULT=none
-      else
+        return 0
+      fi
+      echo "checks: PR $pr reports no checks yet — confirming for ${none_grace}s before proceeding" >&2
+    else
+      first_empty_at=""
+      failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
+      if [ "${failing:-0}" -gt 0 ]; then
+        names=$(printf '%s' "$checks" | jq -r '[.[]|select(.bucket=="fail" or .bucket=="cancel")|.name]|join(", ")' 2>/dev/null || echo "unknown")
+        echo "ERROR: PR $pr has failing check(s): $names — will not merge" >&2
+        CHECKS_RESULT=fail
+        return 1
+      fi
+      pending=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pending")]|length' 2>/dev/null || echo 0)
+      if [ "${pending:-0}" -eq 0 ]; then
         echo "checks: PR $pr checks all settled and passing — proceeding" >&2
         CHECKS_RESULT=pass
+        return 0
       fi
-      return 0
     fi
     if [ "$elapsed" -ge "$timeout" ]; then
-      echo "ERROR: PR $pr checks still pending after ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — timed out, leaving PR open" >&2
+      echo "ERROR: PR $pr checks did not settle within ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — still pending, empty, or the checks query kept failing; timed out, leaving PR open" >&2
       CHECKS_RESULT=timeout
       return 1
     fi
