@@ -48,9 +48,10 @@ The agent should:
    git commit -m "docs(spec): <STORY-KEY> <story summary>"
    # Push BEFORE creating PR — PR creation fails if branch not on remote
    git push -u origin spec/<STORY-KEY>
-   # Raise the PR atomically via raise-pr.sh (create + mark-ready + request @copilot + verify the
-   # request attached). NEVER hand-roll gh pr create + add-reviewer separately — that is how the
-   # reviewer step gets dropped. Write the body to the session-scoped temp dir, then pass by file.
+   # Raise the PR atomically via raise-pr.sh (create + mark-ready). With --phase spec it never
+   # requests a reviewer (NA-104 — unconditional, regardless of the Review gate token). NEVER
+   # hand-roll gh pr create separately — that bypasses this script's idempotent PR reuse. Write
+   # the body to the session-scoped temp dir, then pass by file.
    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
    # write "$dir/pr-body.md" with your file-write tool, e.g.:
    #   Spec for <STORY-KEY>. See docs/superpowers/specs/<STORY-KEY>.md.
@@ -72,16 +73,20 @@ The agent should:
 Applies only when `/spec` is the **top-level** command. Nested under `/auto`, `/auto` owns the
 terminal action — do **not** run this final action nested.
 
-The phase closed at PR raise: the spec is on a branch and the Jira comment is posted, so nothing
-resident is still load-bearing. Apply the **Session boundary at PR raise** block in
-`${CLAUDE_PLUGIN_ROOT}/commands/auto.md` with `<NEXT>` = `/loop /sdlc:loop <PR_URL>` (`<PR_URL>` =
-the spec PR from step 9). It decides: harness → emit `<NEXT>` and release here; interactive →
-run `<NEXT>` inline as the tail, which owns the release.
+**Spec never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
+that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at
+PR raise: the spec is on a branch and the Jira comment is posted (step 8), so nothing resident is
+still load-bearing — release directly, with the PR URL:
 
-> - If the harness cannot invoke the native `/loop`, drive `sdlc:loop`'s pass-cycle via
->   `ScheduleWakeup` instead — same effect.
-> - If the command hit a terminal STOP **before** a PR was raised (nothing to loop on), run
->   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh` directly to release.
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh <PR_URL>
+```
+
+> If the command hit a terminal STOP **before** a PR was raised (e.g. Step 0's defects-skip-spec
+> guard — nothing to release with a PR URL), run the same script **bare** (no argument) instead.
+
+It prints the completion signal the automation worker watches for. Outside the worker
+(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
 Jira story key (e.g. CER-123):
 $ARGUMENTS

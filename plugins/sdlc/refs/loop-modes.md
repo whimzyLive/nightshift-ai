@@ -23,16 +23,17 @@ themselves the mode-specific body.
 
 Detect whether @copilot is already a requested reviewer by inspecting the `reviewRequests` field
 returned by `gh pr view`. **Note:** `reviewRequests` may not list the Copilot bot (GitHub does not
-reliably expose bot reviewers here), so this detection is best-effort. When in doubt the loop treats
+reliably expose bot reviewers here), so detection is best-effort. When in doubt the loop treats
 the current HEAD as not-yet-reviewed and waits or re-requests (rule 2a/2b in the fast path's decision
 table).
 
 If @copilot is not detected as a pending reviewer, add it best-effort — **but only in `on-update`
-mode** (the fast path's rule 2a/2b action cells already give the exact command):
+mode** (the fast path's rule 2a/2b action cells give the exact command):
 
 ```bash
 # Re-request only when the mode asks for per-update reviews. `on-create` relies on the
-# single create-time request (raise-pr.sh) and must NOT re-request; `none` never reaches here.
+# single create-time request (raise-pr.sh, impl via the playbook) and must NOT re-request;
+# `none` never reaches here.
 [ "$REVIEW_MODE" = "on-update" ] && gh pr edit <PR> --add-reviewer @copilot
 ```
 
@@ -40,10 +41,9 @@ Proceed without exiting regardless of outcome.
 
 ### Step 5 — Halt on /review-fix failure (AC-4)
 
-If the `/review-fix` run (fast-path rule 3) errors or returns `Status: blocked`, stop the loop
-immediately. Print the failure details (which comment / what error) to stdout and do NOT schedule a
-next iteration. Surface the error to the user. Budget is NOT checked here — this is an immediate
-halt.
+If the `/review-fix` run (fast-path rule 3) errors or returns `Status: blocked`, stop the loop.
+Print the failure details (which comment / what error) to stdout and do NOT schedule a next
+iteration. Surface the error to the user. Budget is NOT checked here — this is an immediate halt.
 
 ### Row rationale (why the fast-path decision table is ordered and worded this way)
 
@@ -87,7 +87,8 @@ halt.
 > - **`none`** — handled in Step 0; the loop never reaches the table (no review request, no wait,
 >   immediate clean exit).
 > - **`on-create`** — the rule-2a/2b reviewer **re-request is SKIPPED** (the single create-time
->   request from `raise-pr.sh` stands). Rule 2a still waits for the one initial review. When **rule
+>   request (`raise-pr.sh`, impl via the playbook) stands). Rule 2a still waits for the one initial
+>   review. When **rule
 >   3** fires, run `/review-fix` **once** and then **STOP the loop** (do NOT schedule a next
 >   iteration): `on-create` caps the cycle at a single fix and never waits for a re-review. After
 >   that one fix the head moves, so a follow-up pass would see `reviewed-any == 1 && reviewed-head ==
@@ -119,7 +120,7 @@ comments differs (AC-2/AC-3).
   plugin's skill framework, lighter per review than native `/code-review` (AC-2/AC-3).
 
 Everywhere below, **`REVIEW_CMD`** stands for whichever the configured agent selects; the marker,
-decision table, budget, and modifiers are otherwise **identical** for both agents. Where the steps
+decision table, budget, and modifiers are **identical** for both agents. Where the steps
 below name `/code-review` explicitly, read it as `REVIEW_CMD` — `claude-inline` keeps running
 `/code-review --comment`, `claude-superpowers` runs the superpowers skill.
 
@@ -155,9 +156,9 @@ RULE=CI-c2 (halt) -> print "<N> unresolved non-loop comment(s) on <HEAD> — rev
 > idle timeout and the 30-pass runaway backstop apply uniformly. The progress signals are
 > `CUR_HEAD`, `CUR_UNRESOLVED`, **and a CI-b review** (a synchronous review is real work even when it
 > finds nothing and leaves head/unresolved unchanged — the pass-count still advances via the
-> script's own increment, so a stuck-but-reviewing loop still hits the 30-pass backstop eventually).
+> script's increment, so a stuck-but-reviewing loop still hits the 30-pass backstop eventually).
 > A HEAD that advanced (a fix) or a changed unresolved count also resets the idle window via the
-> script's own progress detection, so an actively-progressing review↔fix cycle runs as long as it
+> script's own progress detection, so a progressing review↔fix cycle runs as long as it
 > progresses, while a stall (checks pending with no review happening) or an oscillation is bounded
 > exactly as on the Copilot path. CI-d/CI-e/CI-f have their own terminal exits and are never
 > interrupted by the budget.

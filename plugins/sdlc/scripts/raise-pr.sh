@@ -44,6 +44,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 set -- "${ARGS[@]}"
+PHASE="$(printf '%s' "$PHASE" | tr '[:upper:]' '[:lower:]')"
 
 HEAD="${1:?head branch required}"
 BASE="${2:?base branch required}"
@@ -59,6 +60,7 @@ REVIEWER="${5:-@copilot}"
 # - REVIEW_AGENT=claude-inline ⇒ the review runs in-session via /code-review during the /loop;
 #   there is NO bot to assign here, so skip the reviewer request (the loop owns the review).
 # - REVIEW_AGENT=github-copilot ⇒ request the bot here at creation, exactly as before (back-compat).
+# - PHASE=spec|plan       ⇒ unconditional skip, regardless of the Review gate token (NA-104).
 # When --phase was passed, thread it through so the per-repo Review gate can downgrade THIS phase's
 # effective REVIEW_MODE to `none` (the same reviewer-skip path) when the phase is not gated.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -73,6 +75,9 @@ fi
 # so a reader failure degrades to the safe github-copilot/on-update path instead of crashing.
 REVIEW_AGENT="${REVIEW_AGENT:-github-copilot}"
 REVIEW_MODE="${REVIEW_MODE:-on-update}"
+if [ "$PHASE" = "spec" ] || [ "$PHASE" = "plan" ]; then
+  REVIEW_MODE=none
+fi
 
 [ -f "$BODY_FILE" ] || { echo "ERROR: body file not found: $BODY_FILE" >&2; exit 1; }
 
@@ -89,7 +94,9 @@ gh pr ready "$PR_URL" >/dev/null 2>&1 || echo "warn: gh pr ready failed (already
 # either `none` mode (no review gate) or `claude-inline` agent (the /loop runs /code-review
 # in-session instead of assigning a reviewer). Only github-copilot requests the bot here.
 if [ "$REVIEW_MODE" = "none" ]; then
-  if [ -n "$PHASE" ]; then
+  if [ "$PHASE" = "spec" ] || [ "$PHASE" = "plan" ]; then
+    echo "phase '$PHASE' — not requesting $REVIEWER (unconditional, NA-104)" >&2
+  elif [ -n "$PHASE" ]; then
     echo "review-gate: phase '$PHASE' not gated (effective review-mode=none) — not requesting $REVIEWER" >&2
   else
     echo "review-mode=none — not requesting $REVIEWER (no review gate)" >&2

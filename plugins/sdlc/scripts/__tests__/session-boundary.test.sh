@@ -95,21 +95,23 @@ if [ -f "$auto" ]; then
   fi
 fi
 
-# --- Assertion (d): exactly one pointer per standalone command ---------------------
-for f in $standalone; do
-  if [ ! -f "$f" ]; then
-    echo "FAIL: assertion d — file not found: $f" >&2
-    failures=$((failures + 1))
-    continue
-  fi
-  count="$(grep -Fc -- 'Session boundary at PR raise' "$f")"
+# --- Assertion (d): impl.md carries exactly one POINTER (positive form) ------------
+# Scoped to impl.md only (round-3 Minor): a bare phrase count can't distinguish a pointer from a
+# negation, so it no longer runs against spec.md/plan.md — those carry a NEGATION since NA-104
+# and are accurately covered by assertions (h)/(j) below instead.
+impl_standalone="plugins/sdlc/commands/impl.md"
+if [ ! -f "$impl_standalone" ]; then
+  echo "FAIL: assertion d — file not found: $impl_standalone" >&2
+  failures=$((failures + 1))
+else
+  count="$(grep -Fc -- 'Session boundary at PR raise' "$impl_standalone")"
   if [ "$count" -eq 1 ]; then
-    echo "PASS: assertion d — $f carries exactly one pointer to the canonical block"
+    echo "PASS: assertion d — $impl_standalone carries exactly one pointer to the canonical block"
   else
-    echo "FAIL: assertion d — $f carries $count reference(s) to 'Session boundary at PR raise', expected exactly 1" >&2
+    echo "FAIL: assertion d — $impl_standalone carries $count reference(s) to 'Session boundary at PR raise', expected exactly 1" >&2
     failures=$((failures + 1))
   fi
-done
+fi
 
 # --- Assertion (e): always-loaded surface must not grow (NON-POSITIVE) -------------
 # The four command files totalled 49,571 bytes at 4c3ad88. F is required to land non-positive
@@ -145,6 +147,52 @@ else
   failures=$((failures + 1))
 fi
 
+# --- Assertion (h): spec.md/plan.md state the boundary does NOT apply (negation form) ----------
+# Round-2 I6: assertion (d)'s bare phrase-count check can't tell "applies" from "does not apply" —
+# NA-104 replaced the pointer in these two files with a negation. Pin the negation text itself so
+# a future edit that silently drops it (reverting to the positive "applies" form) is caught.
+neg_ok=0
+for f in plugins/sdlc/commands/spec.md plugins/sdlc/commands/plan.md; do
+  if [ -f "$f" ] && grep -Fq -- 'no **Session boundary at PR raise** applies' "$f"; then
+    :
+  else
+    neg_ok=1
+    echo "FAIL: assertion h — $f must state 'no **Session boundary at PR raise** applies' (NA-104)" >&2
+  fi
+done
+if [ "$neg_ok" -eq 0 ]; then
+  echo "PASS: assertion h — spec.md and plan.md both state the boundary does NOT apply"
+else
+  failures=$((failures + 1))
+fi
+
+# --- Assertion (i): impl.md keeps the POSITIVE form — its review-fix loop is unaffected --------
+if grep -Fq -- 'no **Session boundary at PR raise** applies' plugins/sdlc/commands/impl.md 2>/dev/null; then
+  echo "FAIL: assertion i — impl.md must NOT carry the spec/plan negation; NA-104 does not touch impl" >&2
+  failures=$((failures + 1))
+elif grep -Fq -- 'Apply the **Session boundary at PR raise**' plugins/sdlc/commands/impl.md 2>/dev/null; then
+  echo "PASS: assertion i — impl.md still applies the boundary (positive form), unaffected by NA-104"
+else
+  echo "FAIL: assertion i — impl.md must apply the canonical Session boundary block (positive form)" >&2
+  failures=$((failures + 1))
+fi
+
+# --- Assertion (j): spec.md/plan.md release WITH the PR URL, not bare ---------------------------
+pr_ok=0
+for f in plugins/sdlc/commands/spec.md plugins/sdlc/commands/plan.md; do
+  if [ -f "$f" ] && grep -Fq -- 'session-complete.sh <PR_URL>' "$f"; then
+    :
+  else
+    pr_ok=1
+    echo "FAIL: assertion j — $f must release via 'session-complete.sh <PR_URL>' (round-1 Important 4)" >&2
+  fi
+done
+if [ "$pr_ok" -eq 0 ]; then
+  echo "PASS: assertion j — spec.md and plan.md both release with the PR URL"
+else
+  failures=$((failures + 1))
+fi
+
 if [ "$failures" -ne 0 ]; then
   echo
   echo "session-boundary.test.sh: FAILED ($failures assertion(s) failed)"
@@ -152,5 +200,5 @@ if [ "$failures" -ne 0 ]; then
 fi
 
 echo
-echo "session-boundary.test.sh: PASS — all 7 assertions passed"
+echo "session-boundary.test.sh: PASS — all 10 assertions passed"
 exit 0

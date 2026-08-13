@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# auto-merge-pr.sh <pr> [<story-key> <done-status>]
+# auto-merge-pr.sh [--auto] <pr> [<story-key> <done-status>]
 #
 # Merge a pull request using the repository's allowed merge method, resolved DYNAMICALLY at
 # merge time — never a hard-coded flag. Used by /auto's Full-Auto terminal action, after the
 # review-fix loop has driven the PR to a clean state (Copilot approved on the reviewed head +
-# checks green). Merging emits the GitHub `pull_request closed+merged` event that the automation
-# service consumes to advance the pipeline.
+# checks green) — default mode; `--auto` is the exception (A1's spec PR, no prior loop; see Args
+# below). `--auto` decides UP FRONT, from repo settings + PR state (never from parsing gh's error
+# text), whether GitHub auto-merge is even usable here; when it isn't, `--auto` waits (bounded —
+# see Env below) for the PR's own checks to settle before merging, so a spec PR on THIS path is
+# never merged before or without CI (the arming path instead relies on GitHub's own auto-merge,
+# which only waits on required checks). Merging emits the GitHub `pull_request closed+merged`
+# event that the automation service consumes to advance the pipeline.
 #
 # Why a script: the resolve-method -> merge -> verify sequence is multi-step gh logic that gets
 # dropped or mis-flagged when typed inline, and a bare `gh pr merge` prompts interactively for the
@@ -16,21 +21,47 @@ set -euo pipefail
 #
 # Method resolution precedence (first enabled wins): merge-commit -> squash -> rebase. The repo's
 # own settings govern; if a repo disables a method this is honored with no script change. If NO
-# method is enabled, or the merge does not take, the script exits non-zero so the caller (/auto)
-# halts and surfaces — it must NOT guess, and the PR stays open.
+# method is enabled, or the merge (or auto-merge enable) does not take, the script exits non-zero
+# so the caller (/auto) halts and surfaces — it must NOT guess, and the PR stays open.
 #
 # Args:
+#   --auto          OPTIONAL, must be the FIRST argument when present (see modes above). Parsed
+#                   and stripped before the positional args below, so their order is unchanged.
+#                   REJECTED together with $2/$3 (see below) — enforced, not just documented.
 #   $1 pr           PR number or URL to merge
 #   $2 story-key    OPTIONAL — the Jira story key to transition after a story-COMPLETING merge
 #                   (Workflow B impl PR, or Workflow A Phase-2 plan+impl PR). Omit for a
 #                   non-completing merge (e.g. Workflow A Phase-1 spec PR) — the story stays
-#                   in progress and no transition is attempted.
+#                   in progress and no transition is attempted. Incompatible with `--auto` (a spec
+#                   PR never completes the story) — the script exits 1 if both are supplied.
 #   $3 done-status  OPTIONAL — the consuming project's pipeline done status (e.g. `Done`), read
 #                   by the caller from `.claude/project/project-context.md`'s `Pipeline done
 #                   status` token. Both $2 and $3 must be supplied together to enable the
 #                   transition block below; supplying only one is treated as neither (1-arg
 #                   behaviour) since a story key with no target status (or vice versa) cannot
 #                   drive a transition.
+#
+# Env (consulted only on --auto's non-arming wait-for-checks path — see below). All three are
+# validated (a non-numeric or empty value resets to its default; poll and none-grace both have a
+# floor of 1s) — this prevents an EMPTY or NON-NUMERIC override from causing a hot-spin or an
+# infinite loop, but it is not a claim that any valid value keeps the wait bounded: a
+# AUTO_MERGE_CHECKS_POLL_SECS larger than the timeout still overruns the deadline by up to one
+# poll interval before the next check runs (see below) — keep it well under the timeout.
+#   AUTO_MERGE_CHECKS_TIMEOUT_SECS     OPTIONAL — bounded wait for checks to settle before
+#                                      merging (default 720s / 12 min).
+#   AUTO_MERGE_CHECKS_POLL_SECS        OPTIONAL — poll interval while waiting (default 15s,
+#                                      floored at 1s). The loop's single `sleep "$poll"` runs
+#                                      before the next timeout check, so a poll set larger than
+#                                      AUTO_MERGE_CHECKS_TIMEOUT_SECS overruns the deadline by up
+#                                      to (poll - 1)s; keep it well under the timeout.
+#   AUTO_MERGE_CHECKS_NONE_GRACE_SECS  OPTIONAL — a PR reporting zero checks must keep reporting
+#                                      zero for this long (default 30s, floored at 1s) before it's
+#                                      trusted, so a single early read (checks can take several
+#                                      seconds to register after the PR is raised) can't misread
+#                                      "not yet created" as "will never exist" and merge unchecked.
+#                                      If set higher than AUTO_MERGE_CHECKS_TIMEOUT_SECS,
+#                                      "genuinely no checks" becomes unreachable and the PR always
+#                                      exits 3 instead — fail-closed, not a bug.
 #
 # Note: the transition requires the consumer repo's Jira workflow to permit a DIRECT transition
 # from the story's current status to <done-status>; a workflow that forces an intermediate hop
@@ -44,34 +75,167 @@ set -euo pipefail
 #     comment on the story noting the auto-transition failed and a human should move it
 #     manually; the script still prints `MERGED` and exits 0.
 #
-# Back-compat: called with exactly 1 arg, this script is byte-for-byte behaviourally identical
-# to the original merge-only version — no transition block runs, nothing new is printed.
+# Back-compat: called with exactly 1 arg (no `--auto`), this script is byte-for-byte behaviourally
+# identical to the original merge-only version — no transition block runs, nothing new is printed.
 #
 # Output:
-#   - On success: prints `MERGED` to stdout; progress/warnings go to stderr.
-#   - On failure: non-zero exit, reason on stderr, nothing on stdout. (The transition block never
-#     causes a non-zero exit — see Best-effort above.)
+#   - On success: prints `MERGED` (an immediate merge succeeded, whether by default or via
+#     `--auto` falling back to one) or `AUTO-MERGE-ENABLED` (`--auto`, armed but not yet merged) to
+#     stdout; progress/warnings go to stderr.
+#   - On failure: non-zero exit, reason on stderr, nothing on stdout. `--auto`'s non-arming path
+#     (repo doesn't allow GitHub auto-merge, or the PR is already `mergeStateStatus=CLEAN` —
+#     see the false-CLEAN note below) waits for checks instead of guessing: **exit 1**
+#     naming the failing check(s) if any fail; **exit 3** on timeout
+#     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — including a timeout caused by the checks query itself
+#     repeatedly failing (transient — never treated as a failing check) — the distinct code lets
+#     a caller tell "fix CI" from "just wait and re-run" apart. The PR is left open either way.
+#     (The transition block never causes a non-zero exit — see Best-effort above.)
 
 here="$(cd "$(dirname "$0")" && pwd)"
+
+AUTO=false
+if [ "${1:-}" = "--auto" ]; then
+  AUTO=true
+  shift
+fi
 
 PR="${1:?PR number or URL required}"
 STORY_KEY="${2:-}"
 DONE_STATUS="${3:-}"
 
+if [ "$AUTO" = true ] && { [ -n "$STORY_KEY" ] || [ -n "$DONE_STATUS" ]; }; then
+  echo "ERROR: --auto does not accept story-key/done-status — a spec PR never completes the story" >&2
+  exit 1
+fi
+
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
 [ -n "$SLUG" ] || { echo "ERROR: could not determine repo slug (gh repo context)" >&2; exit 1; }
 
-# Resolve the merge method from the repo's allowed methods (precedence: merge-commit > squash >
-# rebase). Distinguish a gh-api failure (auth/network/API) from "no method enabled" — they need
-# different fixes, so do NOT swallow the api error with `|| true`. Distinct exit codes: 2 = could
-# not query; 1 = queried OK but no method enabled.
-if ! METHOD=$(gh api "repos/$SLUG" \
-  --jq 'if .allow_merge_commit then "--merge" elif .allow_squash_merge then "--squash" elif .allow_rebase_merge then "--rebase" else "" end'); then
-  echo "ERROR: could not query merge settings for $SLUG (gh api auth/network/API failure)" >&2
+# Resolve the merge method AND (for --auto) allow_auto_merge from ONE repo-settings fetch.
+# Distinguish a gh-api failure (auth/network/API) from "no method enabled" — they need different
+# fixes, so do NOT swallow the api error with `|| true`. Distinct exit codes: 2 = could not query;
+# 1 = queried OK but no method enabled.
+if ! REPO_JSON=$(gh api "repos/$SLUG"); then
+  echo "ERROR: could not query repo settings for $SLUG (gh api auth/network/API failure)" >&2
   exit 2
 fi
+METHOD=$(printf '%s' "$REPO_JSON" | jq -r \
+  'if .allow_merge_commit then "--merge" elif .allow_squash_merge then "--squash" elif .allow_rebase_merge then "--rebase" else "" end')
 [ -n "$METHOD" ] || { echo "ERROR: no merge method enabled on $SLUG — cannot auto-merge" >&2; exit 1; }
 echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
+
+# wait_for_checks <pr> -> sets CHECKS_RESULT to none|pass on return 0; fail|timeout on return 1
+# (stderr message already printed in the return-1 case).
+wait_for_checks() {
+  local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}"
+  local none_grace="${AUTO_MERGE_CHECKS_NONE_GRACE_SECS:-30}" elapsed=0 first_empty_at=""
+  local checks failing names query_rc total settled_ok passing
+  case "$timeout" in ''|*[!0-9]*) timeout=720 ;; esac
+  case "$poll" in ''|*[!0-9]*) poll=15 ;; esac
+  [ "$poll" -lt 1 ] && poll=1
+  case "$none_grace" in ''|*[!0-9]*) none_grace=30 ;; esac
+  [ "$none_grace" -lt 1 ] && none_grace=1
+  while :; do
+    if checks=$(gh pr checks "$pr" --json bucket,name 2>/dev/null); then
+      query_rc=0
+    else
+      query_rc=$?
+      checks=""
+    fi
+    if [ "$query_rc" -ne 0 ]; then
+      echo "checks: PR $pr — gh pr checks query failed (exit $query_rc); retrying within the timeout budget" >&2
+      first_empty_at=""
+    elif [ "$checks" = "[]" ]; then
+      [ -z "$first_empty_at" ] && first_empty_at="$elapsed"
+      if [ $((elapsed - first_empty_at)) -ge "$none_grace" ]; then
+        echo "checks: PR $pr has reported no checks for ${none_grace}s — proceeding" >&2
+        CHECKS_RESULT=none
+        return 0
+      fi
+      echo "checks: PR $pr reports no checks yet — confirming for ${none_grace}s before proceeding" >&2
+    elif printf '%s' "$checks" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+      first_empty_at=""
+      failing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="fail" or .bucket=="cancel")]|length' 2>/dev/null || echo 0)
+      if [ "${failing:-0}" -gt 0 ]; then
+        names=$(printf '%s' "$checks" | jq -r '[.[]|select(.bucket=="fail" or .bucket=="cancel")|.name]|join(", ")' 2>/dev/null || echo "unknown")
+        echo "ERROR: PR $pr has failing check(s): $names — will not merge" >&2
+        CHECKS_RESULT=fail
+        return 1
+      fi
+      # "Settled and not blocking" is ONLY pass|skipping — anything else (pending, or an
+      # unrecognised/future bucket value gh might one day add) is treated as not-yet-settled and
+      # falls through to the poll/timeout below rather than being silently counted as passing.
+      # Fail-closed on purpose: NO `|| echo 0` fallback here. If either jq call itself fails
+      # (OOM-killed, a shimmed/broken jq, ulimit exhaustion — all non-deterministic, not reachable
+      # from any GitHub payload since the `-e` probe above already gated well-formed JSON), `total`
+      # and `settled_ok` are both left empty, the `-n` guards below short-circuit false, and the
+      # script falls through to the poll/timeout below rather than treating "both counters
+      # defaulted to 0" as "0 -eq 0, therefore settled" and merging past an unread check.
+      total=$(printf '%s' "$checks" | jq 'length' 2>/dev/null) || total=""
+      settled_ok=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass" or .bucket=="skipping")]|length' 2>/dev/null) || settled_ok=""
+      if [ -n "$total" ] && [ -n "$settled_ok" ] && [ "$settled_ok" -eq "$total" ]; then
+        passing=$(printf '%s' "$checks" | jq '[.[]|select(.bucket=="pass")]|length' 2>/dev/null || echo 0)
+        if [ "${passing:-0}" -gt 0 ]; then
+          echo "checks: PR $pr checks all settled and passing — proceeding" >&2
+        else
+          echo "checks: PR $pr checks all settled (skipped/non-blocking only, none required to pass) — proceeding" >&2
+        fi
+        CHECKS_RESULT=pass
+        return 0
+      fi
+    else
+      # gh exited 0 but the output isn't `[]` and isn't a parseable non-empty JSON array either
+      # (empty stdout, garbage/non-JSON text, etc.) — this is a query-shaped failure, not "checks
+      # settled", so treat it exactly like a non-zero gh exit: retry within the budget, never merge
+      # on it.
+      echo "checks: PR $pr — gh pr checks returned unparseable output; retrying within the timeout budget" >&2
+      first_empty_at=""
+    fi
+    if [ "$elapsed" -ge "$timeout" ]; then
+      echo "ERROR: PR $pr checks did not settle within ${timeout}s (AUTO_MERGE_CHECKS_TIMEOUT_SECS) — still pending, empty, or the checks query kept failing; timed out, leaving PR open" >&2
+      CHECKS_RESULT=timeout
+      return 1
+    fi
+    sleep "$poll"
+    elapsed=$((elapsed + poll))
+  done
+}
+
+if [ "$AUTO" = true ]; then
+  ALLOW_AUTO=$(printf '%s' "$REPO_JSON" | jq -r 'if .allow_auto_merge then "yes" else "" end')
+  MSS=$(gh pr view "$PR" --json mergeStateStatus -q .mergeStateStatus 2>/dev/null || echo "")
+  if [ "$ALLOW_AUTO" = "yes" ] && [ "$MSS" != "CLEAN" ]; then
+    if MERGE_OUT=$(gh pr merge "$PR" "$METHOD" --auto 2>&1); then
+      STATE="" ENABLED=""
+      for i in 1 2 3; do
+        STATE=$(gh pr view "$PR" --json state -q .state 2>/dev/null || echo "")
+        [ "$STATE" = "MERGED" ] && break
+        ENABLED=$(gh pr view "$PR" --json autoMergeRequest -q 'if .autoMergeRequest then "yes" else "" end' 2>/dev/null || true)
+        [ "$ENABLED" = "yes" ] && break
+        [ "$i" -lt 3 ] && sleep 2
+      done
+      if [ "$STATE" = "MERGED" ]; then
+        echo "merged: PR $PR (checks were already green)" >&2
+        printf 'MERGED\n'
+        exit 0
+      fi
+      [ "$ENABLED" = "yes" ] || { echo "ERROR: PR $PR auto-merge not confirmed enabled after gh pr merge --auto; merge output: $MERGE_OUT" >&2; exit 1; }
+      echo "auto-merge-enabled: PR $PR (GitHub will merge it once eligible)" >&2
+      printf 'AUTO-MERGE-ENABLED\n'
+      exit 0
+    elif ! printf '%s' "$MERGE_OUT" | grep -qi 'clean status'; then
+      echo "ERROR: gh pr merge $PR $METHOD --auto failed (auto-merge disabled on repo / branch protection / conflict): $MERGE_OUT" >&2
+      exit 1
+    fi
+    echo "auto-merge: PR $PR already mergeable — falling back to an immediate merge" >&2
+  else
+    if ! wait_for_checks "$PR"; then
+      [ "$CHECKS_RESULT" = "timeout" ] && exit 3
+      exit 1
+    fi
+    echo "auto-merge: PR $PR checks settled ($CHECKS_RESULT) — merging immediately" >&2
+  fi
+fi
 
 # Merge with the explicit resolved flag. `gh pr merge` only prompts interactively for the merge
 # METHOD when the repo allows more than one and none is given on the command line — passing the
