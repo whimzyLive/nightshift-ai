@@ -1,3 +1,15 @@
+## 0.45.10 (2026-09-13)
+
+### 🩹 Fixes
+
+- **sdlc:** prefer the /pull/N segment when normalising a PR URL ([#240](https://github.com/whimzyLive/nightshift-ai/issues/240))
+- **sdlc:** harden PR-arg normalisation and fix the checks-fallback comment/test in loop probes ([#240](https://github.com/whimzyLive/nightshift-ai/issues/240))
+- **sdlc:** normalize PR URL and fall back to all checks in loop probes ([1a46e41](https://github.com/whimzyLive/nightshift-ai/commit/1a46e41))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.9 (2026-08-08)
 
 ### 🚀 Features
