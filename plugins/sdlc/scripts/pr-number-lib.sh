@@ -3,7 +3,7 @@
 # Sourced, never executed: no `set -e`, no top-level side effects.
 
 normalize_pr_number() {
-  local raw="${1:-}" expected_slug="${2:-}" body after lead trail rest owner repo path url_slug=''
+  local raw="${1:-}" expected_slug="${2:-}" body after lead trail rest owner repo path url_slug='' from_url=0
   lead="${raw%%[![:space:]]*}"; raw="${raw#"$lead"}"
   trail="${raw##*[![:space:]]}"; raw="${raw%"$trail"}"
   body="${raw%%[#?]*}"
@@ -16,16 +16,20 @@ normalize_pr_number() {
       [ -n "$owner" ] && [ -n "$repo" ] && [ "$path" != "$rest" ] || return 1
       url_slug="$owner/$repo"
       body="$path"
+      from_url=1
       ;;
   esac
-  case "$body" in
-    pull/*|*/pull/*)
-      after="${body#*/pull/}"
-      [ "$after" = "$body" ] && after="${body#pull/}"
-      body="${after%%/*}"
-      ;;
-    *) body="${body%/}"; body="${body##*/}" ;;
-  esac
+  if [ "$from_url" -eq 1 ]; then
+    case "$body" in
+      pull/*) after="${body#pull/}"; body="${after%%/*}" ;;
+      *) return 1 ;;
+    esac
+  else
+    case "$body" in
+      */pull/*) after="${body#*/pull/}"; body="${after%%/*}" ;;
+      *) body="${body%/}"; body="${body##*/}" ;;
+    esac
+  fi
   case "$body" in
     ''|*[!0-9]*) return 1 ;;
   esac

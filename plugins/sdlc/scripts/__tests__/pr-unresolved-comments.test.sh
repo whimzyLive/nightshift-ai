@@ -265,6 +265,8 @@ reject_case 14 "a /pull/abc URL (non-numeric PR segment) is still rejected, neve
   "https://github.com/example-org/example-repo/pull/abc" none
 reject_case 15 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
   "notaurl" none
+reject_case 16 "a nested non-PR URL path is rejected before any PR API call" \
+  "https://github.com/example-org/example-repo/foo/pull/239" none
 
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all pr-unresolved-comments.sh regression cases passed"
