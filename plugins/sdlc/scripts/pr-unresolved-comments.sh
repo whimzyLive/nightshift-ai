@@ -29,7 +29,6 @@ if ! PR="$(normalize_pr_number "$PR")"; then
   echo "pr-unresolved-comments.sh: not a valid PR number or URL: $1" >&2
   exit 1
 fi
-
 SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER="${SLUG%/*}"; REPO="${SLUG#*/}"
 

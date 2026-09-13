@@ -156,17 +156,17 @@ assert_pr_num_threaded() { # <label> <call_log> <stderr_log> <status> <expect_pr
 }
 
 slash_stderr="$mockdir/stderr-slash.log"; slash_calls="$mockdir/gh-calls-slash.log"; : >"$slash_calls"
-PATH="$mockdir:$PATH" GH_CALL_LOG="$slash_calls" bash "$script" "https://github.com/o/r/pull/999999/" >/dev/null 2>"$slash_stderr"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$slash_calls" bash "$script" "https://github.com/example-org/example-repo/pull/999999/" >/dev/null 2>"$slash_stderr"
 assert_pr_num_threaded "(5) a PR URL with a trailing slash normalises and threads PR_NUM=999999 through to gh" \
   "$slash_calls" "$slash_stderr" "$?" "999999"
 
 frag_stderr="$mockdir/stderr-frag.log"; frag_calls="$mockdir/gh-calls-frag.log"; : >"$frag_calls"
-PATH="$mockdir:$PATH" GH_CALL_LOG="$frag_calls" bash "$script" "https://github.com/o/r/pull/999999#discussion_r1" >/dev/null 2>"$frag_stderr"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$frag_calls" bash "$script" "https://github.com/example-org/example-repo/pull/999999#discussion_r1" >/dev/null 2>"$frag_stderr"
 assert_pr_num_threaded "(6) a PR URL with a #fragment normalises and threads PR_NUM=999999 through to gh" \
   "$frag_calls" "$frag_stderr" "$?" "999999"
 
 query_stderr="$mockdir/stderr-query.log"; query_calls="$mockdir/gh-calls-query.log"; : >"$query_calls"
-PATH="$mockdir:$PATH" GH_CALL_LOG="$query_calls" bash "$script" "https://github.com/o/r/pull/999999?tab=files" >/dev/null 2>"$query_stderr"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$query_calls" bash "$script" "https://github.com/example-org/example-repo/pull/999999?tab=files" >/dev/null 2>"$query_stderr"
 assert_pr_num_threaded "(7) a PR URL with a ?query normalises and threads PR_NUM=999999 through to gh" \
   "$query_calls" "$query_stderr" "$?" "999999"
 
@@ -177,7 +177,7 @@ assert_pr_num_threaded "(7) a PR URL with a ?query normalises and threads PR_NUM
 malformed_stderr="$mockdir/stderr-malformed.log"
 malformed_call_log="$mockdir/gh-calls-malformed.log"
 : >"$malformed_call_log"
-malformed_out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$malformed_call_log" bash "$script" "https://github.com/o/r/pull/" 2>"$malformed_stderr")"
+malformed_out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$malformed_call_log" bash "$script" "https://github.com/example-org/example-repo/pull/" 2>"$malformed_stderr")"
 malformed_status=$?
 if [ "$malformed_status" -eq 0 ] \
   && ! printf '%s\n' "$malformed_out" | grep -q '^loop-status:' \
@@ -194,17 +194,17 @@ fi
 # changed/Commits), a double trailing slash, and whitespace-padded input must all normalise and
 # thread PR_NUM=999999 through to gh (same call-log discipline as cases 5-7 — see their comment).
 files_stderr="$mockdir/stderr-files.log"; files_calls="$mockdir/gh-calls-files.log"; : >"$files_calls"
-PATH="$mockdir:$PATH" GH_CALL_LOG="$files_calls" bash "$script" "https://github.com/o/r/pull/999999/files" >/dev/null 2>"$files_stderr"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$files_calls" bash "$script" "https://github.com/example-org/example-repo/pull/999999/files" >/dev/null 2>"$files_stderr"
 assert_pr_num_threaded "(9) a /pull/N/files URL (Files changed tab) normalises and threads PR_NUM=999999 through to gh" \
   "$files_calls" "$files_stderr" "$?" "999999"
 
 commits_stderr="$mockdir/stderr-commits.log"; commits_calls="$mockdir/gh-calls-commits.log"; : >"$commits_calls"
-PATH="$mockdir:$PATH" GH_CALL_LOG="$commits_calls" bash "$script" "https://github.com/o/r/pull/999999/commits" >/dev/null 2>"$commits_stderr"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$commits_calls" bash "$script" "https://github.com/example-org/example-repo/pull/999999/commits" >/dev/null 2>"$commits_stderr"
 assert_pr_num_threaded "(10) a /pull/N/commits URL (Commits tab) normalises and threads PR_NUM=999999 through to gh" \
   "$commits_calls" "$commits_stderr" "$?" "999999"
 
 dblslash_stderr="$mockdir/stderr-dblslash.log"; dblslash_calls="$mockdir/gh-calls-dblslash.log"; : >"$dblslash_calls"
-PATH="$mockdir:$PATH" GH_CALL_LOG="$dblslash_calls" bash "$script" "https://github.com/o/r/pull/999999//" >/dev/null 2>"$dblslash_stderr"
+PATH="$mockdir:$PATH" GH_CALL_LOG="$dblslash_calls" bash "$script" "https://github.com/example-org/example-repo/pull/999999//" >/dev/null 2>"$dblslash_stderr"
 assert_pr_num_threaded "(11) a PR URL with a double trailing slash normalises and threads PR_NUM=999999 through to gh" \
   "$dblslash_calls" "$dblslash_stderr" "$?" "999999"
 
@@ -213,11 +213,11 @@ PATH="$mockdir:$PATH" GH_CALL_LOG="$ws_calls" bash "$script" " 999999 " >/dev/nu
 assert_pr_num_threaded "(12) whitespace-padded input normalises and threads PR_NUM=999999 through to gh" \
   "$ws_calls" "$ws_stderr" "$?" "999999"
 
-# Cases 13-14: widening acceptance must not regress the rejection path — genuinely malformed
-# input (/pull/abc, a bare non-numeric string) is still rejected before reaching gh, with no
-# loop-status: line.
-reject_case() { # <n> <label> <input>
-  local n="$1" label="$2" input="$3" stderr call_log out status
+# Cases 13-15: widening acceptance must not regress the rejection path. A mismatched-repo PR URL
+# may perform a single repo-slug lookup so it can be rejected before any PR API call; malformed
+# inputs still reject before reaching gh at all, with no loop-status: line.
+reject_case() { # <n> <label> <input> <gh_mode:none|repo-view-only>
+  local n="$1" label="$2" input="$3" gh_mode="${4:-none}" stderr call_log out status ok=1
   stderr="$mockdir/stderr-$n.log"
   call_log="$mockdir/gh-calls-$n.log"
   : >"$call_log"
@@ -225,8 +225,18 @@ reject_case() { # <n> <label> <input>
   status=$?
   if [ "$status" -eq 0 ] \
     && ! printf '%s\n' "$out" | grep -q '^loop-status:' \
-    && grep -q 'not a valid PR number or URL' "$stderr" \
-    && [ ! -s "$call_log" ]; then
+    && grep -q 'not a valid PR number or URL' "$stderr"; then
+    case "$gh_mode" in
+      none) [ ! -s "$call_log" ] || ok=0 ;;
+      repo-view-only)
+        grep -qx 'repo view --json nameWithOwner -q .nameWithOwner' "$call_log" || ok=0
+        ;;
+      *) ok=0 ;;
+    esac
+  else
+    ok=0
+  fi
+  if [ "$ok" -eq 1 ]; then
     echo "PASS: ($n) $label"
   else
     echo "FAIL: ($n) $label — exit=$status output=${out:-<empty>} gh-calls=$(cat "$call_log" 2>/dev/null)"
@@ -234,10 +244,12 @@ reject_case() { # <n> <label> <input>
     failures=$((failures + 1))
   fi
 }
-reject_case 13 "a /pull/abc URL (non-numeric PR segment) is still rejected, never reaching gh" \
-  "https://github.com/o/r/pull/abc"
-reject_case 14 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
-  "notaurl"
+reject_case 13 "a PR URL for a different repository is rejected before any PR API call" \
+  "https://github.com/other-org/other-repo/pull/999999" repo-view-only
+reject_case 14 "a /pull/abc URL (non-numeric PR segment) is still rejected, never reaching gh" \
+  "https://github.com/example-org/example-repo/pull/abc" none
+reject_case 15 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
+  "notaurl" none
 
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all pr-loop-status.sh regression cases passed"
