@@ -100,87 +100,55 @@ inline, not the `/triage` command — so `/auto` and `/impl` share one definitio
 
 ---
 
-## Loop-after-raise + mode-conditioned terminal action (shared by A1, A2, B1)
+## Loop-after-raise + mode-conditioned terminal action (shared by A2, B1)
 
-Every phase that raises a PR drives the Copilot review-fix loop on it **before** the phase finishes,
-then takes a terminal action that depends on the story's mode. A1, A2, and B1 below each invoke this
-procedure with their just-raised `<PR_URL>` and a `<PHASE>` of `spec` (advances to Phase 2 on
-merge), `plan+impl`, or `impl` (completes the story on merge).
+Every phase that raises an **implementation-bearing** PR drives the Copilot review-fix loop on it
+**before** the phase finishes, then takes a terminal action that depends on the story's mode. A2
+and B1 below each invoke this procedure with their just-raised `<PR_URL>` and a `<PHASE>` of
+`plan+impl` or `impl` (both complete the story on merge). **A1's spec PR never reaches this
+procedure (NA-104)** — spec is unconditionally exempt from the review-fix loop, regardless of the
+Review gate token; see A1 below.
 
 The loop is also handed a **`--phase <GATE_PHASE>`** flag so the per-repo **Review gate** can skip
 this phase's review (see **Review Gate** below). The gate-phase maps from the workflow branch:
-**A1 spec PR → `spec`**, **A2 combined plan+impl PR → `impl`**, **B impl PR → `impl`**. (The combined
-plan+impl PR uses `impl`: there is no separate plan PR in `/auto`.) `<GATE_PHASE>` is passed
-literally per-invocation, so there is no cross-phase state bleed.
+**A2 combined plan+impl PR → `impl`**, **B impl PR → `impl`**. (The combined plan+impl PR uses
+`impl`: there is no separate plan PR in `/auto`.) `<GATE_PHASE>` is passed literally per-invocation,
+so there is no cross-phase state bleed.
 
 ### Resolving the working issue's mode
 
-The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode. Do
-**not** parse `acli workitem view` text output — that format is not stable across acli
-versions/flags, and a parse miss would silently disable Full Auto. Instead probe **definitively**
-with a JQL match (the repo's established custom-field-read pattern — see `refs/jira-fetch.md`), so
-auto-merge is enabled **only** when Jira itself confirms the mode is `Full Auto`.
-
-The mode has two sources, in strict precedence order:
-
-1. **The `"AI Workflow"` custom field** — always wins when it is set to anything.
-2. **An `AI-Workflow:<mode>` label fallback** — consulted **only when the field is unset or the
-   field doesn't exist on the instance**. Projects that cannot add custom fields opt in via a label
-   instead: `AI-Workflow:full-auto`, `AI-Workflow:auto`, or `AI-Workflow:assisted` (lowercase mode
-   tokens). When a story carries **multiple** `AI-Workflow:*` labels, the **most conservative** one
-   wins (`assisted` > `auto` > `full-auto`) — the label probes below check most-conservative first,
-   so the ladder's order encodes that rule.
-
-`MODE` always resolves to a **real mode string** (`Full Auto` / `Auto` / `Assisted`), or empty when
-**neither source is set** — never a placeholder — because callers interpolate it into
-operator-facing text (e.g. the epic loop's E2b gate prompt via `storyMode(S)`).
-
-Resolve it via the shared ladder script (collapses this ladder and E0's `epicFallback` ladder into
-one implementation — NA-86 A6):
+The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode,
+resolved via the shared ladder script — never by parsing `acli workitem view` text (unstable
+across versions). Full ladder (custom field → label fallback, precedence, why JQL not text) lives
+in `${CLAUDE_PLUGIN_ROOT}/refs/ai-workflow-mode-resolution.md` — read it the first time this
+section is reached.
 
 ```bash
 eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-ai-workflow-mode.sh STORY_KEY)"
-# -> sets MODE ('Full Auto' | 'Auto' | 'Assisted' | '') and MODE_SOURCE (additive
-#    observability only — D9, no caller branches on it)
+# -> sets MODE ('Full Auto' | 'Auto' | 'Assisted' | '') and MODE_SOURCE (additive, D9)
 ```
 
-`MODE="Full Auto"` is the **only** value that enables auto-merge. Any other outcome (`Auto`,
-`Assisted`, empty, or a JQL/auth error that yields no match) → the **human-merge** path. Defaulting
-to the human path is the safe failure mode: a transient read error must never trigger an unattended
-merge. (The `"AI Workflow"` field name is the consuming repo's single-select; the JQL match is
-case- and format-stable, unlike scraping view output. On an instance where the field doesn't exist
-at all, the field probes error → no match → the label probes still run, which is exactly the
-fallback's target case. The label tokens deliberately mirror the mode values the consuming repo's
-trigger service resolves from the same labels, so webhook-side triggering and `/auto`-side gating
-agree.)
+`MODE="Full Auto"` is the **only** value that enables auto-merge; any other outcome (including
+empty or a read error) takes the **human-merge** path — defaulting to human is the safe failure
+mode.
 
 ### The procedure (release at PR raise; the loop is a NEW session)
 
 1. **Resolve `MODE`** (see above) — this decides whether an `--on-clean` hook is attached.
 2. **Resolve `DONE_STATUS`** — read the **`Pipeline done status`** row from this repo's
    `.claude/project/project-context.md` (the same token E2a's idempotent-skip check reads; no new
-   terminal status is introduced here). Only needed when `MODE` = `Full Auto` **and** `<PHASE>` is
-   story-COMPLETING (see step 3) — resolve it unconditionally here for simplicity, it is simply
-   unused otherwise.
+   terminal status is introduced here). Only needed when `MODE` = `Full Auto` (both `plan+impl` and
+   `impl` are story-COMPLETING — A1's spec PR never reaches this procedure, NA-104) — resolve it
+   unconditionally here for simplicity, it is simply unused otherwise.
 3. **Post the phase's Jira comment FIRST** (the loop is the session's last act, so the comment is
-   posted before it — see A1/A3/B2 for the per-phase, mode-aware text).
+   posted before it — see A3/B2 for the per-phase, mode-aware text).
 4. **Build `<NEXT>`, the full re-invocation line:**
    - **`MODE` = `Full Auto`** → attach the auto-merge hook; on `<NEXT>`'s clean exit it auto-merges
-     `<PR_URL>`, whose merge event advances the pipeline (`<PHASE>=spec` → resumes Phase 2;
-     `plan+impl`/`impl` → completes the story and also best-effort transitions it to
-     `<DONE_STATUS>`). Whether the hook also transitions the story depends on **whether `<PHASE>` is
-     story-COMPLETING**:
-     - **`<PHASE>` = `plan+impl` or `impl`** (story-COMPLETING — A2/A3's combined PR, or B1/B2's impl
-       PR) → pass `<STORY_KEY>` and `<DONE_STATUS>` so the hook transitions the story after the
-       verified merge:
-       ```bash
-       /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL> <STORY_KEY> \"<DONE_STATUS>\""
-       ```
-     - **`<PHASE>` = `spec`** (A1's spec PR — does NOT complete the story; the pipeline just advances
-       to Phase 2) → the 1-arg, merge-only invocation, no transition:
-       ```bash
-       /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL>"
-       ```
+     `<PR_URL>` and best-effort transitions the story to `<DONE_STATUS>` (pass `<STORY_KEY>` and
+     `<DONE_STATUS>` — both remaining phases here are story-COMPLETING):
+     ```bash
+     /loop /sdlc:loop <PR_URL> --phase <GATE_PHASE> --on-clean "bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh <PR_URL> <STORY_KEY> \"<DONE_STATUS>\""
+     ```
    - **Any other mode** → no hook; `<NEXT>` just drives the PR to Copilot-clean and stops for a human
      merge:
      ```bash
@@ -199,17 +167,23 @@ was handed; `/auto` decides (via `MODE`) whether to attach the auto-merge hook.
 ### Review Gate
 
 The optional **`Review gate`** token in the repo's `## Code Review` section is a comma-separated
-subset of `spec,plan,impl` listing which phases trigger the configured automated review:
+subset of `spec,plan,impl`. **Only `impl` uses this token at all (NA-104)** — the review-fix loop
+never runs against the spec PR (A1) or a standalone plan PR (`/sdlc:plan`), and `raise-pr.sh` never
+requests a reviewer for `spec`/`plan` either (an unaddressed review left open forever is worse than
+none), regardless of this token.
 
-- A phase listed in the gate reviews as usual; a phase **not** listed has its review skipped (the
-  reader returns effective `REVIEW_MODE=none`, so `raise-pr.sh` requests no reviewer and the tail
-  loop runs `--on-clean` once and releases — the pipeline advances without waiting for a review).
-- **Token absent or empty ⇒ all phases review** — the default, fully back-compatible behaviour
-  (no regression).
-- The combined plan+impl PR is gated by the **`impl`** value (there is no separate plan PR in
-  `/auto`); the spec PR is gated by `spec`.
-- The phase is passed per-invocation as `--phase <GATE_PHASE>`, so each PR is gated independently and
-  there is no cross-phase state bleed.
+- A gated `impl` phase reviews as usual; an ungated one still gets `@copilot` requested — the impl
+  PR is raised by the Principal Engineer playbook's own `gh pr create` + unconditional
+  `--add-reviewer`, never through `raise-pr.sh` (`refs/principal-engineer-playbook.md`). Gating
+  `impl` out downgrades it to `REVIEW_MODE=none` (`--on-clean` once, release — skips EVERY wait,
+  including checks-green): under `Full Auto` the impl PR then auto-merges unreviewed and without
+  waiting for CI, while the already-open `@copilot` request sits unaddressed on a PR that already
+  merged — unlike spec/plan, this is a real per-repo config trap, not suppressed.
+- **Token absent or empty ⇒ `impl` reviews** — the default, back-compatible behaviour.
+- The combined plan+impl PR (A2) is gated by `impl` (no separate plan PR in `/auto`) — see A2's
+  review-scope note below for its plan-doc exclusion.
+- `--phase <GATE_PHASE>` is passed per-invocation, so the `impl` PR is gated independently of any
+  other phase.
 
 ### Session boundary at PR raise
 
@@ -275,44 +249,69 @@ curl -s --retry 3 -X POST http://localhost:9001 \
   -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/pr_raised\",\"params\":{\"storyKey\":\"STORY_KEY\",\"type\":\"spec\",\"url\":\"SPEC_PR_URL\"},\"id\":1}"
 ```
 
-**Exit.** Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
+**Exit** (release directly, per **Final action** below — this branch raised a PR but never loops).
+Do not continue to A2. The service re-invokes (Phase 2) when the spec PR is merged.
 
-**If ASYNC_REVIEW=false** — resolve `MODE`, post the mode-aware Jira comment, then run the
-**Loop-after-raise** procedure (above) for the spec PR as the session **tail** (`<PR_URL>`=`SPEC_PR_URL`,
-`<PHASE>`=`spec`). The comment is posted **before** the loop (the loop is the last act). Run the site
-guard once before either branch below:
-
-```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
-```
-
-- **`MODE`=`Full Auto`** → post an intent note, then run the tail loop **with** the auto-merge hook
-  (it auto-merges the spec PR on clean exit; that merge webhook then resumes Phase 2 automatically):
+**If ASYNC_REVIEW=false** — resolve `MODE`, run the site guard, then complete the phase directly,
+right here. **Spec never enters the review-fix loop (NA-104)** — reserved for the implementation
+PR (see **Loop-after-raise**, above) — so there is no loop tail to hand to a new session:
 
 ```bash
-acli jira workitem comment create --key STORY_KEY --body "Spec PR raised (Full Auto): SPEC_PR_URL
-
-Driving Copilot review-fix now; will auto-merge once review + checks pass, then advance to plan + implementation automatically."
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || { bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh SPEC_PR_URL; exit 1; }
 ```
 
-- **Any other mode** → post the human-merge note, then run the tail loop **without** a hook (drives
-  the PR to Copilot-clean, leaves it open for a human merge):
+A guard failure means **STOP HERE** — the release above already ran; do NOT continue into either
+`MODE` branch below (nothing past this point may write to a possibly-wrong Jira instance), and do
+NOT run the terminal action again.
+
+- **`MODE`=`Full Auto`** → merge FIRST, comment SECOND, so the comment matches what really
+  happened (`auto-merge-pr.sh --auto` decides deterministically, from repo settings and PR state,
+  whether to arm GitHub auto-merge or wait for checks then merge — never from parsing gh's error
+  text, and never racing the CI `raise-pr.sh` just triggered). Exit 3 means the checks wait timed
+  out (transient — just re-run later); any other failure means a check is genuinely failing
+  (needs a fix) — the comment distinguishes them:
+
+```bash
+if OUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --auto SPEC_PR_URL); then
+  if [ "$OUT" = "MERGED" ]; then
+    BODY="Spec PR merged automatically (Full Auto): SPEC_PR_URL. Checks passed; advancing to plan + implementation."
+  else
+    BODY="Spec PR raised (Full Auto): SPEC_PR_URL. GitHub will merge it once checks pass; this then advances automatically."
+  fi
+elif [ $? -eq 3 ]; then
+  BODY="Spec PR checks still running (Full Auto): SPEC_PR_URL. No action needed — re-run /auto STORY_KEY once they finish."
+else
+  BODY="Could not auto-merge the spec PR: SPEC_PR_URL — a check may be failing. Review it, or merge manually, then re-run /auto STORY_KEY."
+fi
+acli jira workitem comment create --key STORY_KEY --body "$BODY"
+```
+
+- **Any other mode** → post the human-merge note; leave the PR open. No automated loop runs against
+  it, and no reviewer is requested either (NA-104 — see **Review Gate**):
 
 ```bash
 acli jira workitem comment create --key STORY_KEY --body "Spec PR ready for review.
 
 Spec PR: SPEC_PR_URL
 
-Driven to Copilot-clean. Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
+Review and merge to develop, then re-run /auto STORY_KEY to generate the plan and implementation in a single PR."
 ```
 
 Tell the user:
 
-> Spec PR raised; driving it to Copilot-clean as the session tail. Review and merge it to `develop`, then re-run `/auto STORY_KEY`.
+> Spec PR raised. Full Auto: merged, or armed to auto-merge (see the Jira comment for which).
+> Otherwise: review and merge it to `develop`, then re-run `/auto STORY_KEY`.
 
-Terminal action: apply **Session boundary at PR raise**. Do **not** proceed to A2
-in this run; Phase 2 is resumed by the spec-PR merge (human, or the Full-Auto auto-merge) as a fresh
-`/auto STORY_KEY` invocation (A0 detects the merged spec).
+**Terminal action (either `MODE` branch above only** — the guard-failure path already released and
+stopped, above): release right here, with the PR URL:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh SPEC_PR_URL
+```
+
+No **Session boundary at PR raise** applies (there is no loop tail to hand to a new session). Do
+**not** proceed to A2 in this run; Phase 2 is resumed by the spec-PR merge (human, or the
+Full-Auto auto-merge) as a fresh `/auto STORY_KEY` invocation (A0 detects the merged spec).
 
 ---
 
@@ -342,6 +341,8 @@ curl -s --retry 3 -X POST http://localhost:9001 \
    hook (auto-merges on clean → the plan+impl PR landing on `develop` **completes** the story, then
    best-effort transitions it to the pipeline done status); any other mode → tail loop **without** a
    hook (leave open for human merge). Terminal action: apply **Session boundary at PR raise**.
+   **Review scope (NA-104 AC-2):** the loop reviews this PR's code, not its plan prose — triage any
+   finding against `docs/superpowers/plans/STORY_KEY.md` as out of scope during `/review-fix`.
 
 ### A3 — Complete (comment posted BEFORE the tail loop)
 
@@ -469,30 +470,42 @@ the missing path; never continue on a half-loaded contract.
 
 ## Final action — release the session
 
+first-match-wins:
+
 ```text
-SDLC_BOUNDARY_ON unset (default)     -> the tail loop owns the single release, exactly as before
-SDLC_BOUNDARY_ON set + harness       -> the PHASE releases at PR raise (Session boundary at PR
-                                         raise); the re-invoked loop session releases its own slot
-SDLC_BOUNDARY_ON set + interactive   -> the tail loop owns the single release, exactly as before
+ASYNC_REVIEW=true (A1, A2, or B)     -> raises a PR, fires the phase/* JSON-RPC event, and stops
+                                         without looping — release directly, WITH that PR URL
+A1's ASYNC_REVIEW=false branch       -> spec never loops (NA-104), regardless of SDLC_BOUNDARY_ON
+                                         (A1 has no tail loop) — release directly here, right after
+                                         the comment/merge step, WITH the spec PR URL
+SDLC_BOUNDARY_ON unset (default)     -> A2/B1: the tail loop owns the single release, exactly as
+                                         before
+SDLC_BOUNDARY_ON set + harness       -> A2/B1: the PHASE releases at PR raise (Session boundary at
+                                         PR raise); the re-invoked loop session releases its own slot
+SDLC_BOUNDARY_ON set + interactive   -> A2/B1: the tail loop owns the single release, exactly as
+                                         before
 no PR was raised at all              -> run session-complete.sh directly here
 ```
 
-**Direct release whenever no tail loop ran.** In every case below, run `session-complete.sh` directly
-as the very last action, or the slot leaks until the idle timeout:
+**Direct release whenever no tail loop ran.** Run `session-complete.sh` directly as the very last
+action, or the slot leaks until the idle timeout:
 
-- the Step 0 unsupported-input-type stop (no session spawned); **and**
-- the **epic path** when the epic session itself ends (E0 unset-Epic reject, E1 `GATE=STOP`, E3
+- **Bare (no PR was raised):** the Step 0 unsupported-input-type stop (no session spawned); the
+  **epic path** when the epic session itself ends (E0 unset-Epic reject, E1 `GATE=STOP`, E3
   `abort`, E4 HALT, or all children done) — the epic session keeps `SDLC_SESSION_KEY=EPIC_KEY` and
   must release its **own** slot directly here (each child released its own slot via its own tail
-  loop); **and**
-- the Step 2 missing-points stop, a triage failure, or any early error (no PR raised); **and**
-- the **`ASYNC_REVIEW=true`** branches (A1, A2, B-phase), which raise a PR, fire the `phase/*`
-  JSON-RPC event, and **stop without looping** — they still need the explicit release.
-
-In those cases run this as the very last action:
+  loop); the Step 2 missing-points stop, a triage failure, or any early error:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+```
+
+- **With the PR URL (a PR WAS raised):** A1's `ASYNC_REVIEW=false` branch (see above), and the
+  **`ASYNC_REVIEW=true`** branches (A1, A2, B-phase) — each raises a PR, fires the `phase/*`
+  JSON-RPC event, and **stops without looping**; release with that same just-raised PR URL:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh <PR_URL>
 ```
 
 It prints the completion signal the automation worker watches for. Outside the worker

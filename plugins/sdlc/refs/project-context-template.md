@@ -108,11 +108,22 @@ generated file — every slot must be replaced with an actual value.
   preferred for low-activity repos, where wall-clock decay would expire still-relevant rules
   between infrequent commits) — no other grammar. Consumed by
   `${CLAUDE_PLUGIN_ROOT}/refs/memory-maintenance.md`'s decay/demotion and review-file GC ops.
-- **Review gate** — OPTIONAL. A comma-separated subset of `spec,plan,impl` listing
-  which phases trigger the configured review (e.g. `Review gate | spec, impl`). A
-  phase not listed has its review skipped (effective review-mode `none` for that
-  phase). **OMIT the row entirely when not gating** — an omitted/empty gate means
-  all phases review, the default and back-compatible behaviour.
+- **Review gate** — OPTIONAL. A comma-separated subset of `spec,plan,impl`; only
+  `impl` is read (NA-104) — `spec`/`plan` are ignored entirely, both for the
+  review-fix loop and the PR-creation-time reviewer request (`raise-pr.sh`
+  unconditionally skips that request for those two phases regardless of this
+  token), so listing them here has no effect. The only value that changes
+  anything is one that **excludes** `impl` (e.g. `Review gate | spec`) — **read
+  this before writing it:** excluding `impl` downgrades it to
+  `REVIEW_MODE=none`, which skips the review-fix loop's wait entirely,
+  including its checks-green requirement, so under `Full Auto` the impl PR
+  **auto-merges unreviewed and without waiting for CI**. The impl PR's
+  `@copilot` request is itself unconditional (raised by the Principal Engineer
+  playbook, never through `raise-pr.sh`) and is NOT suppressed either — it
+  sits unaddressed on a PR that already merged. A real per-repo config trap,
+  not a skip.
+  **OMIT the row entirely when not gating** — an omitted/empty gate means `impl`
+  reviews, the default and back-compatible behaviour.
 - **Pipeline done status** — the consuming project's terminal/Done status, exactly
   as it appears in that project's issue tracker workflow (e.g. `Done`, `Closed`,
   `Resolved`) — substitute the real status name; never leave the `<pipeline-done-status>`
