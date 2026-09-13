@@ -1,3 +1,34 @@
+## 0.45.11 (2026-09-13)
+
+### 🚀 Features
+
+- **plugins/sdlc:** remove QA review-fix loop from spec and plan (NA-104) ([ce3dbf3](https://github.com/whimzyLive/nightshift-ai/commit/ce3dbf3))
+
+### 🩹 Fixes
+
+- **sdlc:** accept only rooted PR URL paths ([649a8c4](https://github.com/whimzyLive/nightshift-ai/commit/649a8c4))
+- **sdlc:** reject foreign PR URLs in PR helper scripts ([4aa08ee](https://github.com/whimzyLive/nightshift-ai/commit/4aa08ee))
+- **sdlc:** fail-closed the total/settled_ok comparison, pin the none-grace floor, narrow the docstring ([181cea7](https://github.com/whimzyLive/nightshift-ai/commit/181cea7))
+- **sdlc:** floor none-grace and close the fail-open unparseable-checks gap in auto-merge-pr.sh ([3057b49](https://github.com/whimzyLive/nightshift-ai/commit/3057b49))
+- **sdlc:** close gh-checks-query and empty-read merge-safety holes in auto-merge-pr.sh ([db8bba8](https://github.com/whimzyLive/nightshift-ai/commit/db8bba8))
+- **plugins/sdlc:** wait on ALL checks, not just required ones, before an unattended merge ([a03cbda](https://github.com/whimzyLive/nightshift-ai/commit/a03cbda))
+- **plugins/sdlc:** wait for checks before merging on auto-merge-pr.sh's non-arming path ([9bf07ba](https://github.com/whimzyLive/nightshift-ai/commit/9bf07ba))
+- **plugins/sdlc:** qualify the last raise-pr.sh attribution in loop-modes.md ([8cbfd21](https://github.com/whimzyLive/nightshift-ai/commit/8cbfd21))
+- **plugins/sdlc:** spell out the impl auto-merge risk, fix a cross-file contradiction, close a vacuous test axis ([664298b](https://github.com/whimzyLive/nightshift-ai/commit/664298b))
+- **plugins/sdlc:** correct the impl reviewer-request claim, fix the worked example, isolate raise-pr.test.sh ([97f09b2](https://github.com/whimzyLive/nightshift-ai/commit/97f09b2))
+- **plugins/sdlc:** normalize --phase case in raise-pr.sh so the spec/plan skip is truly unconditional ([9d39dbb](https://github.com/whimzyLive/nightshift-ai/commit/9d39dbb))
+- **plugins/sdlc:** correct the Review gate template's spec/plan claim, fix a comma splice ([1de1674](https://github.com/whimzyLive/nightshift-ai/commit/1de1674))
+- **plugins/sdlc:** net-zero-trim loop.md to restore the byte-cap gate ([4bf8805](https://github.com/whimzyLive/nightshift-ai/commit/4bf8805))
+- **plugins/sdlc:** close round-4 QA findings on NA-104's spec/plan loop removal ([bb605c0](https://github.com/whimzyLive/nightshift-ai/commit/bb605c0))
+- **plugins/sdlc:** close round-3 QA findings on NA-104's spec/plan loop removal ([f185a46](https://github.com/whimzyLive/nightshift-ai/commit/f185a46))
+- **plugins/sdlc:** close round-2 QA findings on NA-104's spec/plan loop removal ([c77a165](https://github.com/whimzyLive/nightshift-ai/commit/c77a165))
+- **plugins/sdlc:** close QA findings on NA-104's spec/plan loop removal ([e89661c](https://github.com/whimzyLive/nightshift-ai/commit/e89661c))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+- whimzyLive @whimzyLive
+
 ## 0.45.10 (2026-09-13)
 
 ### 🩹 Fixes
