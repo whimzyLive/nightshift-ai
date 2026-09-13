@@ -99,7 +99,7 @@ all_resolved_threads='[
 # Case 1 (regression pin): a full PR URL must resolve and succeed — this is exactly the shape
 # every real caller (auto.md, impl.md, adr-pipeline.md, loop-decide.sh) passes.
 url_stderr="$mockdir/stderr-url.log"
-url_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239" 2>"$url_stderr")"
+url_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/example-org/example-repo/pull/239" 2>"$url_stderr")"
 url_status=$?
 url_count=$(printf '%s' "$url_out" | grep -c . || true)
 if [ "$url_status" -eq 0 ] && [ "$url_count" -eq 3 ]; then
@@ -150,7 +150,7 @@ fi
 # Case 5 (regression pin): a PR URL with a trailing slash (e.g. a pasted "/pull/239/") must still
 # resolve — ${PR##*/} alone leaves this empty and re-triggers the GraphQL Int! failure.
 slash_stderr="$mockdir/stderr-slash.log"
-slash_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239/" 2>"$slash_stderr")"
+slash_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/example-org/example-repo/pull/239/" 2>"$slash_stderr")"
 slash_status=$?
 slash_count=$(printf '%s' "$slash_out" | grep -c . || true)
 if [ "$slash_status" -eq 0 ] && [ "$slash_count" -eq 3 ]; then
@@ -163,7 +163,7 @@ fi
 
 # Case 6 (regression pin): a PR URL with a #fragment (e.g. "/pull/239#discussion_r1") must resolve.
 frag_stderr="$mockdir/stderr-frag.log"
-frag_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239#discussion_r1" 2>"$frag_stderr")"
+frag_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/example-org/example-repo/pull/239#discussion_r1" 2>"$frag_stderr")"
 frag_status=$?
 frag_count=$(printf '%s' "$frag_out" | grep -c . || true)
 if [ "$frag_status" -eq 0 ] && [ "$frag_count" -eq 3 ]; then
@@ -176,7 +176,7 @@ fi
 
 # Case 7 (regression pin): a PR URL with a ?query resolves too.
 query_stderr="$mockdir/stderr-query.log"
-query_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/239?tab=files" 2>"$query_stderr")"
+query_out="$(PATH="$mockdir:$PATH" MOCK_THREADS_JSON="$mixed_threads" bash "$script" "https://github.com/example-org/example-repo/pull/239?tab=files" 2>"$query_stderr")"
 query_status=$?
 query_count=$(printf '%s' "$query_out" | grep -c . || true)
 if [ "$query_status" -eq 0 ] && [ "$query_count" -eq 3 ]; then
@@ -192,7 +192,7 @@ fi
 malformed_stderr="$mockdir/stderr-malformed.log"
 malformed_call_log="$mockdir/gh-calls-malformed.log"
 : >"$malformed_call_log"
-malformed_out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$malformed_call_log" bash "$script" "https://github.com/whimzyLive/nightshift-ai/pull/" 2>"$malformed_stderr")"
+malformed_out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$malformed_call_log" bash "$script" "https://github.com/example-org/example-repo/pull/" 2>"$malformed_stderr")"
 malformed_status=$?
 if [ "$malformed_status" -ne 0 ] && [ -z "$malformed_out" ] \
   && grep -q 'not a valid PR number or URL' "$malformed_stderr" \
@@ -221,26 +221,37 @@ accept_case() { # <n> <label> <input>
   fi
 }
 accept_case 9  "a /pull/N/files URL (Files changed tab) resolves and succeeds" \
-  "https://github.com/whimzyLive/nightshift-ai/pull/239/files"
+  "https://github.com/example-org/example-repo/pull/239/files"
 accept_case 10 "a /pull/N/commits URL (Commits tab) resolves and succeeds" \
-  "https://github.com/whimzyLive/nightshift-ai/pull/239/commits"
+  "https://github.com/example-org/example-repo/pull/239/commits"
 accept_case 11 "a PR URL with a double trailing slash resolves and succeeds" \
-  "https://github.com/whimzyLive/nightshift-ai/pull/239//"
+  "https://github.com/example-org/example-repo/pull/239//"
 accept_case 12 "whitespace-padded input resolves and succeeds" \
   " 239 "
 
-# Cases 13-14: widening acceptance must not regress the rejection path — genuinely malformed
-# input (/pull/abc, a bare non-numeric string) is still rejected before reaching gh.
-reject_case() { # <n> <label> <input>
-  local n="$1" label="$2" input="$3" stderr call_log out status
+# Cases 13-15: widening acceptance must not regress the rejection path. A mismatched-repo PR URL
+# may perform a single repo-slug lookup so it can be rejected before any PR API call; malformed
+# inputs still reject before reaching gh at all.
+reject_case() { # <n> <label> <input> <gh_mode:none|repo-view-only>
+  local n="$1" label="$2" input="$3" gh_mode="${4:-none}" stderr call_log out status
   stderr="$mockdir/stderr-$n.log"
   call_log="$mockdir/gh-calls-$n.log"
   : >"$call_log"
   out="$(PATH="$mockdir:$PATH" GH_CALL_LOG="$call_log" bash "$script" "$input" 2>"$stderr")"
   status=$?
   if [ "$status" -ne 0 ] && [ -z "$out" ] \
-    && grep -q 'not a valid PR number or URL' "$stderr" \
-    && [ ! -s "$call_log" ]; then
+    && grep -q 'not a valid PR number or URL' "$stderr"; then
+    case "$gh_mode" in
+      none) [ ! -s "$call_log" ] || status=0 ;;
+      repo-view-only)
+        grep -qx 'repo view --json nameWithOwner -q .nameWithOwner' "$call_log" || status=0
+        ;;
+      *) status=0 ;;
+    esac
+  else
+    status=0
+  fi
+  if [ "$status" -ne 0 ]; then
     echo "PASS: ($n) $label"
   else
     echo "FAIL: ($n) $label — exit=$status output=${out:-<empty>} gh-calls=$(cat "$call_log" 2>/dev/null)"
@@ -248,10 +259,14 @@ reject_case() { # <n> <label> <input>
     failures=$((failures + 1))
   fi
 }
-reject_case 13 "a /pull/abc URL (non-numeric PR segment) is still rejected, never reaching gh" \
-  "https://github.com/whimzyLive/nightshift-ai/pull/abc"
-reject_case 14 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
-  "notaurl"
+reject_case 13 "a PR URL for a different repository is rejected before any PR API call" \
+  "https://github.com/other-org/other-repo/pull/239" repo-view-only
+reject_case 14 "a /pull/abc URL (non-numeric PR segment) is still rejected, never reaching gh" \
+  "https://github.com/example-org/example-repo/pull/abc" none
+reject_case 15 "a bare non-URL, non-numeric string is still rejected, never reaching gh" \
+  "notaurl" none
+reject_case 16 "a nested non-PR URL path is rejected before any PR API call" \
+  "https://github.com/example-org/example-repo/foo/pull/239" none
 
 if [ "$failures" -eq 0 ]; then
   echo "PASS: all pr-unresolved-comments.sh regression cases passed"

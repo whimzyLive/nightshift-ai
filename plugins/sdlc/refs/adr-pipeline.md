@@ -147,7 +147,9 @@ Both branch off `<BASE-BRANCH>` from `.claude/project/project-context.md` — ne
 
 **Command control flow:**
 
-After the phase-2 PR is raised, drive the review loop to convergence exactly as `/spec` does:
+After the phase-2 PR is raised, drive the review loop to convergence exactly as `/impl` does for
+its implementation PR (`/spec`/`/plan` no longer drive this loop themselves — NA-104 — but the ADR
+PR is docs-pipeline content, not a spec/plan PR, so it keeps its own review-fix loop here):
 
 ```bash
 /loop /sdlc:loop <PR_URL>
