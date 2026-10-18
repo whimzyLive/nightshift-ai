@@ -187,7 +187,12 @@ Same as `bulletList` but `"type": "orderedList"`.
 
 ## Epic description template
 
-Use for `/refine-feature` and any Epic create/update. Sections: Core Idea, Target Users, Key Value, Out of Scope, Open Questions.
+Use for `/refine-feature` and any Epic create/update. Sections: Core Idea, Target Users, Key Value, Out of Scope, Open Questions, Design, Dev Notes, References.
+
+The last three follow the story rules in `jira-story-template.md` → "Design, Dev Notes, References —
+what goes where", at feature level: **Design** names the design's `index.md` (no per-row picks — `/stories`
+assigns rows to each child), **Dev Notes** holds feature-wide implementation directives, **References**
+holds feature-wide supporting material. Each renders "None" when empty.
 
 ```json
 {
@@ -251,6 +256,43 @@ Use for `/refine-feature` and any Epic create/update. Sections: Core Idea, Targe
         {
           "type": "listItem",
           "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Question — Owner: Name" }] }]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [{ "type": "text", "text": "Design" }]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "docs/design/<slug>/index.md", "marks": [{ "type": "code" }] }]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [{ "type": "text", "text": "Dev Notes" }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Feature-wide implementation directive — or \"None\"" }] }]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 2 },
+      "content": [{ "type": "text", "text": "References" }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Doc / URL / ticket / repo path — or \"None\"" }] }]
         }
       ]
     }
@@ -342,10 +384,63 @@ Use for `/refine-issue`, `/stories`, and any Story create/update. See `jira-stor
           "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "None" }] }]
         }
       ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Design" }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                { "type": "text", "text": "docs/design/<slug>/pages/<page>.html", "marks": [{ "type": "code" }] },
+                { "type": "text", "text": " — what this story takes from it (or the single item \"None\")" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "Dev Notes" }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Implementation directive — or \"None\"" }] }]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": { "level": 3 },
+      "content": [{ "type": "text", "text": "References" }]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Doc / URL / ticket / repo path — or \"None\"" }] }]
+        }
+      ]
     }
   ]
 }
 ```
+
+Render every repo path in **Design** and **References** with the `code` mark (a bare path is easy to
+mis-copy). An external URL in **References** uses the `link` mark instead.
 
 ---
 

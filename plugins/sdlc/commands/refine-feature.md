@@ -30,6 +30,18 @@ For any `@filename` references in `$ARGUMENTS`:
 
 - Read those files and incorporate as additional context
 
+Classify design material, implementation directives, and supporting links in `$ARGUMENTS` with the
+"Design, Dev Notes, References — what goes where" table in
+`${CLAUDE_PLUGIN_ROOT}/refs/jira-story-template.md`:
+
+- A `docs/design/<slug>/index.md` path (or a `Design:` comment on the Epic in `MODE=update`) → the
+  Epic's **Design** section.
+- A design file outside the repo (HTML export, screenshot, handoff folder) → do not link it; return
+  "run `/design <EPIC-KEY> <path>` to attach it" once the Epic key exists.
+- Implementation directives from the requester → **Dev Notes**, verbatim. The product-language rule
+  does not apply to them, and the agent never authors new ones.
+- Docs, URLs, other tickets → **References**.
+
 For raw idea text — analyse: identify the user, the action, the outcome, what's ambiguous. Ask ONE clarifying question if critical info is missing; otherwise proceed.
 
 **Step 3 — Synthesize**
@@ -49,6 +61,8 @@ Compose Epic description covering:
 - Key value (what problem it solves)
 - What it is NOT (scope boundaries)
 - Open questions to resolve in PRD phase
+- Design, Dev Notes, References (from Step 2's classification; `MODE=update` carries the Epic's
+  existing content in these sections forward — never drop it; empty → "None")
 
 **Step 4 — Create or Update**
 
@@ -102,6 +116,7 @@ Return:
 - The Epic key (e.g. CER-100)
 - Whether it was created or updated
 - Any open questions still unresolved
+- Any `run /design <EPIC-KEY> <path>` instructions for design files that are not in the repo yet
 
 ## Final action — release the session (required)
 

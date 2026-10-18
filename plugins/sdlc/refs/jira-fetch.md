@@ -24,8 +24,8 @@ acli jira workitem attachment list --key <KEY> --json               # attachment
 
 From the JSON output collectively:
 
-- Summary, description, status, parent key (Epic for a Story).
-- All comment bodies — agents often leave breadcrumbs here (`PRD: docs/features/...`, `Spec: docs/superpowers/specs/...`, `Plan: docs/superpowers/plans/...`).
+- Summary, description, status, parent key (Epic for a Story) — including the description's **Design**, **Dev Notes**, and **References** sections when present (`refs/design-references.md`).
+- All comment bodies — agents often leave breadcrumbs here (`PRD: docs/features/...`, `Spec: docs/superpowers/specs/...`, `Plan: docs/superpowers/plans/...`, `Design: docs/design/<slug>/index.md`).
 - Linked tickets — to walk Epic ↔ Story relationships.
 - Attachment filenames — for product-decision context.
 
