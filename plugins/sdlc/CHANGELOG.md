@@ -1,3 +1,20 @@
+## 0.45.12 (2026-10-18)
+
+### 🚀 Features
+
+- **sdlc:** carry story design and dev notes through spec, plan, impl and QA ([c5f0d0e](https://github.com/whimzyLive/nightshift-ai/commit/c5f0d0e))
+- **sdlc:** add Design, Dev Notes and References sections to stories and epics ([55027eb](https://github.com/whimzyLive/nightshift-ai/commit/55027eb))
+- **sdlc:** add /design to ingest design references into docs/design ([404a21f](https://github.com/whimzyLive/nightshift-ai/commit/404a21f))
+
+### 🩹 Fixes
+
+- **sdlc:** resolve the Epic with --fields parent and let Epics hold several designs ([1ce4329](https://github.com/whimzyLive/nightshift-ai/commit/1ce4329))
+- **sdlc:** harden design-ingest against asset-dir collisions, partial failures and padded indexes ([1f5b504](https://github.com/whimzyLive/nightshift-ai/commit/1f5b504))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.11 (2026-09-13)
 
 ### 🚀 Features
