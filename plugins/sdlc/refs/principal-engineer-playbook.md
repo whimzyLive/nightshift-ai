@@ -153,7 +153,9 @@ task list **inline from the Jira story**:
 3. Treat the **acceptance criteria as the completion contract** — pass them verbatim into each
    domain-agent prompt (there is no plan doc to carry them).
 
-Either way, Step 3+ (the phase ladder) is identical.
+Design + Dev Notes: full path → the plan tasks carry them; lightweight → resolve them from the story
+per `${CLAUDE_PLUGIN_ROOT}/refs/design-references.md` (missing design path → STOP). Either way,
+Step 3+ (the phase ladder) is identical.
 
 ## Step 2.5 — Detect child sub-tasks (drives per-sub-task commit sequencing)
 
@@ -339,7 +341,8 @@ Agent({
    explicitly "No project skills apply for this task." The prompt MUST state exactly one of these
    two so the agent knows whether `Skills loaded: none` is correct.
 6. Relevant spec/plan context — entity names, field types, route paths, class/interface names,
-   secret keys, SSM helper names — plus any plan "grounding corrections" verbatim.
+   secret keys, SSM helper names — plus any plan "grounding corrections" verbatim, and the story's
+   Design paths + Dev Notes verbatim (both paths; `${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`).
 7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Do NOT create a new branch. Do your work there and
    commit."

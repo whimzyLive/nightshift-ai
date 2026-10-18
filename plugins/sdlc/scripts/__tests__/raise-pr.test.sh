@@ -129,6 +129,9 @@ run_case "$fixture" "Spec" "not-requested" "--phase Spec (mixed case) suppresses
 # Case 2: upper-case phase must still suppress the reviewer request.
 run_case "$fixture" "PLAN" "not-requested" "--phase PLAN (upper case) suppresses the reviewer request"
 
+# Case 2b: the /design phase is docs-only and shares the unconditional skip.
+run_case "$fixture" "Design" "not-requested" "--phase Design suppresses the reviewer request"
+
 # Case 3: an unaffected phase, unaffected case, must still request a reviewer — proves the fix
 # didn't overcorrect into suppressing every phase.
 run_case "$fixture" "impl" "requested" "--phase impl (unaffected) still requests the reviewer"
