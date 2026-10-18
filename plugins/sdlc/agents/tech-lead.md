@@ -58,7 +58,7 @@ Requires a merged spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `pla
 > lightweight plan committed in-place (e.g. running the agent by hand); it is **not** part of the
 > default `/auto`/`/impl` flow.
 
-Caller passes `LIGHTWEIGHT=true`. No spec file required. Derive tasks from the Jira story description directly. Commit the plan file to `<BASE-BRANCH>` in-place — **no plan branch, no PR**. Comment on Jira only with the plan file path:
+Caller passes `LIGHTWEIGHT=true`. No spec file required. Derive tasks from the Jira story description directly — including its Design and Dev Notes sections, attached to tasks per the task-writing rules below. Commit the plan file to `<BASE-BRANCH>` in-place — **no plan branch, no PR**. Comment on Jira only with the plan file path:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
@@ -149,7 +149,9 @@ rules := [
   a spec gap gets filled with the most reasonable default, noted inline,
   tasks ordered within each phase (respect dependencies within the phase),
   no task spans two agents — split it if it touches two domains,
-  every task is verifiable — each phase ends with a typecheck/lint/validate step
+  every task is verifiable — each phase ends with a typecheck/lint/validate step,
+  a UI task names the design path(s) it implements, from the spec's `## Design & Dev Notes` (refs/design-references.md),
+  each Dev Note rides verbatim on the task(s) it constrains — `Dev Note: <text>` — so the plan slice carries it to the agent
 ]
 ```
 
@@ -160,7 +162,8 @@ self_review := [
   phase order matches: DB -> Backend -> Offline-sync -> Web -> Mobile,
   only phases for active agents included,
   no "TBD" — every task concrete and actionable,
-  every entity named in Phase 1 referenced correctly in Phase 2
+  every entity named in Phase 1 referenced correctly in Phase 2,
+  every spec Design row and Dev Note lands on at least one task
 ]
 ```
 

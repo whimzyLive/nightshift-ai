@@ -55,6 +55,7 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 
 1. **Jira is the ONLY product context source.** The summary, description, acceptance criteria, and Epic in Jira define what the story means. Nothing else does.
 2. **NEVER use existing repository files as product context.** Do NOT read or reference any file in `docs/superpowers/specs/`, `docs/features/`, `docs/ideas/`, or `docs/superpowers/plans/` to determine what to build — even if those files appear relevant.
+   **Design carve-out:** `docs/design/` files that the story's (or its Epic's) **Design** section or `Design:` comment names ARE Jira-referenced product context — read them per `${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`. Never browse `docs/design/` beyond those paths.
 3. **If `acli` fails, diagnose before stopping:**
    - Run the Jira reachability/DNS check from `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` against the base URL in `.claude/project/project-context.md` — if it fails, Atlassian is DNS-blocked. STOP: "Cannot generate spec — the Jira host is DNS-blocked in this environment."
    - Any other acli failure → STOP: "Cannot generate spec — acli failed: [error]. Fix acli access and retry."
@@ -67,7 +68,8 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 2. **Fetch Jira (mandatory).** Apply `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>`. If it fails, STOP.
 3. **Fetch Epic (if parent exists).** Apply `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<EPIC-KEY>`.
 4. Read `CLAUDE.md` — platform stack, domains, conventions
-5. Read relevant existing code in areas the spec will touch
+5. **Resolve Design, Dev Notes, References** per `${CLAUDE_PLUGIN_ROOT}/refs/design-references.md` — read the design `index.md`, then the renders/screenshots of the rows the story names (bounded reads for `.html` pages). A resolved path missing on disk → STOP: "Design not on the base branch — merge the /design PR first."
+6. Read relevant existing code in areas the spec will touch
 
 ## Output: technical spec
 
@@ -140,6 +142,11 @@ Structure — include only sections applicable to this project's active agents:
 [Bucket definition and parameters]
 [New transaction builders needed]
 
+## Design & Dev Notes (if the story has a Design or Dev Notes section)
+
+[UI surface → design row path(s) it implements + states/copy to match]
+[Each Dev Note verbatim → where this spec honours it, or why it deviates]
+
 ## Permissions Detail
 
 [For each role: what they can/cannot do]
@@ -169,7 +176,8 @@ Structure — include only sections applicable to this project's active agents:
 1. No "TBD" in final spec
 2. Only sections for applicable layers (based on .claude/project/project-context.md active agents) are included
 3. Every new endpoint has a permission row
-4. Agent boundary clear — spec says WHAT, not HOW
+4. Agent boundary clear — spec says WHAT, not HOW (except where a Dev Note dictates the HOW — carry it)
+5. Every story Design row and every Dev Note appears in `## Design & Dev Notes`
 
 ## Return
 

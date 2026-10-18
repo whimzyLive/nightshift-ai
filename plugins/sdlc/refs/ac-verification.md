@@ -19,6 +19,12 @@ evidence (git log, file existence, or test output) — no item checked off on as
    with the specific evidence (handler/test/file) named. _(Always — and the primary gate on the
    lightweight path.)_
 3. On `WORK_KIND=defect` — apply the **Defect regression-evidence contract** below IN FULL.
+3a. **Every Dev Note** on the story → `followed` (name the code that follows it) or `deviated` with
+    the reason recorded in the spec, plan, or a commit body. A deviation with no recorded reason is
+    `unmet`. **Every Design row** the story names → the UI that implements it exists on the branch
+    (name the component/page path). Visual fidelity is the reviewer's judgement, not this checklist.
+    Both lists come from the story description (`refs/design-references.md`); a story whose Dev
+    Notes and Design are `None` emits neither line type.
 4. Read the range:
 
 ```bash
@@ -71,8 +77,10 @@ Return contract, **verbatim**:
 Verification: complete | incomplete
 AC-<n>: met | unmet — <path:line | test name | commit sha>          # one line per AC, always
 Plan task <n>: met | unmet — <evidence>                             # full path only; omitted on lightweight
+Dev Note <n>: followed | deviated | unmet — <evidence | recorded reason>   # one per Dev Note; none when "None"
+Design <n>: met | unmet — <implementing path>                       # one per story Design row; none when "None"
 Regression evidence: fail-before <sha> / pass-after <sha> | n/a     # defect path only
-Unmet: <comma-separated AC/task ids | none>
+Unmet: <comma-separated AC/task/Dev Note/Design ids | none>
 Owner: <id>=<agent-name>, ...  | none                               # owning agent per unmet id
 ```
 
@@ -80,6 +88,7 @@ Owner: <id>=<agent-name>, ...  | none                               # owning age
 never -> paste the plan doc, a test log, or a diff into the return; name the path, not the content
 never -> dispatch an agent from here
 never -> mark an AC `met` on assertion; every `met` names a path, a test, or a sha
+never -> open design pages to judge pixels; a Design line checks that the implementing UI exists
 a line over 250 B -> shorten the evidence pointer, never drop the line
 whole block over 4,000 B -> shorten evidence pointers; never drop an AC line, never drop the `Unmet` field
 ```

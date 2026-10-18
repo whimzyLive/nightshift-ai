@@ -35,6 +35,7 @@ The agent should:
    - Web UI section (only if the project has an active web app and the story is web-scoped): pages, components, data hooks, client-state changes
    - Mobile UI section (only if the project has an active mobile app and the story is mobile-scoped): screens, offline read hooks, transaction builders needed
    - Offline-sync section (only if the project has an active sync layer and offline writes are required): sync-rule addition, bucket definition, user-scoping filter
+   - Design & Dev Notes section (when the story has either): each UI surface → the design row(s) it implements; each Dev Note verbatim → where it is honoured or why it deviates. Resolve and read the design per `${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`
    - Error handling and out-of-scope boundaries
 6. Self-review before saving:
    - No TBDs — every open question has a concrete answer or flagged decision with suggested default

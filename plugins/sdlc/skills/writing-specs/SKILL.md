@@ -38,6 +38,8 @@ acli jira workitem comment create --key <STORY-KEY> \
 
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
+`## Design & Dev Notes` is filled from the story's **Design** and **Dev Notes** sections — resolve and read the design per `refs/design-references.md` before writing it.
+
 ````markdown
 # [Feature Name] — Technical Spec
 
@@ -174,6 +176,18 @@ If the project uses offline sync, the spec MUST cover:
 
 Define these using the project's offline-sync technology and config location (see project-context); state the exact files.
 
+## Design & Dev Notes
+
+One-line N/A when the story's Design and Dev Notes are both "None".
+
+| UI surface | Design row(s) | Match |
+| --- | --- | --- |
+| [page / screen / component] | docs/design/[slug]/renders/[page].png | [layout, states, copy to match; design-system tokens that replace mock values] |
+
+| Dev Note (verbatim) | Honoured by | Deviation |
+| --- | --- | --- |
+| [requester directive] | [spec section / file] | none, or [reason] |
+
 ## Error Handling
 
 | Scenario | Behaviour | HTTP Status |
@@ -234,6 +248,7 @@ gate := [
   all TypeScript interfaces fully typed — no `any`,
   spec says WHAT to build — no HOW (no line-by-line implementation instructions),
   Web / Mobile / Offline Sync sections omitted if not applicable to this story,
+  every story Design row maps to a UI surface and every Dev Note has an Honoured-by or a Deviation reason,
   entity base class choice stated and justified per the project's conventions
 ]
 before saving -> every item in gate must hold
