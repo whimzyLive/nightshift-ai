@@ -25,18 +25,27 @@ ASSERT >= 1 path AND every path exists (test -e)       ELSE STOP listing each mi
 ASSERT `git status --porcelain` is empty                ELSE STOP "commit or stash local changes first"
 ```
 
+```bash
+git fetch origin <BASE>          # Step 2 reads origin/<BASE>; Step 3 branches from it
+```
+
 ## Step 1 — Fetch the ticket
 
-Apply `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>`. Capture `SUMMARY`, `ITYPE`, and
-`EPIC_KEY` (the `parent` when present and `ITYPE != Epic`; `<KEY>` itself when `ITYPE == Epic`). From
-the comments, capture the newest `Design: docs/design/<slug>/index.md` breadcrumb, if any.
+Apply `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>`. Capture `SUMMARY` and `ITYPE`. Read
+the parent with the protocol's `--fields parent` call (its "Walking Epic ↔ Story" section — the
+default `view --json` renders `parent` as null): `EPIC_KEY` := `<KEY>` when `ITYPE == Epic`, else
+that parent key, else empty. From the comments, capture the newest
+`Design: docs/design/<slug>/index.md` breadcrumb, if any.
 
 ## Step 2 — Resolve the folder and mode
 
 ```text
 SLUG := --slug (kebab-cased)
-      | <slug> from the ticket's newest `Design:` breadcrumb        # MODE=revision
-      | kebab(SUMMARY), max 5 words                                  # MODE=new
+      | <slug> from the ticket's newest `Design:` breadcrumb
+      | kebab(SUMMARY), max 5 words
+      | lowercased <KEY>                                             # summary kebabs to nothing
+ASSERT SLUG matches ^[a-z0-9][a-z0-9-]*$   ELSE STOP "unusable slug '<SLUG>' — pass --slug"   # never docs/design/ itself
+MODE := revision WHEN docs/design/<SLUG>/index.md exists on origin/<BASE> or on an open design/<KEY> PR | new
 MODE=new AND docs/design/<SLUG>/index.md exists on origin/<BASE> with a different `Source ticket:` -> SLUG := <SLUG>-<lowercased KEY>
 DESIGN_DIR := docs/design/<SLUG>
 REPLACE := MODE=revision AND no --add -> --replace | ""     # a revision replaces the asset set: pass every file the design still needs
@@ -45,10 +54,9 @@ REPLACE := MODE=revision AND no --add -> --replace | ""     # a revision replace
 ## Step 3 — Branch
 
 ```bash
-git fetch origin <BASE>
 BRANCH="design/<KEY>"
 if [ "$(gh pr view "$BRANCH" --json state -q .state 2>/dev/null)" = "OPEN" ]; then
-  git checkout "$BRANCH" && git pull --ff-only origin "$BRANCH"        # revise the open design PR
+  git fetch origin "$BRANCH" && git checkout -B "$BRANCH" "origin/$BRANCH"   # revise the open design PR
 else
   git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1 \
     && BRANCH="design/<KEY>-$(date +%Y%m%d%H%M)"                        # an earlier design PR already merged
@@ -64,8 +72,10 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-ingest.sh $REPLACE --ticket "<KEY>" --
 ```
 
 Non-zero exit → **STOP**, surface its stderr verbatim. Keep the final `SUMMARY …` line for Step 6.
-`render=skipped:no-browser` is not an error — the pages and screenshots still land; say so in the
-return.
+`render=skipped:<why>` and `render=chrome:failed=<n>` are not errors — the pages and screenshots
+still land; say which pages have no render in the return (a failed render on Linux is usually the
+browser refusing to run as root without a sandbox). `note: dropped dotfile` lines on stderr are
+expected — dotfiles never ship.
 
 The repo formats on commit/CI and `docs/design/` is not formatter-ignored (e.g. no
 `.prettierignore` entry) → add `docs/design/` to the ignore file in this same commit. Design exports
@@ -90,6 +100,13 @@ ASSERT no `| TODO |` left in index.md
 
 ```bash
 git add "$DESIGN_DIR"          # plus the formatter-ignore file, if Step 4 touched it
+git diff --cached --stat       # review before anything leaves the machine
+```
+
+Anything staged that is not design material (credentials, exports of unrelated work) → unstage it
+and **STOP** to ask — a pushed file is published. Otherwise:
+
+```bash
 git commit -m "docs(design): <KEY> <SUMMARY>"
 git push -u origin "$BRANCH"
 dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
@@ -105,7 +122,9 @@ PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
 ## Step 7 — Link it in Jira
 
 Post the breadcrumb on `<KEY>`, and again on `EPIC_KEY` when it differs — `/stories` and every
-downstream agent resolve the design from these (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`):
+downstream agent resolve the design from these (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`).
+An Epic can collect several designs (one per design ticket); refiners read every one and pick rows
+per story, so a design attached to one Story never displaces the Epic's other designs:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
@@ -117,7 +136,8 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
 
 ## Step 8 — Return
 
-- `DESIGN_DIR`, `PR_URL`, MODE, the script's `SUMMARY` line, and which keys got the breadcrumb.
+- `DESIGN_DIR`, `PR_URL`, MODE, the script's `SUMMARY` line, the committed file list (Step 6's
+  `--stat`), any pages without a render, and which keys got the breadcrumb.
 - Next step: merge the PR, then refine — `/refine-feature <EPIC>`, `/stories <EPIC>`, or
   `/refine-issue <STORY>`. Refinement puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its

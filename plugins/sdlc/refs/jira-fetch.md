@@ -93,9 +93,16 @@ If the field is non-empty (Step 1 matched) but no candidate matches, the value i
 
 ## Walking Epic ↔ Story
 
-For a Story, the Epic key is in the `parent` field of the view JSON.
+For a Story, the Epic key is its `parent`. **Read it with `--fields parent`** — the default
+`view --json` above renders `fields.parent` as `null` even when a parent is set (see the `acli`
+skill's known limitations; `scripts/dep-gate.sh` relies on the same call):
 
-**Guard before fetching Epic:** Check the `parent` field in the story view JSON response first. If `parent` is `null`, absent, or an empty object — stop. Do NOT fire the four calls. Only re-run the four calls with the Epic key when `parent` is non-null and contains a valid issue key.
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+EPIC_KEY="$(acli jira workitem view <KEY> --fields parent --json 2>/dev/null | jq -r '.fields.parent.key // empty')"
+```
+
+**Guard before fetching Epic:** If `EPIC_KEY` is empty — stop. Do NOT fire the four calls. Only re-run the four calls with the Epic key when `EPIC_KEY` is a valid issue key.
 
 ## Fetching sub-tasks
 

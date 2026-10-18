@@ -38,7 +38,7 @@ acli jira workitem comment create --key <STORY-KEY> \
 
 Artifact encoding contract: unpadded tables, no section dropped, one-line N/A, verbatim contracts, rationale as annotation, prose < 10 lines between headings. plugins/sdlc/refs/artifact-encoding.md
 
-`## Design & Dev Notes` is filled from the story's **Design** and **Dev Notes** sections — resolve and read the design per `refs/design-references.md` before writing it.
+`## Design & Dev Notes` is filled from the story's **Design** and **Dev Notes** sections — resolve and read the design per `${CLAUDE_PLUGIN_ROOT}/refs/design-references.md` before writing it.
 
 ````markdown
 # [Feature Name] — Technical Spec
@@ -246,7 +246,7 @@ gate := [
   entity relationships state exact cardinality (1:1, 1:N, M:N),
   auth/route type stated for every endpoint, using the project's conventions,
   all TypeScript interfaces fully typed — no `any`,
-  spec says WHAT to build — no HOW (no line-by-line implementation instructions),
+  spec says WHAT to build — no HOW (no line-by-line implementation instructions), except a HOW a Dev Note dictates,
   Web / Mobile / Offline Sync sections omitted if not applicable to this story,
   every story Design row maps to a UI surface and every Dev Note has an Honoured-by or a Deviation reason,
   entity base class choice stated and justified per the project's conventions

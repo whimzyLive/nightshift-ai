@@ -18,13 +18,17 @@ sections := story description headings "Design", "Dev Notes", "References"     #
 ## Resolving the design for a story (first match wins)
 
 ```text
-design := story Design section paths
+design := story Design section rows/paths
+        | story Design section "None — no rows of <index> apply"   -> none, deliberately; do NOT fall back
         | story comment `Design: …/index.md`
-        | parent Epic Design section / comment `Design: …/index.md`
+        | Epic designs
         | none
+Epic designs := every distinct index.md named by the Epic's Design section or any of its `Design:` comments   # an Epic can hold several designs; a "(via <KEY>)" one came from a child ticket
+EPIC_KEY := `acli jira workitem view <KEY> --fields parent --json`   # the default view --json renders parent null (refs/jira-fetch.md)
+bare "None" or no Design section -> fall back down the list (the story predates its design)
 none -> no design applies; never list or search docs/design/ speculatively
 ASSERT every resolved path exists on disk ELSE STOP "Design not on the base branch — merge the /design PR first"
-Epic-level design only (story names no rows) -> pick the rows whose Description matches the story's ACs; name them in your output
+Epic designs only (story names no rows) -> pick the rows whose Description matches the story's ACs; name them in your output
 ```
 
 ## Reading rules

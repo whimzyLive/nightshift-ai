@@ -142,10 +142,11 @@ Structure — include only sections applicable to this project's active agents:
 [Bucket definition and parameters]
 [New transaction builders needed]
 
-## Design & Dev Notes (if the story has a Design or Dev Notes section)
+## Design & Dev Notes
 
 [UI surface → design row path(s) it implements + states/copy to match]
 [Each Dev Note verbatim → where this spec honours it, or why it deviates]
+[One-line N/A when the story's Design and Dev Notes are both "None"]
 
 ## Permissions Detail
 

@@ -57,7 +57,8 @@ renders `None`, never disappears.
 ```text
 input names a local design file outside the repo -> do NOT link it; flag "run /design <KEY> <path> first" in the return
 an AC says HOW (a library, a file, an approach) -> move that clause to Dev Notes; the AC keeps only the verifiable WHAT
-story refined before its design existed -> the Design section stays "None"; consumers fall back to the `Design:` comment (refs/design-references.md)
+a design exists but no row fits this story -> Design := "None — no rows of docs/design/<slug>/index.md apply"   # deliberate; consumers do not fall back
+story refined before its design existed -> the Design section stays bare "None"; consumers fall back to the `Design:` comments (refs/design-references.md)
 Design / Dev Notes / References never gate quality -> a story with all three "None" is still well-formed
 ```
 

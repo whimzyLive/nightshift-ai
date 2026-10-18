@@ -150,7 +150,7 @@ rules := [
   tasks ordered within each phase (respect dependencies within the phase),
   no task spans two agents — split it if it touches two domains,
   every task is verifiable — each phase ends with a typecheck/lint/validate step,
-  a UI task names the design path(s) it implements, from the spec's `## Design & Dev Notes` (refs/design-references.md),
+  a UI task names the design path(s) it implements, from the spec's `## Design & Dev Notes` (${CLAUDE_PLUGIN_ROOT}/refs/design-references.md),
   each Dev Note rides verbatim on the task(s) it constrains — `Dev Note: <text>` — so the plan slice carries it to the agent
 ]
 ```

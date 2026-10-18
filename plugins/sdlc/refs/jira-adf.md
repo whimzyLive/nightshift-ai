@@ -399,8 +399,20 @@ Use for `/refine-issue`, `/stories`, and any Story create/update. See `jira-stor
             {
               "type": "paragraph",
               "content": [
+                { "type": "text", "text": "docs/design/<slug>/index.md", "marks": [{ "type": "code" }] },
+                { "type": "text", "text": " — the design this story belongs to" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
                 { "type": "text", "text": "docs/design/<slug>/pages/<page>.html", "marks": [{ "type": "code" }] },
-                { "type": "text", "text": " — what this story takes from it (or the single item \"None\")" }
+                { "type": "text", "text": " — what this story takes from it (one item per row; or the single item \"None\")" }
               ]
             }
           ]
