@@ -88,6 +88,7 @@ Re-running `/sdlc:init` later is safe — it merges rather than overwrites.
 flowchart TD
     I(["your idea"]) --> RF["/sdlc:refine-feature"] --> E{{"Jira Epic"}}
     E --> P["/sdlc:prd"] --> S["/sdlc:stories"]
+    E -. "optional: final design" .-> DS["/sdlc:design"] -.-> S
     S --> R["you — story points + AI Workflow mode"]
     R --> T{"story points"}
     T -- "above threshold" --> FULL["spec → plan → impl"]
@@ -99,15 +100,16 @@ flowchart TD
     MG -. optional .-> DX["/sdlc:docs sync"]
 ```
 
-|     | You run                                       | What happens                                                                                            |
-| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| 1   | `/sdlc:refine-feature`                        | Your idea becomes a Jira **Epic** — or enriches one you already created                                 |
-| 2   | `/sdlc:prd`                                   | The Epic plus your context becomes a detailed PRD                                                       |
-| 3   | `/sdlc:stories`                               | Stories, each linked to the Epic, with `Blocks` links and the build order written into the PRD          |
-| 4   | _you_                                         | Assign story points and the automation mode; add labels and references                                  |
-| 5   | `/sdlc:auto`<br>_or_ `spec` → `plan` → `impl` | Triages by size, then drives the story to a PR — one shot, or step by step if you want the controls     |
-| 6   | `/sdlc:review-fix`                            | Triages your PR comments, keeps what's right for this codebase, implements them, replies on each thread |
-| 7   | `/sdlc:docs sync`                             | Optional — folds the completed story into your docs surface                                             |
+|     | You run                                       | What happens                                                                                                                             |
+| --- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `/sdlc:refine-feature`                        | Your idea becomes a Jira **Epic** — or enriches one you already created                                                                  |
+| 1b  | `/sdlc:design`                                | Optional — your final design (HTML exports, screenshots) lands in `docs/design/`, linked on the Epic, so each story gets its own screens |
+| 2   | `/sdlc:prd`                                   | The Epic plus your context becomes a detailed PRD                                                                                        |
+| 3   | `/sdlc:stories`                               | Stories, each linked to the Epic, with `Blocks` links and the build order written into the PRD                                           |
+| 4   | _you_                                         | Assign story points and the automation mode; add labels and references                                                                   |
+| 5   | `/sdlc:auto`<br>_or_ `spec` → `plan` → `impl` | Triages by size, then drives the story to a PR — one shot, or step by step if you want the controls                                      |
+| 6   | `/sdlc:review-fix`                            | Triages your PR comments, keeps what's right for this codebase, implements them, replies on each thread                                  |
+| 7   | `/sdlc:docs sync`                             | Optional — folds the completed story into your docs surface                                                                              |
 
 **Step 4 drives everything after it.** Story points decide the route: at or under your lightweight threshold, a story skips spec and plan entirely — no plan doc, no review gate, tasks derived inline from the ticket. Above it, the full ceremony. Automation mode comes from the Jira **AI Workflow** field (`Full Auto` / `Auto` / `Assisted`), falling back to an `AI-Workflow:full-auto` / `:auto` / `:assisted` **label** on projects without that custom field.
 
@@ -135,14 +137,14 @@ Standby roles activate only when your `project-context.md` says your project has
 
 All commands are namespaced by plugin — `/sdlc:*`.
 
-| Stage          | Commands                                                                      |
-| -------------- | ----------------------------------------------------------------------------- |
-| **Onboard**    | `/sdlc:init` · `/sdlc:analyze`                                                |
-| **Shape work** | `/sdlc:refine-feature` · `/sdlc:prd` · `/sdlc:stories` · `/sdlc:refine-issue` |
-| **Build**      | `/sdlc:triage` · `/sdlc:spec` · `/sdlc:plan` · `/sdlc:impl`                   |
-| **Review**     | `/sdlc:review` · `/sdlc:review-fix` · `/sdlc:loop`                            |
-| **End to end** | `/sdlc:auto`                                                                  |
-| **Document**   | `/sdlc:docs`                                                                  |
+| Stage          | Commands                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| **Onboard**    | `/sdlc:init` · `/sdlc:analyze`                                                                 |
+| **Shape work** | `/sdlc:refine-feature` · `/sdlc:design` · `/sdlc:prd` · `/sdlc:stories` · `/sdlc:refine-issue` |
+| **Build**      | `/sdlc:triage` · `/sdlc:spec` · `/sdlc:plan` · `/sdlc:impl`                                    |
+| **Review**     | `/sdlc:review` · `/sdlc:review-fix` · `/sdlc:loop`                                             |
+| **End to end** | `/sdlc:auto`                                                                                   |
+| **Document**   | `/sdlc:docs`                                                                                   |
 
 📖 **Full command list with usage, always current → [`docs/reference/commands/`](docs/reference/commands/)** — generated from the command sources, so a newly added command shows up automatically and this README never advertises a stale set.
 
