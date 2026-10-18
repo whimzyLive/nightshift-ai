@@ -32,6 +32,34 @@ Write the description using this block structure (verbatim section headers):
 
 **Dependencies**
 - [Story titles or keys that must complete first, or "None"]
+
+**Design**
+- [Repo path of a design asset this story implements + what to take from it, or "None"]
+
+**Dev Notes**
+- [Implementation directive from the requester — the HOW — or "None"]
+
+**References**
+- [Supporting material that is not a design — doc, URL, ticket, repo path — or "None"]
+```
+
+All seven section headings (Context through References) are always present — an empty section
+renders `None`, never disappears.
+
+## Design, Dev Notes, References — what goes where
+
+| Section | Holds | Never holds |
+| --- | --- | --- |
+| Design | Repo paths under `docs/design/<slug>/` from a merged `/design` PR — the design's `index.md` plus the specific page/render/screenshot rows THIS story implements, each with a one-line "take from it" (e.g. `pages/automations-admin-v3.html` + `renders/automations-admin-v3.png` — rule list table, empty state; ignore sidebar) | Files outside the repo, external links, whole-design dumps with no row picked |
+| Dev Notes | How the requester wants it built: a library, pattern, file to extend, constraint, approach to avoid | Testable outcomes (those are ACs), product rationale (that is Context) |
+| References | Non-design material: specs/docs, API docs, related tickets/PRs, external URLs, `docs/design/<slug>/references/` files, existing code to mirror | Designs (Design section), requirements (ACs) |
+
+```text
+input names a local design file outside the repo -> do NOT link it; flag "run /design <KEY> <path> first" in the return
+an AC says HOW (a library, a file, an approach) -> move that clause to Dev Notes; the AC keeps only the verifiable WHAT
+a design exists but no row fits this story -> Design := "None — no rows of docs/design/<slug>/index.md apply"   # deliberate; consumers do not fall back
+story refined before its design existed -> the Design section stays bare "None"; consumers fall back to the `Design:` comments (refs/design-references.md)
+Design / Dev Notes / References never gate quality -> a story with all three "None" is still well-formed
 ```
 
 ## Story summary (title) format
@@ -86,7 +114,7 @@ Split only at these boundaries:
 - Each AC must be binary: either done or not done — no partial states
 - Each AC must be independently testable by a QA or product person
 - Minimum 3 ACs per story; maximum 6 — if you need more, split the story
-- AC should describe WHAT is verifiable, not HOW it is implemented
+- AC should describe WHAT is verifiable, not HOW it is implemented — the HOW goes in **Dev Notes**
 
 ## Authoring quality
 

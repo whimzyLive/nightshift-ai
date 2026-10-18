@@ -58,6 +58,10 @@ interface ReferenceExample {
 
 **N/A** — reference artifact has no offline-sync scope.
 
+## Design & Dev Notes
+
+**N/A** — reference artifact has no design or dev notes.
+
 ## Error Handling
 
 **N/A** — reference artifact, no error scenarios.

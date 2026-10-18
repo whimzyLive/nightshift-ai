@@ -18,6 +18,7 @@ The agent should:
    - Open questions (product decisions still needed)
    - Dependencies (features that must exist first)
    - Product checks: roles affected, mobile/offline required, surfaces (web/mobile/both)
+   - Design & references: the Epic's design `index.md` path (its **Design** section or `Design:` comment), **Dev Notes**, and **References**, carried verbatim — link them, never restate the design in prose
 6. Commit, push, and raise PR titled `docs(prd): <Epic summary>`
 7. Comment the Epic with the PRD reference:
    ```bash
