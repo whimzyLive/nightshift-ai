@@ -177,5 +177,63 @@ printf '%s\n' "$out7" | grep -q ' rendered=3 render=chrome$' && ok "(7d) summary
 out7b="$(BROWSER_OVERRIDE="$tmp/nope" run "$tmp/d7b" "$in/Plain Mock.HTML")"
 printf '%s\n' "$out7b" | grep -q ' render=skipped:browser-not-executable$' && [ -f "$tmp/d7b/pages/plain-mock.html" ] \
   && ok "(7e) unusable browser skips renders without failing the ingest" || bad "(7e) render skip" "got: $(printf '%s\n' "$out7b" | tail -1)"
+run "$d7" "$in/Plain Mock.HTML" >/dev/null
+row_of "$d7" 'pages/plain-mock.html' | grep -qF '| renders/plain-mock.png |' \
+  && ok "(7f) a browserless re-run keeps the existing render in the index" \
+  || bad "(7f) render kept on browserless re-run" "row: $(row_of "$d7" 'pages/plain-mock.html')"
+nopng="$tmp/nopng-browser"; printf '#!/usr/bin/env bash\nexit 0\n' >"$nopng"; chmod +x "$nopng"
+out7g="$(BROWSER_OVERRIDE="$nopng" run "$tmp/d7g" "$bundle" "$in/Plain Mock.HTML")"; rc=$?
+[ "$rc" -eq 0 ] && printf '%s\n' "$out7g" | grep -q ' rendered=0 render=chrome:failed=3$' \
+  && ok "(7g) a browser that writes no png is reported as chrome:failed=<n>, not fatal" \
+  || bad "(7g) silent render failure surfaced" "rc=$rc got: $(printf '%s\n' "$out7g" | tail -1)"
+
+# --- (8) folder inputs never land on (or delete) the asset dirs -------------------------------
+mkdir -p "$in/screenshots" "$in/pages"; printf 'x' >"$in/screenshots/x.png"; printf '<p>p</p>' >"$in/pages/p.html"
+printf 'hero' >"$in/hero.png"
+d8="$tmp/d8"; run "$d8" "$in/hero.png" "$in/screenshots" >/dev/null
+[ "$(cat "$d8/screenshots/hero.png" 2>/dev/null)" = "hero" ] && [ -f "$d8/screenshots-2/x.png" ] \
+  && ok "(8a) a folder named like an asset dir is suffixed, not merged over it" \
+  || bad "(8a) reserved folder name" "hero.png lost or folder not suffixed"
+run "$d8" "$bundle" >/dev/null; run "$d8" "$in/pages" >/dev/null
+[ -f "$d8/pages/alpha-screen-v2.html" ] && [ -f "$d8/pages-2/p.html" ] && row_of "$d8" 'pages/alpha-screen-v2.html' | grep -q '^| screen |' \
+  && ok "(8b) an additive folder named pages keeps the unpacked pages and their rows" \
+  || bad "(8b) pages folder re-run" "unpacked pages wiped or rows dropped"
+
+# --- (9) a page that fails to decode fails the ingest ----------------------------------------
+bad_manifest="$(jq -cn '{"u-x": {mime: "text/html", compressed: true, data: "bm90LWd6aXA="}}')"
+printf '<script type="__bundler/manifest">%s</script><script type="__bundler/ext_resources">[]</script>' "$bad_manifest" >"$in/undecodable.html"
+run "$tmp/d9" "$in/undecodable.html" >/dev/null 2>"$tmp/d9.err"; rc=$?
+[ "$rc" -eq 1 ] && grep -q 'could not decode page' "$tmp/d9.err" \
+  && ok "(9) an undecodable page exits 1" || bad "(9) undecodable page" "rc=$rc"
+
+# --- (10) a bundle with no template still unpacks (every page a component) --------------------
+printf '<script type="__bundler/manifest">%s</script><script type="__bundler/ext_resources">%s</script>' "$manifest" "$ext" >"$in/no-template.html"
+run "$tmp/d10" "$in/no-template.html" >/dev/null; rc=$?
+[ "$rc" -eq 0 ] && row_of "$tmp/d10" 'pages/alpha-screen-v2.html' | grep -q '^| component |' \
+  && ok "(10) a template-less bundle unpacks with every page as component" || bad "(10) no-template bundle" "rc=$rc"
+
+# --- (11) a formatter-padded index keeps every row and description ----------------------------
+d11="$tmp/d11"; run "$d11" "$in/Screen Shot 1.PNG" "$in/Spec Notes.PDF" >/dev/null
+perl -pi -e 's{^\| screenshot \| (.*) \| TODO \|$}{|  screenshot  |  $1  |  Login form, error state  |}' "$d11/index.md"
+run "$d11" "$in/later.md" >/dev/null
+row_of "$d11" 'screenshots/screen-shot-1.png' | grep -q '| Login form, error state |$' \
+  && row_of "$d11" 'references/spec-notes.pdf' | grep -q '^| reference |' \
+  && ok "(11) padded rows survive a re-run with their descriptions" \
+  || bad "(11) padded index" "rows dropped: $(grep -c '^| ' "$d11/index.md") table lines"
+
+# --- (12) dotfiles in a folder input are stripped ---------------------------------------------
+mkdir -p "$in/Leaky"; printf 'SECRET=1' >"$in/Leaky/.env"; printf 'x' >"$in/Leaky/.DS_Store"; printf '# ok' >"$in/Leaky/notes.md"
+run "$tmp/d12" "$in/Leaky" >/dev/null 2>&1
+[ -f "$tmp/d12/leaky/notes.md" ] && [ ! -e "$tmp/d12/leaky/.env" ] && [ ! -e "$tmp/d12/leaky/.DS_Store" ] \
+  && ok "(12) dotfiles never land in the design folder" || bad "(12) dotfile strip" ".env or .DS_Store copied"
+
+# --- (13) --replace refuses a parent of other designs, and validates before deleting ------------
+d13="$tmp/d13"; run "$d13/one" "$in/hero.png" >/dev/null
+run --replace "$d13" "$in/hero.png" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && [ -f "$d13/one/screenshots/hero.png" ] \
+  && ok "(13a) --replace on a folder of designs is refused, nothing deleted" || bad "(13a) replace guard" "rc=$rc or sibling deleted"
+run --replace "$d13/one" "$in/broken.html" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && [ -f "$d13/one/screenshots/hero.png" ] \
+  && ok "(13b) --replace with a malformed bundle fails before deleting anything" || bad "(13b) replace pre-validation" "rc=$rc or assets deleted"
 
 exit "$fail"
