@@ -16,9 +16,8 @@
 
 ## Tech rules
 
-- No informative/explanatory comments — see the shared rule at
-  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` (excludes comments required by language or
-  lint conventions).
+- Code comments: the **Comments** rules in your agent definition (full text:
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`).
 - Language: Markdown (plugin commands/refs/skills), Shell (tooling scripts).
 - Framework: none detected.
 - File naming: kebab-case for all source files.
