@@ -152,7 +152,7 @@ rules := [
   every task is verifiable — each phase ends with a typecheck/lint/validate step,
   a UI task names the design path(s) it implements, from the spec's `## Design & Dev Notes` (${CLAUDE_PLUGIN_ROOT}/refs/design-references.md),
   each Dev Note rides verbatim on the task(s) it constrains — `Dev Note: <text>` — so the plan slice carries it to the agent,
-  no task asks for a code comment ${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md forbids (e.g. citing the story, task or AC id in code)
+  no task or plan code snippet asks for or carries a code comment ${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md forbids (e.g. a story, task or AC id) — agents copy snippets verbatim
 ]
 ```
 
@@ -164,7 +164,8 @@ self_review := [
   only phases for active agents included,
   no "TBD" — every task concrete and actionable,
   every entity named in Phase 1 referenced correctly in Phase 2,
-  every spec Design row and Dev Note lands on at least one task
+  every spec Design row and Dev Note lands on at least one task,
+  no plan code snippet carries a comment from the policy's Never-write table
 ]
 ```
 

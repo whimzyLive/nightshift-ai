@@ -282,7 +282,8 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
    these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
    skills apply for this task." Exactly one of the two.
 6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
-   (the working directory named in item 1). Fix ONLY these issues, and commit (use the
+   (the working directory named in item 1). Fix ONLY these issues, run your **Comments**
+   self-check (no comment cites a finding, round or story), and commit (use the
    `conventional-commit` skill). Do NOT push — the QA loop handles pushes."
 7. "Capture any admitted rule entries per the admission test in
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s memory-write section."
