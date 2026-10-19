@@ -1,3 +1,17 @@
+## 0.45.13 (2026-10-19)
+
+### 🚀 Features
+
+- **sdlc:** give implementers the comment rules QA reviews against ([5bf6e58](https://github.com/whimzyLive/nightshift-ai/commit/5bf6e58))
+
+### 🩹 Fixes
+
+- **sdlc:** make comment findings mechanical and close the review gaps ([26724c0](https://github.com/whimzyLive/nightshift-ai/commit/26724c0))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.12 (2026-10-18)
 
 ### 🚀 Features
