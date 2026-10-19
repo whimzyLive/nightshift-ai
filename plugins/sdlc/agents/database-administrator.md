@@ -49,10 +49,18 @@ loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/re
 
 Follow the conventions in your override and the directory `CLAUDE.md` guides. Defaults: strict TypeScript, no `any`, kebab-case files, import order external → internal → relative → types.
 
-Write self-explanatory code. Do not add informative/explanatory comments — see the shared rule at
-`${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` for what's forbidden, what's excluded
-(comments required by language or lint conventions), and where non-obvious context belongs instead
-(your agent memory file).
+**Comments** — the QA gate reviews against these same rules (full text, examples and edge cases:
+`${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`):
+
+- Default to none: names and structure say what the code does.
+- Never write (each one blocks QA): a tracker reference — ticket key, PR number, plan-task, AC or
+  review-finding id, round number, spec section; change history ("previously", "changed from",
+  "added for"); narration of what the next lines do; a restated name; an untracked TODO/FIXME;
+  commented-out code; padding in a required block.
+- Allowed: a one- or two-line, present-tense cause the code guards against; a revisit marker on a
+  workaround — the upstream issue, dependency version or tracked follow-up ticket whose resolution
+  ends it, plus what to do then; toolchain-required comments (lint directives, pragmas, license
+  headers, required doc tags).
 
 ## Constraints
 
@@ -65,7 +73,9 @@ Follow `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — shared protocol 
 
 ## Completion checklist
 
-1. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate sections). Also run any domain-specific completion steps your override lists.
-2. Stage your changed paths, then commit and push per the handoff protocol.
+1. Stage your changed paths and check every comment line `git diff --cached -U0` adds against the
+   **Comments** rules (policy "Self-check before commit"); delete any that fails and re-stage.
+2. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate sections). Also run any domain-specific completion steps your override lists.
+3. Stage your changed paths, then commit and push per the handoff protocol.
 
 Return to Principal Engineer a summary of what changed in your domain (stacks, handlers, entities, config, screens — as applicable).

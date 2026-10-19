@@ -116,8 +116,8 @@ comments differs (AC-2/AC-3).
 - **`claude-superpowers`** → run the **superpowers `requesting-code-review` skill** instead: it
   dispatches a focused `code-reviewer` subagent over the PR diff (`origin/<base>...<head>`); post the
   findings it returns as **inline PR comments** on the current HEAD, so the shared `/review-fix`
-  pipeline can action them exactly as for `claude-inline`. This keeps review reasoning inside the
-  plugin's skill framework, lighter per review than native `/code-review` (AC-2/AC-3).
+  pipeline can action them exactly as for `claude-inline`. The reviewer judges code comments per
+  `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` Review — say so in its prompt.
 
 Everywhere below, **`REVIEW_CMD`** stands for whichever the configured agent selects; the marker,
 decision table, budget, and modifiers are **identical** for both agents. Where the steps
