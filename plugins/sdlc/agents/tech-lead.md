@@ -151,7 +151,8 @@ rules := [
   no task spans two agents — split it if it touches two domains,
   every task is verifiable — each phase ends with a typecheck/lint/validate step,
   a UI task names the design path(s) it implements, from the spec's `## Design & Dev Notes` (${CLAUDE_PLUGIN_ROOT}/refs/design-references.md),
-  each Dev Note rides verbatim on the task(s) it constrains — `Dev Note: <text>` — so the plan slice carries it to the agent
+  each Dev Note rides verbatim on the task(s) it constrains — `Dev Note: <text>` — so the plan slice carries it to the agent,
+  no task asks for a code comment ${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md forbids (e.g. citing the story, task or AC id in code)
 ]
 ```
 

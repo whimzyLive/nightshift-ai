@@ -110,6 +110,21 @@ skip in the report. `find-skills` is for surfacing/suggesting only — never run
 commands here; see
 [Skill usage guardrails](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#skill-usage-guardrails).
 
+## Conventions
+
+**Comments** — the QA gate reviews against these same rules (full text, examples and edge cases:
+`${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`):
+
+- Default to none: names and structure say what the code does.
+- Never put a tracker reference (ticket key, PR number, plan-task or review-finding id, round
+  number, spec section) or change history ("previously", "changed from", "added for") in a
+  comment — that context goes in the commit message.
+- A comment may state a non-obvious cause the code guards against, in one or two present-tense
+  lines, or mark a workaround to revisit — linking the upstream issue, dependency version or
+  follow-up ticket whose resolution ends it, and saying what to do then.
+- Toolchain-required comments (lint directives, pragmas, license headers, required doc tags) are
+  fine.
+
 ## Branch, memory, commit, return
 
 Follow `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — shared protocol for all domain
@@ -119,7 +134,8 @@ engineers.
 
 1. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality Gate
    sections). Also run any domain-specific completion steps your override lists.
-2. Stage your changed paths, then commit per the handoff protocol. **Dispatched mode:** commit
+2. Check every comment line your diff adds against the **Comments** rules (policy "Self-check before commit"); delete any that fails.
+3. Stage your changed paths, then commit per the handoff protocol. **Dispatched mode:** commit
    only — the Principal Engineer pushes (per
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s "Do NOT push"). **Standalone
    `/sdlc:analyze` mode:** push the `chore/ai-config-<slug>` branch yourself before raising the PR

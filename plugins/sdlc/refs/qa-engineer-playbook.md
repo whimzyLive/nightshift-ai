@@ -142,10 +142,9 @@ skill pattern. The prompt MUST include:
 - Explicit instruction to review across all five axes: **correctness, readability,
   architecture, security, performance** — and (Story mode) to flag any AC that is not demonstrably
   met and any regression risk to existing behavior.
-- Explicit instruction (readability axis) to flag any new informative/explanatory code comment the
-  diff introduces, per the shared rule at `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` —
-  point the reviewer at that file for the exact definition and the language/lint-required
-  exclusions rather than restating the rule in the dispatch prompt.
+- Explicit instruction (readability axis) to review the code comments the diff adds per the
+  Review section of `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` — the same rules the
+  implementers wrote to, no stricter, no looser; point the reviewer at that file, don't restate it.
 
 Dispatch with `isolation: "worktree"` is NOT needed — the reviewer reads, it does not write.
 
@@ -210,11 +209,8 @@ PR. Accepted comments flow into the Step 3 fix loop; discarded ones go in the re
 - **AC gap** — treat as Critical regardless of how the reviewer framed it; the ticket exists to
   satisfy its ACs.
 - **Security** — treat as Critical unless demonstrably non-exploitable; say why if downgraded.
-- **Informative/explanatory comment** (per `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md`) —
-  treat as **Important**: the fix requests the comment be removed and, if it captured real
-  non-obvious context, that the introducing agent capture it as a rule entry instead (per the
-  admission test in `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). A comment required by
-  language/lint convention (per that same doc's exclusions) is not a finding.
+- **Code comment** — what is a finding (**Important**), what isn't, the fix, and external requests
+  to add one: `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` Review. Same rules both sides.
 
 **Domain mapping (file path → owning agent — derive from project-context Workspace Structure):**
 
