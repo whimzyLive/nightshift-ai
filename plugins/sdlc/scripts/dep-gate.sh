@@ -7,6 +7,8 @@
 # (acli link list only exposes outwardIssueKey = the issue a story BLOCKS, so a
 # sibling S blocks STORY iff S's links contain outwardIssueKey == STORY), and
 # verifies every blocker already has a feat/<blocker> OR fix/<blocker> PR (open or merged).
+# A blocker labelled UI-Components needs a MERGED PR: the dependent branch is cut from the
+# base branch and must already contain the components (refs/ui-components.md).
 #
 # All command substitution / loops / jq live INSIDE this script so the caller
 # issues one statically-analyzable invocation (allowlisted Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/*)).
@@ -14,7 +16,8 @@
 # Output (greppable, deterministic):
 #   EPIC=<key>
 #   BLOCKERS=<space-separated keys or empty>
-#   <blocker> PR: yes|NO        (one line per blocker)
+#   <blocker> PR: yes|NO|unmerged (one line per blocker; unmerged = UI-Components blocker without a merged PR)
+#   UI_BLOCKERS=<keys or empty>  UI-Components blockers; the branch must contain their merge
 #   GATE=PASS                   -> exit 0, safe to implement
 #   GATE=STOP                   -> exit 1, with REASON= line(s)
 #
@@ -62,19 +65,42 @@ echo "BLOCKERS=$blockers"
 #    Both-present (a stale opposite-prefix PR for an abandoned attempt) is a LEGAL state, not a
 #    contradiction — never assert/error on "two matches"; pass if either prefix has a PR.
 rc=0
+unmerged=""
+ui_blockers=""
 for dep in $blockers; do
+  ui_json="$(acli jira workitem search --jql "key = $dep AND labels = \"UI-Components\"" --fields key --json 2>/dev/null)" \
+    || fail "cannot read labels of blocker $dep (cannot verify dependencies)"
+  ui="$(printf '%s' "$ui_json" | jq --arg k "$dep" '[.[]? | select(.key == $k)] | length' 2>/dev/null)"
+  [ -z "$ui" ] && fail "cannot read labels of blocker $dep (cannot verify dependencies)"
   feat_found="$(gh pr list --head "feat/$dep" --state all --json number 2>/dev/null | jq 'length')"
   fix_found="$(gh pr list --head "fix/$dep"  --state all --json number 2>/dev/null | jq 'length')"
   if [ "${feat_found:-0}" -eq 0 ] && [ "${fix_found:-0}" -eq 0 ]; then
     echo "$dep PR: NO"
     rc=1
-  else
-    echo "$dep PR: yes"
+    continue
   fi
+  if [ "$ui" -gt 0 ]; then
+    ui_blockers="${ui_blockers:+$ui_blockers }$dep"
+    feat_merged="$(gh pr list --head "feat/$dep" --state merged --json number 2>/dev/null | jq 'length')"
+    fix_merged="$(gh pr list --head "fix/$dep"  --state merged --json number 2>/dev/null | jq 'length')"
+    if [ "${feat_merged:-0}" -eq 0 ] && [ "${fix_merged:-0}" -eq 0 ]; then
+      echo "$dep PR: unmerged"
+      unmerged="${unmerged:+$unmerged }$dep"
+      continue
+    fi
+  fi
+  echo "$dep PR: yes"
 done
+echo "UI_BLOCKERS=$ui_blockers"
 
 if [ "$rc" -ne 0 ]; then
   echo "REASON=one or more blockers have no feat/* or fix/* PR — implement the blocker first (or remove a stale Jira Blocks link)"
+fi
+if [ -n "$unmerged" ]; then
+  echo "REASON=UI-Components blocker(s) $unmerged not merged — merge the components PR first; this branch is cut from the base branch"
+  rc=1
+fi
+if [ "$rc" -ne 0 ]; then
   echo "GATE=STOP"
   exit 1
 fi
