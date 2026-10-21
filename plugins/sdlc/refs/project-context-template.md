@@ -41,6 +41,7 @@ generated file — every slot must be replaced with an actual value.
 
 | Typecheck | `<typecheck cmd>` |
 | Test | `<test cmd>` |
+| UI library | `<shared component package path>` |
 
 ## Memory
 
@@ -75,6 +76,9 @@ generated file — every slot must be replaced with an actual value.
 
 - **Omit blank rows** — if the user left Typecheck or Test blank, omit those
   rows from `## Tooling` rather than writing an empty backtick pair.
+- **UI library** — the shared component package other workspaces import (e.g.
+  `packages/ui/`); omit the row when there is none. `/design` inventories
+  components against it (`refs/ui-components.md`).
 - **Omit none-detected stack rows** — in `## Detected stack`, omit any row
   whose detected value is empty or `none`. Do not write `none` into the file.
 - **Package manager appears twice** — once in the top table (user-confirmed

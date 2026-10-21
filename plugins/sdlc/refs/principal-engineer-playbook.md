@@ -116,12 +116,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>   # exit 0 = GATE=PAS
 
 - Plan missing on the **full** path (`LIGHTWEIGHT` unset/false) → **STOP**, tell user to merge the plan PR. On the **lightweight** path a missing plan doc is expected — **do not STOP**; proceed (Step 2 derives tasks from the story).
 - Implementation PR already merged → **STOP**, report it's already done.
-- An open `<BRANCH_PREFIX>/<STORY-KEY>` PR/branch already exists → reuse it (check it out); do not create a duplicate.
-- **Any blocker has no `feat/<blocker>` or `fix/<blocker>` PR (open or merged) → STOP the entire flow and REJECT.** Do not create a branch, do not dispatch any domain agent. Report to the user:
+- An open `<BRANCH_PREFIX>/<STORY-KEY>` PR/branch already exists → reuse it (check it out); do not create a duplicate. Gate prints a non-empty `UI_BLOCKERS=` → merge the base branch into it first (the components must be on it).
+- **Any blocker has no `feat/<blocker>` or `fix/<blocker>` PR (open or merged), or a `UI-Components` blocker prints `PR: unmerged` → STOP the entire flow and REJECT.** Do not create a branch, do not dispatch any domain agent. Report to the user:
   ```
   BLOCKED — <STORY-KEY> cannot be implemented yet.
   Missing upstream work: <blocker-key(s) with no feat/* or fix/* PR>.
-  These dependencies must reach at least an open feat/* or fix/* PR before <STORY-KEY> starts.
+  These dependencies must reach at least an open feat/* or fix/* PR (merged, for UI-Components) before <STORY-KEY> starts.
   Next step: implement <blocker-key> first (or remove the Jira "Blocks" link if stale).
   ```
   This gate enforces the Jira dependency graph (kept in the Epic PRD's "Story Dependency Graph" section) — never implement a story ahead of the work it depends on.
