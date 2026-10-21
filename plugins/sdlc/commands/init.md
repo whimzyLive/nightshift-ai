@@ -519,6 +519,7 @@ are documented in that template file. Token slots to substitute:
 | `<DETECTED_PM>` | `DETECTED_PM` (Step 2.5) |
 | `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
+| `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |

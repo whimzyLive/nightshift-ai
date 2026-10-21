@@ -110,7 +110,9 @@ session down and continue (handle gating in E3, then advance to the next story).
 ## E3 — Gate handling (suspend primitive)
 
 After a child completes (sentinel seen): `gated(S) -> suspend before starting the next story` — the
-gated story's PR needs human review + merge first. Suspension goes through a single documented seam
+gated story's PR needs human review + merge first. A story labelled `UI-Components` is always
+gated, whatever its mode, and `continue` waits for its implementation PR to merge — its dependents'
+branches must contain the components (`refs/ui-components.md`). Suspension goes through a single documented seam
 (see **E5 — Suspend-primitive protocol**), and `resolveImpl()` picks the path: the **worker
 alternate** emits the `<<<SDLC_EPIC_GATED:…>>>` marker and yields to the worker host (E5a/E5b), the
 **interactive default** (implemented here, unchanged) is:

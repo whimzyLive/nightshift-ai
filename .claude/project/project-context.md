@@ -36,6 +36,7 @@
 ## Tooling
 
 | Test | `pnpm nx run-many -t test` |
+| UI library | `packages/ui/` |
 | Shared Nx cache | `<repo-root>/.nx/cache` (absolute path; the primary checkout's cache — do NOT mutate committed `nx.json`) |
 | SDLC agent reuse | `enabled` |
 

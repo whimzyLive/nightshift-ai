@@ -11,6 +11,7 @@ repo lives in `commands/design.md` (`/design`). This file is how they are _used_
 ```text
 design_root := docs/design/                       # committed on the base branch by /design PRs
 design_dir := design_root/<slug>/                 # one folder per design; index.md is its entry point
+components := design_dir/components.md             # component inventory; refs/ui-components.md
 breadcrumb := Jira comment "Design: docs/design/<slug>/index.md | PR: <url>"   # posted by /design
 sections := story description headings "Design", "Dev Notes", "References"     # jira-story-template.md
 ```
@@ -35,6 +36,7 @@ Epic designs only (story names no rows) -> pick the rows whose Description match
 
 ```text
 index.md first -> it describes every asset in one table; read nothing else to "browse"
+components.md -> which library components a page uses (Reused/Changed/New); a `Uses <Component>` Dev Note means import it, never rebuild it
 open only rows the story's Design section names (or the rows picked above)
 .png (render | screenshot) -> Read it: layout, hierarchy, copy, states, spacing
 .html page -> Grep for the region you are building, then Read with offset/limit   # pages run 50–150 KB
