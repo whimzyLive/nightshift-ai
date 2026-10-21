@@ -1,3 +1,13 @@
+## 0.45.14 (2026-10-21)
+
+### 🚀 Features
+
+- **sdlc:** build a design's UI components ahead of its feature stories ([dc52228](https://github.com/whimzyLive/nightshift-ai/commit/dc52228))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.13 (2026-10-19)
 
 ### 🚀 Features
