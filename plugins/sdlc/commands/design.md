@@ -105,6 +105,21 @@ only as far as needed to read a component's states. `--add` merges into the exis
 step and say so in the return. Refinement reads this file to put the components ahead of the
 features (`/stories` creates a `UI-Components` story that blocks them).
 
+On a revision, give a component the `Selector` column only when `[data-slot="<kebab name>"]` would
+not find it (`${CLAUDE_PLUGIN_ROOT}/refs/design-revisions.md`).
+
+## Step 5c — Measure the change (revision only)
+
+`MODE=new` → skip. Otherwise apply `${CLAUDE_PLUGIN_ROOT}/refs/design-revisions.md` (Measuring):
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-diff.sh --base "origin/<BASE>" "$DESIGN_DIR"
+```
+
+Non-zero exit → **STOP**, surface its stderr verbatim. `UNCAPTURED <Component>` lines → add a
+Selector for each (Step 5b's rule) and re-run once. Keep the `DIFF …` lines and the `SUMMARY` line
+for the PR body and Step 8; `diff=skipped:<why>` is not an error — the rows still land, without images.
+
 ## Step 6 — Commit, push, raise the PR
 
 ```bash
@@ -122,6 +137,8 @@ dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
 # write "$dir/pr-body.md" with your file-write tool:
 #   Design assets for <KEY>. Index: docs/design/<SLUG>/index.md
 #   <the script's SUMMARY line>
+#   revision only: the Changed block's table, and each Diff image as
+#   ![<Item>](https://github.com/<owner>/<repo>/blob/<BRANCH>/<DESIGN_DIR>/<Diff>?raw=true)
 PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
   "$BRANCH" <BASE> "docs(design): <KEY> <SUMMARY>" "$dir/pr-body.md" --phase design)
 ```
@@ -148,6 +165,8 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
 - `DESIGN_DIR`, `PR_URL`, MODE, the script's `SUMMARY` line, the committed file list (Step 6's
   `--stat`), any pages without a render, and which keys got the breadcrumb.
 - The component inventory: counts of Reused / Changed / New, or "no UI library configured".
+- Revision: the `DIFF` rows (Step 5c). Next step: merge the PR, then `/auto <EPIC>` — its E0a routes
+  the change to the stories it reaches (`${CLAUDE_PLUGIN_ROOT}/refs/design-revisions.md` Routing).
 - Next step: merge the PR, then refine — `/refine-feature <EPIC>`, `/stories <EPIC>`, or
   `/refine-issue <STORY>`. Refinement puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its

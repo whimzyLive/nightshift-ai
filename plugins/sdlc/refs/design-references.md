@@ -36,6 +36,7 @@ Epic designs only (story names no rows) -> pick the rows whose Description match
 
 ```text
 index.md first -> it describes every asset in one table; read nothing else to "browse"
+Design section names a renders/diff/ image -> Read it first: Before | After | Diff of a design revision (refs/design-revisions.md Reading)
 components.md -> which library components a page uses (Reused/Changed/New); a `Uses <Component>` Dev Note means import it, never rebuild it
 open only rows the story's Design section names (or the rows picked above)
 .png (render | screenshot) -> Read it: layout, hierarchy, copy, states, spacing

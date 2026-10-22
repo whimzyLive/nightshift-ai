@@ -43,6 +43,15 @@ Then run the direct `session-complete.sh` release (see **Final action** in `comm
 exit. # rationale: an unreadable probe is treated as unset — the safe default is to refuse to spawn
 anything rather than guess a mode.
 
+## E0a — Route merged design revisions
+
+Before E1 (so stories it creates join `ORDER`), for each of the Epic's designs
+(`refs/design-references.md` Epic designs) whose `index.md` on `origin/<BASE>` ends in a
+`## Changed in this revision` block with rows, and no Epic comment `Design revision routed: <slug>
+<Revision>`: dispatch the `scrum-master` in **design-revision mode** (Mode 4) with `EPIC_KEY`,
+`DESIGN_DIR`, `<BASE>` — bounded to Jira edits under `EPIC_KEY` plus read-only `git fetch`/`git show`.
+Routing runs only once a revision has merged; `refs/design-revisions.md` Routing.
+
 ## E0b — Spec preflight: approve every needed spec before the unattended run
 
 Children run unattended and cannot ask for approval, so every full-path child gets its spec
