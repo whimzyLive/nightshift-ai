@@ -2,7 +2,7 @@
 description: Triage a Jira story's complexity and return a deterministic TRIAGE=lightweight|full / STORY_POINTS= routing block so /impl and /auto route consistently. Reads existing story points; never sets them.
 ---
 
-Triage the Jira story **`$ARGUMENTS`** and emit the shared routing contract so callers (`/impl`, `/auto`, or a human) decide whether the story needs the full spec+plan ceremony or can go straight to implementation.
+Triage the Jira story **`$ARGUMENTS`** and emit the shared routing contract so callers (`/impl`, `/auto`, or a human) decide whether the story needs an approved spec first or can go straight to implementation.
 
 `/triage` is a thin wrapper over `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` — it does not re-state the threshold or decision logic; it applies the ref and prints the contract block.
 

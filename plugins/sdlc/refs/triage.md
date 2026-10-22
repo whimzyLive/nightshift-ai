@@ -1,6 +1,6 @@
 # Triage protocol
 
-Shared complexity-routing protocol for SDLC commands. Reference this from any command that needs to decide whether a story is **lightweight** (skip the spec+plan ceremony, implement directly) or **full** (spec + plan review gate required before implementation). This is the single source of truth for the threshold, the decision table, and the missing-points handling — `/triage`, `/auto`, and `/impl` all reference it rather than re-stating the logic.
+Shared complexity-routing protocol for SDLC commands. Reference this from any command that needs to decide whether a story is **lightweight** (no spec, implement directly) or **full** (a spec the user approves in session before implementation). This is the single source of truth for the threshold, the decision table, and the missing-points handling — `/triage`, `/auto`, and `/impl` all reference it rather than re-stating the logic.
 
 ## Inputs
 
@@ -72,13 +72,13 @@ Read the story's points via the existing `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.
 
 Threshold `T` (default `3`); lightweight uses an **inclusive upper bound** — exactly `T` points is lightweight.
 The **Bug row is highest priority and overrides the points threshold unconditionally** — an 8-point Bug
-is still `lightweight` (defects skip spec+plan):
+is still `lightweight` (defects skip the spec):
 
 | Condition | `WORK_KIND` | `TRIAGE` | Notes |
 | --- | --- | --- | --- |
 | `issuetype` is Bug | `defect` | `lightweight` | **forced** — overrides points; highest priority |
 | `points <= T` (non-Bug) | `feature` | `lightweight` | inclusive upper bound (exactly `T` ⇒ lightweight) |
-| `points > T` (non-Bug) | `feature` | `full` | spec + plan required |
+| `points > T` (non-Bug) | `feature` | `full` | approved spec required |
 | `points` missing (non-Bug) | `feature` | `full` | fail-safe default; also emit a `WARNING:` line |
 
 A defect with `STORY_POINTS=missing` still reports `STORY_POINTS=missing` honestly on its line, but
@@ -117,7 +117,7 @@ existing two-line parsers stay back-compatible. `STORY_POINTS=` carries the same
 On its own line, prefixed `WARNING:`, so parsers that consume only `TRIAGE=`/`STORY_POINTS=` are unaffected. Worked example for the missing-points case:
 
 ```
-WARNING: Story points not set on <KEY> — defaulting to the full (spec+plan) path. Set points in Jira before running /impl for the lightweight path.
+WARNING: Story points not set on <KEY> — defaulting to the full (approved-spec) path. Set points in Jira before running /impl for the lightweight path.
 WORK_KIND=feature
 TRIAGE=full
 STORY_POINTS=missing

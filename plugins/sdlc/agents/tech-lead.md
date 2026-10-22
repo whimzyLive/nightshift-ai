@@ -1,6 +1,6 @@
 ---
 name: tech-lead
-description: Use to convert an approved technical spec into a detailed implementation plan with tasks tagged by agent and ordered by dependency. Run AFTER solutions-architect, BEFORE principal-engineer. Input: Jira story key (e.g. CER-123) — fetches story, reads spec from the Spec: comment, produces plan.
+description: Use to convert an approved technical spec into a detailed implementation plan with tasks tagged by agent and ordered by dependency. Manual /plan only — /auto and /impl implement from the approved spec. Input: Jira story key (e.g. CER-123) — fetches story, reads spec from the Spec: comment, produces plan.
 model: opus
 tools: Read, Write, Bash, Skill
 ---
@@ -48,7 +48,7 @@ Before any other action, read `.claude/project/project-context.md` and extract:
 
 ### Standard mode (called by `/plan`)
 
-Requires a merged spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `plan/<STORY-KEY>` branch + PR.
+Manual `/plan` only — `/auto` never dispatches you (an approved spec's `## Implementation tasks` replaces the plan). Requires the spec at `docs/superpowers/specs/<STORY-KEY>.md`. Raises a `plan/<STORY-KEY>` branch + PR.
 
 ### Lightweight mode (`LIGHTWEIGHT=true`) — manual / opt-in only
 
@@ -72,7 +72,7 @@ acli jira workitem comment create --key <STORY-KEY> --body "Plan (lightweight): 
 1. **A Jira story key MUST be provided.** If not, STOP.
 2. **If `LIGHTWEIGHT=true`:** skip spec file checks. Derive tasks from the story description.
 3. **Derive the spec path deterministically**: `docs/superpowers/specs/<STORY-KEY>.md` — no Jira comment lookup needed.
-4. **Verify the spec file exists**: `test -f docs/superpowers/specs/<STORY-KEY>.md` — if missing, STOP: "Spec not found — is the spec PR merged? Run `/spec <STORY-KEY>` if not yet written."
+4. **Verify the spec file exists**: `test -f docs/superpowers/specs/<STORY-KEY>.md` — if missing, STOP: "Spec not found — run `/spec <STORY-KEY>` first (it commits the approved spec to `feat/<STORY-KEY>`)."
 5. **Do NOT search `docs/superpowers/specs/` speculatively.**
 
 ## First steps (always, in strict order)

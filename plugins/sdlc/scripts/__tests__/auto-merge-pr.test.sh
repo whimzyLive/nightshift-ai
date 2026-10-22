@@ -61,6 +61,8 @@
 #      the next read, run with AUTO_MERGE_CHECKS_NONE_GRACE_SECS=0 (floored to 1s) — must NOT
 #      merge blind on the first empty read; must still be polling when the failing check appears
 #      and refuse. Deleting the none-grace floor line must turn this case red (mutation-tested).
+#  21-23. `--wait-checks` — waits then merges and transitions; failing check exits 1; timeout
+#      exits 3.
 #
 # Self-runnable, no test harness/framework dependency:
 #   bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
@@ -695,6 +697,71 @@ if [ "$floorgrace_status" -eq 1 ] && [ -z "$floorgrace_out" ] \
 else
   echo "FAIL: --auto none-grace-floor — exit=$floorgrace_status output=${floorgrace_out:-<empty>}"
   cat "$floorgrace_stderr"
+  failures=$((failures + 1))
+fi
+
+# Cases 21-23: --wait-checks (/auto's Full-Auto impl tail). It accepts story-key/done-status
+# (unlike --auto), always waits for checks — even when the repo allows GitHub auto-merge — and
+# shares --auto's fail (exit 1) / timeout (exit 3) contract.
+wait_stderr="$mockdir/stderr-wait.log"
+wait_counter="$mockdir/checks-counter-wait"
+wait_out="$(PATH="$mockdir:$PATH" MOCK_GH_ALLOW_AUTO_MERGE=true MOCK_GH_MERGE_STATE_STATUS=BLOCKED \
+  MOCK_GH_CHECKS_MODE=pending-then-pass MOCK_GH_CHECKS_COUNTER_FILE="$wait_counter" MOCK_GH_CHECKS_PASS_AFTER=2 \
+  AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_TIMEOUT_SECS=30 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$wait_stderr")"
+wait_status=$?
+if [ "$wait_status" -eq 0 ] && [ "$wait_out" = "MERGED" ] \
+  && grep -q 'checks all settled and passing' "$wait_stderr" \
+  && grep -q '^merged: PR 999999' "$wait_stderr" \
+  && ! grep -q 'auto-merge-enabled' "$wait_stderr"; then
+  echo "PASS: --wait-checks accepts story-key/done-status, waits for checks (never arms auto-merge), then merges"
+else
+  echo "FAIL: --wait-checks happy path — exit=$wait_status output=${wait_out:-<empty>}"
+  cat "$wait_stderr"
+  failures=$((failures + 1))
+fi
+
+waitfail_stderr="$mockdir/stderr-waitfail.log"
+waitfail_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=fail MOCK_GH_MERGE_REJECT=1 \
+  AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_TIMEOUT_SECS=30 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$waitfail_stderr")"
+waitfail_status=$?
+if [ "$waitfail_status" -eq 1 ] && [ -z "$waitfail_out" ] \
+  && grep -q '^ERROR: PR 999999 has failing check(s): ci-main' "$waitfail_stderr" \
+  && ! grep -q '^merged:' "$waitfail_stderr"; then
+  echo "PASS: --wait-checks refuses on a failing check — exit 1, no merge"
+else
+  echo "FAIL: --wait-checks failing check — exit=$waitfail_status output=${waitfail_out:-<empty>}"
+  cat "$waitfail_stderr"
+  failures=$((failures + 1))
+fi
+
+waittimeout_stderr="$mockdir/stderr-waittimeout.log"
+waittimeout_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=pending-forever \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=1 AUTO_MERGE_CHECKS_POLL_SECS=1 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$waittimeout_stderr")"
+waittimeout_status=$?
+if [ "$waittimeout_status" -eq 3 ] && [ -z "$waittimeout_out" ] \
+  && grep -q '^ERROR: PR 999999 checks did not settle within 1s' "$waittimeout_stderr"; then
+  echo "PASS: --wait-checks timeout — exits 3, leaves the PR open"
+else
+  echo "FAIL: --wait-checks timeout — exit=$waittimeout_status output=${waittimeout_out:-<empty>}"
+  cat "$waittimeout_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 24: --wait-checks runs seconds after PR creation, so a PR reporting no checks is NOT
+# believed within the 30s --auto grace — the 120s default outlasts this 3s budget and times out.
+waitnone_stderr="$mockdir/stderr-waitnone.log"
+waitnone_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=none MOCK_GH_MERGE_REJECT=1 \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=3 AUTO_MERGE_CHECKS_POLL_SECS=1 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$waitnone_stderr")"
+waitnone_status=$?
+if [ "$waitnone_status" -eq 3 ] && [ -z "$waitnone_out" ] && ! grep -q 'has reported no checks' "$waitnone_stderr"; then
+  echo "PASS: --wait-checks does not trust an early no-checks read (120s grace)"
+else
+  echo "FAIL: --wait-checks no-checks grace — exit=$waitnone_status output=${waitnone_out:-<empty>}"
+  cat "$waitnone_stderr"
   failures=$((failures + 1))
 fi
 

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# auto-merge-pr.sh [--auto] <pr> [<story-key> <done-status>]
+# auto-merge-pr.sh [--auto | --wait-checks] <pr> [<story-key> <done-status>]
+#
+# `--wait-checks` (/auto's Full-Auto impl tail — no review loop runs first): always wait for the
+# PR's checks to settle exactly as `--auto`'s non-arming path does (same exit 1 / exit 3), then
+# merge and run the transition below. Unlike `--auto` it accepts story-key/done-status. It runs
+# seconds after the PR is created, so "no checks" must persist for 120s (not 30s) before it is
+# believed — CI that registers late must never let the PR merge unchecked.
 #
 # Merge a pull request using the repository's allowed merge method, resolved DYNAMICALLY at
 # merge time — never a hard-coded flag. Used by /auto's Full-Auto terminal action, after the
@@ -30,8 +36,7 @@ set -euo pipefail
 #                   REJECTED together with $2/$3 (see below) — enforced, not just documented.
 #   $1 pr           PR number or URL to merge
 #   $2 story-key    OPTIONAL — the Jira story key to transition after a story-COMPLETING merge
-#                   (Workflow B impl PR, or Workflow A Phase-2 plan+impl PR). Omit for a
-#                   non-completing merge (e.g. Workflow A Phase-1 spec PR) — the story stays
+#                   (the /auto implementation PR). Omit for a non-completing merge — the story stays
 #                   in progress and no transition is attempted. Incompatible with `--auto` (a spec
 #                   PR never completes the story) — the script exits 1 if both are supplied.
 #   $3 done-status  OPTIONAL — the consuming project's pipeline done status (e.g. `Done`), read
@@ -94,10 +99,12 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 
 AUTO=false
-if [ "${1:-}" = "--auto" ]; then
-  AUTO=true
-  shift
-fi
+WAIT_CHECKS=false
+NONE_GRACE_DEFAULT=30
+case "${1:-}" in
+  --auto) AUTO=true; shift ;;
+  --wait-checks) WAIT_CHECKS=true; NONE_GRACE_DEFAULT=120; shift ;;
+esac
 
 PR="${1:?PR number or URL required}"
 STORY_KEY="${2:-}"
@@ -128,12 +135,12 @@ echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 # (stderr message already printed in the return-1 case).
 wait_for_checks() {
   local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}"
-  local none_grace="${AUTO_MERGE_CHECKS_NONE_GRACE_SECS:-30}" elapsed=0 first_empty_at=""
+  local none_grace="${AUTO_MERGE_CHECKS_NONE_GRACE_SECS:-$NONE_GRACE_DEFAULT}" elapsed=0 first_empty_at=""
   local checks failing names query_rc total settled_ok passing
   case "$timeout" in ''|*[!0-9]*) timeout=720 ;; esac
   case "$poll" in ''|*[!0-9]*) poll=15 ;; esac
   [ "$poll" -lt 1 ] && poll=1
-  case "$none_grace" in ''|*[!0-9]*) none_grace=30 ;; esac
+  case "$none_grace" in ''|*[!0-9]*) none_grace="$NONE_GRACE_DEFAULT" ;; esac
   [ "$none_grace" -lt 1 ] && none_grace=1
   while :; do
     if checks=$(gh pr checks "$pr" --json bucket,name 2>/dev/null); then
@@ -235,6 +242,12 @@ if [ "$AUTO" = true ]; then
     fi
     echo "auto-merge: PR $PR checks settled ($CHECKS_RESULT) — merging immediately" >&2
   fi
+elif [ "$WAIT_CHECKS" = true ]; then
+  if ! wait_for_checks "$PR"; then
+    [ "$CHECKS_RESULT" = "timeout" ] && exit 3
+    exit 1
+  fi
+  echo "auto-merge: PR $PR checks settled ($CHECKS_RESULT) — merging" >&2
 fi
 
 # Merge with the explicit resolved flag. `gh pr merge` only prompts interactively for the merge
