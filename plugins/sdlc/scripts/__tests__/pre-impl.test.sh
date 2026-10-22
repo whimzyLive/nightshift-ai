@@ -88,6 +88,10 @@ add_remote_branch() {
   )
 }
 
+# The script merges the base into a reused branch, which writes a merge commit: give it an
+# identity, since a CI runner has no global git config.
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+
 pass=0 fail=0
 OUT="" RC=0
 run() {
