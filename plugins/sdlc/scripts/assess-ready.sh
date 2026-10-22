@@ -8,7 +8,9 @@ set -uo pipefail
 # Exit 0 when both probes answered; exit 1 when either is `unknown` (a failed Jira probe) — the
 # caller then falls back to the scrum-master Mode 3 dispatch and treats the spec as unapproved.
 #
-# JQL label probes, not `acli view --json` — view renders labels as null even when set.
+# JQL label probes, not `acli view --json` — view renders labels as null even when set. A probe
+# hit is the proof (the search returns only `key`, so its labels field is null by design); callers
+# take these two lines as final and never re-check labels another way.
 
 here="$(cd "$(dirname "$0")" && pwd)"
 KEY="${1:?usage: assess-ready.sh <KEY>}"
