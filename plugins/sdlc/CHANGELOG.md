@@ -1,3 +1,13 @@
+## 0.47.1 (2026-10-22)
+
+### 🩹 Fixes
+
+- **sdlc:** resume returned fix agents, and treat assess-ready's label lines as final ([8d26bd4](https://github.com/whimzyLive/nightshift-ai/commit/8d26bd4))
+
+### ❤️ Thank You
+
+- Rushi Patel
+
 ## 0.47.0 (2026-10-22)
 
 ### 🚀 Features
