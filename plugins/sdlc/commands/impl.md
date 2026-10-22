@@ -1,5 +1,5 @@
 ---
-description: Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first — full stories require a merged plan PR; lightweight (<= threshold pts) stories implement directly with no plan precondition.
+description: Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first — full stories require an approved spec (/spec) on their feat/ branch; lightweight (<= threshold pts) stories implement directly from the story.
 ---
 
 Execute the implementation for the Jira story **`$ARGUMENTS`** by running the Principal
@@ -14,7 +14,7 @@ the Principal Engineer role directly.
 
 1. **Triage gate.** Run the triage step by **applying `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` INLINE**
    (in this same session) and capture **both** `TRIAGE` (`lightweight` | `full`) **and `WORK_KIND`
-   (`defect` | `feature`)**. `TRIAGE` decides whether the merged plan file is a hard precondition
+   (`defect` | `feature`)**. `TRIAGE` decides whether an approved spec is a hard precondition
    (Step 2). `WORK_KIND` is threaded into the playbook (Step 4): `WORK_KIND=defect` activates the
    systematic-debugging defect variant on a `fix/<STORY-KEY>` branch and re-points QA's Step-7
    verification — so a Bug routed to `/impl` gets the defect workflow, identical to `/auto`'s
@@ -29,23 +29,19 @@ the Principal Engineer role directly.
    > slot mid-`/impl`. `/impl` owns the single release at the very end. Apply the **ref** inline,
    > never the **command** (`refs/triage.md` emits no sentinel).
 
-2. Derive the plan path: `docs/superpowers/plans/<STORY-KEY>.md` — no Jira comment lookup needed.
-   Whether the plan file is **required** depends on `TRIAGE`:
-   - **`TRIAGE=full`** → the plan file MUST exist at that path (merged to `develop`). If missing →
-     return **blocked**: tell the user to run `/spec <STORY-KEY>` then `/plan <STORY-KEY>` and merge
-     the plan PR first (AC-2). No branch, no domain agents.
-   - **`TRIAGE=lightweight`** → the plan file is **optional**: a missing
-     `docs/superpowers/plans/<STORY-KEY>.md` is **NOT a blocker**. Proceed directly to the Principal
-     Engineer playbook; it derives tasks from the story description. This is the **same direct path**
-     `/auto` Workflow B takes for a lightweight story — neither command generates a plan doc on this
-     path. The ONLY lock relaxed here is the plan-file STOP — the dependency gate below still runs.
+2. Whether a task source must already exist depends on `TRIAGE`:
+   - **`TRIAGE=full`** → an approved spec: label `Spec-Approved` and
+     `docs/superpowers/specs/<STORY-KEY>.md` on `origin/feat/<STORY-KEY>` (a legacy merged plan doc
+     `docs/superpowers/plans/<STORY-KEY>.md` also satisfies it). Missing → return **blocked**: run
+     `/spec <STORY-KEY>` first. No domain agents. The PR then carries the spec and the code.
+   - **`TRIAGE=lightweight`** → nothing is required; the playbook derives tasks from the story —
+     the same direct path `/auto` Workflow B takes. The dependency gate below still runs.
 3. Fetch the Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for the
    summary, description, and context (comments, linked tickets, attachments).
 4. **Execute `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` inline**, start to finish, for
    `<STORY-KEY>` — passing **`LIGHTWEIGHT=true` when `TRIAGE=lightweight`** (else `false`) **and the
-   `WORK_KIND` captured in Step 1**. `LIGHTWEIGHT` makes the playbook skip the plan-file STOP and
-   derive tasks inline from the story on the lightweight path; on the full path it leaves the
-   merged-plan precondition intact. **`WORK_KIND=defect`** activates the playbook's systematic-debugging
+   `WORK_KIND` captured in Step 1**. `LIGHTWEIGHT` makes the playbook derive tasks from the story;
+   on the full path they come from the approved spec. **`WORK_KIND=defect`** activates the playbook's systematic-debugging
    defect variant (reproduce → root-cause → failing regression test → fix+verify, dispatching domain
    agents) on a `fix/<STORY-KEY>` branch, and the playbook threads `WORK_KIND` on to the QA Engineer
    (re-pointing Step-7 to the defect regression-evidence contract); `WORK_KIND=feature` keeps the
@@ -80,8 +76,8 @@ All phases done. Review clean. Quality gate passed."
 6. Report back: phases completed, the PR URL, review rounds, quality-gate evidence, any blockers
    or open items for the reviewer.
 
-**IMPORTANT:** On the `full` path, only run after the plan PR is reviewed and merged (Step 2). On
-the `lightweight` path, no plan PR is required. Either way this makes real code changes across
+**IMPORTANT:** On the `full` path, only run after the spec is approved (Step 2). On the
+`lightweight` path, nothing is required first. Either way this makes real code changes across
 domain agents and cannot be easily undone. If the playbook hits `Status: blocked` at any phase,
 STOP and surface it — do not improvise around it.
 
@@ -94,7 +90,7 @@ Do not bypass this.
 
 ## Final action — release at PR raise (when run standalone)
 
-Applies only when `/impl` is the **top-level** command. Nested under `/auto` Workflow A Phase 2
+Applies only when `/impl` is the **top-level** command. Nested under `/auto` (A2 or B1)
 running the playbook inline, `/auto` owns the terminal action — do **not** run this final action
 nested.
 

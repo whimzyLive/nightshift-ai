@@ -43,6 +43,27 @@ Then run the direct `session-complete.sh` release (see **Final action** in `comm
 exit. # rationale: an unreadable probe is treated as unset — the safe default is to refuse to spawn
 anything rather than guess a mode.
 
+## E0b — Spec preflight: approve every needed spec before the unattended run
+
+Children run unattended and cannot ask for approval, so every full-path child gets its spec
+approved **here, in the epic session, before any child spawns**. Run it right after E1 builds
+`ORDER` and before E2; it is E0b because it gates spawning exactly like E0.
+
+```text
+NEEDS := every S in ORDER, in dependency order (later specs may rely on earlier ones), except:
+  issuetype Bug | status == <Pipeline done status> | triage(S) == lightweight
+  | triage(S) STORY_POINTS=missing   # the child stops on missing points anyway; set them first
+  | assess-ready.sh S -> SPEC_APPROVED=yes AND origin/feat/S has docs/superpowers/specs/S.md
+  | /auto A0's LEGACY=yes for S (spec merged under the old flow, or a plan doc)
+NEEDS empty -> E2
+resolveImpl() == worker alternate (no person to ask) -> spawn nothing; comment the Epic with NEEDS
+  ("approve their specs with /spec <KEY>, then re-run /auto <EPIC>"); bare release   # check FIRST
+for S in NEEDS: apply commands/spec.md Steps 1-4 INLINE (questions + approval via AskUserQuestion)
+  not approved -> stop the preflight; spawn nothing; bare release (a re-run resumes here)
+```
+
+`triage(S)` is `refs/triage.md` applied inline for `S`. Every child then reaches A0 already approved.
+
 ## E1 — Build the dependency-ordered queue
 
 Run the queue builder as **one** statically-analysable invocation (all `acli`/`jq`/loops live inside
@@ -58,7 +79,7 @@ Parse its greppable output:
   that `Blocks` it (the feature-spec dependencies, encoded in the Jira `Blocks` graph).
   Independent stories are tie-broken by Jira `created ASC`.
 - one `<key> BLOCKERS=<…>` line per story (informational).
-- `GATE=PASS` (exit 0) -> proceed with `ORDER`.
+- `GATE=PASS` (exit 0) -> **E0b** (spec preflight), then E2 with `ORDER`.
 - `GATE=STOP` (exit 1) -> the builder hit an acli failure **or a dependency cycle** (its `REASON=`
   line names the cycle keys). Do not spawn anything — surface the `REASON` to the user, run the
   direct `session-complete.sh` release, and exit.
@@ -131,19 +152,17 @@ Story S is gated (mode=<effectiveMode(S)>). PR: <url>. Review + merge, then type
   the direct `session-complete.sh` release and exit. (Re-running `/auto EPIC_KEY` later resumes —
   E2a skips every already-done story and picks up where the abort left off.)
 
-`gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> the child succeeded, but for a
-spec-only A1 completion (NA-104) that means auto-merge was ARMED, or already merged if the PR was
-immediately mergeable — **not necessarily a landed PR** either way; only an impl-completing
-phase's own tail loop verifies an actual merge before the child's sentinel fires. **No suspend**
-either way — advance straight to the next story; A1's eventual merge (and Phase 2) resumes
-independently via the webhook-triggered `/auto STORY_KEY` re-invocation, not via anything the
-epic loop tracks here. The all-Full-Auto epic is therefore **emergent**: no story is ever gated,
-so the suspend primitive is never invoked, so the whole epic runs to completion in this single
-epic session, hands-free.
+`gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> verify before advancing: the sentinel
+must carry `|PR=<url>` **and** `gh pr view <url> --json state -q .state` must be `MERGED` (the
+child's tail waits for checks and merges). A bare sentinel (the child stopped before a PR, e.g. on
+an unapproved spec) or an unmerged PR (failing checks, refused merge) → **HALT** (E4) — never
+advance past an unmerged story. Verified → **no suspend**, advance straight to the next story. With E0b's specs approved up front, an all-Full-Auto epic is **emergent**: no
+story is ever gated, so the whole epic runs to completion in this single epic session, hands-free.
 
 ## E4 — HALT on child failure
 
-A child **succeeds** iff it emits its `<<<SDLC_SESSION_COMPLETE:S…>>>` sentinel.
+A child **succeeds** iff it emits its `<<<SDLC_SESSION_COMPLETE:S…>>>` sentinel — and, for a
+non-gated story, E3's merge check passes.
 `child exits non-zero, errors out, or hits its idle timeout with no sentinel -> treat as failure,
 HALT the whole epic immediately` — do **not** skip the story and do **not** continue to the next
 one:

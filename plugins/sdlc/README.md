@@ -1,11 +1,14 @@
 # sdlc — repo-agnostic SDLC plugin
 
-Generic SDLC agent workflow for Claude Code. Drives Jira → spec → plan → impl → review
+Generic SDLC agent workflow for Claude Code. Drives Jira → spec → impl → review
 using a per-repo config file the consumer supplies at `.claude/project/project-context.md`.
 
 `/auto` triages by complexity first: **small stories** (≤ the configurable lightweight threshold,
-default 3 points) skip spec+plan entirely and go **straight to implementation** (tasks derived inline
-from the ticket); the full spec → plan → review-gate flow is reserved for larger stories.
+default 3 points) skip the spec and go **straight to implementation** (tasks derived inline from the
+ticket). Larger stories get a spec written in your session — open questions asked, your approval
+required — and the spec ships with the code in **one** PR; the spec's task list replaces a separate
+plan. An epic gets every needed spec approved up front, then runs unattended. In-session review,
+quality gate and AC check run in parallel; Copilot review on the PR is advisory.
 
 ## Install
 
@@ -34,9 +37,8 @@ The file is a regenerated per-session cache — **gitignore it**.
   (`superpowers@claude-plugins-official`), so `/plugin install sdlc@nightshift` reuses an existing
   superpowers install or pulls it from the official marketplace. Agents invoke its skills:
   executing-plans, test-driven-development, verification-before-completion, requesting-code-review,
-  receiving-code-review, writing-plans. (`subagent-driven-development` was dropped from the
-  Principal Engineer playbook's Step-0 preload — NA-86 A8 — since the playbook dispatches domain
-  agents directly via its own Step-4 prompt contract.)
+  receiving-code-review, writing-plans — the domain agents, reviewer and verifier subagents load
+  them. The orchestrating PE/QA playbooks load none: they carry their own dispatch and triage rules.
 - **claude-mem plugin** — **auto-installed.** Declared as a cross-marketplace dependency
   (`claude-mem@thedotmack`). The `knowledge-engineer` agent's `/sdlc:docs distill` mode uses its
   `observation_search` / `get_observations` MCP tools to mine claude-mem's persistent cross-session

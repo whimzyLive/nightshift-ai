@@ -41,9 +41,10 @@ tot=$((qb + pb))
 [ "$tot" -le 73704 ] && ok "(G-14a) combined playbooks $tot <= 73704" \
   || bad "(G-14a) combined playbooks <= 73704" "actual $tot (qa=$qb pe=$pb) — NEVER raise this constant"
 
+# Re-pinned 13445 -> 13406 when /auto stopped calling /sdlc:loop (its stale caller sentence fixed).
 lm="$(wc -c < "$loop_md" | tr -d ' ')"
-[ "$lm" -eq 13445 ] && ok "(G-14b) commands/loop.md byte-unchanged at 13445" \
-  || bad "(G-14b) commands/loop.md == 13445" "actual $lm"
+[ "$lm" -eq 13406 ] && ok "(G-14b) commands/loop.md byte-unchanged at 13406" \
+  || bad "(G-14b) commands/loop.md == 13406" "actual $lm"
 
 lmo="$(wc -c < "$loop_modes" | tr -d ' ')"
 [ "$lmo" -eq 13554 ] && ok "(G-14c) refs/loop-modes.md byte-unchanged at 13554" \

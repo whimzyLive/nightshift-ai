@@ -80,17 +80,12 @@ Skip phases for agents marked **Standby** in project-context.
 
 ---
 
-## Step 0 — Required skills
+## Step 0 — Nesting self-guard
 
-**Nesting self-guard (first):** confirm the `Agent` tool is available to you. If it is not, you
-were dispatched as a subagent — STOP and return the BLOCKED message from the qa-engineer profile.
-Do not review, fix, or improvise the loop yourself.
-
-Invoke, in order, before reviewing anything:
-
-1. `requesting-code-review`
-2. `receiving-code-review`
-3. `verification-before-completion`
+Confirm the `Agent` tool is available to you. If it is not, you were dispatched as a subagent —
+STOP and return the BLOCKED message from the qa-engineer profile. Do not review, fix, or improvise
+the loop yourself. No skill loads: the reviewer and verifier subagents carry the review and
+verification skills; this playbook states the triage and evidence rules you apply (Steps 2, 8).
 
 ## Step 1 — Request review
 
@@ -126,14 +121,14 @@ replaces reading a single append-only audit log whole.
 Captured round files are not committed, so also read them:
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --kind review`
 
-Dispatch an `agent-skills:code-reviewer` subagent following the `requesting-code-review`
-skill pattern. The prompt MUST include:
+Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exists, else
+`general-purpose`); it loads `requesting-code-review` itself. The prompt MUST include:
 
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
 - `PLAN_OR_REQUIREMENTS`: Story mode — the story's **acceptance criteria verbatim** (the reviewer
   must check the code against the ACs, not just internal consistency), **plus** the path to
-  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists** — the reviewer reads it itself. On the
+  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists**, else the spec path — the reviewer reads it. On the
   **lightweight** path there is no plan doc — use the Jira story **description + acceptance criteria**
   as the requirement source (the ACs are the contract). Diff mode — there are no ACs/plan; the
   requirement is the change's stated intent.
@@ -147,55 +142,21 @@ skill pattern. The prompt MUST include:
   implementers wrote to, no stricter, no looser; point the reviewer at that file, don't restate it.
 
 Dispatch with `isolation: "worktree"` is NOT needed — the reviewer reads, it does not write.
+Story mode dispatches it together with the Step 6 gate and Step 7 verifier, one round per HEAD —
+`${CLAUDE_PLUGIN_ROOT}/refs/qa-review-rounds.md`.
 
 ### Alternative entry — external review feedback (`/review-fix`)
 
-When findings come from an existing **GitHub PR or commit** (Copilot or human reviewers) rather
-than a fresh code-reviewer pass, SKIP the dispatch above. Instead build the finding list from the
-fetched comments:
+Findings from an existing PR or commit (Copilot or human) instead of a fresh reviewer pass → read
+`${CLAUDE_PLUGIN_ROOT}/refs/qa-external-review.md` and follow it, then continue at Step 2.
 
-- The caller (`/review-fix`) has fetched the feedback into files under the session temp dir
-  (`dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)`): `"$dir/review-fix-summary.json"` = PR
-  **body** + general/issue comments + review-summary bodies; `"$dir/review-fix-inline.json"` =
-  **unresolved** inline review comments. Read BOTH — the only exclusion is inline threads marked
-  _Resolved_ (filtered at fetch via GraphQL `reviewThreads.isResolved`, already addressed). The PR
-  body and generic comments have no resolved state and are ALWAYS included.
-- Each inline comment becomes one candidate finding; treat the PR body + general comments as
-  context AND as potential candidate requests in their own right. Keep each comment's file/line
-  anchor, author, AND its numeric `id` (databaseId), required to reply on and resolve that exact
-  thread in the close-out step. (Do NOT re-triage already-resolved threads — excluded at fetch.)
-- Treat these EXACTLY as if a reviewer had produced them, then proceed to Step 2 triage — where you
-  decide which are real (`receiving-code-review`). Record a decision ledger row per comment:
-  `{id, path:line, decision: accepted|rejected, justification}`.
+## Step 2 — Triage feedback
 
-This mode operates on the **PR head branch** (or the commit's branch): Step 3 fix commits are
-committed AND **pushed** there, so the PR updates and reviewers see the resolution. Step 4's
-re-review is a fresh `agent-skills:code-reviewer` pass over the **applied fix commits**
-(`BASE_SHA`=pre-fix HEAD, `HEAD_SHA`=post-fix HEAD), confirming each accepted comment is resolved
-and nothing regressed.
-
-**Close out the PR threads (fixes pushed + gate green — `/review-fix` only).** Post each decision
-back so the reviewer sees only what still needs attention, each with a justification. For every
-triaged inline comment, write the reply to a file (never inline JSON) and call the helper:
-
-```bash
-dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)   # session-scoped ./.tmp/<key>
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> accepted "$dir/reply-<id>.md"   # replies + RESOLVES the thread
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/pr-resolve-comment.sh <PR> <comment-id> rejected "$dir/reply-<id>.md"   # replies, leaves thread OPEN
-```
-
-- **Accepted** → reply with why + the fix commit; thread RESOLVES (drops off the open list).
-- **Rejected** → reply why it's wrong/stale/out-of-scope; thread stays OPEN.
-- Review-summary/top-level issue comments aren't resolvable threads → post ONE summarising PR
-  issue comment (`gh pr comment`) instead.
-- Commit-SHA target → reply on the commit comment; nothing to resolve.
-- Best-effort: a reply/resolve failure must NOT fail the run (fixes are already pushed) — log + continue.
-
-## Step 2 — Triage feedback (receiving-code-review)
-
-Apply the `receiving-code-review` skill. For each finding, classify by **severity** and
-**domain**. Do not perform agreement — verify each finding is technically real before queuing a
-fix; push back (in the final report) on any finding that is wrong or out of scope, with reasons.
+For each finding, classify by **severity** and **domain**. Do not perform agreement — a finding
+must carry `file:line` and the reviewer's evidence; one you doubt goes back to the reviewer (resume
+it) or to the owning agent — you never read the code yourself. Push back (in the final report) on
+any finding that is wrong or out of scope, with reasons. A finding against the spec or plan doc on
+the branch is out of scope — those are requirements, not code under review.
 
 For external feedback (`/review-fix`): keep only comments that are **true in the context of this
 application** — discard ones that are wrong, stale (already addressed), based on a misreading, or
@@ -342,7 +303,8 @@ attempt to fix or revert it yourself. Never self-repair.
 
 ## Step 4 — Re-review
 
-After all fixes are pushed, repeat Steps 1–3 until the reviewer returns **no Critical/Important
+After all fixes are pushed, resume the reviewer on the fix diff (fresh full review only on the
+escalations in `refs/qa-review-rounds.md`), then Steps 2–3, until **no Critical/Important
 findings and no open AC gaps**. Minor issues: collect for the return report, do not loop.
 
 ## Step 5 — Write learnings to memory
@@ -416,7 +378,7 @@ committed rule file.
 ## Step 6 — Quality gate
 
 ```text
-offload := Agent("general-purpose", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX>,
+offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX>,
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")
 Stray files non-empty -> STOP, list; never clean
 Gate:fail -> dispatch Owning agent w/Error(Step3), push, re-offload fresh
@@ -434,7 +396,7 @@ Follow `${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md` — the plan-task checkli
 checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live there.
 
 ```text
-offload := Agent("general-purpose", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
+offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
 Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
 WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
@@ -459,6 +421,7 @@ Return exactly this block (the caller creates the PR only on `clean`):
 ## QA verdict: <STORY-KEY>
 Status: clean | blocked
 Review rounds: <N>
+Re-review: resumed <N> / fresh <N>
 Fix dispatch: reuse <N> / fresh <N>
 Fixed (Critical/Important): <list, or "none">
 Minor noted (not fixed): <list, or "none">

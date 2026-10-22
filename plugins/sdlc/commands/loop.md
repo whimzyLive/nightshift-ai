@@ -41,9 +41,9 @@ reviewers.
   green), right before the session release. It is **NOT** run on any halt
   (rules 5/6/7, `/review-fix` failure) or budget-exceeded path. This keeps
   `sdlc:loop` **mode-agnostic** — it never decides to merge; it only runs
-  whatever terminal action the caller injected (e.g. `/auto` passes an auto-merge
-  command for a Full Auto story; standalone `/impl` passes nothing; `spec`/`plan`
-  never call `/sdlc:loop` — NA-104). If `--on-clean` is absent, rule 4 simply stops.
+  whatever terminal action the caller injected (e.g. a merge command; standalone
+  `/impl` passes nothing; `/auto`, `/spec` and `/plan` never call `/sdlc:loop`).
+  If `--on-clean` is absent, rule 4 simply stops.
 
 **Parsing `$ARGUMENTS`.** Split it explicitly — do NOT pass the whole string to
 `gh`:

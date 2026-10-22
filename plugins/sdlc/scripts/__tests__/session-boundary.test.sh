@@ -177,18 +177,21 @@ else
   failures=$((failures + 1))
 fi
 
-# --- Assertion (j): spec.md/plan.md release WITH the PR URL, not bare ---------------------------
+# --- Assertion (j): plan.md releases WITH the PR URL; spec.md raises no PR and releases bare ------
+# spec.md commits the approved spec to the story branch and raises no PR of its own (the spec ships
+# in the implementation PR), so its release carries no URL — and it must never call raise-pr.sh.
 pr_ok=0
-for f in plugins/sdlc/commands/spec.md plugins/sdlc/commands/plan.md; do
-  if [ -f "$f" ] && grep -Fq -- 'session-complete.sh <PR_URL>' "$f"; then
-    :
-  else
-    pr_ok=1
-    echo "FAIL: assertion j — $f must release via 'session-complete.sh <PR_URL>' (round-1 Important 4)" >&2
-  fi
-done
+if grep -Fq -- 'session-complete.sh <PR_URL>' plugins/sdlc/commands/plan.md 2>/dev/null; then :; else
+  pr_ok=1; echo "FAIL: assertion j — plan.md must release via 'session-complete.sh <PR_URL>'" >&2
+fi
+if grep -Fq -- 'raise-pr.sh' plugins/sdlc/commands/spec.md 2>/dev/null; then
+  pr_ok=1; echo "FAIL: assertion j — spec.md must not raise a PR (the spec ships in the implementation PR)" >&2
+fi
+if grep -Fxq -- 'bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh' plugins/sdlc/commands/spec.md 2>/dev/null; then :; else
+  pr_ok=1; echo "FAIL: assertion j — spec.md must release bare (no PR is raised)" >&2
+fi
 if [ "$pr_ok" -eq 0 ]; then
-  echo "PASS: assertion j — spec.md and plan.md both release with the PR URL"
+  echo "PASS: assertion j — plan.md releases with the PR URL; spec.md raises no PR and releases bare"
 else
   failures=$((failures + 1))
 fi

@@ -1,5 +1,5 @@
 ---
-description: Produce an implementation plan for a Jira story. Creates branch, writes docs/superpowers/plans/ doc, raises PR, and links back to the story. Run after /spec PR is reviewed and merged.
+description: Optional, manual — produce a separate implementation plan for a Jira story (branch, docs/superpowers/plans/ doc, PR). /auto and /impl never need it — an approved spec's Implementation tasks are the task list; the playbook still honours a plan doc when one exists.
 ---
 
 ## Step 0 — Issue-type guard (defects skip plan)
@@ -25,7 +25,7 @@ Dispatch the `tech-lead` agent to produce an implementation plan for the Jira st
 The agent should:
 
 1. Derive the spec path: `docs/superpowers/specs/<STORY-KEY>.md` — no Jira comment lookup needed
-2. Verify the spec file exists (must be merged to develop); if missing, STOP and tell user to run `/spec <STORY-KEY>` first
+2. Verify the spec file exists (on develop, or on `origin/feat/<STORY-KEY>` where `/spec` commits it); if missing, STOP and tell user to run `/spec <STORY-KEY>` first
 3. Read the spec file at the derived path
 4. Fetch Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for story summary and Epic context
 5. Read CLAUDE.md to verify stack assumptions
@@ -74,8 +74,7 @@ The agent should:
 
 ## Final action — release at PR raise (when run standalone)
 
-Applies only when `/plan` is the **top-level** command. Nested under `/auto` Workflow A Phase 2,
-`/auto` owns the terminal action — do **not** run this final action nested.
+Applies whenever `/plan` runs — `/auto` never nests it.
 
 **Plan never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
 that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at

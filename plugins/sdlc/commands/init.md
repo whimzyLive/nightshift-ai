@@ -196,7 +196,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Package manager | `npm` / `pnpm` / `yarn` / `bun` / other — **pre-select `DETECTED_PM`** |
 | Typecheck command | the project's typecheck — **default: `DETECTED_TYPECHECK`** (blank if none) |
 | Test command | the project's test runner — **default: `DETECTED_TEST`** (blank if none) |
-| Lightweight threshold | story points at/under which `/auto` skips spec+plan; default `3` |
+| Lightweight threshold | story points at/under which `/auto` skips the spec; default `3` |
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
 | Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
