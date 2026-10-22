@@ -1,11 +1,11 @@
 ---
 title: '/sdlc:prd'
-description: 'Convert a Jira Epic into a full PRD. Creates branch, writes docs/features/ doc, raises PR, and links back to the Epic. Run after /refine-feature or Slack ideation.'
+description: 'Optional — convert a Jira Epic into a full PRD. The product-manager drafts docs/features/ doc, then every open question is settled with you in this session before the PR is raised and linked back to the Epic. Run after /refine-feature and before /design; skip it when the Epic already says enough — /stories then decomposes from the Epic.'
 ---
 
 # /sdlc:prd
 
-Convert a Jira Epic into a full PRD. Creates branch, writes docs/features/ doc, raises PR, and links back to the Epic. Run after /refine-feature or Slack ideation.
+Optional — convert a Jira Epic into a full PRD. The product-manager drafts docs/features/ doc, then every open question is settled with you in this session before the PR is raised and linked back to the Epic. Run after /refine-feature and before /design; skip it when the Epic already says enough — /stories then decomposes from the Epic.
 
 ## Source
 

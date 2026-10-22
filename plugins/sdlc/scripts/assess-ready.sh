@@ -8,9 +8,9 @@ set -uo pipefail
 # Exit 0 when both probes answered; exit 1 when either is `unknown` (a failed Jira probe) — the
 # caller then falls back to the scrum-master Mode 3 dispatch and treats the spec as unapproved.
 #
-# JQL label probes, not `acli view --json` — view renders labels as null even when set. A probe
-# hit is the proof (the search returns only `key`, so its labels field is null by design); callers
-# take these two lines as final and never re-check labels another way.
+# JQL label probes, not `acli view --json` — view renders labels as null even when set. A hit is
+# the story's own key in the result. Never pass `--fields key`: acli 1.3.22 then returns `[null]`
+# for a hit, which has no key to match (the same trap `epic-queue.sh` notes).
 
 here="$(cd "$(dirname "$0")" && pwd)"
 KEY="${1:?usage: assess-ready.sh <KEY>}"
@@ -22,7 +22,7 @@ bash "$here/jira-site-guard.sh" >/dev/null 2>&1 || guard_ok=false
 has_label() {
   local out
   [ "$guard_ok" = true ] || { echo unknown; return; }
-  if ! out=$(acli jira workitem search --jql "key = $KEY AND labels = \"$1\"" --fields key --json 2>/dev/null); then
+  if ! out=$(acli jira workitem search --jql "key = $KEY AND labels = \"$1\"" --json 2>/dev/null); then
     echo unknown
   elif printf '%s' "$out" | jq -e --arg k "$KEY" 'type == "array" and any(.[]; .key == $k)' >/dev/null 2>&1; then
     echo yes

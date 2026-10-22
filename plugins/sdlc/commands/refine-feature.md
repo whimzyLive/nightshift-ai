@@ -1,5 +1,5 @@
 ---
-description: Refine a raw idea (or an existing Jira ticket) and create or update a Jira Epic. First step in the SDLC pipeline. Returns an Epic key for use with /prd.
+description: Refine a raw idea (or an existing Jira ticket) and create or update a Jira Epic. First step in the SDLC pipeline. Returns an Epic key for /prd (optional), then /design and /stories.
 ---
 
 Dispatch the `product-manager` agent to refine the input and create or update a Jira Epic.

@@ -68,7 +68,7 @@ rc=0
 unmerged=""
 ui_blockers=""
 for dep in $blockers; do
-  ui_json="$(acli jira workitem search --jql "key = $dep AND labels = \"UI-Components\"" --fields key --json 2>/dev/null)" \
+  ui_json="$(acli jira workitem search --jql "key = $dep AND labels = \"UI-Components\"" --json 2>/dev/null)" \
     || fail "cannot read labels of blocker $dep (cannot verify dependencies)"
   ui="$(printf '%s' "$ui_json" | jq --arg k "$dep" '[.[]? | select(.key == $k)] | length' 2>/dev/null)"
   [ -z "$ui" ] && fail "cannot read labels of blocker $dep (cannot verify dependencies)"
