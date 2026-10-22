@@ -1,7 +1,6 @@
 # Resolving the working issue's mode
 
-Referenced from `commands/auto.md`'s **Loop-after-raise** procedure (the "Resolving the working
-issue's mode" pointer) and `refs/epic-orchestration.md` E0's `epicFallback` ladder — both resolve
+Referenced from `commands/auto.md`'s **Tail after PR raise** (step 1, resolving `MODE`) and `refs/epic-orchestration.md` E0's `epicFallback` ladder — both resolve
 mode via the SAME shared script; this file is the single source of truth for the ladder itself.
 
 The terminal action (auto-merge vs leave for a human) depends on the story's AI workflow mode. Do

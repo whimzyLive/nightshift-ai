@@ -12,9 +12,10 @@ Apply `verification-before-completion`. Produce line-by-line checklists, each it
 evidence (git log, file existence, or test output) — no item checked off on assertion alone:
 
 1. **Every plan task** → has a corresponding commit/file/test. Source the `checklist`-mode slice
-   when the orchestrator supplies one; read the whole plan doc only on `GRAMMAR=unmatched`. _(Full
-   path only. On the lightweight path there is no plan doc — skip this checklist; the AC checklist
-   below is the completion contract.)_
+   when the orchestrator supplies one; read the whole plan doc only on `GRAMMAR=unmatched`. With no
+   plan doc on the full path, the tasks are the `## Implementation tasks` lines of
+   `docs/superpowers/specs/<STORY-KEY>.md` on the branch. _(Full path only. On the lightweight path
+   there is neither — skip this checklist; the AC checklist below is the completion contract.)_
 2. **Every acceptance criterion** on the Jira story → is met by code that exists on the branch,
    with the specific evidence (handler/test/file) named. _(Always — and the primary gate on the
    lightweight path.)_
