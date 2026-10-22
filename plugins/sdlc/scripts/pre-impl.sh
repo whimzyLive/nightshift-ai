@@ -33,13 +33,22 @@ if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
 fi
 git fetch -q origin "$BASE" || stop "git fetch origin $BASE failed"
 
-# 2. Full path: a task source — the spec on the story branch, a legacy spec merged to the base
-#    branch, or a legacy plan doc.
+# 2. Full path: a task source — a legacy spec merged to the base branch or a legacy plan doc, or
+#    the spec on the story branch, which also needs its Spec-Approved label (removed on any edit).
 if [ "$LIGHTWEIGHT" != "true" ]; then
-  { [ "$branch_existed" = true ] && git cat-file -e "origin/$BRANCH:docs/superpowers/specs/$KEY.md" 2>/dev/null; } \
-    || git cat-file -e "origin/$BASE:docs/superpowers/specs/$KEY.md" 2>/dev/null \
-    || test -f "docs/superpowers/plans/$KEY.md" \
-    || stop "no approved spec — run /spec $KEY first"
+  if git cat-file -e "origin/$BASE:docs/superpowers/specs/$KEY.md" 2>/dev/null \
+    || test -f "docs/superpowers/plans/$KEY.md"; then
+    :
+  elif [ "$branch_existed" = true ] && git cat-file -e "origin/$BRANCH:docs/superpowers/specs/$KEY.md" 2>/dev/null; then
+    approved="$(bash "$here/assess-ready.sh" "$KEY" 2>/dev/null | sed -n 's/^SPEC_APPROVED=//p')"
+    case "$approved" in
+      yes) : ;;
+      no) stop "the spec on $BRANCH is not approved (no Spec-Approved label) — run /spec $KEY" ;;
+      *) stop "cannot read the Spec-Approved label on $KEY (Jira probe failed)" ;;
+    esac
+  else
+    stop "no approved spec — run /spec $KEY first"
+  fi
 fi
 
 base_sha="$(git rev-parse "origin/$BASE")" || stop "cannot resolve origin/$BASE"

@@ -12,6 +12,11 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/scripts" "$work/bin"
 cp "$src" "$work/scripts/pre-impl.sh"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$work/scripts/jira-site-guard.sh"
+cat > "$work/scripts/assess-ready.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "AI_READY=yes"
+echo "SPEC_APPROVED=${MOCK_SPEC_APPROVED:-yes}"
+EOF
 
 cat > "$work/scripts/dep-gate.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -149,6 +154,14 @@ r="$(fresh_repo)"
 run "$r" false
 [ "$RC" -eq 0 ] && has "RESULT=ok"
 expect "legacy spec merged to the base branch satisfies the full path" $?
+
+r="$(fresh_repo)"; add_remote_branch "$r" feat/S-1 docs/superpowers/specs/S-1.md; run "$r" false MOCK_SPEC_APPROVED=no
+[ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -q '^REASON=the spec on feat/S-1 is not approved' && [ ! -d "$r/.wt/S-1" ]
+expect "spec on the branch without the Spec-Approved label stops" $?
+
+r="$(fresh_repo)"; add_remote_branch "$r" feat/S-1 docs/superpowers/specs/S-1.md; run "$r" false MOCK_SPEC_APPROVED=unknown
+[ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -q '^REASON=cannot read the Spec-Approved label'
+expect "unreadable Spec-Approved label stops, never assumes approval" $?
 
 echo "pre-impl: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

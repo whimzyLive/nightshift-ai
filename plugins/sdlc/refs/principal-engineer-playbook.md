@@ -57,8 +57,8 @@ reviewer and verifier subagents QA dispatches). The defect path is the one excep
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-impl.sh <STORY-KEY> <BRANCH_PREFIX> <BASE-BRANCH> <LIGHTWEIGHT>
 ```
 
-It runs, in order and stopping at the first failure: the full-path task-source check (approved spec
-on `origin/<BRANCH_PREFIX>/<STORY-KEY>`, or a legacy plan doc), `BASE_SHA` (before branching — the
+It runs, in order and stopping at the first failure: the full-path task-source check (the spec on
+`origin/<BRANCH_PREFIX>/<STORY-KEY>` with its `Spec-Approved` label, or a legacy spec/plan doc), `BASE_SHA` (before branching — the
 QA review-range start), the existing-PR check, the dependency gate (`scripts/dep-gate.sh`), the
 sub-task probe, `scripts/worktree-setup.sh`, and the branch push. Keep `BASE_SHA`, `PR_STATE`,
 `UI_BLOCKERS`, `SUBTASK_COUNT`, the `SUBTASK=` lines, `WORKTREE`, `NX_CACHE_DIRECTORY`.
