@@ -1,3 +1,26 @@
+## 0.46.0 (2026-10-22)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** approve specs in session, ship spec and code in one PR, and cut /auto's waits ([e20b4f3](https://github.com/whimzyLive/nightshift-ai/commit/e20b4f3))
+
+### 🩹 Fixes
+
+- **sdlc:** require Spec-Approved for a branch spec in pre-impl, correct loop.md's caller list ([e862910](https://github.com/whimzyLive/nightshift-ai/commit/e862910))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** approve specs in session, ship spec and code in one PR, and cut /auto's waits  ([e20b4f3](https://github.com/whimzyLive/nightshift-ai/commit/e20b4f3))
+  /spec no longer raises a spec PR and /auto no longer runs /plan. A full-path
+  story needs its spec approved in session (/spec or interactive /auto) before implementation, and
+  the async service receives only `phase/pr_raised` type=impl and `phase/complete` — no spec or
+  plan events.
+  Claude-Session: https://claude.ai/code/session_01QAXVmLZ97grVF2JxQUydQQ
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.14 (2026-10-21)
 
 ### 🚀 Features
