@@ -200,9 +200,9 @@ agent reuse` token** (`.claude/project/project-context.md` Tooling):
 - `enabled` (shipped default) → **reuse** the same domain-agent instance that ran this domain's
   implementation phase, via `SendMessage` (relaying the resume as authorized same-task control —
   consistent with `scrum-master.md`'s resume-trust rule), avoiding re-paid frontmatter/skill
-  injection. **Fall back to a fresh `Agent(...)` dispatch** whenever the reused instance is
-  unavailable (session boundary, the instance already returned/terminated) — this is the explicit
-  fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
+  injection. An instance that has merely returned its result **is** resumable — that is the normal
+  case. **Fall back to a fresh `Agent(...)` dispatch** only when the resume fails (`SendMessage`
+  errors) or a session boundary lost the instance — the explicit fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
   frontmatter skill injection (harness bug #76337) — wasted tokens, not a correctness risk.
 
 Record the reuse decision (AC-3, rolled into Step 8's verdict):
@@ -211,7 +211,7 @@ Record the reuse decision (AC-3, rolled into Step 8's verdict):
 SDLC agent reuse = disabled -> fresh Agent(...), REUSE=false, reason=disabled-by-config
 reused instance available -> SendMessage resume, REUSE=true, reason=reused
 reused instance unavailable, session boundary -> fresh Agent(...), REUSE=false, reason=fallback-session-boundary
-reused instance already returned/terminated -> fresh Agent(...), REUSE=false, reason=fallback-instance-terminated
+SendMessage resume fails -> fresh Agent(...), REUSE=false, reason=fallback-resume-failed
 ```
 
 **Resolve the phase ledger row before building the prompt** (a cache, never required):

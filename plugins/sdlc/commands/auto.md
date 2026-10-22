@@ -38,6 +38,8 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/assess-ready.sh STORY_KEY   # AI_READY=yes|no
 - `AI_READY=no|unknown` → dispatch the `scrum-master` agent in **Mode 3 (Auto-Assess)** with
   `STORY_KEY`; it returns exactly `QUALITY=ok|triaged` and `STORY_POINTS=N|missing`.
 - Keep `SPEC_APPROVED` for Workflow A (`unknown` counts as not approved).
+- The two lines ARE the label answer — never re-check labels with `acli … view --json` (it renders
+  `labels` null even when set; `refs/jira-fetch.md`).
 
 ## Step 2 — Route
 
