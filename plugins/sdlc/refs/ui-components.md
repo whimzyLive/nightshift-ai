@@ -40,6 +40,7 @@ Storybook: yes|no
 | Library export | The existing export (`Reused`/`Changed`); `—` for `New` |
 | Gap | `Changed`: exactly what is missing (variant, state, prop). `New`: props and every visible state. `Reused`: `—` |
 | Used in | `File` values of this design's `index.md` rows that show it, comma-separated |
+| Selector | Optional last column — CSS selector of the rendered component, only when `[data-slot="<kebab name>"]` misses it; `none` = never captured (`refs/design-revisions.md`) |
 
 ```text
 component := a UI element that repeats across pages, or is a recognisable widget (button, badge, card, input, nav, table, dialog)
