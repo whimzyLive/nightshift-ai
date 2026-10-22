@@ -1,3 +1,21 @@
+## 0.47.0 (2026-10-22)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** measure design revisions visually and route them to the stories they change ([960ff92](https://github.com/whimzyLive/nightshift-ai/commit/960ff92))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** measure design revisions visually and route them to the stories they change  ([960ff92](https://github.com/whimzyLive/nightshift-ai/commit/960ff92))
+  /auto <EPIC> now routes merged design revisions before building its queue
+  (E0a), creating Design-Change stories under the Epic; components.md gains an optional Selector
+  column.
+  Claude-Session: https://claude.ai/code/session_01QAXVmLZ97grVF2JxQUydQQ
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.46.0 (2026-10-22)
 
 ### 🚀 Features
