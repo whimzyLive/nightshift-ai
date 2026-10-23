@@ -17,10 +17,13 @@ case "$*" in
   "jira workitem view S-1 --fields parent --json") echo '{"fields":{"parent":{"key":"EP-1"}}}' ;;
   "jira workitem search --jql parent = EP-1 --json") echo '[{"key":"S-1"},{"key":"B-1"}]' ;;
   "jira workitem link list --key B-1 --json") echo '{"issueLinks":[{"typeName":"Blocks","outwardIssueKey":"S-1"}]}' ;;
+  # real acli 1.3.22: `--fields key` turns each hit into `null`, so the mock does too
   "jira workitem search --jql key = B-1 AND labels = \"UI-Components\" --fields key --json")
+    if [ "${MOCK_UI:-0}" = 1 ]; then echo '[null]'; else echo '[]'; fi ;;
+  "jira workitem search --jql key = B-1 AND labels = \"UI-Components\" --json")
     [ "${MOCK_LABEL_FAIL:-0}" = 1 ] && exit 1
     [ "${MOCK_LABEL_FAIL:-0}" = 2 ] && { echo '[]'; exit 1; }
-    if [ "${MOCK_UI:-0}" = 1 ]; then echo '[{"key":"B-1"}]'; else echo '[]'; fi ;;
+    if [ "${MOCK_UI:-0}" = 1 ]; then echo '[{"key":"B-1","fields":{"summary":"s"}}]'; else echo '[]'; fi ;;
   *) echo '[]' ;;
 esac
 EOF

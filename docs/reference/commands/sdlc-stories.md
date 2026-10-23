@@ -1,11 +1,11 @@
 ---
 title: '/sdlc:stories'
-description: 'Decompose a Jira Epic into user stories linked to the Epic. Run after /prd PR is reviewed and merged.'
+description: 'Decompose a Jira Epic into user stories linked to the Epic. Run after the /prd and /design PRs are merged — both are optional; without a PRD the Epic description is the source.'
 ---
 
 # /sdlc:stories
 
-Decompose a Jira Epic into user stories linked to the Epic. Run after /prd PR is reviewed and merged.
+Decompose a Jira Epic into user stories linked to the Epic. Run after the /prd and /design PRs are merged — both are optional; without a PRD the Epic description is the source.
 
 ## Source
 

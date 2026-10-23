@@ -83,6 +83,9 @@ Save to: `docs/features/<YYYY-MM-DD>-<feature-slug>.md`
 
 The slug is kebab-case derived from the feature title, max 5 words.
 
+**Dispatched by `/prd`:** its step list overrides this one — draft only (no publish, no commit,
+no questions to the user), and return open questions in its `Q:` / `WHY:` / `OPTIONS:` format.
+
 ## Output format
 
 Return:
