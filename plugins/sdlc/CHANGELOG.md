@@ -1,3 +1,246 @@
+## 0.47.2 (2026-10-23)
+
+### 🚀 Features
+
+- **sdlc:** make the plan step opt-in and let /spec approve a batch of specs up front ([9c69152](https://github.com/whimzyLive/nightshift-ai/commit/9c69152))
+- **sdlc:** settle PRD open questions in session, make the PRD optional, and fix label probes ([a665229](https://github.com/whimzyLive/nightshift-ai/commit/a665229))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.47.1 (2026-10-22)
+
+### 🩹 Fixes
+
+- **sdlc:** resume returned fix agents, and treat assess-ready's label lines as final ([8d26bd4](https://github.com/whimzyLive/nightshift-ai/commit/8d26bd4))
+
+### ❤️ Thank You
+
+- Rushi Patel
+
+## 0.47.0 (2026-10-22)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** measure design revisions visually and route them to the stories they change ([960ff92](https://github.com/whimzyLive/nightshift-ai/commit/960ff92))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** measure design revisions visually and route them to the stories they change  ([960ff92](https://github.com/whimzyLive/nightshift-ai/commit/960ff92))
+  /auto <EPIC> now routes merged design revisions before building its queue
+  (E0a), creating Design-Change stories under the Epic; components.md gains an optional Selector
+  column.
+  Claude-Session: https://claude.ai/code/session_01QAXVmLZ97grVF2JxQUydQQ
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.46.0 (2026-10-22)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** approve specs in session, ship spec and code in one PR, and cut /auto's waits ([e20b4f3](https://github.com/whimzyLive/nightshift-ai/commit/e20b4f3))
+
+### 🩹 Fixes
+
+- **sdlc:** require Spec-Approved for a branch spec in pre-impl, correct loop.md's caller list ([e862910](https://github.com/whimzyLive/nightshift-ai/commit/e862910))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** approve specs in session, ship spec and code in one PR, and cut /auto's waits  ([e20b4f3](https://github.com/whimzyLive/nightshift-ai/commit/e20b4f3))
+  /spec no longer raises a spec PR and /auto no longer runs /plan. A full-path
+  story needs its spec approved in session (/spec or interactive /auto) before implementation, and
+  the async service receives only `phase/pr_raised` type=impl and `phase/complete` — no spec or
+  plan events.
+  Claude-Session: https://claude.ai/code/session_01QAXVmLZ97grVF2JxQUydQQ
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.14 (2026-10-21)
+
+### 🚀 Features
+
+- **sdlc:** build a design's UI components ahead of its feature stories ([dc52228](https://github.com/whimzyLive/nightshift-ai/commit/dc52228))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.13 (2026-10-19)
+
+### 🚀 Features
+
+- **sdlc:** give implementers the comment rules QA reviews against ([5bf6e58](https://github.com/whimzyLive/nightshift-ai/commit/5bf6e58))
+
+### 🩹 Fixes
+
+- **sdlc:** make comment findings mechanical and close the review gaps ([26724c0](https://github.com/whimzyLive/nightshift-ai/commit/26724c0))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.12 (2026-10-18)
+
+### 🚀 Features
+
+- **sdlc:** carry story design and dev notes through spec, plan, impl and QA ([c5f0d0e](https://github.com/whimzyLive/nightshift-ai/commit/c5f0d0e))
+- **sdlc:** add Design, Dev Notes and References sections to stories and epics ([55027eb](https://github.com/whimzyLive/nightshift-ai/commit/55027eb))
+- **sdlc:** add /design to ingest design references into docs/design ([404a21f](https://github.com/whimzyLive/nightshift-ai/commit/404a21f))
+
+### 🩹 Fixes
+
+- **sdlc:** resolve the Epic with --fields parent and let Epics hold several designs ([1ce4329](https://github.com/whimzyLive/nightshift-ai/commit/1ce4329))
+- **sdlc:** harden design-ingest against asset-dir collisions, partial failures and padded indexes ([1f5b504](https://github.com/whimzyLive/nightshift-ai/commit/1f5b504))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.11 (2026-09-13)
+
+### 🚀 Features
+
+- **plugins/sdlc:** remove QA review-fix loop from spec and plan (NA-104) ([ce3dbf3](https://github.com/whimzyLive/nightshift-ai/commit/ce3dbf3))
+
+### 🩹 Fixes
+
+- **sdlc:** accept only rooted PR URL paths ([649a8c4](https://github.com/whimzyLive/nightshift-ai/commit/649a8c4))
+- **sdlc:** reject foreign PR URLs in PR helper scripts ([4aa08ee](https://github.com/whimzyLive/nightshift-ai/commit/4aa08ee))
+- **sdlc:** fail-closed the total/settled_ok comparison, pin the none-grace floor, narrow the docstring ([181cea7](https://github.com/whimzyLive/nightshift-ai/commit/181cea7))
+- **sdlc:** floor none-grace and close the fail-open unparseable-checks gap in auto-merge-pr.sh ([3057b49](https://github.com/whimzyLive/nightshift-ai/commit/3057b49))
+- **sdlc:** close gh-checks-query and empty-read merge-safety holes in auto-merge-pr.sh ([db8bba8](https://github.com/whimzyLive/nightshift-ai/commit/db8bba8))
+- **plugins/sdlc:** wait on ALL checks, not just required ones, before an unattended merge ([a03cbda](https://github.com/whimzyLive/nightshift-ai/commit/a03cbda))
+- **plugins/sdlc:** wait for checks before merging on auto-merge-pr.sh's non-arming path ([9bf07ba](https://github.com/whimzyLive/nightshift-ai/commit/9bf07ba))
+- **plugins/sdlc:** qualify the last raise-pr.sh attribution in loop-modes.md ([8cbfd21](https://github.com/whimzyLive/nightshift-ai/commit/8cbfd21))
+- **plugins/sdlc:** spell out the impl auto-merge risk, fix a cross-file contradiction, close a vacuous test axis ([664298b](https://github.com/whimzyLive/nightshift-ai/commit/664298b))
+- **plugins/sdlc:** correct the impl reviewer-request claim, fix the worked example, isolate raise-pr.test.sh ([97f09b2](https://github.com/whimzyLive/nightshift-ai/commit/97f09b2))
+- **plugins/sdlc:** normalize --phase case in raise-pr.sh so the spec/plan skip is truly unconditional ([9d39dbb](https://github.com/whimzyLive/nightshift-ai/commit/9d39dbb))
+- **plugins/sdlc:** correct the Review gate template's spec/plan claim, fix a comma splice ([1de1674](https://github.com/whimzyLive/nightshift-ai/commit/1de1674))
+- **plugins/sdlc:** net-zero-trim loop.md to restore the byte-cap gate ([4bf8805](https://github.com/whimzyLive/nightshift-ai/commit/4bf8805))
+- **plugins/sdlc:** close round-4 QA findings on NA-104's spec/plan loop removal ([bb605c0](https://github.com/whimzyLive/nightshift-ai/commit/bb605c0))
+- **plugins/sdlc:** close round-3 QA findings on NA-104's spec/plan loop removal ([f185a46](https://github.com/whimzyLive/nightshift-ai/commit/f185a46))
+- **plugins/sdlc:** close round-2 QA findings on NA-104's spec/plan loop removal ([c77a165](https://github.com/whimzyLive/nightshift-ai/commit/c77a165))
+- **plugins/sdlc:** close QA findings on NA-104's spec/plan loop removal ([e89661c](https://github.com/whimzyLive/nightshift-ai/commit/e89661c))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+- whimzyLive @whimzyLive
+
+## 0.45.10 (2026-09-13)
+
+### 🩹 Fixes
+
+- **sdlc:** prefer the /pull/N segment when normalising a PR URL ([#240](https://github.com/whimzyLive/nightshift-ai/issues/240))
+- **sdlc:** harden PR-arg normalisation and fix the checks-fallback comment/test in loop probes ([#240](https://github.com/whimzyLive/nightshift-ai/issues/240))
+- **sdlc:** normalize PR URL and fall back to all checks in loop probes ([1a46e41](https://github.com/whimzyLive/nightshift-ai/commit/1a46e41))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.9 (2026-08-08)
+
+### 🚀 Features
+
+- **sdlc:** validate the 7-field rule schema at capture write time (NA-103) ([74a3bdc](https://github.com/whimzyLive/nightshift-ai/commit/74a3bdc))
+- **sdlc:** add one-shot memory-corpus migration script (NA-102) ([f341e5f](https://github.com/whimzyLive/nightshift-ai/commit/f341e5f))
+- **sdlc:** NA-101 make promote-target root-relative and normalise it once on promotion ([e90d341](https://github.com/whimzyLive/nightshift-ai/commit/e90d341))
+- **sdlc:** NA-101 write captures into the resolved memory root ([b59b47e](https://github.com/whimzyLive/nightshift-ai/commit/b59b47e))
+- **sdlc:** NA-101 validate memory frontmatter across both roots ([d5d283e](https://github.com/whimzyLive/nightshift-ai/commit/d5d283e))
+- **sdlc:** NA-101 collect rules from the resolved root and the legacy root ([ba62160](https://github.com/whimzyLive/nightshift-ai/commit/ba62160))
+- **sdlc:** NA-101 list captures from the resolved root and the legacy root ([9d6420d](https://github.com/whimzyLive/nightshift-ai/commit/9d6420d))
+- **sdlc:** NA-101 add memory-root --ensure layout creation ([4456062](https://github.com/whimzyLive/nightshift-ai/commit/4456062))
+- **sdlc:** NA-101 add the memory-root resolver library ([02426b5](https://github.com/whimzyLive/nightshift-ai/commit/02426b5))
+
+### 🩹 Fixes
+
+- **sdlc:** finish the counter-only sweep, validate uses on the full-rule path, replace the phrasing-based ref sweep ([#237](https://github.com/whimzyLive/nightshift-ai/issues/237))
+- **sdlc:** sweep refs/ for the inverted counter-only contract, drop the SHA-pinned test fixture ([43a02ee](https://github.com/whimzyLive/nightshift-ai/commit/43a02ee))
+- **sdlc:** close the QA gate findings on NA-103's capture/frontmatter validation ([fb5f4d7](https://github.com/whimzyLive/nightshift-ai/commit/fb5f4d7))
+- **sdlc:** fix the delete-failure fallback order and scope, drop a reintroduced BRE (PR #235 round 2) ([#235](https://github.com/whimzyLive/nightshift-ai/issues/235))
+- **sdlc:** make the copy list-driven, close portability and messaging gaps (PR #235 round 1) ([#235](https://github.com/whimzyLive/nightshift-ai/issues/235))
+- **sdlc:** treat an unreadable destination as occupied, make delete-failure recovery actionable (NA-102) ([3eaa173](https://github.com/whimzyLive/nightshift-ai/commit/3eaa173))
+- **sdlc:** stop trusting find's emptiness as an affirmative safety signal (NA-102) ([b1a54cd](https://github.com/whimzyLive/nightshift-ai/commit/b1a54cd))
+- **sdlc:** close vacuous-pass and destructive-path gaps in memory migration (NA-102) ([5e992e2](https://github.com/whimzyLive/nightshift-ai/commit/5e992e2))
+- **sdlc:** NA-101 refuse to run gen-goldens.py against a dirty plans tree ([583a2a8](https://github.com/whimzyLive/nightshift-ai/commit/583a2a8))
+- **sdlc:** NA-101 regenerate corpus-expectation.tsv from a clean tree and widen the provenance check ([f889e54](https://github.com/whimzyLive/nightshift-ai/commit/f889e54))
+- **sdlc:** NA-101 explain the init.md Step 4h rewrite's provenance ([44770c1](https://github.com/whimzyLive/nightshift-ai/commit/44770c1))
+- **sdlc:** NA-101 exclude the legacy in-repo capture root from the workspace-integrity guard ([8b4530f](https://github.com/whimzyLive/nightshift-ai/commit/8b4530f))
+- **sdlc:** NA-101 correct the plan doc's corpus-expectation.tsv scope claim and regenerate it ([fa71aee](https://github.com/whimzyLive/nightshift-ai/commit/fa71aee))
+- **sdlc:** NA-101 point qa-engineer-playbook and qa-gate-runner at memory-root.sh ([760a054](https://github.com/whimzyLive/nightshift-ai/commit/760a054))
+- **sdlc:** NA-101 close the memory-root ensure dangling-symlink gap Copilot found ([cf2022e](https://github.com/whimzyLive/nightshift-ai/commit/cf2022e))
+- **sdlc:** NA-101 resolve check-frontmatter's legacy captured/** scan via primary worktree ([bcd6309](https://github.com/whimzyLive/nightshift-ai/commit/bcd6309))
+- **sdlc:** NA-101 make the ensure probe catch dangling symlinks and a directory-shaped .gitignore ([deca920](https://github.com/whimzyLive/nightshift-ai/commit/deca920))
+- **sdlc:** NA-101 stop success-path stderr from contaminating the resolved memory root ([bcb1439](https://github.com/whimzyLive/nightshift-ai/commit/bcb1439))
+- **sdlc:** NA-101 point domain-agent-handoff and analyze-protocol at memory-root.sh ([2e310fa](https://github.com/whimzyLive/nightshift-ai/commit/2e310fa))
+- **sdlc:** NA-101 make memory-root --ensure probe-first and cover remaining error paths ([b5e16c0](https://github.com/whimzyLive/nightshift-ai/commit/b5e16c0))
+- **sdlc:** NA-101 surface the real resolver failure reason instead of discarding stderr ([b09d6f7](https://github.com/whimzyLive/nightshift-ai/commit/b09d6f7))
+- **sdlc:** NA-101 regenerate plan-slice corpus-expectation.tsv for NA-101.md ([41b174c](https://github.com/whimzyLive/nightshift-ai/commit/41b174c))
+- **sdlc:** NA-101 resolve the capture-exclusion root via memory-root.sh ([7f1a1c5](https://github.com/whimzyLive/nightshift-ai/commit/7f1a1c5))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.8 (2026-08-06)
+
+### 🚀 Features
+
+- **sdlc:** promote captured learnings through the distill gate ([012f115](https://github.com/whimzyLive/nightshift-ai/commit/012f115))
+- **sdlc:** add capture promotion to the memory maintenance op ([b0f854e](https://github.com/whimzyLive/nightshift-ai/commit/b0f854e))
+- **sdlc:** sanction capture promotion under memory-ownership exception 2 ([f85ca46](https://github.com/whimzyLive/nightshift-ai/commit/f85ca46))
+- **sdlc:** capture QA review rounds instead of committing them ([a272d5d](https://github.com/whimzyLive/nightshift-ai/commit/a272d5d))
+- **sdlc:** retarget domain-agent memory writes to learning captures ([78ccbf7](https://github.com/whimzyLive/nightshift-ai/commit/78ccbf7))
+- **sdlc:** validate captured learnings as warnings only ([61e4d87](https://github.com/whimzyLive/nightshift-ai/commit/61e4d87))
+- **sdlc:** enumerate the learning-capture corpus ([c2aa1ea](https://github.com/whimzyLive/nightshift-ai/commit/c2aa1ea))
+- **sdlc:** write rule and review learning captures to the staging area ([d6e6e83](https://github.com/whimzyLive/nightshift-ai/commit/d6e6e83))
+- **sdlc:** resolve capture staging root to the primary checkout ([60cd6f9](https://github.com/whimzyLive/nightshift-ai/commit/60cd6f9))
+- **sdlc:** add shared frontmatter helper for capture scripts ([2ea1344](https://github.com/whimzyLive/nightshift-ai/commit/2ea1344))
+
+### 🩹 Fixes
+
+- **sdlc:** three Copilot findings — capture-only warn, slash-less target, silent-empty corpus ([c922df3](https://github.com/whimzyLive/nightshift-ai/commit/c922df3))
+- **sdlc:** STOP/BLOCKED on a cannot-verify workspace assert, not just VIOLATED ([6e199e5](https://github.com/whimzyLive/nightshift-ai/commit/6e199e5))
+- **sdlc:** a cannot-verify workspace state is a hard error, never a fabricated VIOLATED ([409af60](https://github.com/whimzyLive/nightshift-ai/commit/409af60))
+- **sdlc:** close the shared counter-only smuggle path, drop test rationale comments ([b5fe436](https://github.com/whimzyLive/nightshift-ai/commit/b5fe436))
+- **sdlc:** correct sibling-ref drift and off-by-one pointers in the capture docs ([a28700f](https://github.com/whimzyLive/nightshift-ai/commit/a28700f))
+- **sdlc:** exempt the shared/ counter-only path, bound round, drop a why-comment ([e2f1a19](https://github.com/whimzyLive/nightshift-ai/commit/e2f1a19))
+- **sdlc:** document the payload-file frontmatter channel in the memory-write contract ([af72c95](https://github.com/whimzyLive/nightshift-ai/commit/af72c95))
+- **sdlc:** resolve the distill halt-row contradiction for a non-empty capture corpus ([0344f65](https://github.com/whimzyLive/nightshift-ai/commit/0344f65))
+- **sdlc:** capture writes now abort on failure instead of reporting false success ([7bccfa9](https://github.com/whimzyLive/nightshift-ai/commit/7bccfa9))
+- **sdlc:** add NA-98.md to the plan-slice corpus-expectation snapshot ([fbed421](https://github.com/whimzyLive/nightshift-ai/commit/fbed421))
+- **sdlc:** exclude the capture staging root from the workspace-integrity guard ([00973fa](https://github.com/whimzyLive/nightshift-ai/commit/00973fa))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.7 (2026-08-04)
+
+### 🩹 Fixes
+
+- **sdlc:** drop inert SessionEnd hook timeout, document real budget lever ([a280648](https://github.com/whimzyLive/nightshift-ai/commit/a280648))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.45.6 (2026-08-04)
+
+### 🩹 Fixes
+
+- **sdlc:** give the SessionEnd hooks a timeout and unbreak the release changelog ([86329cb](https://github.com/whimzyLive/nightshift-ai/commit/86329cb))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.45.5 (2026-08-04)
 
 ### 🚀 Features
