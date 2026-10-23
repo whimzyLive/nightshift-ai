@@ -201,6 +201,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
 | Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` is read (NA-104) — `spec`/`plan` are ignored entirely (no reviewer request either, unconditionally). Default (omitted) = `impl` reviews. Not an interactive picker — the only value that changes anything **excludes** `impl` (e.g. `spec`); writing `impl` itself is a no-op, same as omitting the row. **Excluding `impl` downgrades it to `REVIEW_MODE=none`, which skips the checks-green wait too — under `Full Auto` the impl PR auto-merges unreviewed and without waiting for CI**, and its `@copilot` request still fires but sits unaddressed. |
+| Plan step | OPTIONAL — `on` \| `off`; default `off` (spec → implementation, no plan). Not an interactive picker — write the row only if the founder asks for a plan step on full-path stories. |
 | Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
 
 ### Prompt mechanics (mandatory — do not fall back to plain text for picker fields)
@@ -521,6 +522,7 @@ are documented in that template file. Token slots to substitute:
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
 | `<threshold>` | lightweight threshold (Step 3) |
+| `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
 | `<review-retention-window>` | Review retention window (Step 3) — `6 months` default unless the founder requests otherwise; accepted formats are exactly `<n> months` or `<n> stories` |

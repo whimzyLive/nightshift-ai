@@ -1,11 +1,11 @@
 ---
 title: '/sdlc:plan'
-description: 'Produce an implementation plan for a Jira story. Creates branch, writes docs/superpowers/plans/ doc, raises PR, and links back to the story. Run after /spec PR is reviewed and merged.'
+description: "Produce an implementation plan for a full-path Jira story from its approved spec, committed to the story's feat/ branch (no PR of its own) so it ships in the implementation PR. Off by default — an approved spec's Implementation tasks are the task list. /auto and /impl run it only when project-context sets `Plan step` to `on`; run it by hand any time."
 ---
 
 # /sdlc:plan
 
-Produce an implementation plan for a Jira story. Creates branch, writes docs/superpowers/plans/ doc, raises PR, and links back to the story. Run after /spec PR is reviewed and merged.
+Produce an implementation plan for a full-path Jira story from its approved spec, committed to the story's feat/ branch (no PR of its own) so it ships in the implementation PR. Off by default — an approved spec's Implementation tasks are the task list. /auto and /impl run it only when project-context sets `Plan step` to `on`; run it by hand any time.
 
 ## Source
 

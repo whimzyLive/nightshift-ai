@@ -1,96 +1,72 @@
 ---
-description: Optional, manual — produce a separate implementation plan for a Jira story (branch, docs/superpowers/plans/ doc, PR). /auto and /impl never need it — an approved spec's Implementation tasks are the task list; the playbook still honours a plan doc when one exists.
+description: Produce an implementation plan for a full-path Jira story from its approved spec, committed to the story's feat/ branch (no PR of its own) so it ships in the implementation PR. Off by default — an approved spec's Implementation tasks are the task list. /auto and /impl run it only when project-context sets `Plan step` to `on`; run it by hand any time.
 ---
 
-## Step 0 — Issue-type guard (defects skip plan)
-
-Before dispatching anything, probe the issue type — **defects have no plan phase**. Use the canonical
-one-liner (same as `/auto` Step 0):
+## Step 0 — Guards
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
 ITYPE="$(acli jira workitem view <STORY-KEY> --fields issuetype --json 2>/dev/null \
            | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
+git fetch origin --quiet
+git cat-file -e origin/feat/<STORY-KEY>:docs/superpowers/specs/<STORY-KEY>.md 2>/dev/null && echo SPEC=yes || echo SPEC=no
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/assess-ready.sh <STORY-KEY>   # SPEC_APPROVED=yes|no|unknown
 ```
 
-If `ITYPE == bug` → **STOP** with: `defects skip spec/plan — run /impl`. Do **not** create a
-`plan/<STORY-KEY>` branch and do **not** dispatch the agent. Without this guard a Bug would
-false-fail on "run `/spec` first" (step 2) because a defect never has a spec doc. (Defence-in-depth;
-the `/auto` Step-0 gate + lightweight defect routing are the primary gate.) Otherwise continue.
+- `ITYPE == bug` → **STOP**: `defects skip spec/plan — run /impl`. Dispatch nothing.
+- `SPEC=no` or `SPEC_APPROVED` not `yes` → **STOP**: `no approved spec on feat/<STORY-KEY> — run /spec <STORY-KEY> first`.
 
----
+No human gate: the plan only orders the approved spec's tasks, so it runs unattended too.
 
-Dispatch the `tech-lead` agent to produce an implementation plan for the Jira story.
+## Step 1 — Plan (tech-lead)
 
-The agent should:
-
-1. Derive the spec path: `docs/superpowers/specs/<STORY-KEY>.md` — no Jira comment lookup needed
-2. Verify the spec file exists (on develop, or on `origin/feat/<STORY-KEY>` where `/spec` commits it); if missing, STOP and tell user to run `/spec <STORY-KEY>` first
-3. Read the spec file at the derived path
-4. Fetch Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for story summary and Epic context
-5. Read CLAUDE.md to verify stack assumptions
-6. Create and switch to branch `plan/<STORY-KEY>`
-7. Break the spec into concrete, ordered, agent-tagged tasks saved to `docs/superpowers/plans/<STORY-KEY>.md`:
-   - Phase 1 — `database-administrator` (schema + entities + migrations — ALWAYS FIRST)
-   - Phase 2 — `platform-engineer` (backend infra + handlers + config)
-   - Phase 3 — `sync-engineer` (only if spec has an offline-sync section)
-   - Phase 4 — `web-engineer` (only if spec has Web UI section)
-   - Phase 5 — `mobile-engineer` (only if spec has Mobile UI section)
-   - `ai-enablement-engineer` — DEPENDENCY-FREE (plugins/**, skills/**, AI-config surface — only if
-     plan has tasks) — may be dispatched at any point in the ladder above (first, between phases, or
-     last): it consumes no artifacts from other domain agents and nothing consumes its; not part of
-     the numbered serial sequence
-   - All phases sequential — principal-engineer dispatches one agent at a time, never two at once;
-     `ai-enablement-engineer` is the sole exception to phase **order** (may be dispatched anywhere in
-     the sequence), not to serial execution — it still runs alone when dispatched
-8. Each task must be completable without questions — include entity names, field names, route paths from spec
-9. End each phase with a verification step (typecheck + lint + validate)
-10. Commit the plan file, push the branch to remote, then raise PR:
-    ```bash
-    # Stage and commit
-    git add <plan-file-path>
-    git commit -m "docs(plan): <STORY-KEY> <story summary>"
-    # Push BEFORE creating PR — PR creation fails if branch not on remote
-    git push -u origin plan/<STORY-KEY>
-    # Raise the PR atomically via raise-pr.sh (create + mark-ready). With --phase plan it never
-    # requests a reviewer (NA-104 — unconditional, regardless of the Review gate token). NEVER
-    # hand-roll gh pr create separately — that bypasses this script's idempotent PR reuse. Write
-    # the body to the session-scoped temp dir, then pass by file.
-    dir=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)
-    # write "$dir/pr-body.md" with your file-write tool, e.g.:
-    #   Plan for <STORY-KEY>. See docs/superpowers/plans/<STORY-KEY>.md.
-    PR_URL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/raise-pr.sh \
-      "plan/<STORY-KEY>" develop "docs(plan): <STORY-KEY> <story summary>" "$dir/pr-body.md" --phase plan)
-    ```
-11. Comment the story. Use the real captured PR URL (must be a full `https://github.com/...` URL — not a placeholder):
-    ```bash
-    bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
-    acli jira workitem comment create --key <STORY-KEY> \
-      --body "Plan ready.
-    File: docs/superpowers/plans/<STORY-KEY>.md
-    PR: <PR_URL>"
-    ```
-12. Return: story key, plan file path, PR URL
-
-## Final action — release at PR raise (when run standalone)
-
-Applies whenever `/plan` runs — `/auto` never nests it.
-
-**Plan never drives the review-fix loop (NA-104)** — no **Session boundary at PR raise** applies;
-that block hands a loop tail to a new session, and there is no loop tail here. The phase closed at
-PR raise: the plan doc is on a branch and the Jira comment is posted (step 11), so nothing resident
-is still load-bearing — release directly, with the PR URL:
+`<BASE-BRANCH>` := the `Base branch` row of `.claude/project/project-context.md`.
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh <PR_URL>
+setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> feat/<STORY-KEY> <BASE-BRANCH>) || exit 1
+WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
 ```
 
-> If the command hit a terminal STOP **before** a PR was raised (e.g. Step 0's defects-skip-plan
-> guard, or step 2's missing-spec STOP — nothing to release with a PR URL), run the same script
-> **bare** (no argument) instead.
+Dispatch the `tech-lead` agent in standard mode with `<STORY-KEY>` and `WORKTREE`. It reads the spec
+in `$WORKTREE`, fetches the story (`${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`), and writes
+`$WORKTREE/docs/superpowers/plans/<STORY-KEY>.md`:
 
-It prints the completion signal the automation worker watches for. Outside the worker
-(`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
+- Phases in ladder order, each task tagged `[agent-name]`: `database-administrator` (always first)
+  → `platform-engineer` → `sync-engineer` (only with an offline-sync section) → `web-engineer` (only
+  with a Web UI section) → `mobile-engineer` (only with a Mobile UI section). `ai-enablement-engineer`
+  may sit anywhere; every phase still runs alone.
+- Every task completable without questions — entity, field, and route names from the spec.
+- Each phase ends with a verification step (typecheck + lint + validate).
+- **Never commit, push, raise a PR, or write to Jira** — leave the file for Step 2.
+
+## Step 2 — Commit to the story branch
+
+```bash
+git -C "$WORKTREE" add docs/superpowers/plans/<STORY-KEY>.md
+git -C "$WORKTREE" diff --cached --quiet || git -C "$WORKTREE" commit -m "docs(plan): <STORY-KEY> <story summary>"
+git -C "$WORKTREE" push -u origin feat/<STORY-KEY>
+PLAN_SHA=$(git -C "$WORKTREE" rev-parse HEAD)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
+acli jira workitem comment create --key <STORY-KEY> --body "Plan: docs/superpowers/plans/<STORY-KEY>.md @ $PLAN_SHA on feat/<STORY-KEY>. It ships in the implementation PR."
+```
+
+No PR is raised — the plan reaches review in the implementation PR. The Principal Engineer playbook
+uses a plan doc in place of the spec's `## Implementation tasks` whenever one exists.
+
+## Step 3 — Return
+
+Story key, plan path, `PLAN_SHA`, the phases with their task counts.
+
+## Final action — release (when run standalone)
+
+Nested under `/auto` or `/impl`, the caller owns the terminal action. Standalone: no PR was raised,
+so no **Session boundary at PR raise** applies — release bare:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-complete.sh
+```
+
+Outside the worker (`SDLC_SESSION_KEY` unset) it is a silent no-op — always safe to run.
 
 Jira story key (e.g. CER-123):
 $ARGUMENTS

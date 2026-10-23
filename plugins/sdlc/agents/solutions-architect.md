@@ -161,9 +161,9 @@ Structure — include only sections applicable to this project's active agents:
 
 [Explicit list of things NOT in this spec]
 
-## Open Questions for Implementers
+## Decisions
 
-[Decisions left to implementation agents — with suggested defaults]
+[Each question settled with the user before approval — `- **<question>** — <answer>`. None left open: an unattended run implements the spec as written]
 
 ## Implementation tasks
 

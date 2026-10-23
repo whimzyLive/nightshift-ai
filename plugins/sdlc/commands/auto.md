@@ -105,7 +105,7 @@ First-match-wins; the boundary is **opt-in**. **A harness must adopt `SDLC_NEXT_
 ## Workflow A — `TRIAGE=full`
 
 A full story is implemented only from a spec a human approved in session. Spec and code ship in
-**one** PR on `feat/STORY_KEY`; there is no spec PR and no plan.
+**one** PR on `feat/STORY_KEY`; there is no spec PR, and no plan unless `Plan step` is `on` (A2).
 
 ### A0 — Is the spec approved?
 
@@ -132,6 +132,11 @@ the spec, settle open questions with `AskUserQuestion` (defaults first), get an 
 commit it to `feat/STORY_KEY`, label `Spec-Approved`. Not approved → **STOP** here, bare release.
 
 ### A2 — Implement (single PR with the spec)
+
+**Plan step** — the `Plan step` row of `.claude/project/project-context.md` is `on` and
+`origin/feat/STORY_KEY` has no `docs/superpowers/plans/STORY_KEY.md` → apply
+`${CLAUDE_PLUGIN_ROOT}/commands/plan.md` Steps 0–3 inline first (never its Final action); it STOPs →
+**STOP**, bare release. Row absent or not `on` → no plan.
 
 Run `${CLAUDE_PLUGIN_ROOT}/commands/impl.md`'s implementation for `STORY_KEY`: execute
 `${CLAUDE_PLUGIN_ROOT}/refs/principal-engineer-playbook.md` **inline in this session** with

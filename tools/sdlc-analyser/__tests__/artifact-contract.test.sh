@@ -31,7 +31,7 @@ run() { # $1=description $2..=args to artifact-contract.sh; sets OUT and STATUS
 # Ordinals as corrected in docs/superpowers/plans/NA-87-measurements/contract-diff.txt.
 tier1_cases=(
   "plugins/sdlc/skills/writing-specs/SKILL.md|## Spec Template|1|docs/superpowers/plans/NA-87-measurements/ref-spec.md"
-  "plugins/sdlc/agents/tech-lead.md|## Output: implementation plan|3|docs/superpowers/plans/NA-87-measurements/ref-plan.md"
+  "plugins/sdlc/agents/tech-lead.md|## Output: implementation plan|2|docs/superpowers/plans/NA-87-measurements/ref-plan.md"
   "plugins/sdlc/skills/writing-adrs/SKILL.md|## Template|1|docs/superpowers/plans/NA-87-measurements/ref-adr.md"
   "plugins/sdlc/refs/qa-engineer-playbook.md|## Step 5 — Write learnings to memory|3,4|docs/superpowers/plans/NA-87-measurements/ref-review-round.md"
   "plugins/sdlc/refs/domain-agent-handoff.md|## Memory write (before committing)|2|docs/superpowers/plans/NA-87-measurements/ref-rule-entry.md"

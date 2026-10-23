@@ -32,7 +32,7 @@ verification, and return a single verdict (`clean` or `blocked`) to the Principa
   `git merge-base origin/develop origin/<BRANCH_PREFIX>/<STORY-KEY>`. They differ only if `develop` advanced
   after branching; merge-base is the more precise start.
 - Branch `<BRANCH_PREFIX>/<STORY-KEY>` exists on origin with all implementation phases pushed
-- Plan path: `docs/superpowers/plans/<STORY-KEY>.md`
+- Plan path: `$WORKTREE/docs/superpowers/plans/<STORY-KEY>.md`
 - Jira story summary + acceptance criteria (from the story body the caller already fetched)
 - `WORK_KIND` — `defect` | `feature`, handed in by the caller (default `feature` when absent).
   Supplied by: the Principal Engineer playbook (inline `/auto`/`/impl`) and `commands/review.md`
@@ -128,7 +128,7 @@ Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exis
   the change's own intent (commit subjects + changed-file summary).
 - `PLAN_OR_REQUIREMENTS`: Story mode — the story's **acceptance criteria verbatim** (the reviewer
   must check the code against the ACs, not just internal consistency), **plus** the path to
-  `docs/superpowers/plans/<STORY-KEY>.md` **when that file exists**, else the spec path — the reviewer reads it. On the
+  `$WORKTREE/docs/superpowers/plans/<STORY-KEY>.md` **when it exists**, else the spec path — the reviewer reads it. On the
   **lightweight** path there is no plan doc — use the Jira story **description + acceptance criteria**
   as the requirement source (the ACs are the contract). Diff mode — there are no ACs/plan; the
   requirement is the change's stated intent.

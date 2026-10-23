@@ -1,11 +1,11 @@
 ---
 title: '/sdlc:impl'
-description: 'Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first: full stories require a merged plan PR; lightweight (<= threshold pts) stories implement directly with no plan precondition.'
+description: 'Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first — full stories require an approved spec (/spec) on their feat/ branch; lightweight (<= threshold pts) stories implement directly from the story.'
 ---
 
 # /sdlc:impl
 
-Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first: full stories require a merged plan PR; lightweight (<= threshold pts) stories implement directly with no plan precondition.
+Execute implementation for a Jira story by running the Principal Engineer playbook INLINE in this session (domain agents dispatched directly). Comments the PR back on the story. Triages first — full stories require an approved spec (/spec) on their feat/ branch; lightweight (<= threshold pts) stories implement directly from the story.
 
 ## Source
 

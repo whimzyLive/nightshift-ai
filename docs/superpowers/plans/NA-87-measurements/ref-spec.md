@@ -70,6 +70,6 @@ interface ReferenceExample {
 
 **N/A** — reference artifact.
 
-## Open Questions
+## Decisions
 
-**N/A** — reference artifact, none open.
+**N/A** — reference artifact, none settled.
