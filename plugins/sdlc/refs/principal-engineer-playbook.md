@@ -24,7 +24,7 @@ and create the PR only after QA returns a `clean` verdict.
 - `LIGHTWEIGHT` — `true` when the caller (triage) routed this story **lightweight**; default `false`.
   On `true` tasks derive **inline from the Jira story**. On `false` (full path) they come from the
   approved spec on the story branch — `SPEC := docs/superpowers/specs/<STORY-KEY>.md`, its
-  `## Implementation tasks` (a legacy plan doc `docs/superpowers/plans/<STORY-KEY>.md`, when one
+  `## Implementation tasks` (a plan doc `docs/superpowers/plans/<STORY-KEY>.md` on the branch, when one
   exists, is used instead).
 - `WORK_KIND` — `defect` | `feature`, from the caller's inline `refs/triage.md`; default `feature`.
   `defect` → read `${CLAUDE_PLUGIN_ROOT}/refs/defect-variant.md` now (the systematic-debugging
@@ -77,9 +77,9 @@ sub-task probe, `scripts/worktree-setup.sh`, and the branch push. Keep `BASE_SHA
 - `SUBTASK_COUNT > 0` → read `${CLAUDE_PLUGIN_ROOT}/refs/subtask-sequencing.md` and apply it in Steps
   4, 5 and 7. One branch per story, never per sub-task.
 
-## Step 2 — Derive the task list (spec, legacy plan, or — lightweight — the story)
+## Step 2 — Derive the task list (spec, plan, or — lightweight — the story)
 
-**Full path:** read the legacy plan doc when it exists; otherwise `SPEC` from the story branch
+**Full path:** read the plan doc in `$WORKTREE` when it exists; otherwise `SPEC` from the story branch
 (`git show origin/<BRANCH_PREFIX>/<STORY-KEY>:<SPEC>`) — its `## Implementation tasks` lines are the
 tasks. Group them by agent tag: `[database-administrator]`, `[platform-engineer]`,
 `[ai-enablement-engineer]`, `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`; drop Standby
@@ -122,7 +122,7 @@ Dispatch with the `Agent` tool; the harness's **`isolation: "worktree"` param is
 orchestrator owns isolation via `$WORKTREE`:
 
 ```text
-PLAN := docs/superpowers/plans/<STORY-KEY>.md   # legacy plan doc, full path only
+PLAN := $WORKTREE/docs/superpowers/plans/<STORY-KEY>.md   # /plan output, full path
 no plan doc (lightweight, or a spec-driven full path) -> skip the slice; item 4 carries the ACs
                      verbatim, plus the SPEC path and this agent's task lines on the full path.
 plan doc exists   -> slice := bash ${CLAUDE_PLUGIN_ROOT}/scripts/plan-slice.sh "$PLAN" phase <agent-name>

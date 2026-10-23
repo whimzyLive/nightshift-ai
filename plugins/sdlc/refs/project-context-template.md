@@ -54,6 +54,7 @@ generated file — every slot must be replaced with an actual value.
 | Token                                           | Value         |
 | ----------------------------------------------- | ------------- |
 | Lightweight threshold (story points, inclusive) | `<threshold>` |
+| Plan step                                       | `<plan-step>` |
 
 ## Code Review
 
@@ -128,6 +129,10 @@ generated file — every slot must be replaced with an actual value.
   not a skip.
   **OMIT the row entirely when not gating** — an omitted/empty gate means `impl`
   reviews, the default and back-compatible behaviour.
+- **Plan step** — `on` adds a tech-lead plan between the approved spec and implementation on the
+  full path (`/plan`, committed to the story branch); `off` (the default) implements straight from
+  the spec's `## Implementation tasks`. **Omit the row unless the founder asks for `on`** — omitted
+  or any other value is `off`.
 - **Pipeline done status** — the consuming project's terminal/Done status, exactly
   as it appears in that project's issue tracker workflow (e.g. `Done`, `Closed`,
   `Resolved`) — substitute the real status name; never leave the `<pipeline-done-status>`

@@ -17,6 +17,7 @@ exit 0
 EOF
 
 # MOCK_READY / MOCK_SPEC: hit | none | other | error | garbage — answer for that label's probe.
+# Real acli 1.3.22 shapes: full objects without --fields; `[null]` per hit with `--fields key`.
 cat > "$work/bin/acli" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
@@ -24,9 +25,10 @@ case "$*" in
   *'"Spec-Approved"'*) mode="${MOCK_SPEC:-none}" ;;
   *) mode=none ;;
 esac
+fields=no; case "$*" in *--fields*) fields=yes ;; esac
 case "$mode" in
-  hit) echo '[{"key":"S-1"}]' ;;
-  other) echo '[{"key":"S-10"}]' ;;
+  hit) if [ "$fields" = yes ]; then echo '[null]'; else echo '[{"key":"S-1","fields":{"summary":"s"}}]'; fi ;;
+  other) if [ "$fields" = yes ]; then echo '[null]'; else echo '[{"key":"S-10","fields":{"summary":"s"}}]'; fi ;;
   none) echo '[]' ;;
   error) exit 1 ;;
   garbage) echo 'not-json' ;;

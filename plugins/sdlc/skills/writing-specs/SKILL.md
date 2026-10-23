@@ -204,11 +204,11 @@ One-line N/A when the story's Design and Dev Notes are both "None".
 - [Thing that sounds related but is NOT in this spec]
 - [Future enhancement explicitly excluded]
 
-## Open Questions
+## Decisions
 
-[Any decision still needed — each must have a suggested default so implementation can proceed]
+[Every question the spec raised, settled with the user before approval — none left open]
 
-- [ ] [Question] — Suggested default: [answer]
+- **[Question]** — [answer]
 
 ````
 

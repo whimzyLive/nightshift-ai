@@ -1,5 +1,5 @@
 ---
-description: Attach a design to a Jira ticket. Ingests HTML exports (standalone bundles are unpacked into one readable page each, with a headless render per page), screenshots, handoff folders, and any non-design reference files into docs/design/<slug>/, writes the design index and component inventory, raises a docs PR, and links it on the ticket and its parent Epic. Run when the design is final, before /refine-feature, /stories, or /refine-issue, so refinement can put the right part of the design on each story.
+description: Attach a design to a Jira ticket. Ingests HTML exports (standalone bundles are unpacked into one readable page each, with a headless render per page), screenshots, handoff folders, and any non-design reference files into docs/design/<slug>/, writes the design index and component inventory, raises a docs PR, and links it on the ticket and its parent Epic. Run when the design is final — after /prd settles the requirements (when the feature has one), before /stories or /refine-issue — so refinement can put the right part of the design on each story.
 ---
 
 Runs **inline** (no agent dispatch) — every step is a script call, a small index edit, or a
@@ -122,8 +122,15 @@ for the PR body and Step 8; `diff=skipped:<why>` is not an error — the rows st
 
 ## Step 6 — Commit, push, raise the PR
 
+**Link it from the PRD** (new design only): `EPIC_KEY`'s newest `PRD: docs/features/<file>.md`
+comment, with that file on `origin/<BASE>` → in it, replace `Design: pending — /design <EPIC_KEY>`
+with `Design: <DESIGN_DIR>/index.md` (no pending line → add that line to its Design & references
+section) and stage it. PRD only on an open `prd/<EPIC_KEY>` PR → make the same edit there
+(`git worktree add` that branch, commit `docs(prd): link design <SLUG>`, push, remove the worktree).
+No PRD → skip; `/stories` reads the Epic's breadcrumb either way.
+
 ```bash
-git add "$DESIGN_DIR"          # plus the formatter-ignore file, if Step 4 touched it
+git add "$DESIGN_DIR"          # plus the formatter-ignore file, if Step 4 touched it, and the PRD
 git diff --cached --stat       # review before anything leaves the machine
 ```
 
@@ -167,8 +174,8 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
 - The component inventory: counts of Reused / Changed / New, or "no UI library configured".
 - Revision: the `DIFF` rows (Step 5c). Next step: merge the PR, then `/auto <EPIC>` — its E0a routes
   the change to the stories it reaches (`${CLAUDE_PLUGIN_ROOT}/refs/design-revisions.md` Routing).
-- Next step: merge the PR, then refine — `/refine-feature <EPIC>`, `/stories <EPIC>`, or
-  `/refine-issue <STORY>`. Refinement puts the matching design rows in each story's **Design** section.
+- Next step: merge the PR, then refine — `/stories <EPIC>`, or `/refine-issue <STORY>`. Refinement
+  puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its
   Epic's breadcrumb. To get the rows into its Design section, remove `AI-Ready` and re-run
   `/refine-issue <STORY>`.

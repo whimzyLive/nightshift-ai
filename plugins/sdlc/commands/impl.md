@@ -34,6 +34,9 @@ the Principal Engineer role directly.
      `docs/superpowers/specs/<STORY-KEY>.md` on `origin/feat/<STORY-KEY>` (a legacy merged plan doc
      `docs/superpowers/plans/<STORY-KEY>.md` also satisfies it). Missing → return **blocked**: run
      `/spec <STORY-KEY>` first. No domain agents. The PR then carries the spec and the code.
+     Project-context `Plan step` is `on` and `origin/feat/<STORY-KEY>` has no
+     `docs/superpowers/plans/<STORY-KEY>.md` → apply `${CLAUDE_PLUGIN_ROOT}/commands/plan.md`
+     Steps 0–3 inline first (never its Final action); it STOPs → return **blocked** with its reason.
    - **`TRIAGE=lightweight`** → nothing is required; the playbook derives tasks from the story —
      the same direct path `/auto` Workflow B takes. The dependency gate below still runs.
 3. Fetch the Jira story using `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` with `<KEY>=<STORY-KEY>` for the
