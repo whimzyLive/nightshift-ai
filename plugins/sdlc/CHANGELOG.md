@@ -1,3 +1,14 @@
+## 0.47.2 (2026-10-23)
+
+### 🚀 Features
+
+- **sdlc:** make the plan step opt-in and let /spec approve a batch of specs up front ([9c69152](https://github.com/whimzyLive/nightshift-ai/commit/9c69152))
+- **sdlc:** settle PRD open questions in session, make the PRD optional, and fix label probes ([a665229](https://github.com/whimzyLive/nightshift-ai/commit/a665229))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.1 (2026-10-22)
 
 ### 🩹 Fixes
