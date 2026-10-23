@@ -129,8 +129,7 @@ gh pr merge <number-or-url> --squash --delete-branch
 | --- | --- |
 | Idea doc | `ideas/<slug>` |
 | PRD | `feature/prd-<slug>` |
-| Spec | `spec/<JIRA-KEY>` |
-| Plan | `plan/<slug>` |
+| Spec, plan | committed to `feat/<JIRA-KEY>`; they ship in the implementation PR (no PR of their own) |
 | DB changes | `feat/db/<feature>` |
 | Backend | `feat/backend/<feature>` |
 | Sync | `feat/sync/<feature>` |
@@ -153,7 +152,7 @@ gh pr merge <number-or-url> --squash --delete-branch
 
 ## PR body template per phase
 
-### Doc artifact PR (idea / PRD / spec / plan)
+### Doc artifact PR (idea / PRD)
 
 ```
 ## Summary

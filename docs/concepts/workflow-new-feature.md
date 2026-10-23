@@ -112,14 +112,32 @@ Each child run of `/auto <STORY>`:
 1. **Assess** — `AI-Ready` stories skip the scrum-master check.
 2. **Triage** — points at or under the lightweight threshold (project setting, default 3) → no
    spec; above it → full path. Bugs always take the debugging path.
-3. **Spec** (full path only) — the spec approved in E0b is on `feat/<KEY>`.
+3. **Spec** (full path only) — the spec approved in E0b is on `feat/<KEY>`. There is no separate
+   plan by default: the spec's `## Implementation tasks` is the task list. A project that sets
+   `Plan step` to `on` in its project context gets a tech-lead plan committed to the same branch
+   first; it needs no approval, so it runs unattended too.
 4. **Implement** — domain agents run in dependency order (database → backend → sync → web →
    mobile). `dep-gate.sh` holds a story whose blockers have not merged.
 5. **QA, in session** — review, fix, re-review until clean and every acceptance criterion has
    evidence.
-6. **One PR** — spec and code together. Copilot review is advisory.
+6. **One PR** — spec (and plan, when on) and code together. Copilot review is advisory.
 7. **Tail** — `Full Auto`: wait for checks, merge, move the story to Done. Otherwise the PR waits
    for you.
+
+## Approving specs ahead of time
+
+`/spec` settles every open question the spec raises with `AskUserQuestion` (recommended answer
+first), writes each answer into the spec and its `## Decisions` section, and only asks for approval
+once nothing is left open: an unattended run implements the spec as written and cannot ask.
+
+To get a batch of complex stories ready before any run, approve them in one sitting:
+
+- `/spec <EPIC>` — every child story that needs a spec and does not have an approved one, in
+  dependency order (the same list `/auto <EPIC>` E0b would ask about).
+- `/spec <KEY> <KEY> …` — the stories you name.
+
+Each approved story carries `Spec-Approved` and its spec on `feat/<KEY>`, so an unattended
+`/auto <KEY>`, a worker, or the epic run goes straight to implementation.
 
 ## A single story instead of an epic
 
@@ -135,5 +153,5 @@ spec is written and approved in that session, before implementation starts.
 | `/prd`                                      | Answer its open questions, then merge the PRD PR |
 | After `/design`                             | Review and merge the design PR                   |
 | After `/stories`                            | Set story points                                 |
-| `/auto` E0b                                 | Answer the spec questions and approve each spec  |
+| `/spec <EPIC>` or `/auto` E0b               | Answer the spec questions and approve each spec  |
 | Non-`Full Auto` and `UI-Components` stories | Review and merge the PR, then type `continue`    |

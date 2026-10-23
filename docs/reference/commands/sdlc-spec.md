@@ -1,11 +1,11 @@
 ---
 title: '/sdlc:spec'
-description: 'Produce a technical design spec for a Jira story. Creates branch, writes docs/superpowers/specs/ doc, raises PR, and links back to the story. Run after /stories.'
+description: "Write a technical spec for a Jira story IN THIS SESSION, settle every open question with you, and record your approval. The approved spec is committed to the story's feat/ branch (no PR of its own) and ships in the implementation PR alongside the code. Takes one or more story keys, or an Epic key to approve every child spec up front, so the stories can then run unattended under /auto. /auto runs this for every full-path story before implementing."
 ---
 
 # /sdlc:spec
 
-Produce a technical design spec for a Jira story. Creates branch, writes docs/superpowers/specs/ doc, raises PR, and links back to the story. Run after /stories.
+Write a technical spec for a Jira story IN THIS SESSION, settle every open question with you, and record your approval. The approved spec is committed to the story's feat/ branch (no PR of its own) and ships in the implementation PR alongside the code. Takes one or more story keys, or an Epic key to approve every child spec up front, so the stories can then run unattended under /auto. /auto runs this for every full-path story before implementing.
 
 ## Source
 

@@ -28,7 +28,8 @@ set -euo pipefail
 # Idempotent: re-running for a head branch that already has an open PR reuses it.
 # Reviewer assignment is best-effort and NEVER fails PR creation.
 #
-# OPTIONAL `--phase <p>` flag (p ∈ {spec,plan,impl}): passed through to
+# OPTIONAL `--phase <p>` flag (p ∈ {spec,plan,impl}; spec/plan are legacy — no command raises
+# a spec or plan PR any more): passed through to
 # read-review-config.sh so the per-repo "Review gate" can downgrade this phase's
 # effective REVIEW_MODE to `none` (skip the reviewer request) when the phase is
 # not gated. It is parsed and stripped BEFORE the positional args, so the

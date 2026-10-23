@@ -76,7 +76,8 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
      loop until clean.
    - **Quality gate (Step 6)** — the quality-gate commands from `.claude/project/project-context.md`, pasted evidence.
      **Gate the AC/plan verification (Step 7) purely on plan-doc existence** at
-     `docs/superpowers/plans/<STORY-KEY>.md` — **not** on the head-branch name. Run Step 7 when that
+     `docs/superpowers/plans/<STORY-KEY>.md` on the PR head (`git cat-file -e origin/<head>:<path>`)
+     — **not** on the head-branch name. Run Step 7 when that
      plan doc exists; otherwise skip it — the comments are the requirements. This single signal is
      correct for every path: feature-full (plan exists) → verify; feature-lightweight (no plan) → skip;
      defect (no plan) → skip — each for the right reason (no plan doc), not by an accidental
