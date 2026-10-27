@@ -175,6 +175,9 @@ Structure — include only sections applicable to this project's active agents:
 - Only reference paths and patterns that actually exist in this project (verify against .claude/project/project-context.md)
 - No `any` — all TypeScript interfaces must be fully typed
 - No "TBD" in final spec — pick a concrete answer or flag as open question with a suggested default
+- Untrusted input (parsing, sanitising, escaping, URLs, file paths, SQL, auth tokens, crypto) — name
+  the maintained library that handles it; hand-written code there needs a `## Decisions` entry
+  saying why no library fits. Hand-rolled sanitisers are where review rounds keep finding bypasses
 
 ## Self-review before saving
 

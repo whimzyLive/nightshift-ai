@@ -65,17 +65,21 @@ creation) is **advisory** — its comments never block the merge.
 
 1. **Resolve `MODE`** — `eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-ai-workflow-mode.sh STORY_KEY)"`
    (ladder: `${CLAUDE_PLUGIN_ROOT}/refs/ai-workflow-mode-resolution.md`). Only `Full Auto` merges;
-   empty or a read error takes the human-merge path.
+   empty or a read error takes the human-merge path. A QA `capped` verdict (draft PR) takes it too,
+   whatever `MODE` is, and its comment reads `Implementation stopped at the review round cap. Draft
+   PR: <PR_URL> lists the open findings — fix them or merge it yourself.`
 2. **Resolve `DONE_STATUS`** — the `Pipeline done status` row of `.claude/project/project-context.md`.
 3. **Post the Jira comment FIRST** — `jira-site-guard.sh` once; guard fails → **STOP**, release with
    the PR URL (nothing may write to a possibly-wrong Jira):
+   - QA `capped` (any mode, async too): the step-1 round-cap comment — it replaces both below.
    - `Full Auto` (not async): `Implementation complete (Full Auto). PR: <PR_URL>. <NOTE> Waiting for checks, then auto-merging and moving the story to <DONE_STATUS>. Copilot review is advisory.`
    - otherwise, and every `ASYNC_REVIEW=true` run: `Implementation complete. PR: <PR_URL>. <NOTE> Ready for review and merge (Copilot review is advisory).`
    - `<NOTE>`: A2 → `Includes the approved spec.`; B1 → `Small story — direct implementation path.`
 4. **`<NEXT>`** — `Full Auto` → `Run bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --wait-checks <PR_URL> STORY_KEY "<DONE_STATUS>"; on a non-zero exit comment STORY_KEY per /sdlc:auto Tail step 5, then run session-complete.sh <PR_URL>.`
    Any other mode → no `<NEXT>`: skip the boundary below and release with the PR URL.
 5. **Merge outcome** (whoever runs `<NEXT>` posts it): exit 0 → nothing more; exit 1 → `Not merged:
-   <PR_URL> — a check is failing or branch protection refused the merge. Fix it, then merge.`;
+   <PR_URL> — a check is failing, branch protection refused the merge, or the PR is a draft (review
+   round cap). Fix it, then merge.`;
    exit 3 → `Checks still running on <PR_URL> — merge once they pass.`; any other exit → `Could not
    merge <PR_URL> automatically (gh/API error) — merge it manually.` The PR stays open on every
    non-zero exit, and the run still releases normally.
@@ -157,13 +161,14 @@ raise** with `<NOTE>` for B1.
 ## ASYNC_REVIEW=true
 
 After the impl PR is raised (A2 or B1), post the Step-3 comment, fire both events, and stop
-without the tail — the service owns the merge. Release with the PR URL.
+without the tail — the service owns the merge. Release with the PR URL. `DRAFT` := `true` on a QA
+`capped` verdict (draft PR, review round cap — the service must not merge it), else `false`.
 
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 -H "Content-Type: application/json" \
-  -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/pr_raised\",\"params\":{\"storyKey\":\"STORY_KEY\",\"type\":\"impl\",\"url\":\"IMPL_PR_URL\"},\"id\":1}"
+  -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/pr_raised\",\"params\":{\"storyKey\":\"STORY_KEY\",\"type\":\"impl\",\"url\":\"IMPL_PR_URL\",\"draft\":DRAFT},\"id\":1}"
 curl -s --retry 3 -X POST http://localhost:9001 -H "Content-Type: application/json" \
-  -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/complete\",\"params\":{\"storyKey\":\"STORY_KEY\",\"implUrl\":\"IMPL_PR_URL\"},\"id\":2}"
+  -d "{\"jsonrpc\":\"2.0\",\"method\":\"phase/complete\",\"params\":{\"storyKey\":\"STORY_KEY\",\"implUrl\":\"IMPL_PR_URL\",\"draft\":DRAFT},\"id\":2}"
 ```
 
 **Service contract change:** there is no spec or plan PR any more, so `type=spec` / `type=plan`

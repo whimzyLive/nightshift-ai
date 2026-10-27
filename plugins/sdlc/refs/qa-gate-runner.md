@@ -5,6 +5,7 @@ inline-fallback path — by the orchestrator itself. Written in the third person
 never address "you, the subagent", and never depend on a value the orchestrator does not hold.
 
 Inputs, all passed in the dispatch prompt: `<STORY-KEY>` `<WORKTREE>` `<NX_CACHE_DIRECTORY>` `<BRANCH_PREFIX>`
+`<RUN_INFRA>` (`yes`|`no` — the orchestrator decides; this runner only executes, so it runs on Haiku)
 
 ## Procedure
 
@@ -37,10 +38,12 @@ cd "$WORKTREE"
 # ... run the project-context Tooling + Quality Gate commands here ...
 ```
 
-4. If the change touched infra, also run the infra build with the stage flag from project-context
-   (still inside `$WORKTREE`).
+4. `RUN_INFRA=yes` → also run the infra build with the stage flag from project-context (still
+   inside `$WORKTREE`). Never decide this yourself.
 
-5. Capture each command's exact string and its verbatim final status line(s) — never paraphrase.
+5. Capture each command's exact string, its **exit code**, and its verbatim final status line(s) —
+   never paraphrase. `Gate: pass` only when every command exited 0, any non-zero exit is `fail` —
+   decided from exit codes, never from reading the output.
 
 ## Gate realism
 
@@ -57,7 +60,7 @@ Return contract, **verbatim**:
 ```text
 Gate: pass | fail
 Commands: <one line per command actually run, exact string>
-Evidence: <verbatim final status line(s) per command, truncated to 1,200 B — never paraphrased>
+Evidence: <per command: `exit=<code>` + verbatim final status line(s), truncated to 1,200 B — never paraphrased>
 Failing workspace: <path or nx project name | none>
 Owning agent: <agent-name from the project-context workspace->agent table | none>
 Error: <first 400 B of the failing command's stderr, verbatim | none>

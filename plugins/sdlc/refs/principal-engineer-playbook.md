@@ -16,7 +16,7 @@ either: a question about the code goes to the agent that owns it, or to the revi
 branch, the ordered domain-agent dispatch, per-phase pushes, and the PR. The post-implementation
 **code-quality loop** (review → fix → learn → quality gate → AC verification) is owned by the **QA
 Engineer** — at Step 6 you hand off, inline, to `${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`,
-and create the PR only after QA returns a `clean` verdict.
+and create the PR only after QA returns a `clean` verdict (a draft PR on `capped`).
 
 ## Inputs
 
@@ -247,15 +247,17 @@ return; discard the rest.
 - `WORK_KIND` — `defect` re-points QA Step 7 to the regression-evidence contract
 - The phase ledger (`LEDGER_FILE`) — **optional**: QA Step 3 falls back to git when absent (D3)
 
-It returns `## QA verdict: <STORY-KEY>` with `Status: clean | blocked`.
+It returns `## QA verdict: <STORY-KEY>` with `Status: clean | capped | blocked`.
 
 - `Status: blocked` → **STOP**. Surface the QA `Blocked reason` exactly. No PR. No improvising.
 - `Status: clean` → Step 6.5. QA already wrote learnings, ran the gate, and evidenced every AC —
   carry its verdict fields into your report; never repeat the work.
+- `Status: capped` → Step 6.5, then Step 7 as a **draft** PR (review round cap hit, Important
+  findings open, gate green, ACs met). Never merged automatically — a person decides.
 
-## Step 6.5 — Post-QA docs sync (on a clean QA verdict, before the PR)
+## Step 6.5 — Post-QA docs sync (on a clean or capped QA verdict, before the PR)
 
-Reached only on `Status: clean`. The branch is pushed and unmerged and `$WORKTREE` is still
+Reached only on `Status: clean` or `capped`. The branch is pushed and unmerged and `$WORKTREE` is still
 provisioned, so a docs commit folds into the same impl PR. This wires in `sync`'s inline post-QA
 dispatch variant (`${CLAUDE_PLUGIN_ROOT}/refs/docs-pipeline-postqa.md` §25), diffing
 story-branch-vs-base (§26).
@@ -287,23 +289,30 @@ Classify into **exactly five** outcomes (rationale: `refs/design-notes/docs-sync
 
 The docs commit, when made, is the last commit before the PR.
 
-## Step 7 — Create the PR (only after QA returns `clean`)
+## Step 7 — Create the PR (only after QA returns `clean` or `capped`)
 
 Title keeps the parent `<STORY-KEY>`; head `<BRANCH_PREFIX>/<STORY-KEY>`. On the full path the PR
 already carries the approved spec commit. Sub-tasks → body by file (`refs/subtask-sequencing.md`).
+QA `Follow-ups:` or `capped` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
+`## Open review findings (round cap)` list from `Open (capped):`, then a `## Follow-ups` list.
+`capped` → `DRAFT=--draft`, else `DRAFT=` (unquoted below, so empty adds nothing).
 Create, mark ready, request Copilot (advisory — best-effort, never fails creation), and tear the
 worktree down, in one call:
 
 ```bash
 # sub-tasks: --body-file "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/pr-body.md" in place of --body
 PR_URL=$(gh pr view <BRANCH_PREFIX>/<STORY-KEY> --json url,state -q 'select(.state=="OPEN").url' 2>/dev/null)
-[ -n "$PR_URL" ] || PR_URL=$(gh pr create \
+# capped / follow-ups: --body-file "$BODY_FILE" in place of --body
+[ -n "$PR_URL" ] || PR_URL=$(gh pr create $DRAFT \
   --title "[<STORY-KEY>] <story summary>" \
   --body "Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed." \
   --base <BASE-BRANCH> \
   --head <BRANCH_PREFIX>/<STORY-KEY>)
 echo "PR_URL=$PR_URL"
-[ -n "$PR_URL" ] && gh pr ready "$PR_URL"
+if [ -n "$DRAFT" ]; then   # capped: a reused, already-ready PR must become a draft too
+  gh pr ready --undo "$PR_URL" 2>/dev/null || true
+  gh pr edit "$PR_URL" --body-file "$BODY_FILE"
+elif [ -n "$PR_URL" ]; then gh pr ready "$PR_URL"; fi
 gh pr edit "$PR_URL" --add-reviewer "@copilot" || echo "warn: @copilot reviewer not assigned — PR created regardless"
 git worktree remove --force "$WORKTREE"
 ```
@@ -325,7 +334,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
 ### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
-### Status: all phases complete, QA verdict clean, gate passed, PR ready.
+### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped: "QA capped at the round cap — draft PR, <N> open findings, needs a human"
 ```
 
 ## Constraints
@@ -335,7 +344,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 - YOU create the branch and push; domain agents only commit.
 - Never read or grep source code yourself — ask the owning agent or the reviewer (defect phases 1–2 excepted, `refs/defect-variant.md`).
 - The code-quality loop is owned by the QA Engineer (Step 6) — run it inline, never duplicate it.
-- PR opened by YOU only after QA returns `Status: clean`.
+- PR opened by YOU only after QA returns `Status: clean`, or as a draft on `capped`.
 - Any agent `blocked`, or a QA `Status: blocked` → stop, report immediately, no PR.
 - Never implement feature code yourself — coordinate only.
 - Never dispatch a `principal-engineer` (or `qa-engineer`) subagent — run both playbooks inline.

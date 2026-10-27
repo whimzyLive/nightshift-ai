@@ -119,7 +119,9 @@ Each child run of `/auto <STORY>`:
 4. **Implement** — domain agents run in dependency order (database → backend → sync → web →
    mobile). `dep-gate.sh` holds a story whose blockers have not merged.
 5. **QA, in session** — review, fix, re-review until clean and every acceptance criterion has
-   evidence.
+   evidence. Round 1 is the one full review; later rounds check only the fixes, and review stops
+   after 3 rounds. Important findings still open at that point make the PR a **draft** that lists
+   them, and it waits for you even in `Full Auto`.
 6. **One PR** — spec (and plan, when on) and code together. Copilot review is advisory.
 7. **Tail** — `Full Auto`: wait for checks, merge, move the story to Done. Otherwise the PR waits
    for you.

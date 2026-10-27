@@ -1,8 +1,8 @@
 ---
-description: Run ONLY the QA code-quality loop (review → fix → re-review until clean) without re-running the implementation lifecycle. With a story key → reviews its fix/ or feat/<STORY-KEY> branch (whichever exists) against the plan + ACs. With no key → Diff mode: reviews the current working changes vs develop. Runs the QA Engineer playbook inline. Not for implementing.
+description: Run ONLY the QA code-quality loop (review → fix → re-review until clean or the round cap) without re-running the implementation lifecycle. With a story key → reviews its fix/ or feat/<STORY-KEY> branch (whichever exists) against the plan + ACs. With no key → Diff mode: reviews the current working changes vs develop. Runs the QA Engineer playbook inline. Not for implementing.
 ---
 
-Run the QA Engineer's code-quality loop (review → fix → re-review until clean), then report the
+Run the QA Engineer's code-quality loop (review → fix → re-review until clean or the round cap), then report the
 verdict. This NEVER re-implements, creates a branch, or opens a PR.
 
 **Do NOT dispatch a `qa-engineer` subagent.** Claude Code blocks subagent → subagent nesting, so
@@ -86,8 +86,11 @@ fix agents it needs. You play the QA Engineer role directly, in the top-level se
 
 ## Report (both modes)
 
-Report the QA verdict block verbatim (Status clean|blocked, rounds, fixes, gate evidence — plus
-AC check in Story mode). On `blocked`, surface the reason — do not improvise around it.
+Report the QA verdict block verbatim (Status clean|capped|blocked — `capped` lists the open
+findings left at the review round cap, rounds, fixes, gate evidence — plus
+AC check in Story mode). On `blocked`, surface the reason — do not improvise around it. On `capped`
+in Story mode with an open PR for the branch, comment the `Open (capped):` list on it; the PR's
+ready/draft state is left to you.
 
 **IMPORTANT:** This makes real code changes (fix commits / working-tree edits). PR creation is
 out of scope — that stays with `/impl`. If the loop returns `Status: blocked`, STOP and surface it.

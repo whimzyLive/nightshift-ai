@@ -71,9 +71,9 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    - **Fix loop (Step 3)** — dispatch the owning domain agent per ACCEPTED finding (file path →
      agent via project-context Workspace Structure); commits pushed to the head branch. Note the
      fix commit SHA per accepted comment for the reply.
-   - **Re-review (Step 4)** — fresh `agent-skills:code-reviewer` over the applied fix commits
-     (`PRE_FIX_HEAD..HEAD`) to confirm each accepted comment is resolved and nothing regressed;
-     loop until clean.
+   - **Re-review (Step 4)** — a fresh scoped reviewer over the applied fix commits
+     (`PRE_FIX_HEAD..HEAD`) to confirm each accepted comment is resolved and nothing regressed,
+     resumed in later rounds; loop until clean or the round cap (`refs/qa-review-rounds.md`).
    - **Quality gate (Step 6)** — the quality-gate commands from `.claude/project/project-context.md`, pasted evidence.
      **Gate the AC/plan verification (Step 7) purely on plan-doc existence** at
      `docs/superpowers/plans/<STORY-KEY>.md` on the PR head (`git cat-file -e origin/<head>:<path>`)
@@ -116,8 +116,12 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
      log it and continue; the code fixes are already pushed.
 
 6. **Report** the verdict: per-comment decision table (accepted+resolved / rejected+left-open, each
-   with its justification), fixes pushed, re-review rounds, and gate evidence. On `Status: blocked`,
-   surface the reason — do not improvise.
+   with its justification), fixes pushed, re-review rounds, and gate evidence. On `Status: capped`,
+   list the open findings left at the review round cap: their threads get a reply but stay OPEN
+   (`refs/qa-external-review.md`), and a commit-SHA target (no PR) reports them only. Report it to the
+   caller as `Status: blocked` with reason `review round cap — <N> findings open`, so `/sdlc:loop`
+   halts instead of seeing no unresolved threads and exiting clean. On
+   `Status: blocked`, surface the reason — do not improvise.
 
 **IMPORTANT:** This makes real code changes (fix commits pushed to the PR head branch). It does
 NOT create a new PR. If the QA loop returns `Status: blocked`, STOP and surface it.
