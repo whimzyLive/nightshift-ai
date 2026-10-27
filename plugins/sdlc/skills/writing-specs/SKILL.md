@@ -268,3 +268,4 @@ before saving -> every item in gate must hold
 | TBD without a suggested default | Add "Suggested default: X" so impl can proceed |
 | Spec contains implementation code | Move to agent instructions, not spec |
 | Offline Sync section absent for an offline-synced entity | Add the section — the sync implementer needs it |
+| Hand-rolled parser/sanitiser/escaper for untrusted input | Name the maintained library; if none fits, record why under `## Decisions` |

@@ -94,7 +94,8 @@ set -euo pipefail
 #     (`AUTO_MERGE_CHECKS_TIMEOUT_SECS`) — including a timeout caused by the checks query itself
 #     repeatedly failing (transient — never treated as a failing check) — the distinct code lets
 #     a caller tell "fix CI" from "just wait and re-run" apart. The PR is left open either way.
-#     (The transition block never causes a non-zero exit — see Best-effort above.)
+#     A **draft** PR (QA stopped at the review round cap) is refused up front with **exit 1**,
+#     before any checks wait. (The transition block never causes a non-zero exit — see Best-effort above.)
 
 here="$(cd "$(dirname "$0")" && pwd)"
 
@@ -207,6 +208,14 @@ wait_for_checks() {
     elapsed=$((elapsed + poll))
   done
 }
+
+# A draft PR is never merged: QA opens one when it stops at the review round cap with findings
+# open (refs/qa-review-rounds.md), and a person decides. Exit 1, the PR stays open.
+IS_DRAFT=$(gh pr view "$PR" --json isDraft -q .isDraft 2>/dev/null || echo "")
+if [ "$IS_DRAFT" = "true" ]; then
+  echo "ERROR: PR $PR is a draft — will not merge; mark it ready once its open findings are settled" >&2
+  exit 1
+fi
 
 if [ "$AUTO" = true ]; then
   ALLOW_AUTO=$(printf '%s' "$REPO_JSON" | jq -r 'if .allow_auto_merge then "yes" else "" end')

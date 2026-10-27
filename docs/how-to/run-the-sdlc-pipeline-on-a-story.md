@@ -32,7 +32,7 @@ Drive one Jira story from a raw ticket to a merged PR. Two routes get you there:
 - **Lightweight story** (at or under the threshold, or any Bug) implements directly from the story: no spec, no plan. One `feat/NA-123` (or `fix/NA-123` for a Bug) PR.
 - **Full story** needs an approved spec first. If the story has none, `/auto` writes it in this session, asks you every open question with a recommended answer, and waits for your explicit approval. It commits the spec to `feat/NA-123`, then implements on the same branch. Spec and code ship in **one** PR. There is no plan step unless the project's `Plan step` row is `on`, in which case a tech-lead plan is committed to the same branch first.
 
-Either way, QA runs in the session (review → fix → re-review until clean, quality gate, every acceptance criterion evidenced) before the PR is raised. Copilot review on the PR is advisory. In `Full Auto` the PR merges once checks pass and the story moves to the pipeline done status; otherwise it waits for you.
+Either way, QA runs in the session (review → fix → re-review until clean, quality gate, every acceptance criterion evidenced) before the PR is raised. Review stops after 3 rounds: if Important findings are still open then, the PR is opened as a **draft** listing them, and it never merges automatically. Copilot review on the PR is advisory. In `Full Auto` the PR merges once checks pass and the story moves to the pipeline done status; otherwise it waits for you.
 
 An unattended run (a worker or an epic child) cannot ask for approval: a full story without an approved spec stops and is labelled `Spec-Required`. Approve specs ahead of time with `/sdlc:spec` (below).
 
