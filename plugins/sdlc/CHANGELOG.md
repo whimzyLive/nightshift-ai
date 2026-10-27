@@ -1,3 +1,13 @@
+## 0.47.3 (2026-10-27)
+
+### 🚀 Features
+
+- **sdlc:** shorten QA review loops, pin review and gate models, and route ad-hoc agents ([86584bd](https://github.com/whimzyLive/nightshift-ai/commit/86584bd))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.2 (2026-10-23)
 
 ### 🚀 Features
