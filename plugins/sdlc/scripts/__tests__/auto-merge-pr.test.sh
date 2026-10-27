@@ -228,7 +228,7 @@ case "${1:-}" in
         state="${MOCK_GH_STATE:-MERGED}"
         automerge="${MOCK_GH_AUTOMERGE:-null}"
         mss="${MOCK_GH_MERGE_STATE_STATUS:-BLOCKED}"
-        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge,\"mergeStateStatus\":\"$mss\"}"
+        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge,\"mergeStateStatus\":\"$mss\",\"isDraft\":${MOCK_GH_DRAFT:-false}}"
         if [ -n "$jqexpr" ]; then
           echo "$payload" | jq -r "$jqexpr"
         else
@@ -747,6 +747,21 @@ if [ "$waittimeout_status" -eq 3 ] && [ -z "$waittimeout_out" ] \
 else
   echo "FAIL: --wait-checks timeout — exit=$waittimeout_status output=${waittimeout_out:-<empty>}"
   cat "$waittimeout_stderr"
+  failures=$((failures + 1))
+fi
+
+# Draft guard: QA opens a draft PR when it stops at the review round cap — never merged, exit 1.
+draft_stderr="$mockdir/stderr-draft.log"
+draft_out="$(PATH="$mockdir:$PATH" MOCK_GH_DRAFT=true MOCK_GH_CHECKS_MODE=pending-then-pass \
+  MOCK_GH_CHECKS_COUNTER_FILE="$mockdir/draft-counter" AUTO_MERGE_CHECKS_POLL_SECS=1 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$draft_stderr")"
+draft_status=$?
+if [ "$draft_status" -eq 1 ] && [ -z "$draft_out" ] \
+  && grep -q '^ERROR: PR 999999 is a draft' "$draft_stderr" && ! grep -q '^merged:' "$draft_stderr"; then
+  echo "PASS: a draft PR is never merged — exit 1"
+else
+  echo "FAIL: draft guard — exit=$draft_status output=${draft_out:-<empty>}"
+  cat "$draft_stderr"
   failures=$((failures + 1))
 fi
 

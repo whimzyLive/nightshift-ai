@@ -55,10 +55,10 @@ the Principal Engineer role directly.
    ordered domain-agent dispatch (each threaded `WORKTREE` + `NX_CACHE_DIRECTORY` — no per-dispatch
    harness isolation) → per-phase push/verify (with a machine-checked primary-checkout guard) →
    **hand off to the QA Engineer** (`${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md`, run
-   inline: code-review loop until clean → memory writes → quality gate → AC/plan verification) →
-   **post-QA docs sync** (playbook Step 6.5 — on a `clean` verdict, before the PR: regenerates the
+   inline: code-review loop until clean or the round cap → memory writes → quality gate → AC/plan verification) →
+   **post-QA docs sync** (playbook Step 6.5 — on a `clean` or `capped` verdict, before the PR: regenerates the
    manifest-activated docs on the story branch so they fold into the same PR; a docs-content failure
-   WARNs and does not block, a workspace-integrity failure STOPs) → PR on a `clean` QA verdict, then
+   WARNs and does not block, a workspace-integrity failure STOPs) → PR on a `clean` QA verdict (a draft PR on `capped`), then
    tear down the worktree. Dispatch domain agents and the QA loop with the `Agent` tool from THIS
    session. Capture the PR URL it produces as `IMPL_PR_URL`.
 5. When the playbook completes, comment the PR on the story (use the real captured URL — a full
@@ -73,6 +73,9 @@ PR: <IMPL_PR_URL>
 
 All phases done. Review clean. Quality gate passed."
 ```
+
+On a QA `capped` verdict the body's last line reads instead: `Stopped at the review round cap — the
+draft PR lists the open findings; fix them or merge it yourself. Quality gate passed.`
 
 (`comment add` does not exist in this acli version — use `comment create --key`.)
 

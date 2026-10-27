@@ -64,6 +64,19 @@ ctx="$proj/.claude/project/project-context.md"
 body=""
 [ -f "$ctx" ] && body="$(cat "$ctx")"
 
+# (2.5) AGENT ROUTING. Ad-hoc code edits handed to general-purpose agents inherit the main session's
+# model (often Opus) and skip the domain agent's rules; point them at the owning sdlc agent instead.
+case "$body" in *'## Workspace → agent'*)
+  body="${body}
+
+## Agent routing
+
+When you hand a code change to a subagent outside the sdlc commands, dispatch the owning \`sdlc:<agent>\` from the Workspace → agent table above, never \`general-purpose\`: a general-purpose agent inherits this session's model and skips the domain agent's rules. Read-only search, review, and research may still use \`general-purpose\` or \`Explore\`.
+
+Every \`general-purpose\` or \`Explore\` dispatch passes \`model: \"sonnet\"\` instead of inheriting this session's model — unless the command, playbook, or ref you are following names a model for that dispatch (the QA code reviewer is \`opus\`). A dispatch that only runs fixed commands and reports their output — a predefined command, a test or CI run, a build, a lint — passes \`model: \"haiku\"\`: it needs no reasoning."
+  ;;
+esac
+
 if [ -z "$intro" ] && [ -z "$body" ]; then
   exit 0
 fi

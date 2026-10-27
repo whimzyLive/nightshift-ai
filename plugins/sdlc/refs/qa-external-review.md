@@ -23,9 +23,10 @@ fetched comments:
 
 This mode operates on the **PR head branch** (or the commit's branch): Step 3 fix commits are
 committed AND **pushed** there, so the PR updates and reviewers see the resolution. Step 4's
-re-review is a fresh `agent-skills:code-reviewer` pass over the **applied fix commits**
-(`BASE_SHA`=pre-fix HEAD, `HEAD_SHA`=post-fix HEAD), confirming each accepted comment is resolved
-and nothing regressed.
+re-review is a fresh scoped reviewer over the **applied fix commits** (`BASE_SHA`=pre-fix HEAD,
+`HEAD_SHA`=post-fix HEAD), confirming each accepted comment is resolved and nothing regressed; the
+round cap and follow-up rules of `refs/qa-review-rounds.md` apply. On `Status: capped`, an accepted
+comment still on `Open (capped):` gets its reply but its thread is NOT resolved.
 
 **Close out the PR threads (fixes pushed + gate green — `/review-fix` only).** Post each decision
 back so the reviewer sees only what still needs attention, each with a justification. For every

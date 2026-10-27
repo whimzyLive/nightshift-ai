@@ -74,7 +74,7 @@ done
 # --- (f) the three offloaded sections, together (A8) ------------------------------
 s6="$(section_bytes "$qa" '## Step 6 — Quality gate')"
 s7="$(section_bytes "$qa" '## Step 7 — Verification before completion (AC + plan check)')"
-s65="$(section_bytes "$pe" '## Step 6.5 — Post-QA docs sync (on a clean QA verdict, before the PR)')"
+s65="$(section_bytes "$pe" '## Step 6.5 — Post-QA docs sync (on a clean or capped QA verdict, before the PR)')"
 three=$((s6 + s7 + s65))
 [ "$three" -le 7373 ] && ok "(f) three offloaded sections $three <= 7373" \
   || bad "(f) three offloaded sections <= 7373" "actual $three (s6=$s6 s7=$s7 s6.5=$s65)"

@@ -161,9 +161,11 @@ Story S is gated (mode=<effectiveMode(S)>). PR: <url>. Review + merge, then type
   the direct `session-complete.sh` release and exit. (Re-running `/auto EPIC_KEY` later resumes —
   E2a skips every already-done story and picks up where the abort left off.)
 
-`gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> verify before advancing: the sentinel
-must carry `|PR=<url>` **and** `gh pr view <url> --json state -q .state` must be `MERGED` (the
-child's tail waits for checks and merges). A bare sentinel (the child stopped before a PR, e.g. on
+`gated(S) == false` (`effectiveMode(S) == "Full Auto"`) -> first, a **draft** PR (`gh pr view
+<url> --json isDraft -q .isDraft` is `true` — QA stopped at the review round cap) is gated: suspend
+and prompt as above, never HALT. Otherwise verify before advancing: the sentinel must carry
+`|PR=<url>` **and** `gh pr view <url> --json state -q .state` must be `MERGED` (the child's tail
+waits for checks and merges). A bare sentinel (the child stopped before a PR, e.g. on
 an unapproved spec) or an unmerged PR (failing checks, refused merge) → **HALT** (E4) — never
 advance past an unmerged story. Verified → **no suspend**, advance straight to the next story. With E0b's specs approved up front, an all-Full-Auto epic is **emergent**: no
 story is ever gated, so the whole epic runs to completion in this single epic session, hands-free.

@@ -22,7 +22,7 @@ You own the quality of what ships. After the code is written, you make sure it i
 - **AC-complete** — every acceptance criterion the ticket was created for is met, with evidence.
 
 You own the review loop, the learnings memory, the quality gate, and the final AC/plan
-verification, and return a single verdict (`clean` or `blocked`) to the Principal Engineer.
+verification, and return a single verdict (`clean`, `capped` or `blocked`) to the Principal Engineer.
 
 ## Inputs (handed in by the Principal Engineer playbook)
 
@@ -122,7 +122,7 @@ Captured round files are not committed, so also read them:
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --kind review`
 
 Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exists, else
-`general-purpose`); it loads `requesting-code-review` itself. The prompt MUST include:
+`general-purpose`) with `model: "opus"`; it loads `requesting-code-review` itself. The prompt MUST include:
 
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
@@ -140,6 +140,8 @@ Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exis
 - Explicit instruction (readability axis) to review the code comments the diff adds per the
   Review section of `${CLAUDE_PLUGIN_ROOT}/refs/code-comments-policy.md` — the same rules the
   implementers wrote to, no stricter, no looser; point the reviewer at that file, don't restate it.
+- The round-1 exhaustive-pass block (every finding now, by class with all sites, threat checklist
+  for untrusted input) in `${CLAUDE_PLUGIN_ROOT}/refs/qa-review-rounds.md` § Round 1, verbatim.
 
 Dispatch with `isolation: "worktree"` is NOT needed — the reviewer reads, it does not write.
 Story mode dispatches it together with the Step 6 gate and Step 7 verifier, one round per HEAD —
@@ -191,7 +193,7 @@ NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | 
 ```
 
 For each Critical / Important group (grouped by domain), dispatch the owning domain agent with the
-`Agent` tool. The harness's `isolation: "worktree"` param is NOT set — the orchestrator owns
+`Agent` tool — each finding with its class and every listed site (`refs/qa-review-rounds.md` § Round 1). The harness's `isolation: "worktree"` param is NOT set — the orchestrator owns
 isolation via the `$WORKTREE` re-provisioned above. **Branch the dispatch mechanism on the `SDLC
 agent reuse` token** (`.claude/project/project-context.md` Tooling):
 
@@ -303,9 +305,10 @@ attempt to fix or revert it yourself. Never self-repair.
 
 ## Step 4 — Re-review
 
-After all fixes are pushed, resume the reviewer on the fix diff (fresh full review only on the
-escalations in `refs/qa-review-rounds.md`), then Steps 2–3, until **no Critical/Important
-findings and no open AC gaps**. Minor issues: collect for the return report, do not loop.
+After all fixes are pushed, resume the reviewer on the fix diff only (`refs/qa-review-rounds.md`
+§ Re-review — never a fresh full review), then Steps 2–3, until **no Critical/Important findings
+and no open AC gaps**, or the round cap there is hit (→ `blocked` or `capped`). Minor issues and
+follow-ups (new issues in code the fix did not change): collect for the return report, do not loop.
 
 ## Step 5 — Write learnings to memory
 
@@ -378,7 +381,8 @@ committed rule file.
 ## Step 6 — Quality gate
 
 ```text
-offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX>,
+offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA>,
+  # RUN_INFRA := yes when a changed path belongs to platform-engineer infra, else no
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")
 Stray files non-empty -> STOP, list; never clean
 Gate:fail -> dispatch Owning agent w/Error(Step3), push, re-offload fresh
@@ -415,16 +419,19 @@ does **not** fail-before / pass-after → return `blocked`.
 
 ## Step 8 — Return verdict to the Principal Engineer
 
-Return exactly this block (the caller creates the PR only on `clean`):
+Return exactly this block (the caller creates the PR on `clean`, a draft PR on `capped`):
 
 ```
 ## QA verdict: <STORY-KEY>
-Status: clean | blocked
+Status: clean | capped | blocked
 Review rounds: <N>
 Re-review: resumed <N> / fresh <N>
+AC verify: run <N> / carried <N>
 Fix dispatch: reuse <N> / fresh <N>
 Fixed (Critical/Important): <list, or "none">
 Minor noted (not fixed): <list, or "none">
+Follow-ups: <issues in code the fix did not change, or "none">
+Open (capped): <each open Important finding, file:line — only if Status: capped>
 AC check: <met — all N ACs evidenced | UNMET: <which> >
 Quality gate: typecheck pass | tests pass   (paste evidence)
 Learnings: captured to <N> file(s): <ids, or "none">
@@ -433,6 +440,8 @@ Blocked reason: <one line — only if Status: blocked>
 
 - `Status: clean` only when: review has no Critical/Important findings, every AC is evidenced,
   the gate is green with pasted output, and learnings are captured.
+- `Status: capped` only at the round cap with Important findings open, the gate green, and every
+  AC evidenced (`refs/qa-review-rounds.md` § Round cap) — the caller opens a draft PR, never merges.
 - `Status: blocked` at any unrecoverable point (agent blocked, push conflict, AC cannot be met)
   → return immediately with the reason; do not improvise around it.
 
