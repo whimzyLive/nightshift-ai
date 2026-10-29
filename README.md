@@ -6,7 +6,7 @@
 
 **A drop-in [Claude Code](https://claude.com/claude-code) plugin marketplace that turns one terminal into a full software-delivery team — Product Manager, Architect, Tech Lead, Engineers, QA, and Knowledge — driven straight from your issue tracker.**
 
-`Jira ticket → spec → plan → implementation → review → PR → docs.` Automatically. In any repo.
+`Jira ticket → spec → implementation → review → PR → docs.` Automatically. In any repo.
 
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-d97757?logo=anthropic&logoColor=white)](https://code.claude.com/docs/en/plugins)
 [![Marketplace](https://img.shields.io/badge/marketplace-nightshift-1a1a2e)](https://github.com/whimzyLive/nightshift-ai)
@@ -51,7 +51,7 @@ In any Claude Code session:
 
 That's it. The plugins `sdlc` depends on install **automatically** as cross-marketplace dependencies — [superpowers](https://github.com/obra/superpowers) for the shared workflow skills, and claude-mem for the learnings corpus that `/sdlc:docs distill` mines. An existing install is reused and a missing one is pulled in for you. No duplicate copies, no version juggling.
 
-> **Prerequisites:** Claude Code, plus the `acli` (Jira) and `gh` (GitHub) CLIs for the ticket/PR integrations. Both are optional if you only want the spec/plan/impl/review flow locally.
+> **Prerequisites:** Claude Code, plus the `acli` (Jira) and `gh` (GitHub) CLIs for the ticket/PR integrations. Both are optional if you only want the spec/impl/review flow locally.
 
 📖 **Step-by-step first run → [`docs/tutorials/getting-started-with-sdlc.md`](docs/tutorials/getting-started-with-sdlc.md)**
 
@@ -87,31 +87,38 @@ Re-running `/sdlc:init` later is safe — it merges rather than overwrites.
 ```mermaid
 flowchart TD
     I(["your idea"]) --> RF["/sdlc:refine-feature"] --> E{{"Jira Epic"}}
-    E --> P["/sdlc:prd"] --> S["/sdlc:stories"]
+    E --> S["/sdlc:stories"]
+    E -. "optional: PRD" .-> P["/sdlc:prd"] -.-> S
     E -. "optional: final design" .-> DS["/sdlc:design"] -.-> S
     S --> R["you — story points + AI Workflow mode"]
-    R --> T{"story points"}
-    T -- "above threshold" --> FULL["spec → plan → impl"]
-    T -- "at or under" --> FAST["impl only"]
-    FULL --> PR{{"pull request"}}
-    FAST --> PR
-    PR --> CM["you — review comments"] --> RX["/sdlc:review-fix"]
-    RX --> MG(["merge"])
+    R --> A["/sdlc:auto STORY"]
+    A --> T{"triage"}
+    T -- "above threshold" --> SP["spec, in session — you approve"]
+    SP --> IMPL["implement → QA review"]
+    T -- "at or under · or any Bug" --> IMPL
+    IMPL --> V{"QA verdict"}
+    V -- clean --> PR{{"pull request"}}
+    V -- "capped after 3 rounds" --> DPR{{"draft PR + open findings"}}
+    PR -- "Full Auto" --> MG(["checks → auto-merge → Done"])
+    PR -- "Auto / Assisted" --> CM["you — review + merge"]
+    DPR --> CM
+    CM -. "your comments" .-> RX["/sdlc:review-fix"] -.-> CM
     MG -. optional .-> DX["/sdlc:docs sync"]
+    CM -. optional .-> DX
 ```
 
-|     | You run                                       | What happens                                                                                                                             |
-| --- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `/sdlc:refine-feature`                        | Your idea becomes a Jira **Epic** — or enriches one you already created                                                                  |
-| 1b  | `/sdlc:design`                                | Optional — your final design (HTML exports, screenshots) lands in `docs/design/`, linked on the Epic, so each story gets its own screens |
-| 2   | `/sdlc:prd`                                   | The Epic plus your context becomes a detailed PRD                                                                                        |
-| 3   | `/sdlc:stories`                               | Stories, each linked to the Epic, with `Blocks` links and the build order written into the PRD                                           |
-| 4   | _you_                                         | Assign story points and the automation mode; add labels and references                                                                   |
-| 5   | `/sdlc:auto`<br>_or_ `spec` → `plan` → `impl` | Triages by size, then drives the story to a PR — one shot, or step by step if you want the controls                                      |
-| 6   | `/sdlc:review-fix`                            | Triages your PR comments, keeps what's right for this codebase, implements them, replies on each thread                                  |
-| 7   | `/sdlc:docs sync`                             | Optional — folds the completed story into your docs surface                                                                              |
+|     | You run                              | What happens                                                                                                                             |
+| --- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `/sdlc:refine-feature`               | Your idea becomes a Jira **Epic** — or enriches one you already created                                                                  |
+| 1b  | `/sdlc:prd`                          | Optional — the Epic plus your context becomes a detailed PRD; open questions are settled with you in session before the PR is raised     |
+| 1c  | `/sdlc:design`                       | Optional — your final design (HTML exports, screenshots) lands in `docs/design/`, linked on the Epic, so each story gets its own screens |
+| 2   | `/sdlc:stories`                      | Stories, each linked to the Epic, with `Blocks` links and the build order written into the PRD (or the Epic, when there is no PRD)       |
+| 3   | _you_                                | Assign story points and the automation mode; add labels and references                                                                   |
+| 4   | `/sdlc:auto`<br>_or_ `spec` → `impl` | Triages by size, then drives the story to a PR — one shot, or step by step if you want the controls. Spec and code ship in **one PR**    |
+| 5   | `/sdlc:review-fix`                   | Triages your PR comments, keeps what's right for this codebase, implements them, replies on each thread                                  |
+| 6   | `/sdlc:docs sync`                    | Optional — folds the completed story into your docs surface                                                                              |
 
-**Step 4 drives everything after it.** Story points decide the route: at or under your lightweight threshold, a story skips spec and plan entirely — no plan doc, no review gate, tasks derived inline from the ticket. Above it, the full ceremony. Automation mode comes from the Jira **AI Workflow** field (`Full Auto` / `Auto` / `Assisted`), falling back to an `AI-Workflow:full-auto` / `:auto` / `:assisted` **label** on projects without that custom field.
+**Step 3 drives everything after it.** Story points decide the route: at or under your lightweight threshold (and every Bug, whatever its points), a story skips the spec entirely — tasks derive from the ticket, though QA still reviews before the PR opens. Above it, the spec is written and approved with you in session first. `/sdlc:plan` is opt-in either way (project-context `Plan step: on`); by default the approved spec's task list is the plan. Automation mode comes from the Jira **AI Workflow** field (`Full Auto` / `Auto` / `Assisted`), falling back to an `AI-Workflow:full-auto` / `:auto` / `:assisted` **label** on projects without that custom field — only **Full Auto** merges on its own.
 
 ## 🧠 How it works
 
@@ -123,7 +130,155 @@ Four ideas do all the heavy lifting:
 
 **3. Generic agents, per-repo config.** The agents carry **zero** project specifics. Everything that changes between repos — tech stack, owned paths, Jira project key, base branch, quality-gate commands — lives in a single `.claude/project/project-context.md` the plugin auto-loads every session via a SessionStart hook. Write that one file and the entire team adapts to your codebase.
 
-**4. The lifecycle is the product.** Spec → plan → implement → review isn't a suggestion; it's enforced by the commands and the handoff protocol. Tests are the merge gate. Reviews are done by a _different_ agent than the one who wrote the code.
+**4. The lifecycle is the product.** Spec → implement → review isn't a suggestion; it's enforced by the commands and the handoff protocol. Tests are the merge gate. Reviews are done by a _different_ agent than the one who wrote the code.
+
+## 🔬 Under the hood
+
+The diagram above is what you type. These are what happens in between — one question per diagram. Every box names the command, agent, or playbook that does the work, so you can open its source under [`plugins/sdlc/`](plugins/sdlc/) and read the exact rule.
+
+### What `/sdlc:auto` does with one story
+
+```mermaid
+flowchart TD
+    A["/sdlc:auto KEY"] --> S0{"issue type"}
+    S0 -- Epic --> EPIC["Epic orchestration — see below"]
+    S0 -- "Story / Bug" --> S1["assess — already AI-Ready?<br/>else scrum-master triages the ticket"]
+    S1 --> S2{"route"}
+    S2 -- "Bug — any points" --> LW["lightweight · WORK_KIND=defect → fix/KEY"]
+    S2 -- "points ≤ threshold" --> LW2["lightweight · WORK_KIND=feature → feat/KEY"]
+    S2 -- "points > threshold" --> FULL["full → feat/KEY"]
+    S2 -- "no points, not a Bug" --> X1(["stop — set story points, re-run"])
+    FULL --> A0{"approved spec<br/>on feat/KEY?"}
+    A0 -- "no — you are present" --> A1["solutions-architect, inline:<br/>write spec → settle open questions with you → you approve<br/>commit to feat/KEY · label Spec-Approved"]
+    A0 -- "no — unattended" --> X2(["stop — label Spec-Required"])
+    A0 -- yes --> A2
+    A1 --> A2{"Plan step on?"}
+    A2 -- yes --> PL["tech-lead → plan doc"] --> PE
+    A2 -- "no (default)" --> PE
+    LW --> PE
+    LW2 --> PE["Principal Engineer playbook, inline<br/>worktree · tasks from spec or story · domain agents in order"]
+    PE --> QA["QA Engineer playbook, inline<br/>code review · quality gate · AC verification"]
+    QA --> V{"verdict"}
+    V -- blocked --> X3(["stop — no PR"])
+    V -- clean --> D1["post-QA docs sync<br/>(knowledge-engineer, if a docs manifest exists)"] --> PR["PR — spec + code together<br/>Copilot requested as advisory reviewer"]
+    V -- capped --> D2["post-QA docs sync"] --> DPR["draft PR — open findings + follow-ups in the body"]
+    PR --> M{"AI Workflow mode"}
+    M -- "Full Auto" --> MG(["wait for checks → merge → story moved to Done"])
+    M -- "Auto / Assisted / unset" --> H(["PR URL commented on the story — you merge"])
+    DPR --> H2(["commented on the story — never auto-merged"])
+```
+
+A defect (`WORK_KIND=defect`) runs the systematic-debugging variant of implementation: reproduce, find the root cause, write a failing regression test, then fix. A feature derives its tasks from the approved spec's `## Implementation tasks` (full path) or from the story's acceptance criteria (lightweight).
+
+### Who touches the code during implementation
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PE as Principal Engineer (inline playbook)
+    participant DBA as database-administrator
+    participant PLAT as platform-engineer
+    participant SYNC as sync-engineer
+    participant WEB as web-engineer
+    participant MOB as mobile-engineer
+    participant QA as QA Engineer (inline playbook)
+    PE->>PE: pre-impl — dependency gate on Blocks links, worktree, branch push
+    PE->>PE: group tasks by [agent] tag — skip standby agents and empty phases
+    PE->>DBA: schema, entities, migrations
+    DBA-->>PE: commits
+    PE->>PLAT: backend and infrastructure
+    PLAT-->>PE: commits
+    PE->>SYNC: sync rules and transaction builders
+    SYNC-->>PE: commits
+    PE->>WEB: web pages, components, hooks
+    WEB-->>PE: commits
+    PE->>MOB: mobile screens and navigation
+    MOB-->>PE: commits
+    Note over PE,MOB: one agent at a time, in this order — never two in parallel. ai-enablement-engineer may run at any point when a story touches AI config.
+    PE->>PE: verify each phase landed in the worktree, not your checkout
+    PE->>QA: hand off HEAD for review
+    QA-->>PE: Status: clean | capped | blocked
+    PE->>PE: push, open PR (draft when capped), remove worktree
+```
+
+The orchestrator never writes feature code and never reads source — it coordinates. Domain agents only commit; the orchestrator owns the branch, the pushes, and the PR.
+
+### How the QA review loop converges
+
+```mermaid
+flowchart TD
+    H["HEAD from the Principal Engineer"] --> R1
+    subgraph R1["Round 1 — three checks in parallel on the same HEAD"]
+        direction LR
+        REV["code reviewer — opus<br/>the only full review: every Critical / Important finding"]
+        GATE["quality gate — haiku<br/>typecheck · tests · lint, judged by exit codes only"]
+        AC["AC verifier — sonnet<br/>every acceptance criterion and task evidenced"]
+    end
+    R1 --> D{"gate red or AC unmet?"}
+    D -- yes --> F0["fix via the owning domain agent<br/>(these rounds don't count toward the cap)"] --> D
+    D -- no --> D2{"Critical / Important findings open?"}
+    D2 -- none --> CLEAN(["Status: clean"])
+    D2 -- yes --> CAP{"review rounds used < 3?"}
+    CAP -- yes --> FIX["fix via the owning domain agent<br/>(same agent resumed, not a fresh one)"]
+    FIX --> RR["scoped re-review — same reviewer, fix diff only<br/>issues outside the story's diff → non-blocking Follow-ups"]
+    RR --> D
+    CAP -- "no — a Critical is open" --> BLK(["Status: blocked — no PR"])
+    CAP -- "no — Important only, gate green, ACs met" --> CPD(["Status: capped — draft PR"])
+```
+
+Three rounds means one full review plus two scoped re-reviews. The cap exists because a fresh full re-review each round used to find new nits forever; `capped` hands you a draft PR with the open findings listed instead of looping.
+
+### What happens after the PR, when you are the merger
+
+```mermaid
+flowchart LR
+    PR{{"open PR"}} --> L["/loop /sdlc:loop PR"]
+    L --> DEC{"each pass"}
+    DEC -- "checks or review still running" --> W["wait"] --> DEC
+    DEC -- "unresolved review comments" --> RF["/sdlc:review-fix PR"] --> DEC
+    DEC -- "HEAD not yet reviewed<br/>(in-session reviewer)" --> RV["/sdlc:review"] --> DEC
+    DEC -- "HEAD reviewed · 0 unresolved · checks green" --> OK(["clean — you merge"])
+    DEC -- "CI failing · fix failed · review cap hit" --> HALT(["halt — surfaced to you"])
+```
+
+`/sdlc:review-fix` is also what you run by hand after leaving comments. It fetches the unresolved threads, triages each one with the `receiving-code-review` skill (is this true in _this_ codebase?), fixes the accepted ones through the owning domain agent, re-reviews the fix diff, then replies on every thread — accepted threads get `✅ Accepted … Fixed in <sha>` and are resolved, rejected ones get `❎ Not applied — <why>` and stay open for you.
+
+### How an Epic drives its stories
+
+```mermaid
+flowchart TD
+    E["/sdlc:auto EPIC-KEY"] --> M0{"Epic has an AI Workflow mode?"}
+    M0 -- no --> REJ(["reject — comment on the Epic, spawn nothing"])
+    M0 -- yes --> E0a["route merged design revisions<br/>scrum-master → Design-Change stories"]
+    E0a --> E1["queue children in Blocks order<br/>(stop on a dependency cycle)"]
+    E1 --> E0b["spec preflight — approve every full-path spec<br/>with you now, before any child spawns"]
+    E0b --> NEXT{"next story in queue"}
+    NEXT -- "already Done" --> NEXT
+    NEXT -- "queue empty" --> FIN(["Epic complete"])
+    NEXT -- "pending" --> CH["spawn a fresh child session<br/>/sdlc:auto STORY — one live at a time"]
+    CH --> RES{"child result"}
+    RES -- "PR merged (Full Auto)" --> NEXT
+    RES -- "gated — Auto / Assisted, or UI-Components label<br/>or a draft PR from a review cap" --> SUS["suspend — you review and merge,<br/>then type continue or abort"] --> NEXT
+    RES -- "child failed or went silent" --> HALT(["halt — re-run resumes; Done stories are skipped"])
+```
+
+Specs are approved up front because a child session runs unattended and cannot pause to ask you. An Epic whose stories are all `Full Auto` runs hands-free end to end.
+
+### Who runs when
+
+| Role                                                                                                  | Kind                               | Stage                                                                                                  |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `product-manager`                                                                                     | agent                              | `/sdlc:refine-feature`, `/sdlc:prd`                                                                    |
+| `scrum-master`                                                                                        | agent                              | `/sdlc:stories`, `/sdlc:refine-issue`, `/sdlc:auto` assess, Epic design-revision routing               |
+| `solutions-architect`                                                                                 | agent, followed inline             | `/sdlc:spec`, `/sdlc:auto` full path — so you can approve the spec in session                          |
+| `tech-lead`                                                                                           | agent                              | `/sdlc:plan` — opt-in                                                                                  |
+| **principal-engineer**                                                                                | inline playbook                    | implementation: worktree, task list, domain-agent dispatch, PR                                         |
+| `database-administrator` → `platform-engineer` → `sync-engineer` → `web-engineer` → `mobile-engineer` | agents, active per project-context | implementation phases, in that order                                                                   |
+| `ai-enablement-engineer`                                                                              | agent, opt-in at init              | `/sdlc:analyze`; any story touching `CLAUDE.md`, `.claude/**`, `.agents/**`, `plugins/**`, `skills/**` |
+| **qa-engineer**                                                                                       | inline playbook                    | review rounds, quality gate, AC verification; `/sdlc:review`, `/sdlc:review-fix`                       |
+| `knowledge-engineer`                                                                                  | agent, docs opt-in                 | `/sdlc:docs *`; post-QA docs sync inside the implementation PR                                         |
+
+Model pins: the code reviewer runs on **opus**, the quality gate on **haiku**, the AC verifier on **sonnet**; domain agents run on sonnet. The two playbooks run inline because Claude Code does not let a subagent dispatch subagents — an orchestrator has to live in your session.
 
 ## 👥 Meet your team
 
@@ -141,7 +296,7 @@ All commands are namespaced by plugin — `/sdlc:*`.
 | -------------- | ---------------------------------------------------------------------------------------------- |
 | **Onboard**    | `/sdlc:init` · `/sdlc:analyze`                                                                 |
 | **Shape work** | `/sdlc:refine-feature` · `/sdlc:design` · `/sdlc:prd` · `/sdlc:stories` · `/sdlc:refine-issue` |
-| **Build**      | `/sdlc:triage` · `/sdlc:spec` · `/sdlc:plan` · `/sdlc:impl`                                    |
+| **Build**      | `/sdlc:triage` · `/sdlc:spec` · `/sdlc:plan` (opt-in) · `/sdlc:impl`                           |
 | **Review**     | `/sdlc:review` · `/sdlc:review-fix` · `/sdlc:loop`                                             |
 | **End to end** | `/sdlc:auto`                                                                                   |
 | **Document**   | `/sdlc:docs`                                                                                   |
