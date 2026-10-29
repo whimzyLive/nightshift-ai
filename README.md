@@ -87,9 +87,11 @@ Re-running `/sdlc:init` later is safe — it merges rather than overwrites.
 ```mermaid
 flowchart TD
     I(["your idea"]) --> RF["/sdlc:refine-feature"] --> E{{"Jira Epic"}}
-    E --> S["/sdlc:stories"]
-    E -. "optional: PRD" .-> P["/sdlc:prd"] -.-> S
-    E -. "optional: final design" .-> DS["/sdlc:design"] -.-> S
+    E -. "optional" .-> P["/sdlc:prd"]
+    P -. "optional, once requirements are settled" .-> DS["/sdlc:design"]
+    E -. "skip both" .-> S["/sdlc:stories"]
+    P -.-> S
+    DS -.-> S
     S --> R["you — story points + AI Workflow mode"]
     R --> A["/sdlc:auto STORY"]
     A --> T{"triage"}
