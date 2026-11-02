@@ -84,7 +84,9 @@ generated file — every slot must be replaced with an actual value.
 - **Design check** — optional command that renders each design board and the screen that builds
   it and fails on any unaccepted difference (e.g. `pnpm exec nx affected -t fidelity`); omit the
   row when there is none. Row absent or empty = the design-fidelity gate is off and every
-  pipeline step behaves as it did before (`refs/design-references.md` Design check).
+  pipeline step behaves as it did before (`refs/design-references.md` Design check). The check is
+  not a Quality Gate command: only the QA gate's design step runs it. An optional `Design check
+  report` row names the report file path (default `.design-check/report.txt`; gitignore it).
 - **Omit none-detected stack rows** — in `## Detected stack`, omit any row
   whose detected value is empty or `none`. Do not write `none` into the file.
 - **Package manager appears twice** — once in the top table (user-confirmed

@@ -55,6 +55,12 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         - otherwise (a detection-only or static field) fill it from Step 2.5 or the template default,
           no prompt.
 
+        Exception: the optional `Design check` and `Design check report` Tooling rows are never
+        filled from the template, a default or a guess, and never prompted — a missing row stays
+        missing (a placeholder like `<design-check cmd>` would run as a command). Existence is
+        detected as the row being present with a non-empty value, the same test as in the token
+        table below.
+
         This is the mechanism that auto-onboards **any newly introduced parameter**: when a future
         template adds a token, an existing repo that runs Merge picks it up here — prompted if it is a
         user choice, defaulted otherwise — instead of silently missing it.

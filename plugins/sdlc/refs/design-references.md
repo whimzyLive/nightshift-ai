@@ -41,15 +41,20 @@ check := renders each board under docs/design/<slug>/pages/ and the screen that 
          compares computed styles of named elements and the pixels of a region, fails on any difference no deviation accepts
 runs := the domain agent of a UI story (before returning) | the QA gate when a Design row exists or a changed path is owned by web/mobile (refs/qa-gate-runner.md)
 failure -> routed to the owning agent like any gate failure; fix the screen, the design-system component, or the board
+report := the check writes a text file at project-context Tooling `Design check report` (default `.design-check/report.txt`, gitignored so the gate's clean-tree assert holds):
+          line 1 `design-check: pass|fail sha=<git HEAD of the worktree>`, then one `<board page path> pass|fail` line per board
+          the AC verifier reads it by path (refs/ac-verification.md); no stdout parsing, nothing relayed through the gate's capped Evidence
 ```
+
+These are requirements on the repo's check; the plugin ships none and enforces none.
 
 **Deviations** — the one way to accept a difference.
 
 ```text
 deviation := an entry in the repo's design-check config: what differs + reason + ticket   # no reason or no ticket -> invalid, the check fails
-list only shrinks -> an entry whose difference no longer exists is stale and fails the check
+agents never grow the list; an entry whose difference no longer exists is stale and fails the check
 agent -> may PROPOSE a deviation (in the return Summary, with reason and ticket); never ADDS, edits or loosens one to pass a check
-a person approves every deviation; recommend CODEOWNERS on the deviation file
+a person approves every addition; recommend CODEOWNERS on the deviation file
 never -> widen a pixel budget, skip a board, or retune code toward a board that uses a different rule
 ```
 

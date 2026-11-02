@@ -39,12 +39,18 @@ git -C "$WORKTREE" log ${BASE_SHA}..origin/<BRANCH_PREFIX>/<STORY-KEY> --oneline
 
 ## Design check evidence
 
+The verifier reads the check's report FILE in `$WORKTREE`; it needs no extra input and nothing the
+orchestrator must relay, so a truncated gate `Evidence` can never hide a board.
+
 ```text
 Design check := project-context Tooling row `Design check`; unset | empty -> this section is off, Design lines stay "implementing UI exists"
-Design check set AND a Design row names a board -> `Design <n>: met` needs BOTH:
+REPORT := $WORKTREE/<path> where <path> := project-context Tooling row `Design check report` | `.design-check/report.txt`   # gitignored; refs/design-references.md Design check
+Design check set AND a Design row names a board -> `Design <n>: met` needs ALL of:
   the implementing UI path exists
-  evidence the check passed for that board: its report path, or the gate's output line naming the board   # Evidence of the QA gate run, or of the domain agent's Summary
-no such evidence | check failed | board not named in the output -> `unmet — design check: <missing | failed>`; Owner = the agent owning the UI path
+  REPORT exists AND its first line is `design-check: pass sha=<HEAD>` with <HEAD> == `git -C "$WORKTREE" rev-parse HEAD`
+  REPORT has a line `<board page path> pass` for that row's board
+REPORT missing | sha != HEAD | first line `fail` | board line missing or `fail` -> `unmet — design check: <missing | stale | failed>`; Owner = the agent owning the UI path
+met -> append `; check <REPORT path>` to the Design line
 the verifier never runs the check and never judges pixels by eye; the check does
 ```
 

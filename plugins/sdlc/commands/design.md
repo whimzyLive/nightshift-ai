@@ -72,9 +72,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-ingest.sh $REPLACE --ticket "<KEY>" --
 ```
 
 Non-zero exit → **STOP**, surface its stderr verbatim. Keep the final `SUMMARY …` line for Step 6.
-On a revision, pages match existing ones by `<title>` and keep their file and render names, so story
-Design references and Step 5c's diff stay valid; only new boards get new names, removed boards go.
-Keep every `WARN font-not-bundled <family> <url>` line for Step 8 (the index also notes them).
+On a revision (`--replace`), a board keeps its page and render names when its dc name matches, else when
+its `<head>` `<title>` is unique in both the old pages and the new bundle, so story Design references and
+Step 5c's diff stay valid; only new boards get new names, removed boards go. With `--add` nothing is
+matched by title and no existing page is renamed or overwritten by title.
+Keep every tab-separated `WARN<TAB>font-not-bundled<TAB><family><TAB><url>` line for Step 8 (the index also
+notes them); none printed means every font resolved.
 `render=skipped:<why>` and `render=chrome:failed=<n>` are not errors — the pages and screenshots
 still land; say which pages have no render in the return (a failed render on Linux is usually the
 browser refusing to run as root without a sandbox). `note: dropped dotfile` lines on stderr are

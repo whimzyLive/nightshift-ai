@@ -393,7 +393,8 @@ carry Evidence -> Step-8 `Quality gate:`
 ```
 
 A design-check failure is a gate failure: Owning agent = the agent owning the screen under check,
-never a new deviation (`refs/design-references.md` Design check).
+never a new deviation (`refs/design-references.md` Design check). The gate run leaves the check's
+report file in `$WORKTREE`; Step 7's verifier reads it by path from project-context (no dispatch input).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
 **exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean.
