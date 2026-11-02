@@ -381,8 +381,9 @@ committed rule file.
 ## Step 6 — Quality gate
 
 ```text
-offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA>,
+offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA> <RUN_DESIGN_CHECK>,
   # RUN_INFRA := yes when a changed path belongs to platform-engineer infra, else no
+  # RUN_DESIGN_CHECK := yes WHEN project-context Tooling `Design check` is set AND (the story has a Design row OR a changed path is owned by web-engineer or mobile-engineer), else no
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")
 Stray files non-empty -> STOP, list; never clean
 Gate:fail -> dispatch Owning agent w/Error(Step3), push, re-offload fresh
@@ -390,6 +391,9 @@ Gate:pass,Evidence="" | no Gate: key -> re-offload once, fallback
 fallback := Read qa-gate-runner.md, run INLINE; offload=inline-fallback
 carry Evidence -> Step-8 `Quality gate:`
 ```
+
+A design-check failure is a gate failure: Owning agent = the agent owning the screen under check,
+never a new deviation (`refs/design-references.md` Design check).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
 **exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean.

@@ -5,7 +5,7 @@ inline-fallback path — by the orchestrator itself. Written in the third person
 never address "you, the subagent", and never depend on a value the orchestrator does not hold.
 
 Inputs, all passed in the dispatch prompt: `<STORY-KEY>` `<WORKTREE>` `<NX_CACHE_DIRECTORY>` `<BRANCH_PREFIX>`
-`<RUN_INFRA>` (`yes`|`no` — the orchestrator decides; this runner only executes, so it runs on Haiku)
+`<RUN_INFRA>` `<RUN_DESIGN_CHECK>` (each `yes`|`no` — the orchestrator decides; this runner only executes, so it runs on Haiku)
 
 ## Procedure
 
@@ -41,6 +41,10 @@ cd "$WORKTREE"
 4. `RUN_INFRA=yes` → also run the infra build with the stage flag from project-context (still
    inside `$WORKTREE`). Never decide this yourself.
 
+4a. `RUN_DESIGN_CHECK=yes` → also run the project-context Tooling `Design check` command (still
+   inside `$WORKTREE`). Its non-zero exit is `Gate: fail`; its report path (or the output line naming
+   each board) goes in `Evidence`. Never decide this yourself; never edit the check's config.
+
 5. Capture each command's exact string, its **exit code**, and its verbatim final status line(s) —
    never paraphrase. `Gate: pass` only when every command exited 0, any non-zero exit is `fail` —
    decided from exit codes, never from reading the output.
@@ -70,6 +74,7 @@ Stray files: <git status --porcelain output | none>
 ```text
 never -> paste a full log, a full test run, or any file's contents into the return
 never -> dispatch an agent from here                       # one-level nesting limit, ADR-0012
+never -> add, edit or accept a design-check deviation to get a pass
 never -> assert a pass without Evidence                    # verification-before-completion
 Evidence over 1,200 B -> truncate and append "…[truncated]" ; do NOT split across return fields
 whole block over 2,000 B -> truncate the `Commands` field first, then `Evidence`; never drop a key

@@ -32,6 +32,27 @@ ASSERT every resolved path exists on disk ELSE STOP "Design not on the base bran
 Epic designs only (story names no rows) -> pick the rows whose Description matches the story's ACs; name them in your output
 ```
 
+## Design check (optional, per repo)
+
+```text
+Design check := project-context Tooling row `Design check` (a command, e.g. `pnpm exec nx affected -t fidelity`)
+unset | empty -> everything below is off; Design rows stay "implementing UI exists" (refs/ac-verification.md)
+check := renders each board under docs/design/<slug>/pages/ and the screen that builds it,
+         compares computed styles of named elements and the pixels of a region, fails on any difference no deviation accepts
+runs := the domain agent of a UI story (before returning) | the QA gate when a Design row exists or a changed path is owned by web/mobile (refs/qa-gate-runner.md)
+failure -> routed to the owning agent like any gate failure; fix the screen, the design-system component, or the board
+```
+
+**Deviations** — the one way to accept a difference.
+
+```text
+deviation := an entry in the repo's design-check config: what differs + reason + ticket   # no reason or no ticket -> invalid, the check fails
+list only shrinks -> an entry whose difference no longer exists is stale and fails the check
+agent -> may PROPOSE a deviation (in the return Summary, with reason and ticket); never ADDS, edits or loosens one to pass a check
+a person approves every deviation; recommend CODEOWNERS on the deviation file
+never -> widen a pixel budget, skip a board, or retune code toward a board that uses a different rule
+```
+
 ## Reading rules
 
 ```text
@@ -70,5 +91,5 @@ Dev Note conflicts with an AC or a project rule -> follow the AC/rule, record th
 | solutions-architect | Spec gets a `## Design & Dev Notes` section: each UI surface -> the design row(s) it implements; each Dev Note verbatim + where the spec honours it or why it deviates |
 | tech-lead | Every UI task names the design path(s) it implements; each Dev Note rides on the task(s) it constrains |
 | principal-engineer | Resolve the design (above) before Step 3; pass Design paths + Dev Notes verbatim in every domain-agent prompt (item 6), on both the full and lightweight paths |
-| domain agents | Before a UI task, Read the named render/screenshot (Grep-then-window any `.html` page); follow every Dev Note; a deviation goes in the return `Summary:` with its reason |
-| QA | The reviewer sees Dev Notes + Design through the story description (lightweight) or the plan tasks (full); verification adds `Dev Note <n>:` / `Design <n>:` lines (`refs/ac-verification.md`) |
+| domain agents | With `Design check` set, run it for a UI story and report counts + pixel ratio, with the report/heat-map path, in `Summary:` (`refs/domain-agent-handoff.md`). Before a UI task, Read the named render/screenshot (Grep-then-window any `.html` page); follow every Dev Note; a deviation goes in the return `Summary:` with its reason |
+| QA | With `Design check` set, the gate runs it and verification requires its evidence per Design row. The reviewer sees Dev Notes + Design through the story description (lightweight) or the plan tasks (full); verification adds `Dev Note <n>:` / `Design <n>:` lines (`refs/ac-verification.md`) |
