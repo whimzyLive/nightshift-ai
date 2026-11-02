@@ -236,4 +236,27 @@ run --replace "$d13/one" "$in/broken.html" >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 1 ] && [ -f "$d13/one/screenshots/hero.png" ] \
   && ok "(13b) --replace with a malformed bundle fails before deleting anything" || bad "(13b) replace pre-validation" "rc=$rc or assets deleted"
 
+# --- (14) stable page names on revision + font-not-bundled warning ---------------------------
+mkbundle() { # <out> <ext-json> <html-a> <html-b>
+  local m
+  m="$(jq -cn --arg a "$(printf '%s' "$3" | base64 | tr -d '\n')" --arg b "$(printf '%s' "$4" | base64 | tr -d '\n')" \
+    '{"u-a":{mime:"text/html",compressed:false,data:$a},"u-b":{mime:"text/html",compressed:false,data:$b}}')"
+  printf '<script type="__bundler/manifest">%s</script><script type="__bundler/ext_resources">%s</script>' "$m" "$2" >"$1"
+}
+fa='<html><head><title>Invoice List</title><style>@font-face{font-family:"Inter";src:url(fonts/inter.woff2) format("woff2"),url(data:font/woff2;base64,AA==);}</style></head><body>one</body></html>'
+fb='<html><head><title>Invoice Detail</title></head><body>two</body></html>'
+mkbundle "$in/rev1.html" '[{"id":"./List.dc.html","uuid":"u-a"},{"id":"./Detail.dc.html","uuid":"u-b"}]' "$fa" "$fb"
+d14="$tmp/d14"; out14="$(run --ticket ABC-1 --title T "$d14" "$in/rev1.html")"
+echo "$out14" | grep -qx 'WARN font-not-bundled Inter fonts/inter.woff2' && grep -q 'Inter` — `fonts/inter.woff2' "$d14/index.md" \
+  && ok "(14a) an unbundled relative @font-face warns and is noted in the index" || bad "(14a) font warning" "$out14"
+perl -pi -e 's{\| TODO \|$}{| Described |}' "$d14/index.md"
+# revision: ext ids renamed, one board edited, one removed, one new
+mkbundle "$in/rev2.html" '[{"id":"./Invoices%20Screen.dc.html","uuid":"u-a"},{"id":"./Brand%20New.dc.html","uuid":"u-b"}]' \
+  "${fa/one/one edited}" '<html><head><title>Brand New</title></head><body>new</body></html>'
+run --replace "$d14" "$in/rev2.html" >/dev/null
+grep -q 'one edited' "$d14/pages/list.html" && [ ! -e "$d14/pages/invoices-screen.html" ] && row_of "$d14" 'pages/list.html' | grep -q 'Described' \
+  && ok "(14b) a board matched by <title> keeps its file name and description" || bad "(14b) stable name" "$(ls "$d14/pages")"
+[ -f "$d14/pages/brand-new.html" ] && [ ! -e "$d14/pages/detail.html" ] \
+  && ok "(14c) a new board gets a new name; a removed board is removed" || bad "(14c) new/removed" "$(ls "$d14/pages")"
+
 exit "$fail"
