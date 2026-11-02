@@ -72,6 +72,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-ingest.sh $REPLACE --ticket "<KEY>" --
 ```
 
 Non-zero exit → **STOP**, surface its stderr verbatim. Keep the final `SUMMARY …` line for Step 6.
+On a revision, pages match existing ones by `<title>` and keep their file and render names, so story
+Design references and Step 5c's diff stay valid; only new boards get new names, removed boards go.
+Keep every `WARN font-not-bundled <family> <url>` line for Step 8 (the index also notes them).
 `render=skipped:<why>` and `render=chrome:failed=<n>` are not errors — the pages and screenshots
 still land; say which pages have no render in the return (a failed render on Linux is usually the
 browser refusing to run as root without a sandbox). `note: dropped dotfile` lines on stderr are
@@ -174,6 +177,12 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
 - The component inventory: counts of Reused / Changed / New, or "no UI library configured".
 - Revision: the `DIFF` rows (Step 5c). Next step: merge the PR, then `/auto <EPIC>` — its E0a routes
   the change to the stories it reaches (`${CLAUDE_PLUGIN_ROOT}/refs/design-revisions.md` Routing).
+- Design check set (project-context Tooling): the design-check config should lint boards for visual
+  logic computed in board scripts (initials, tints, formats, status colours) and for hard-coded
+  colours, and boards must mount the design system's components, never look-alikes
+  (`${CLAUDE_PLUGIN_ROOT}/refs/ui-components.md` Look logic). The plugin ships no lint; the repo's
+  check owns it. Name this as a next step.
+- `WARN font-not-bundled` lines from Step 4: list each family and url — a renderer must serve them.
 - Next step: merge the PR, then refine — `/stories <EPIC>`, or `/refine-issue <STORY>`. Refinement
   puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its
