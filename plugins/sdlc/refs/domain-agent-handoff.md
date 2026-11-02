@@ -132,6 +132,11 @@ shared/ counter-only STILL needs `agent:` >= 2 (NA-103) — only trigger/rule is
 
 Each domain has its own verification commands. Run **all** of them before considering work complete — listed in each agent's body and the directory CLAUDE.md files. See `.claude/project/project-context.md` for project-level quality gate commands.
 
+**Design check** — a UI story (its Design rows, or paths you own as web/mobile) with project-context
+Tooling `Design check` set: run that command after the domain commands, before committing. A failure
+is fixed in the screen or the design-system component, never by adding or loosening a deviation
+(`refs/design-references.md` Design check); propose a deviation in `Summary:` instead. Unset -> skip.
+
 ## Commit your domain changes
 
 Stage your specific files (do NOT use `git add .`):
@@ -177,6 +182,8 @@ Rules applied: <rule-id>, <rule-id> | none
   nothing applicable; it is not a sign anything went wrong. An agent that applied a rule but omitted
   the line is a contract violation, handled exactly as a missing `Skills loaded:` line — the
   orchestrator re-dispatches.
+
+- With a design check run, `Summary:` also carries `design check: <pass|fail> — <n> boards, <n> style diffs, pixels <ratio>%, report <path>` (the check's report or heat-map path). No such part on a story without a design check.
 
 Large outputs are dropped at the dispatch boundary — keep it to the 4 lines (complete) / 5 lines (blocked) above.
 
