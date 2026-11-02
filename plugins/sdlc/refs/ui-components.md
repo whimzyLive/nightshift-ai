@@ -53,6 +53,14 @@ revision replacing assets -> rewrite from every page row now in index.md
 LIBRARY none -> do not write the file
 ```
 
+## Look logic
+
+```text
+logic that decides how something looks (initials, tints, number/date formats, status colours) := lives in ONE design-system component that boards and screens both mount
+board computes it in its own script, or hard-codes the colour -> fix the board to mount the component; never tune app code to match a board that uses a different rule
+design check mismatch on such a rule -> change the component (or the board), never add a deviation or retune one side
+```
+
 ## Components story (written by the scrum-master)
 
 ```text
