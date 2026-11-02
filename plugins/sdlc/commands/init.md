@@ -521,6 +521,7 @@ are documented in that template file. Token slots to substitute:
 | `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
+| `<design-check cmd>` | the repo's design-fidelity command when one exists (e.g. `pnpm exec nx affected -t fidelity`) — otherwise omit the `Design check` row; never ask for it, a repo adds it when its check exists |
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |

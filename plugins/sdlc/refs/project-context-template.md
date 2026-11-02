@@ -42,6 +42,7 @@ generated file — every slot must be replaced with an actual value.
 | Typecheck | `<typecheck cmd>` |
 | Test | `<test cmd>` |
 | UI library | `<shared component package path>` |
+| Design check | `<design-check cmd>` |
 
 ## Memory
 
@@ -80,6 +81,10 @@ generated file — every slot must be replaced with an actual value.
 - **UI library** — the shared component package other workspaces import (e.g.
   `packages/ui/`); omit the row when there is none. `/design` inventories
   components against it (`refs/ui-components.md`).
+- **Design check** — optional command that renders each design board and the screen that builds
+  it and fails on any unaccepted difference (e.g. `pnpm exec nx affected -t fidelity`); omit the
+  row when there is none. Row absent or empty = the design-fidelity gate is off and every
+  pipeline step behaves as it did before (`refs/design-references.md` Design check).
 - **Omit none-detected stack rows** — in `## Detected stack`, omit any row
   whose detected value is empty or `none`. Do not write `none` into the file.
 - **Package manager appears twice** — once in the top table (user-confirmed
