@@ -1,3 +1,33 @@
+## 0.47.4 (2026-11-03)
+
+### 🚀 Features
+
+- **sdlc:** pass the design image and fidelity-first rule to UI implementation ([93dd683](https://github.com/whimzyLive/nightshift-ai/commit/93dd683))
+- **sdlc:** add the look-logic principle to ui-components and design-references ([8b26bb8](https://github.com/whimzyLive/nightshift-ai/commit/8b26bb8))
+- **sdlc:** point /design at the board check and surface font warnings ([34a7853](https://github.com/whimzyLive/nightshift-ai/commit/34a7853))
+- **sdlc:** have UI domain agents run the design check and report its result ([327e598](https://github.com/whimzyLive/nightshift-ai/commit/327e598))
+- **sdlc:** run the design check in the QA gate and govern deviations ([aa4d939](https://github.com/whimzyLive/nightshift-ai/commit/aa4d939))
+- **sdlc:** require design check evidence for Design lines when configured ([561ccc8](https://github.com/whimzyLive/nightshift-ai/commit/561ccc8))
+- **sdlc:** add optional Design check row to project-context Tooling ([a638472](https://github.com/whimzyLive/nightshift-ai/commit/a638472))
+- **sdlc:** keep page names stable on design revision and warn on unbundled fonts ([6791745](https://github.com/whimzyLive/nightshift-ai/commit/6791745))
+
+### 🩹 Fixes
+
+- **sdlc:** start the design check entry from a scaffolded shell ([a6c0cbe](https://github.com/whimzyLive/nightshift-ai/commit/a6c0cbe))
+- **sdlc:** scope design image authority and keep deviations owner-approved ([0f1dd84](https://github.com/whimzyLive/nightshift-ai/commit/0f1dd84))
+- **sdlc:** name both design causes in capped status text ([f73678c](https://github.com/whimzyLive/nightshift-ai/commit/f73678c))
+- **sdlc:** treat not-checked like uncovered for a story's own design boards ([dc11aa6](https://github.com/whimzyLive/nightshift-ai/commit/dc11aa6))
+- **sdlc:** tidy wording for the uncovered-board cap ([b387e1f](https://github.com/whimzyLive/nightshift-ai/commit/b387e1f))
+- **sdlc:** let the QA verdict rules cap on an uncovered design board ([35d6727](https://github.com/whimzyLive/nightshift-ai/commit/35d6727))
+- **sdlc:** cap the verdict when a story's design board stays uncovered ([96868f4](https://github.com/whimzyLive/nightshift-ai/commit/96868f4))
+- **sdlc:** restore plain stray-file guard, add not-checked design state ([c6533ad](https://github.com/whimzyLive/nightshift-ai/commit/c6533ad))
+- **sdlc:** default design-check report to .tmp, define board key, keep font warnings ([0c7dd4b](https://github.com/whimzyLive/nightshift-ai/commit/0c7dd4b))
+- **sdlc:** make design-check evidence reachable and design-ingest renames safe ([c142936](https://github.com/whimzyLive/nightshift-ai/commit/c142936))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.3 (2026-10-27)
 
 ### 🚀 Features
