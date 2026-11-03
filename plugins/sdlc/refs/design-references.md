@@ -68,6 +68,24 @@ a `not-checked` entry (reason + ticket) may be added by an agent ONLY for a boar
 never -> widen a pixel budget, skip a board, or retune code toward a board that uses a different rule
 ```
 
+## Strong references
+
+```text
+Design row := the FULL page path (docs/design/<slug>/pages/<file>) AND that row's render/screenshot PNG path from the design index, plus one line "take from it"; no PNG in the index -> page path only
+words describe intent; the image and the page are the reference -> where prose and image disagree, the image wins
+first UI task of a story, WHEN project-context Tooling `Design check` is set, and once its route exists -> it writes that board's design-check entry (a real entry, never a skip)
+domain agent, before building a UI task -> Reads the PNG (opens the page when there is none), then builds
+```
+
+## Fidelity-first (only when `Design check` is set)
+
+```text
+order := write the board's check entry FIRST -> run the Design check -> treat the failing report as the to-do list -> build until it passes
+deviation := only a difference owned by another ticket, with reason and ticket; never to get a pass
+never -> change code only to match a probe (refs/ui-components.md Look logic); fix the screen, the design-system component, or the board
+Design check unset -> none of this applies; Reading rules below stand
+```
+
 ## Reading rules
 
 ```text

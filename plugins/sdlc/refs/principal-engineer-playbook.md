@@ -147,7 +147,7 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
    agent's override, `.claude/project/agents/<agent-name>.md`, its skills section) with "Invoke these
    via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state "No project skills
    apply for this task." Exactly one of the two.
-6. The story's Design paths + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
+6. The story's Design paths — each page path WITH its render/screenshot PNG path, the agent reads the PNG (or opens the page when none) before building — + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
    and any plan "grounding corrections" verbatim — short items only; spec sections by name, not by
    paste.
 7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
