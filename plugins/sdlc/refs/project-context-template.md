@@ -43,7 +43,6 @@ generated file — every slot must be replaced with an actual value.
 | Test | `<test cmd>` |
 | UI library | `<shared component package path>` |
 | Design check | `<design-check cmd>` |
-| Design check report | `.tmp/design-check/report.txt` |
 
 ## Memory
 
@@ -87,8 +86,8 @@ generated file — every slot must be replaced with an actual value.
   row when there is none. Row absent or empty = the design-fidelity gate is off and every
   pipeline step behaves as it did before (`refs/design-references.md` Design check). The check is
   not a Quality Gate command: only the QA gate's design step runs it. An optional `Design check
-  report` row (omit unless the path differs) names the report file, default `.tmp/design-check/report.txt`
-  (`/init` git-ignores `.tmp/`). The command must write that report on every run, even when nothing is
+  report` row (not in the table above; add it only when the path differs) names the report file, default `.tmp/design-check/report.txt`
+  (`/init` git-ignores `.tmp/`); a custom path MUST be git-ignored too, or the gate's stray-file check stops on it. The command must write that report on every run, even when nothing is
   affected, from one non-cached aggregate step covering every board (e.g. Nx `cache: false`), or the
   verifier reads a stale or missing report. Line format: `refs/design-references.md` Design check.
 - **Omit none-detected stack rows** — in `## Detected stack`, omit any row

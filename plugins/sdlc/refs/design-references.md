@@ -37,11 +37,12 @@ Epic designs only (story names no rows) -> pick the rows whose Description match
 ```text
 Design check := project-context Tooling row `Design check` (a command, e.g. `pnpm exec nx affected -t fidelity`)
 unset | empty -> everything below is off; Design rows stay "implementing UI exists" (refs/ac-verification.md)
+story Design rows should name boards by the full `docs/design/<slug>/pages/<file>` path; a bare `pages/x.html` or a Title is resolved only inside the story's resolved design(s) and must match exactly one row
 check := renders each board under docs/design/<slug>/pages/ and the screen that builds it,
          compares computed styles of named elements and the pixels of a region, fails on any difference no deviation accepts
 runs := the domain agent of a UI story (before returning) | the QA gate when a Design row exists or a changed path is owned by web/mobile (refs/qa-gate-runner.md)
 failure -> routed to the owning agent like any gate failure; fix the screen, the design-system component, or the board
-report := the check writes a text file at project-context Tooling `Design check report` (default `.tmp/design-check/report.txt`; init already git-ignores `.tmp/`):
+report := the check writes a text file at project-context Tooling `Design check report` (default `.tmp/design-check/report.txt`; init already git-ignores `.tmp/`; a custom path MUST be git-ignored, the gate's clean-tree assert is a plain `git status --porcelain`):
           line 1 `design-check: pass|fail sha=<git HEAD of the worktree>`, then one `<KEY> pass|fail|not-checked <ticket>` line per board
           KEY := docs/design/<slug>/<File column path from index.md>, e.g. docs/design/clients-and-contacts/pages/b8221b8f-….html
           the AC verifier reads it by path (refs/ac-verification.md); no stdout parsing, nothing relayed through the gate's capped Evidence
@@ -59,6 +60,7 @@ deviation := an entry in the repo's design-check config: what differs + reason +
 agents never grow the list; an entry whose difference no longer exists is stale and fails the check
 agent -> may PROPOSE a deviation (in the return Summary, with reason and ticket); never ADDS, edits or loosens one to pass a check
 a person approves every addition; recommend CODEOWNERS on the deviation file
+not-checked | uncovered board -> NOT an Unmet id and never looped: QA asks the owning domain agent ONCE to add a check entry for the board its Design row names, then reports what is still not-checked to the person (`Design not checked:` in the verdict)
 never -> widen a pixel budget, skip a board, or retune code toward a board that uses a different rule
 ```
 

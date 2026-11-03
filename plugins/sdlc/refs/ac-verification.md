@@ -47,14 +47,15 @@ Design check := project-context Tooling row `Design check`; unset | empty -> thi
 REPORT := $WORKTREE/<path> where <path> := project-context Tooling row `Design check report` | `.tmp/design-check/report.txt`   # refs/design-references.md Design check
 KEY := repo-relative `docs/design/<slug>/<File column path>` of the board's page row in that feature's index.md
        # e.g. docs/design/clients-and-contacts/pages/b8221b8f-….html
-Design row -> KEY: a page path (pages/x.html, or the full repo path) -> that row | a render png -> the page row whose Render column is it | an index Title -> its row
+Design row -> KEY: a full `docs/design/<slug>/pages/<file>` path -> that row | a bare `pages/x.html` -> the row in the story's resolved design(s) | a render png -> the page row whose Render column is it | an index Title -> its row
+  bare path | png | Title matching MORE than one row (a Title is the dc name and can repeat) or in more than one resolved design -> `unmet — design check: ambiguous (<candidate KEYs>)`; never first-match
 Design check set AND a Design row names a board -> `Design <n>: met` needs ALL of:
   the implementing UI path exists
   REPORT exists AND its first line is `design-check: pass sha=<HEAD>` with <HEAD> == `git -C "$WORKTREE" rev-parse HEAD`
   REPORT has a line `<KEY> pass`
 REPORT missing | sha != HEAD | first line `fail` | `<KEY> fail` -> `unmet — design check: <missing | stale | failed>`; Owner = the agent owning the UI path
-REPORT valid but no line for KEY -> `unmet — design check: uncovered`    # also what a nothing-affected run yields
-`<KEY> not-checked <ticket>` -> `unmet — not checked (<ticket>)`          # a person-accepted gap is still an unmet Design row, never `met`
+REPORT valid but no line for KEY (also what a nothing-affected run yields) | `<KEY> not-checked <ticket>`
+  -> `Design <n>: not-checked — <KEY>[ <ticket>]`; NOT `met`, NOT `unmet`, NOT in `Unmet`/`Owner`; listed on the `Design not checked:` line
 met -> append `; check <REPORT path>` to the Design line
 the verifier never runs the check and never judges pixels by eye; the check does
 ```
@@ -103,8 +104,9 @@ Verification: complete | incomplete
 AC-<n>: met | unmet — <path:line | test name | commit sha>          # one line per AC, always
 Plan task <n>: met | unmet — <evidence>                             # full path only; omitted on lightweight
 Dev Note <n>: followed | deviated | unmet — <evidence | recorded reason>   # one per Dev Note; none when "None"
-Design <n>: met | unmet — <implementing path>[; check <report path>]   # one per story Design row; none when "None"
+Design <n>: met | unmet — <implementing path>[; check <report path>] | not-checked — <KEY>[ <ticket>]   # one per story Design row; none when "None"
 Regression evidence: fail-before <sha> / pass-after <sha> | n/a     # defect path only
+Design not checked: <KEY[ ticket]>, ... | none                      # not-checked rows only; not Unmet
 Unmet: <comma-separated AC/task/Dev Note/Design ids | none>
 Owner: <id>=<agent-name>, ...  | none                               # owning agent per unmet id
 ```

@@ -408,10 +408,12 @@ checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live
 offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
 Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
+Design not checked non-empty -> ONCE per run: dispatch the owning domain agent to add a design-check entry for each listed board (it reports if it cannot, e.g. the board cannot render yet), push, rerun 6-7;
+  what is still not-checked afterwards is carried to Step 8, never dispatched again, never blocks `clean`
 WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
 no Verification: -> re-offload once, fallback
 fallback := Read ac-verification.md INLINE; offload=inline-fallback
-never -> clean while Unmet non-empty
+never -> clean while Unmet non-empty   # `Design not checked` is not Unmet
 carry result -> Step-8 AC check:
 ```
 
@@ -438,6 +440,7 @@ Minor noted (not fixed): <list, or "none">
 Follow-ups: <issues in code the fix did not change, or "none">
 Open (capped): <each open Important finding, file:line — only if Status: capped>
 AC check: <met — all N ACs evidenced | UNMET: <which> >
+Design not checked: <keys + tickets, or "none"> — for the person; not looped
 Quality gate: typecheck pass | tests pass   (paste evidence)
 Learnings: captured to <N> file(s): <ids, or "none">
 Blocked reason: <one line — only if Status: blocked>
