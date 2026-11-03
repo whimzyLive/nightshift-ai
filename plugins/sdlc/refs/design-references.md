@@ -74,7 +74,7 @@ never -> widen a pixel budget, skip a board, or retune code toward a board that 
 Design row := the FULL page path (docs/design/<slug>/pages/<file>) AND that row's PNG path from the design index (the screenshot when the row has both a screenshot and a render: it wins), plus one line "take from it"; no PNG in the index -> page path only
 words describe intent; the image and the page are the reference
 where the Design row's "take from it" line and the image disagree, the image wins; ACs, Dev Notes and design-system tokens/components still rank above the design (Authority)
-first UI task of a story, WHEN project-context Tooling `Design check` is set, and once the screen or component it builds exists -> it writes that board's design-check entry (a real entry, never a skip)
+first UI task of a story, WHEN project-context Tooling `Design check` is set, and as soon as the screen's route or the component's file is scaffolded (an empty shell is enough) -> it writes that board's design-check entry (a real entry, never a skip)
 domain agent, before building a UI task -> Reads the PNG (none -> Grep for the region, then a bounded Read of the page; pages are large), then builds
 ```
 
