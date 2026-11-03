@@ -295,7 +295,7 @@ The docs commit, when made, is the last commit before the PR.
 Title keeps the parent `<STORY-KEY>`; head `<BRANCH_PREFIX>/<STORY-KEY>`. On the full path the PR
 already carries the approved spec commit. Sub-tasks → body by file (`refs/subtask-sequencing.md`).
 QA `Follow-ups:`, `capped` or `Design not checked:` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
-`## Open review findings (round cap)` list from `Open (capped):`, then a `## Follow-ups` list.
+`## Open review findings (round cap)` list from `Open (capped):` (omit `design uncovered:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
 QA `Design not checked:` non-empty (either kind) → also write a `## Design not checked` section into `$BODY_FILE`
 (each `<KEY ticket>` or `<KEY uncovered>`); an `uncovered` entry arrives as `capped`, so it is a draft like any cap.
 `capped` → `DRAFT=--draft`, else `DRAFT=` (unquoted below, so empty adds nothing).
@@ -337,7 +337,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
 ### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
-### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped: "QA capped at the round cap — draft PR, <N> open findings, needs a human"
+### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design uncovered): "QA capped at the round cap | on an uncovered design board — draft PR, <N> open findings, needs a human"
 ```
 
 ## Constraints

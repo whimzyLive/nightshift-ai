@@ -162,7 +162,7 @@ raise** with `<NOTE>` for B1.
 
 After the impl PR is raised (A2 or B1), post the Step-3 comment, fire both events, and stop
 without the tail — the service owns the merge. Release with the PR URL. `DRAFT` := `true` on a QA
-`capped` verdict (draft PR, review round cap — the service must not merge it), else `false`.
+`capped` verdict (draft PR, review round cap or an uncovered design board — the service must not merge it), else `false`.
 
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 -H "Content-Type: application/json" \
