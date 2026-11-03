@@ -337,7 +337,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
 ### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
-### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design uncovered | design not checked): "QA capped at the round cap | on an uncovered design board — draft PR, <N> open findings, needs a human"
+### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design board uncovered or not checked): "QA capped at the round cap | on a design board uncovered or not checked — draft PR, <N> open findings, needs a human"
 ```
 
 ## Constraints
