@@ -383,7 +383,7 @@ committed rule file.
 ```text
 offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA> <RUN_DESIGN_CHECK>,
   # RUN_INFRA := yes when a changed path belongs to platform-engineer infra, else no
-  # RUN_DESIGN_CHECK := yes WHEN project-context Tooling `Design check` is set AND (the story has a Design row OR a changed path is owned by web-engineer or mobile-engineer), else no
+  # RUN_DESIGN_CHECK := yes WHEN `Design check` is set AND (a Design row OR a changed web/mobile-owned path), else no
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")
 Stray files non-empty -> STOP, list; never clean
 Gate:fail -> dispatch Owning agent w/Error(Step3), push, re-offload fresh
@@ -392,9 +392,7 @@ fallback := Read qa-gate-runner.md, run INLINE; offload=inline-fallback
 carry Evidence -> Step-8 `Quality gate:`
 ```
 
-A design-check failure is a gate failure: Owning agent = the agent owning the screen under check,
-never a new deviation (`refs/design-references.md` Design check). The gate run leaves the check's
-report file in `$WORKTREE`; Step 7's verifier reads it by path from project-context (no dispatch input).
+A design-check failure is a gate failure; the verifier reads its report file (`refs/design-references.md`).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
 **exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean.
@@ -408,12 +406,11 @@ checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live
 offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
 Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
-Design not checked non-empty -> ONCE per run: dispatch the owning domain agent to add a REAL design-check entry for each listed board (every one is a board the story's own Design row names; `uncovered` and `<KEY ticket>` alike; it reports if it cannot, e.g. the board cannot render yet), push, rerun 6-7;
-  afterwards, never dispatched again: a board still `uncovered` or `not-checked` -> Status: capped (round-cap semantics: draft PR, never auto-merged), listed on `Open (capped):` as `design uncovered: <KEY>` | `design not checked: <KEY> <ticket>`
+Design not checked non-empty -> ONCE per run: ask the owner for a REAL check entry per board (`refs/design-references.md`), push, rerun 6-7; still `uncovered`|`not-checked` -> capped, `Open (capped)`: `design uncovered: <KEY>` | `design not checked: <KEY> <ticket>`
 WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
 no Verification: -> re-offload once, fallback
 fallback := Read ac-verification.md INLINE; offload=inline-fallback
-never -> clean while Unmet non-empty OR a Design board is still uncovered | not-checked   # `Design not checked` is not Unmet
+never -> clean while Unmet non-empty OR a Design board uncovered | not-checked
 carry result -> Step-8 AC check:
 ```
 
@@ -440,7 +437,7 @@ Minor noted (not fixed): <list, or "none">
 Follow-ups: <issues in code the fix did not change, or "none">
 Open (capped): <each open Important finding, file:line — only if Status: capped>
 AC check: <met — all N ACs evidenced | UNMET: <which> >
-Design not checked: <KEY ticket | KEY uncovered, or "none"> — for the person; not looped
+Design not checked: <KEY ticket | KEY uncovered | none>
 Quality gate: typecheck pass | tests pass   (paste evidence)
 Learnings: captured to <N> file(s): <ids, or "none">
 Blocked reason: <one line — only if Status: blocked>
@@ -449,8 +446,8 @@ Blocked reason: <one line — only if Status: blocked>
 - `Status: clean` only when: review has no Critical/Important findings, every AC is evidenced,
   no Design board is uncovered or not-checked, the gate is green with pasted output, and learnings are captured.
 - `Status: capped` only (a) at the round cap with Important findings open, the gate green, and every
-  AC evidenced (`refs/qa-review-rounds.md` § Round cap), or (b) when a Design board is still
-  uncovered or not-checked after Step 7's one ask (`design uncovered: <KEY>` | `design not checked: <KEY> <ticket>` on `Open (capped):`) — the caller opens a draft PR, never merges.
+  AC evidenced (`refs/qa-review-rounds.md` § Round cap), or (b) a Design board still
+  uncovered or not-checked after Step 7's one ask — the caller opens a draft PR, never merges.
 - `Status: blocked` at any unrecoverable point (agent blocked, push conflict, AC cannot be met)
   → return immediately with the reason; do not improvise around it.
 

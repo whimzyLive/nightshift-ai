@@ -87,6 +87,17 @@ never -> change code only to match a probe (refs/ui-components.md Look logic); f
 Design check unset -> none of this applies; Reading rules below stand
 ```
 
+## Domain agent duties (Design references and check)
+
+```text
+dispatch -> each Design row's page path AND its PNG path; read the PNG before building a UI task (none -> Grep for the region, then a bounded Read of the page; pages are large)
+the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins
+the row's "take from it" line vs the image -> the image wins; ACs, Dev Notes and design-system tokens/components still rank above the design (Authority)
+Design check set -> a failure is fixed in the screen or the design-system component, never by adding or loosening a deviation; propose a deviation in `Summary:`
+return Summary with a design check run -> `design check: <pass|fail> — <n> boards, <n> style diffs, pixels <ratio>%, report <path>`; no such part on a story without one
+asked to cover an uncovered or not-checked board -> add a real check entry or report why you cannot
+```
+
 ## Reading rules
 
 ```text
