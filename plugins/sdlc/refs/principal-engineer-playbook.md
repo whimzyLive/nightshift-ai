@@ -295,7 +295,7 @@ The docs commit, when made, is the last commit before the PR.
 Title keeps the parent `<STORY-KEY>`; head `<BRANCH_PREFIX>/<STORY-KEY>`. On the full path the PR
 already carries the approved spec commit. Sub-tasks → body by file (`refs/subtask-sequencing.md`).
 QA `Follow-ups:`, `capped` or `Design not checked:` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
-`## Open review findings (round cap)` list from `Open (capped):` (omit `design uncovered:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
+`## Open review findings (round cap)` list (omit the heading when it has no entries) from `Open (capped):` (omit `design uncovered:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
 QA `Design not checked:` non-empty (either kind) → also write a `## Design not checked` section into `$BODY_FILE`
 (each `<KEY ticket>` or `<KEY uncovered>`); an `uncovered` entry arrives as `capped`, so it is a draft like any cap.
 `capped` → `DRAFT=--draft`, else `DRAFT=` (unquoted below, so empty adds nothing).

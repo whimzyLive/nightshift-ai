@@ -119,7 +119,8 @@ Repo slug: read `<owner>/<repo>` from `.claude/project/project-context.md` (GitH
    with its justification), fixes pushed, re-review rounds, and gate evidence. On `Status: capped`,
    list the open findings left at the cap (review round cap, or an uncovered design board): their threads get a reply but stay OPEN
    (`refs/qa-external-review.md`), and a commit-SHA target (no PR) reports them only. Report it to the
-   caller as `Status: blocked` with reason `review round cap — <N> findings open`, so `/sdlc:loop`
+   caller as `Status: blocked` with the actual cause — `review round cap — <N> findings open` or
+   `design uncovered — <KEYs>` — so `/sdlc:loop`
    halts instead of seeing no unresolved threads and exiting clean. On
    `Status: blocked`, surface the reason — do not improvise.
 
