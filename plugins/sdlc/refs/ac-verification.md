@@ -51,9 +51,9 @@ Design row -> KEY: a full `docs/design/<slug>/pages/<file>` path -> that row | a
   bare path | png | Title matching MORE than one row (a Title is the dc name and can repeat) or in more than one resolved design -> `unmet — design check: ambiguous (<candidate KEYs>)`; never first-match
 Design check set AND a Design row names a board -> `Design <n>: met` needs ALL of:
   the implementing UI path exists
-  REPORT exists AND its first line is `design-check: pass sha=<HEAD>` with <HEAD> == `git -C "$WORKTREE" rev-parse HEAD`
+  REPORT exists AND its first line, parsed by fields (not an exact string), has verdict `pass`, `sha` == `git -C "$WORKTREE" rev-parse HEAD`, and `dirty` absent or `false`; other fields are ignored
   REPORT has a line `<KEY> pass`
-REPORT missing | sha != HEAD | first line `fail` | `<KEY> fail` -> `unmet — design check: <missing | stale | failed>`; Owner = the agent owning the UI path
+REPORT missing | sha != HEAD | `dirty=true` | first line `fail` | `<KEY> fail` -> `unmet — design check: <missing | stale | dirty | failed>` (`dirty=true` -> `dirty`); Owner = the agent owning the UI path
 `<KEY> not-checked <ticket>` (an allowance, carries a ticket)
   -> `Design <n>: not-checked — <KEY> <ticket>`; NOT `met`, NOT `unmet`, NOT in `Unmet`/`Owner`; listed on `Design not checked:` as `<KEY> <ticket>`; a Design row is the story's OWN board, so it is treated like `uncovered`: QA asks once, then it blocks `clean` (qa-engineer-playbook Step 7)
   not-checked lines for boards no story Design row names are not verified here: the verifier ignores them
