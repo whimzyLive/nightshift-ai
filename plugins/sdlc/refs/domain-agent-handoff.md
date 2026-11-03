@@ -132,10 +132,10 @@ shared/ counter-only STILL needs `agent:` >= 2 (NA-103) — only trigger/rule is
 
 Each domain has its own verification commands. Run **all** of them before considering work complete — listed in each agent's body and the directory CLAUDE.md files. See `.claude/project/project-context.md` for project-level quality gate commands.
 
-**Design references** — the dispatch passes each Design row's page path AND its PNG path. Read the PNG (open the page when none) before building a UI task; words describe intent, the image and page are the reference.
+**Design references** — the dispatch passes each Design row's page path AND its PNG path. Pass the screenshot when a row has both a screenshot and a render. Read the PNG (none -> Grep for the region, then a bounded Read of the page; pages are large) before building a UI task; words describe intent, the image and page are the reference. Where the row's "take from it" line and the image disagree, the image wins; ACs, Dev Notes and design-system tokens/components still rank above the design (`refs/design-references.md` Authority).
 
 **Design check** — a UI story (its Design rows, or paths you own as web/mobile) with project-context
-Tooling `Design check` set: write the board's check entry first (once its route exists), run that command, treat the failing report as your to-do list and build until it passes (`refs/design-references.md` Fidelity-first), then commit. A failure
+Tooling `Design check` set: write the board's check entry first (once the screen or component it builds exists), run that command, treat the failing report as your to-do list and build until it passes (`refs/design-references.md` Fidelity-first), then commit. A failure
 is fixed in the screen or the design-system component, never by adding or loosening a deviation
 (`refs/design-references.md` Design check); propose a deviation in `Summary:` instead. Add a `not-checked` entry (reason + ticket) only for a board that did not exist at the comparison base (a brand-new board from a design ingest); never for a board that existed at the base, and never as a skip. When asked to cover an uncovered or not-checked board, add a real check entry or report why you cannot. Unset -> skip.
 
