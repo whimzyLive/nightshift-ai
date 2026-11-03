@@ -1,3 +1,13 @@
+## 0.47.6 (2026-11-03)
+
+### 🩹 Fixes
+
+- **sdlc:** accept extra fields on the design check report line and reject dirty runs ([ba5e654](https://github.com/whimzyLive/nightshift-ai/commit/ba5e654))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.5 (2026-11-03)
 
 ### 🩹 Fixes
