@@ -1,3 +1,13 @@
+## 0.47.5 (2026-11-03)
+
+### 🩹 Fixes
+
+- **sdlc:** point the handoff at the design-check duties ([efdef2a](https://github.com/whimzyLive/nightshift-ai/commit/efdef2a))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.4 (2026-11-03)
 
 ### 🚀 Features
