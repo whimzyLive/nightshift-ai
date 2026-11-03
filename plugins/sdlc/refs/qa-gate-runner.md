@@ -21,8 +21,9 @@ git -C "$WORKTREE" fetch origin <BRANCH_PREFIX>/<STORY-KEY> && git -C "$WORKTREE
    against a tree that isn't actually what got pushed, a false green.
 
 ```bash
-[ -z "$(git -C "$WORKTREE" status --porcelain)" ] \
-  || { echo "STOP: \$WORKTREE has stray uncommitted/untracked files before the quality gate — $(git -C "$WORKTREE" status --porcelain)"; exit 1; }
+# DC_REPORT := project-context Tooling `Design check report` | `.tmp/design-check/report.txt` — the check's own output is not stray
+[ -z "$(git -C "$WORKTREE" status --porcelain -- . ":(exclude)$DC_REPORT")" ] \
+  || { echo "STOP: \$WORKTREE has stray uncommitted/untracked files before the quality gate — $(git -C "$WORKTREE" status --porcelain -- . ":(exclude)$DC_REPORT")"; exit 1; }
 ```
 
 A non-empty result is NOT a stop here — capture it verbatim into the stray-files field of the
@@ -44,7 +45,7 @@ cd "$WORKTREE"
 
 4a. `RUN_DESIGN_CHECK=yes` → also run the project-context Tooling `Design check` command (still
    inside `$WORKTREE`). Its non-zero exit is `Gate: fail`. It writes its report file (the `Design check
-   report` path, default `.design-check/report.txt`); put that PATH and the exit code in `Evidence`,
+   report` path, default `.tmp/design-check/report.txt`); put that PATH and the exit code in `Evidence`,
    never board names — the AC verifier reads the file (`refs/ac-verification.md`). `RUN_DESIGN_CHECK=no`
    → never run it. Never decide this yourself; never edit the check's config.
 

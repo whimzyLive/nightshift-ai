@@ -185,7 +185,7 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
   colours, and boards must mount the design system's components, never look-alikes
   (`${CLAUDE_PLUGIN_ROOT}/refs/ui-components.md` Look logic). The plugin ships no lint; the repo's
   check owns it. Name this as a next step.
-- `WARN font-not-bundled` lines from Step 4: list each family and url — a renderer must serve them.
+- Tab-separated `WARN<TAB>font-not-bundled<TAB><family><TAB><url>` lines from Step 4: list each family and url — a renderer must serve them.
 - Next step: merge the PR, then refine — `/stories <EPIC>`, or `/refine-issue <STORY>`. Refinement
   puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its

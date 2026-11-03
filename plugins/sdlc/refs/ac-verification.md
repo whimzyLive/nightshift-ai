@@ -44,12 +44,17 @@ orchestrator must relay, so a truncated gate `Evidence` can never hide a board.
 
 ```text
 Design check := project-context Tooling row `Design check`; unset | empty -> this section is off, Design lines stay "implementing UI exists"
-REPORT := $WORKTREE/<path> where <path> := project-context Tooling row `Design check report` | `.design-check/report.txt`   # gitignored; refs/design-references.md Design check
+REPORT := $WORKTREE/<path> where <path> := project-context Tooling row `Design check report` | `.tmp/design-check/report.txt`   # refs/design-references.md Design check
+KEY := repo-relative `docs/design/<slug>/<File column path>` of the board's page row in that feature's index.md
+       # e.g. docs/design/clients-and-contacts/pages/b8221b8f-….html
+Design row -> KEY: a page path (pages/x.html, or the full repo path) -> that row | a render png -> the page row whose Render column is it | an index Title -> its row
 Design check set AND a Design row names a board -> `Design <n>: met` needs ALL of:
   the implementing UI path exists
   REPORT exists AND its first line is `design-check: pass sha=<HEAD>` with <HEAD> == `git -C "$WORKTREE" rev-parse HEAD`
-  REPORT has a line `<board page path> pass` for that row's board
-REPORT missing | sha != HEAD | first line `fail` | board line missing or `fail` -> `unmet — design check: <missing | stale | failed>`; Owner = the agent owning the UI path
+  REPORT has a line `<KEY> pass`
+REPORT missing | sha != HEAD | first line `fail` | `<KEY> fail` -> `unmet — design check: <missing | stale | failed>`; Owner = the agent owning the UI path
+REPORT valid but no line for KEY -> `unmet — design check: uncovered`    # also what a nothing-affected run yields
+`<KEY> not-checked <ticket>` -> `unmet — not checked (<ticket>)`          # a person-accepted gap is still an unmet Design row, never `met`
 met -> append `; check <REPORT path>` to the Design line
 the verifier never runs the check and never judges pixels by eye; the check does
 ```

@@ -41,9 +41,13 @@ check := renders each board under docs/design/<slug>/pages/ and the screen that 
          compares computed styles of named elements and the pixels of a region, fails on any difference no deviation accepts
 runs := the domain agent of a UI story (before returning) | the QA gate when a Design row exists or a changed path is owned by web/mobile (refs/qa-gate-runner.md)
 failure -> routed to the owning agent like any gate failure; fix the screen, the design-system component, or the board
-report := the check writes a text file at project-context Tooling `Design check report` (default `.design-check/report.txt`, gitignored so the gate's clean-tree assert holds):
-          line 1 `design-check: pass|fail sha=<git HEAD of the worktree>`, then one `<board page path> pass|fail` line per board
+report := the check writes a text file at project-context Tooling `Design check report` (default `.tmp/design-check/report.txt`; init already git-ignores `.tmp/`):
+          line 1 `design-check: pass|fail sha=<git HEAD of the worktree>`, then one `<KEY> pass|fail|not-checked <ticket>` line per board
+          KEY := docs/design/<slug>/<File column path from index.md>, e.g. docs/design/clients-and-contacts/pages/b8221b8f-….html
           the AC verifier reads it by path (refs/ac-verification.md); no stdout parsing, nothing relayed through the gate's capped Evidence
+the command MUST write the report on EVERY run, including a nothing-affected run (line 1 only, no board lines), from ONE aggregate step that covers every board
+  -> that step is never cached or restored from cache (e.g. Nx `cache: false`, no `nx affected` filtering of the report), so sha always equals HEAD
+  -> several projects must not overwrite each other: one writer for the whole file
 ```
 
 These are requirements on the repo's check; the plugin ships none and enforces none.

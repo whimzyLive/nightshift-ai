@@ -336,12 +336,16 @@ d22="$tmp/d22"; out22="$(run "$d22" "$tmp/t22.html")"
 tab="$(printf '\t')"
 want1="WARN${tab}font-not-bundled${tab}Instrument Sans${tab}fonts/Instrument Sans.woff2?v=3"
 want2="WARN${tab}font-not-bundled${tab}Bold One${tab}fonts/Bold%20One.woff2"
-[ "$(echo "$out22" | grep -c '^WARN')" = 2 ] && echo "$out22" | grep -qxF "$want1" && echo "$out22" | grep -qxF "$want2" \
-  && ok "(22a) escaped CSS: quoted url with spaces + query warned; data:, remote, root-relative and manifest-carried fonts are not" || bad "(22a) escaped font css" "$out22"
+want3="WARN${tab}font-not-bundled${tab}Carried${tab}fonts/Carried.woff2"
+[ "$(echo "$out22" | grep -c '^WARN')" = 3 ] && echo "$out22" | grep -qxF "$want1" && echo "$out22" | grep -qxF "$want2" && echo "$out22" | grep -qxF "$want3" \
+  && ok "(22a) escaped CSS: quoted url with spaces + query warned, and a bundle-carried font still warns; data:, remote and root-relative do not" || bad "(22a) escaped font css" "$out22"
 mkdir -p "$d22/pages/fonts"; printf x >"$d22/pages/fonts/Bold One.woff2"
 out22b="$(run "$d22" "$tmp/t22.html")"
 echo "$out22b" | grep -q 'Bold One' && bad "(22b) percent-decoded url resolves to the file" "$out22b" || ok "(22b) a percent-encoded url that resolves to a file is not warned"
 echo "$out22b" | tail -1 | grep -q '^SUMMARY ' && ok "(22c) SUMMARY stays the last stdout line with WARN lines" || bad "(22c) summary last" "$(echo "$out22b" | tail -1)"
+# (23) the font scan covers every page in the folder, not only this run's bundles
+out23="$(run "$d22" "$in/hero.png")"
+echo "$out23" | grep -qxF "$want1" && ok "(23) a re-run that adds an unrelated file still reports earlier pages' fonts" || bad "(23) scan scope" "$out23"
 grep -q 'Fonts not bundled' "$tmp/d1/index.md" && bad "(22d) no unbundled font, no section" "section present" || ok "(22d) no Fonts section when nothing is unbundled"
 
 exit "$fail"
