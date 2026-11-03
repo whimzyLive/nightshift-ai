@@ -66,7 +66,7 @@ creation) is **advisory** — its comments never block the merge.
 1. **Resolve `MODE`** — `eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-ai-workflow-mode.sh STORY_KEY)"`
    (ladder: `${CLAUDE_PLUGIN_ROOT}/refs/ai-workflow-mode-resolution.md`). Only `Full Auto` merges;
    empty or a read error takes the human-merge path. A QA `capped` verdict (draft PR) takes it too,
-   whatever `MODE` is, and its comment reads `Implementation stopped at the review round cap. Draft
+   whatever `MODE` is, and its comment reads `Implementation stopped at the review round cap (or a design board was left unchecked). Draft
    PR: <PR_URL> lists the open findings — fix them or merge it yourself.`
 2. **Resolve `DONE_STATUS`** — the `Pipeline done status` row of `.claude/project/project-context.md`.
 3. **Post the Jira comment FIRST** — `jira-site-guard.sh` once; guard fails → **STOP**, release with

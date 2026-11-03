@@ -60,7 +60,9 @@ deviation := an entry in the repo's design-check config: what differs + reason +
 agents never grow the list; an entry whose difference no longer exists is stale and fails the check
 agent -> may PROPOSE a deviation (in the return Summary, with reason and ticket); never ADDS, edits or loosens one to pass a check
 a person approves every addition; recommend CODEOWNERS on the deviation file
-not-checked | uncovered board -> NOT an Unmet id and never looped: QA asks the owning domain agent ONCE to add a check entry for the board its Design row names, then reports what is still not-checked to the person (`Design not checked:` in the verdict)
+not-checked <ticket> (person-accepted) -> reported in the verdict and PR body, non-blocking
+uncovered (no line, no ticket) board a story's Design row names -> not an Unmet id, never looped: QA asks the owning domain agent ONCE to add a REAL check entry; still uncovered -> QA Status: capped (draft PR, never auto-merged)
+agents never write `not-checked` entries nor deviations, and "add a check entry" never means a skip; a person alone accepts a gap
 never -> widen a pixel budget, skip a board, or retune code toward a board that uses a different rule
 ```
 

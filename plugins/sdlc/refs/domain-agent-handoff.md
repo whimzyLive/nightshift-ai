@@ -135,7 +135,7 @@ Each domain has its own verification commands. Run **all** of them before consid
 **Design check** — a UI story (its Design rows, or paths you own as web/mobile) with project-context
 Tooling `Design check` set: run that command after the domain commands, before committing. A failure
 is fixed in the screen or the design-system component, never by adding or loosening a deviation
-(`refs/design-references.md` Design check); propose a deviation in `Summary:` instead. Unset -> skip.
+(`refs/design-references.md` Design check); propose a deviation in `Summary:` instead. Never write a `not-checked` entry or a skip either; when asked to cover an uncovered board, add a real check entry or report why you cannot. Unset -> skip.
 
 ## Commit your domain changes
 
