@@ -60,9 +60,10 @@ deviation := an entry in the repo's design-check config: what differs + reason +
 agents never grow the list; an entry whose difference no longer exists is stale and fails the check
 agent -> may PROPOSE a deviation (in the return Summary, with reason and ticket); never ADDS, edits or loosens one to pass a check
 a person approves every addition; recommend CODEOWNERS on the deviation file
-not-checked <ticket> (person-accepted) -> reported in the verdict and PR body, non-blocking
-uncovered (no line, no ticket) board a story's Design row names -> not an Unmet id, never looped: QA asks the owning domain agent ONCE to add a REAL check entry; still uncovered -> QA Status: capped (draft PR, never auto-merged)
-agents never write `not-checked` entries nor deviations, and "add a check entry" never means a skip; a person alone accepts a gap
+board named by the story's OWN Design row, `uncovered` (no line) or `not-checked <ticket>` -> not an Unmet id, never looped: QA asks the owning domain agent ONCE to add a REAL check entry; still uncovered | not-checked -> QA Status: capped (`design uncovered: <KEY>` | `design not checked: <KEY> <ticket>` on `Open (capped):`, draft PR, never auto-merged), listed under `## Design not checked` in the PR body
+`not-checked <ticket>` for any other board -> the check's own allowance, non-blocking, not verified by QA
+a `not-checked` entry (reason + ticket) may be added by an agent ONLY for a board that did not exist at the comparison base (a brand-new board from a design ingest, which the coverage check requires to be listed); for a board that existed at the base, a deviation, or any other allowance growth a person does it
+"add a check entry" never means a skip or a `not-checked`
 never -> widen a pixel budget, skip a board, or retune code toward a board that uses a different rule
 ```
 

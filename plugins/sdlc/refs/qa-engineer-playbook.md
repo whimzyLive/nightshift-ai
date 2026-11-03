@@ -408,13 +408,12 @@ checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live
 offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
 Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
-Design not checked non-empty -> ONCE per run: dispatch the owning domain agent to add a design-check entry for each `uncovered` board only, never a `<KEY ticket>` board a person accepted (it reports if it cannot, e.g. the board cannot render yet), push, rerun 6-7;
-  afterwards, never dispatched again: `<KEY ticket>` entries -> Step 8 `Design not checked:`, non-blocking
-  a board still `uncovered` after that one attempt -> Status: capped (round-cap semantics: draft PR, never auto-merged), listed on `Open (capped):` as `design uncovered: <KEY>`
+Design not checked non-empty -> ONCE per run: dispatch the owning domain agent to add a REAL design-check entry for each listed board (every one is a board the story's own Design row names; `uncovered` and `<KEY ticket>` alike; it reports if it cannot, e.g. the board cannot render yet), push, rerun 6-7;
+  afterwards, never dispatched again: a board still `uncovered` or `not-checked` -> Status: capped (round-cap semantics: draft PR, never auto-merged), listed on `Open (capped):` as `design uncovered: <KEY>` | `design not checked: <KEY> <ticket>`
 WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
 no Verification: -> re-offload once, fallback
 fallback := Read ac-verification.md INLINE; offload=inline-fallback
-never -> clean while Unmet non-empty OR a Design board is still uncovered   # `Design not checked` is not Unmet
+never -> clean while Unmet non-empty OR a Design board is still uncovered | not-checked   # `Design not checked` is not Unmet
 carry result -> Step-8 AC check:
 ```
 
@@ -448,10 +447,10 @@ Blocked reason: <one line — only if Status: blocked>
 ```
 
 - `Status: clean` only when: review has no Critical/Important findings, every AC is evidenced,
-  no Design board is uncovered, the gate is green with pasted output, and learnings are captured.
+  no Design board is uncovered or not-checked, the gate is green with pasted output, and learnings are captured.
 - `Status: capped` only (a) at the round cap with Important findings open, the gate green, and every
   AC evidenced (`refs/qa-review-rounds.md` § Round cap), or (b) when a Design board is still
-  uncovered after Step 7's one ask (`design uncovered: <KEY>` on `Open (capped):`) — the caller opens a draft PR, never merges.
+  uncovered or not-checked after Step 7's one ask (`design uncovered: <KEY>` | `design not checked: <KEY> <ticket>` on `Open (capped):`) — the caller opens a draft PR, never merges.
 - `Status: blocked` at any unrecoverable point (agent blocked, push conflict, AC cannot be met)
   → return immediately with the reason; do not improvise around it.
 

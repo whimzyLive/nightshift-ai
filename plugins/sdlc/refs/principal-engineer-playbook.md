@@ -253,7 +253,7 @@ It returns `## QA verdict: <STORY-KEY>` with `Status: clean | capped | blocked`.
 - `Status: clean` → Step 6.5. QA already wrote learnings, ran the gate, and evidenced every AC —
   carry its verdict fields into your report; never repeat the work.
 - `Status: capped` → Step 6.5, then Step 7 as a **draft** PR (review round cap hit, Important
-  findings open, gate green, ACs met; or a Design board still uncovered after QA's one ask). Never
+  findings open, gate green, ACs met; or a Design board still uncovered or not-checked after QA's one ask). Never
   merged automatically — a person decides.
 
 ## Step 6.5 — Post-QA docs sync (on a clean or capped QA verdict, before the PR)
@@ -295,9 +295,9 @@ The docs commit, when made, is the last commit before the PR.
 Title keeps the parent `<STORY-KEY>`; head `<BRANCH_PREFIX>/<STORY-KEY>`. On the full path the PR
 already carries the approved spec commit. Sub-tasks → body by file (`refs/subtask-sequencing.md`).
 QA `Follow-ups:`, `capped` or `Design not checked:` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
-`## Open review findings (round cap)` list (omit the heading when it has no entries) from `Open (capped):` (omit `design uncovered:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
+`## Open review findings (round cap)` list (omit the heading when it has no entries) from `Open (capped):` (omit `design uncovered:` and `design not checked:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
 QA `Design not checked:` non-empty (either kind) → also write a `## Design not checked` section into `$BODY_FILE`
-(each `<KEY ticket>` or `<KEY uncovered>`); an `uncovered` entry arrives as `capped`, so it is a draft like any cap.
+(each `<KEY ticket>` or `<KEY uncovered>`); any such entry on a story's own board arrives as `capped`, so it is a draft like any cap.
 `capped` → `DRAFT=--draft`, else `DRAFT=` (unquoted below, so empty adds nothing).
 Create, mark ready, request Copilot (advisory — best-effort, never fails creation), and tear the
 worktree down, in one call:
@@ -337,7 +337,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
 ### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
-### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design uncovered): "QA capped at the round cap | on an uncovered design board — draft PR, <N> open findings, needs a human"
+### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design uncovered | design not checked): "QA capped at the round cap | on an uncovered design board — draft PR, <N> open findings, needs a human"
 ```
 
 ## Constraints

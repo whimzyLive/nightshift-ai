@@ -54,8 +54,9 @@ Design check set AND a Design row names a board -> `Design <n>: met` needs ALL o
   REPORT exists AND its first line is `design-check: pass sha=<HEAD>` with <HEAD> == `git -C "$WORKTREE" rev-parse HEAD`
   REPORT has a line `<KEY> pass`
 REPORT missing | sha != HEAD | first line `fail` | `<KEY> fail` -> `unmet — design check: <missing | stale | failed>`; Owner = the agent owning the UI path
-`<KEY> not-checked <ticket>` (a person-accepted gap, carries a ticket)
-  -> `Design <n>: not-checked — <KEY> <ticket>`; NOT `met`, NOT `unmet`, NOT in `Unmet`/`Owner`; listed on `Design not checked:` as `<KEY> <ticket>`; non-blocking
+`<KEY> not-checked <ticket>` (an allowance, carries a ticket)
+  -> `Design <n>: not-checked — <KEY> <ticket>`; NOT `met`, NOT `unmet`, NOT in `Unmet`/`Owner`; listed on `Design not checked:` as `<KEY> <ticket>`; a Design row is the story's OWN board, so it is treated like `uncovered`: QA asks once, then it blocks `clean` (qa-engineer-playbook Step 7)
+  not-checked lines for boards no story Design row names are not verified here: the verifier ignores them
 REPORT valid but no line for KEY (no ticket; also what a nothing-affected run yields)
   -> `Design <n>: uncovered — <KEY>`; NOT `met`, NOT in `Unmet`/`Owner`; listed on `Design not checked:` as `<KEY> uncovered`; QA asks once, then it blocks `clean` (qa-engineer-playbook Step 7)
 met -> append `; check <REPORT path>` to the Design line

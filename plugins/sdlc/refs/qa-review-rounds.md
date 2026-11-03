@@ -96,7 +96,7 @@ after round MAX_REVIEW_ROUNDS with findings still open, stop review fixes, then:
      count toward the cap; still red/Unmet at an unrecoverable point -> Status: blocked
   2. | any Critical open                              -> Status: blocked, reason "review cap: Critical open"
      | Important only, gate green, ACs met (Story mode) -> Status: capped, each open finding on `Open (capped):`
-a Design board still uncovered after Step 7's one ask (review may be clean) -> Status: capped, `design uncovered: <KEY>` on `Open (capped):`   # from Step 7, not the round cap
+a Design board still uncovered or not-checked after Step 7's one ask (review may be clean) -> Status: capped, `design uncovered: <KEY>` | `design not checked: <KEY> <ticket>` on `Open (capped):`   # from Step 7, not the round cap
 gate-fail / Unmet-only rounds (review clean) and the one not-checked round do not count toward the cap
 ```
 
