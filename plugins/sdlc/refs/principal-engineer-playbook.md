@@ -147,7 +147,7 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
    agent's override, `.claude/project/agents/<agent-name>.md`, its skills section) with "Invoke these
    via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state "No project skills
    apply for this task." Exactly one of the two.
-6. The story's Design paths + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
+6. The story's Design paths — each page path WITH its render/screenshot PNG path, the agent reads the PNG (none: Grep for the region, then a bounded Read of the page) before building. When the story's Design row names no PNG (older or AI-Ready stories), resolve it from the design index (the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins) — + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
    and any plan "grounding corrections" verbatim — short items only; spec sections by name, not by
    paste.
 7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
@@ -253,7 +253,8 @@ It returns `## QA verdict: <STORY-KEY>` with `Status: clean | capped | blocked`.
 - `Status: clean` → Step 6.5. QA already wrote learnings, ran the gate, and evidenced every AC —
   carry its verdict fields into your report; never repeat the work.
 - `Status: capped` → Step 6.5, then Step 7 as a **draft** PR (review round cap hit, Important
-  findings open, gate green, ACs met). Never merged automatically — a person decides.
+  findings open, gate green, ACs met; or a Design board still uncovered or not-checked after QA's one ask). Never
+  merged automatically — a person decides.
 
 ## Step 6.5 — Post-QA docs sync (on a clean or capped QA verdict, before the PR)
 
@@ -293,8 +294,10 @@ The docs commit, when made, is the last commit before the PR.
 
 Title keeps the parent `<STORY-KEY>`; head `<BRANCH_PREFIX>/<STORY-KEY>`. On the full path the PR
 already carries the approved spec commit. Sub-tasks → body by file (`refs/subtask-sequencing.md`).
-QA `Follow-ups:` or `capped` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
-`## Open review findings (round cap)` list from `Open (capped):`, then a `## Follow-ups` list.
+QA `Follow-ups:`, `capped` or `Design not checked:` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
+`## Open review findings (round cap)` list (omit the heading when it has no entries) from `Open (capped):` (omit `design uncovered:` and `design not checked:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
+QA `Design not checked:` non-empty (either kind) → also write a `## Design not checked` section into `$BODY_FILE`
+(each `<KEY ticket>` or `<KEY uncovered>`); any such entry on a story's own board arrives as `capped`, so it is a draft like any cap.
 `capped` → `DRAFT=--draft`, else `DRAFT=` (unquoted below, so empty adds nothing).
 Create, mark ready, request Copilot (advisory — best-effort, never fails creation), and tear the
 worktree down, in one call:
@@ -302,7 +305,7 @@ worktree down, in one call:
 ```bash
 # sub-tasks: --body-file "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/pr-body.md" in place of --body
 PR_URL=$(gh pr view <BRANCH_PREFIX>/<STORY-KEY> --json url,state -q 'select(.state=="OPEN").url' 2>/dev/null)
-# capped / follow-ups: --body-file "$BODY_FILE" in place of --body
+# capped / follow-ups / design not checked: --body-file "$BODY_FILE" in place of --body
 [ -n "$PR_URL" ] || PR_URL=$(gh pr create $DRAFT \
   --title "[<STORY-KEY>] <story summary>" \
   --body "Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed." \
@@ -334,7 +337,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
 ### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
-### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped: "QA capped at the round cap — draft PR, <N> open findings, needs a human"
+### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design board uncovered or not checked): "QA capped at the round cap | on a design board uncovered or not checked — draft PR, <N> open findings, needs a human"
 ```
 
 ## Constraints

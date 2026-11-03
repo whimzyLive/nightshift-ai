@@ -103,6 +103,8 @@ mapping — no custom `types` override needed):
 | `!` suffix or a `BREAKING CHANGE:` footer (any type)                | major |
 | `chore`, `docs`, `refactor`, `perf`, `build`, `test`, `ci`, `style` | none  |
 
+On a 0.x plugin (`adjustSemverBumpsForZeroMajorVersion`) `feat` bumps patch and a breaking change bumps minor.
+
 **One plugin per commit.** With `useCommitScope: true`, a commit that touches a project's files but
 carries a _different_ scope is still treated as a `patch` for that project — so a commit mixing
 `sdlc` and `gtm` changes under one `(gtm)` scope would silently patch-bump `sdlc` too. Keep every

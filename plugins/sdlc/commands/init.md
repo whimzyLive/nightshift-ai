@@ -55,6 +55,12 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         - otherwise (a detection-only or static field) fill it from Step 2.5 or the template default,
           no prompt.
 
+        Exception: the optional `Design check` and `Design check report` Tooling rows are never
+        filled from the template, a default or a guess, and never prompted — a missing row stays
+        missing (a placeholder like `<design-check cmd>` would run as a command). Existence is
+        detected as the row being present with a non-empty value, the same test as in the token
+        table below.
+
         This is the mechanism that auto-onboards **any newly introduced parameter**: when a future
         template adds a token, an existing repo that runs Merge picks it up here — prompted if it is a
         user choice, defaulted otherwise — instead of silently missing it.
@@ -521,6 +527,8 @@ are documented in that template file. Token slots to substitute:
 | `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
+| `<design-check cmd>` | the repo's design-fidelity command when one exists (e.g. `pnpm exec nx affected -t fidelity`) — otherwise omit the `Design check` row; never ask for it, a repo adds it when its check exists |
+| `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |

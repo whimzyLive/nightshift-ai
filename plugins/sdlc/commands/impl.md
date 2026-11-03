@@ -74,7 +74,7 @@ PR: <IMPL_PR_URL>
 All phases done. Review clean. Quality gate passed."
 ```
 
-On a QA `capped` verdict the body's last line reads instead: `Stopped at the review round cap — the
+On a QA `capped` verdict the body's last line reads instead: `Stopped at the review round cap (or an unchecked design board) — the
 draft PR lists the open findings; fix them or merge it yourself. Quality gate passed.`
 
 (`comment add` does not exist in this acli version — use `comment create --key`.)

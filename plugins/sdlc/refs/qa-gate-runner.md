@@ -5,7 +5,7 @@ inline-fallback path — by the orchestrator itself. Written in the third person
 never address "you, the subagent", and never depend on a value the orchestrator does not hold.
 
 Inputs, all passed in the dispatch prompt: `<STORY-KEY>` `<WORKTREE>` `<NX_CACHE_DIRECTORY>` `<BRANCH_PREFIX>`
-`<RUN_INFRA>` (`yes`|`no` — the orchestrator decides; this runner only executes, so it runs on Haiku)
+`<RUN_INFRA>` `<RUN_DESIGN_CHECK>` (each `yes`|`no` — the orchestrator decides; this runner only executes, so it runs on Haiku)
 
 ## Procedure
 
@@ -29,17 +29,24 @@ A non-empty result is NOT a stop here — capture it verbatim into the stray-fil
 return below and let the orchestrator STOP; never silently clean it yourself.
 
 3. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality
-   Gate) **inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the
+   Gate, EXCEPT the Tooling row `Design check` and `Design check report` — step 4a alone runs
+   those, and only when `RUN_DESIGN_CHECK=yes`) **inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the
    shared Nx cache exported so the gate run hits the warm cache (spec §3):
 
 ```bash
 export NX_CACHE_DIRECTORY="$NX_CACHE_DIRECTORY"
 cd "$WORKTREE"
-# ... run the project-context Tooling + Quality Gate commands here ...
+# ... run the project-context Tooling + Quality Gate commands here (never `Design check`) ...
 ```
 
 4. `RUN_INFRA=yes` → also run the infra build with the stage flag from project-context (still
    inside `$WORKTREE`). Never decide this yourself.
+
+4a. `RUN_DESIGN_CHECK=yes` → also run the project-context Tooling `Design check` command (still
+   inside `$WORKTREE`). Its non-zero exit is `Gate: fail`. The report must be git-ignored (the default `.tmp/` is), so step 2 stays a plain `git status --porcelain`. It writes its report file (the `Design check
+   report` path, default `.tmp/design-check/report.txt`); put that PATH and the exit code in `Evidence`,
+   never board names — the AC verifier reads the file (`refs/ac-verification.md`). `RUN_DESIGN_CHECK=no`
+   → never run it. Never decide this yourself; never edit the check's config.
 
 5. Capture each command's exact string, its **exit code**, and its verbatim final status line(s) —
    never paraphrase. `Gate: pass` only when every command exited 0, any non-zero exit is `fail` —
@@ -70,7 +77,8 @@ Stray files: <git status --porcelain output | none>
 ```text
 never -> paste a full log, a full test run, or any file's contents into the return
 never -> dispatch an agent from here                       # one-level nesting limit, ADR-0012
+never -> add, edit or accept a design-check deviation to get a pass
 never -> assert a pass without Evidence                    # verification-before-completion
-Evidence over 1,200 B -> truncate and append "…[truncated]" ; do NOT split across return fields
+Evidence over 1,200 B -> truncate and append "…[truncated]" ; do NOT split across return fields   # the design-check line is the report path only, kept short, and is written FIRST
 whole block over 2,000 B -> truncate the `Commands` field first, then `Evidence`; never drop a key
 ```

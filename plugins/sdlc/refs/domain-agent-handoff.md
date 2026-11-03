@@ -132,6 +132,8 @@ shared/ counter-only STILL needs `agent:` >= 2 (NA-103) — only trigger/rule is
 
 Each domain has its own verification commands. Run **all** of them before considering work complete — listed in each agent's body and the directory CLAUDE.md files. See `.claude/project/project-context.md` for project-level quality gate commands.
 
+**Design references and check** — a UI task's dispatch carries each Design row's page and PNG paths; read the PNG first. With `Design check` set, follow `refs/design-references.md` (Strong references, Fidelity-first, Deviations). Unset -> skip.
+
 ## Commit your domain changes
 
 Stage your specific files (do NOT use `git add .`):
@@ -177,6 +179,8 @@ Rules applied: <rule-id>, <rule-id> | none
   nothing applicable; it is not a sign anything went wrong. An agent that applied a rule but omitted
   the line is a contract violation, handled exactly as a missing `Skills loaded:` line — the
   orchestrator re-dispatches.
+
+- With a design check run, `Summary:` also carries its part (`refs/design-references.md`).
 
 Large outputs are dropped at the dispatch boundary — keep it to the 4 lines (complete) / 5 lines (blocked) above.
 

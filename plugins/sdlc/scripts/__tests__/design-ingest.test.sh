@@ -236,4 +236,116 @@ run --replace "$d13/one" "$in/broken.html" >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 1 ] && [ -f "$d13/one/screenshots/hero.png" ] \
   && ok "(13b) --replace with a malformed bundle fails before deleting anything" || bad "(13b) replace pre-validation" "rc=$rc or assets deleted"
 
+# --- (14) stable page names on revision + font-not-bundled warning ---------------------------
+mkbundle() { # <out> <ext-json> <html-a> <html-b>
+  local m
+  m="$(jq -cn --arg a "$(printf '%s' "$3" | base64 | tr -d '\n')" --arg b "$(printf '%s' "$4" | base64 | tr -d '\n')" \
+    '{"u-a":{mime:"text/html",compressed:false,data:$a},"u-b":{mime:"text/html",compressed:false,data:$b}}')"
+  printf '<script type="__bundler/manifest">%s</script><script type="__bundler/ext_resources">%s</script>' "$m" "$2" >"$1"
+}
+fa='<html><head><title>Invoice List</title><style>@font-face{font-family:"Inter";src:url(fonts/inter.woff2) format("woff2"),url(data:font/woff2;base64,AA==);}</style></head><body>one</body></html>'
+fb='<html><head><title>Invoice Detail</title></head><body>two</body></html>'
+mkbundle "$in/rev1.html" '[{"id":"./List.dc.html","uuid":"u-a"},{"id":"./Detail.dc.html","uuid":"u-b"}]' "$fa" "$fb"
+d14="$tmp/d14"; out14="$(run --ticket ABC-1 --title T "$d14" "$in/rev1.html")"
+echo "$out14" | grep -qx "$(printf 'WARN\tfont-not-bundled\tInter\tfonts/inter.woff2')" && grep -q 'Inter` — `fonts/inter.woff2' "$d14/index.md" \
+  && ok "(14a) an unbundled relative @font-face warns and is noted in the index" || bad "(14a) font warning" "$out14"
+perl -pi -e 's{\| TODO \|$}{| Described |}' "$d14/index.md"
+# revision: ext ids renamed, one board edited, one removed, one new
+mkbundle "$in/rev2.html" '[{"id":"./Invoices%20Screen.dc.html","uuid":"u-a"},{"id":"./Brand%20New.dc.html","uuid":"u-b"}]' \
+  "${fa/one/one edited}" '<html><head><title>Brand New</title></head><body>new</body></html>'
+run --replace "$d14" "$in/rev2.html" >/dev/null
+grep -q 'one edited' "$d14/pages/list.html" && [ ! -e "$d14/pages/invoices-screen.html" ] && row_of "$d14" 'pages/list.html' | grep -q 'Described' \
+  && ok "(14b) a board matched by <title> keeps its file name and description" || bad "(14b) stable name" "$(ls "$d14/pages")"
+[ -f "$d14/pages/brand-new.html" ] && [ ! -e "$d14/pages/detail.html" ] \
+  && ok "(14c) a new board gets a new name; a removed board is removed" || bad "(14c) new/removed" "$(ls "$d14/pages")"
+
+# --- helpers for the revision/naming/font cases below ----------------------------------------
+pg() { printf '<html><head><title>%s</title></head><body>%s</body></html>' "$1" "$2"; }
+mkbn() { # <out> <ext-json> <html>...   pages are uuids u1..uN; MKB_EXTRA = a jq object of extra resources
+  local out="$1" extj="$2" m='{}' i=0 h; shift 2
+  for h in "$@"; do
+    i=$((i + 1))
+    m="$(jq -c --arg k "u$i" --arg d "$(printf '%s' "$h" | base64 | tr -d '\n')" '. + {($k): {mime: "text/html", compressed: false, data: $d}}' <<<"$m")"
+  done
+  [ -n "${MKB_EXTRA:-}" ] && m="$(jq -c ". + $MKB_EXTRA" <<<"$m")"
+  printf '<script type="__bundler/manifest">%s</script><script type="__bundler/ext_resources">%s</script>' "$m" "$extj" >"$out"
+}
+has() { grep -q -- "$2" "$1" 2>/dev/null; }
+HS='[{"id":"./Home.dc.html","uuid":"u1"},{"id":"./Settings.dc.html","uuid":"u2"}]'
+SH='[{"id":"./Settings.dc.html","uuid":"u1"},{"id":"./Home.dc.html","uuid":"u2"}]'
+
+# --- (15) duplicate <title>s never swap pages on re-run (and the re-run is idempotent) -------
+mkbn "$tmp/t15a.html" "$HS" "$(pg Ourli 'home body')" "$(pg Ourli 'settings body')"
+mkbn "$tmp/t15b.html" "$SH" "$(pg Ourli 'settings body')" "$(pg Ourli 'home body')"
+d15="$tmp/d15"; run "$d15" "$tmp/t15a.html" >/dev/null
+run --replace "$d15" "$tmp/t15a.html" >/dev/null
+has "$d15/pages/home.html" 'home body' && has "$d15/pages/settings.html" 'settings body' \
+  && ok "(15a) two boards titled alike keep their own content on an identical re-run" || bad "(15a) duplicate titles" "pages swapped"
+run --replace "$d15" "$tmp/t15b.html" >/dev/null
+has "$d15/pages/home.html" 'home body' && has "$d15/pages/settings.html" 'settings body' \
+  && ok "(15b) manifest order flipped: dc name still wins over the shared title" || bad "(15b) order flip" "pages swapped"
+
+# --- (16) <title> inside an <svg> or the body is not a page key -------------------------------
+mkbn "$tmp/t16a.html" "$HS" '<html><body><svg><title>Close</title></svg>home body</body></html>' '<x-dc><svg><title>Close</title></svg>settings body</x-dc>'
+mkbn "$tmp/t16b.html" "$SH" '<x-dc><svg><title>Close</title></svg>settings body</x-dc>' '<html><body><svg><title>Close</title></svg>home body</body></html>'
+d16="$tmp/d16"; run "$d16" "$tmp/t16a.html" >/dev/null; run --replace "$d16" "$tmp/t16b.html" >/dev/null
+has "$d16/pages/home.html" 'home body' && has "$d16/pages/settings.html" 'settings body' \
+  && ok "(16) svg/body titles do not swap pages" || bad "(16) svg title" "pages swapped"
+
+# --- (17) a new board cannot take the name a matched board keeps (manifest-order collision) ---
+mkbn "$tmp/t17a.html" '[{"id":"./Home.dc.html","uuid":"u1"}]' "$(pg Landing 'old home')"
+mkbn "$tmp/t17b.html" '[{"id":"./home.dc.html","uuid":"u1"},{"id":"./Home.dc.html","uuid":"u2"}]' "$(pg Brand 'new board')" "$(pg Landing 'revised home')"
+d17="$tmp/d17"; run "$d17" "$tmp/t17a.html" >/dev/null; run --replace "$d17" "$tmp/t17b.html" >/dev/null
+has "$d17/pages/home.html" 'revised home' && has "$d17/pages/home-2.html" 'new board' \
+  && ok "(17) matched board keeps its name; the earlier new board gets the suffixed one" || bad "(17) collision" "$(ls "$d17/pages")"
+
+# --- (18) --add never renames or overwrites an unrelated page that shares a title -------------
+mkbn "$tmp/t18a.html" '[{"id":"./Alpha.dc.html","uuid":"u1"}]' "$(pg Shared 'alpha body')"
+mkbn "$tmp/t18b.html" '[{"id":"./Gamma.dc.html","uuid":"u1"}]' "$(pg Shared 'gamma body')"
+d18="$tmp/d18"; run "$d18" "$tmp/t18a.html" >/dev/null; perl -pi -e 's{\| TODO \|$}{| Keep me |}' "$d18/index.md"
+run "$d18" "$tmp/t18b.html" >/dev/null
+has "$d18/pages/alpha.html" 'alpha body' && has "$d18/pages/gamma.html" 'gamma body' && row_of "$d18" 'pages/alpha.html' | grep -q 'Keep me' \
+  && ok "(18) --add keeps the other bundle's page, content and Description" || bad "(18) --add overwrite" "$(ls "$d18/pages")"
+
+# --- (19) a page with no <title> is matched by its dc name; (20) a title change keeps the name -
+mkbn "$tmp/t19a.html" '[{"id":"./Plain.dc.html","uuid":"u1"},{"id":"./Titled.dc.html","uuid":"u2"}]' '<x-dc>plain v1</x-dc>' "$(pg 'Old Title' 'titled v1')"
+mkbn "$tmp/t19b.html" '[{"id":"./Plain.dc.html","uuid":"u1"},{"id":"./Titled.dc.html","uuid":"u2"}]' '<x-dc>plain v2</x-dc>' "$(pg 'New Title' 'titled v2')"
+d19="$tmp/d19"; run "$d19" "$tmp/t19a.html" >/dev/null; perl -pi -e 's{\| TODO \|$}{| Described |}' "$d19/index.md"
+run --replace "$d19" "$tmp/t19b.html" >/dev/null
+has "$d19/pages/plain.html" 'plain v2' && has "$d19/pages/titled.html" 'titled v2' && row_of "$d19" 'pages/titled.html' | grep -q Described \
+  && [ "$(ls "$d19/pages" | wc -l | tr -d ' ')" = 2 ] \
+  && ok "(19/20) title-less page and a retitled page keep their names and descriptions" || bad "(19/20) stable names" "$(ls "$d19/pages")"
+
+# --- (21) renders follow the kept name ---------------------------------------------------------
+tpl21="$(printf '%s' '<!DOCTYPE html><html><body><x-dc><dc-import name="Alpha Screen v2" hint-size="100%,900px"></dc-import></x-dc></body></html>' | jq -Rs . | sed 's#</#<\\u002F#g')"
+mkbn "$tmp/t21a.html" '[{"id":"./Alpha%20Screen%20v2.dc.html","uuid":"u1"}]' "$(pg Alpha 'a1')"
+mkbn "$tmp/t21b.html" '[{"id":"./Alpha%20Screen%20v3.dc.html","uuid":"u1"}]' "$(pg Alpha 'a2')"
+for f in a b; do printf '<script type="__bundler/template">%s</script>' "$tpl21" >>"$tmp/t21$f.html"; done
+d21="$tmp/d21"; rm -rf "$log"; mkdir -p "$log"
+BROWSER_OVERRIDE="$mock" MOCK_LOG="$log" run "$d21" "$tmp/t21a.html" >/dev/null
+BROWSER_OVERRIDE="$mock" MOCK_LOG="$log" run --replace "$d21" "$tmp/t21b.html" >/dev/null
+[ -f "$d21/renders/alpha-screen-v2.png" ] && [ ! -e "$d21/renders/alpha-screen-v3.png" ] && row_of "$d21" 'pages/alpha-screen-v2.html' | grep -q 'renders/alpha-screen-v2.png' \
+  && ok "(21) the render keeps the page's kept name" || bad "(21) render name" "$(ls "$d21/renders" "$d21/pages")"
+
+# --- (22) font check on a real export shape: CSS inside an escaped JS string -------------------
+css='@font-face{font-family:\"Instrument Sans\";src:url(\"fonts/Instrument Sans.woff2?v=3\") format(\"woff2\"),url(\"data:font/woff2;base64,AA==\")}@font-face{font-family:\"Inter\";src:url(data:font/woff2;base64,AA==)}@font-face{font-family:Bold One;src:url(fonts/Bold%20One.woff2)}@font-face{font-family:Carried;src:url(fonts/Carried.woff2)}@font-face{font-family:Remote;src:url(https://x.test/a.woff2),url(/abs.woff2)}'
+esc="<html><head><title>F</title></head><body><script>var css=\"$css\";document.write('<style>'+css+'<\\/style>');</script></body></html>"
+MKB_EXTRA='{"u-font":{"mime":"font/woff2","compressed":false,"data":"AA=="}}' \
+  mkbn "$tmp/t22.html" '[{"id":"./F.dc.html","uuid":"u1"},{"id":"./fonts/Carried.woff2","uuid":"u-font"}]' "$esc"
+d22="$tmp/d22"; out22="$(run "$d22" "$tmp/t22.html")"
+tab="$(printf '\t')"
+want1="WARN${tab}font-not-bundled${tab}Instrument Sans${tab}fonts/Instrument Sans.woff2?v=3"
+want2="WARN${tab}font-not-bundled${tab}Bold One${tab}fonts/Bold%20One.woff2"
+want3="WARN${tab}font-not-bundled${tab}Carried${tab}fonts/Carried.woff2"
+[ "$(echo "$out22" | grep -c '^WARN')" = 3 ] && echo "$out22" | grep -qxF "$want1" && echo "$out22" | grep -qxF "$want2" && echo "$out22" | grep -qxF "$want3" \
+  && ok "(22a) escaped CSS: quoted url with spaces + query warned, and a bundle-carried font still warns; data:, remote and root-relative do not" || bad "(22a) escaped font css" "$out22"
+mkdir -p "$d22/pages/fonts"; printf x >"$d22/pages/fonts/Bold One.woff2"
+out22b="$(run "$d22" "$tmp/t22.html")"
+echo "$out22b" | grep -q 'Bold One' && bad "(22b) percent-decoded url resolves to the file" "$out22b" || ok "(22b) a percent-encoded url that resolves to a file is not warned"
+echo "$out22b" | tail -1 | grep -q '^SUMMARY ' && ok "(22c) SUMMARY stays the last stdout line with WARN lines" || bad "(22c) summary last" "$(echo "$out22b" | tail -1)"
+# (23) the font scan covers every page in the folder, not only this run's bundles
+out23="$(run "$d22" "$in/hero.png")"
+echo "$out23" | grep -qxF "$want1" && ok "(23) a re-run that adds an unrelated file still reports earlier pages' fonts" || bad "(23) scan scope" "$out23"
+grep -q 'Fonts not bundled' "$tmp/d1/index.md" && bad "(22d) no unbundled font, no section" "section present" || ok "(22d) no Fonts section when nothing is unbundled"
+
 exit "$fail"
