@@ -64,6 +64,8 @@ generated file — every slot must be replaced with an actual value.
 | Review agent | `<review-agent>` |
 | Review mode  | `<review-mode>`  |
 | Review gate  | `<review-gate>`  |
+<!-- OPTIONAL: delete this row to keep the QA reviewer on opus. -->
+| Reviewer model threshold (story points, inclusive) | `<reviewer-model-threshold>` |
 
 ## Pipeline
 
@@ -118,6 +120,9 @@ generated file — every slot must be replaced with an actual value.
   > project-context files. `/init` writes `claude-inline` **explicitly**, so new
   > repos get the in-session reviewer; pre-existing repos without the token keep
   > the historical Copilot behaviour.
+- **Reviewer model threshold** — OPTIONAL. Integer story points; a non-Bug story at or under it gets a
+  `sonnet` first-round QA reviewer, everything else `opus`. Omit the row (the default) to keep `opus`
+  always. Substitute the `/init` answer, or delete the row when left unset.
 - **Review retention window** — default `6 months` when the founder does not request otherwise.
   Accepted formats are **exactly** `<n> months` (wall-clock age) or `<n> stories` (activity-based —
   preferred for low-activity repos, where wall-clock decay would expire still-relevant rules

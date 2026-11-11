@@ -6,12 +6,28 @@ Loaded by `refs/qa-engineer-playbook.md` Steps 1, 3, 4, 6 and 7. The parallel ro
 only — Diff mode and the `/review-fix` entry keep the serial order (no gate/AC pass to overlap);
 Round 1, Re-review and Round cap apply to every mode.
 
+## Reviewer model
+
+Round 1 resolves `REVIEWER_MODEL` with the script, never inline. `STORY_POINTS` comes from the Principal
+Engineer playbook (triage block) or `commands/review.md` (one `refs/jira-fetch.md` "Reading story
+points" probe, only when a threshold is set); a Bug is `WORK_KIND=defect`.
+
+```bash
+eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-review-config.sh)"
+eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-reviewer-model.sh \
+  --threshold "$REVIEW_MODEL_THRESHOLD" --mode <story|diff> --work-kind <WORK_KIND> --points <STORY_POINTS>)"
+```
+
+`sonnet` only when the optional `Reviewer model threshold` is set, Story mode, `WORK_KIND=feature` and
+points <= threshold; every other case is `opus`. A resumed reviewer keeps its model; a fresh scoped
+re-review is always `sonnet`.
+
 ## One round = review ‖ gate ‖ AC on the same HEAD
 
 ```text
 ROUND_HEAD := git rev-parse origin/<BRANCH_PREFIX>/<STORY-KEY>
 dispatch in ONE message, all three in the background:
-  reviewer   := Step 1 dispatch, model: "opus"
+  reviewer   := Step 1 dispatch, model: $REVIEWER_MODEL (Step 1 "Reviewer model")
   gate       := Step 6 offload, model: "haiku"   # runs scripted commands, no judgement
   verifier   := Step 7 offload, model: "sonnet"
 reviewer prompt also says: "Read-only. Do not run builds, tests, typecheck or containers —
@@ -73,10 +89,10 @@ resume := SendMessage(<that reviewer instance>,
       (Critical stays Critical wherever it is)
    Same read-only rule. Same severity scale.")
 resume fails (SendMessage errors, or a session boundary) -> fresh reviewer (Step 1 dispatch,
-  model: "opus") with the SAME scoped prompt plus the previous findings verbatim -- never a fresh
+  model: "sonnet" -- always, whatever round 1 used) with the SAME scoped prompt plus the previous findings verbatim -- never a fresh
   full BASE_SHA..HEAD review
 `/review-fix` -> the external comments are round 1 (no reviewer to resume): its first re-review is
-  a fresh scoped reviewer as above; later rounds resume that one
+  a fresh scoped reviewer as above (`sonnet`); later rounds resume that one
 diff size never forces a full review -- it is still FIX_DIFF
 FOLLOW-UP -> only pre-existing code outside the story's diff; never loops; QA verdict `Follow-ups:`
   line; the PR body lists it. An Important issue anywhere in the story's diff is a finding, bounded

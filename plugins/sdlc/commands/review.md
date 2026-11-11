@@ -58,7 +58,7 @@ fix agents it needs. You play the QA Engineer role directly, in the top-level se
 3. Fetch the story with `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` (`<KEY>=<STORY-KEY>`) for the summary and
    **acceptance criteria** — the loop checks the code against the ACs.
 4. **Execute `${CLAUDE_PLUGIN_ROOT}/refs/qa-engineer-playbook.md` inline in Story mode**, passing
-   `<STORY-KEY>`, `BASE_SHA`, `WORK_KIND` (from step 2), the `RESOLVED_BRANCH`, and the story summary +
+   `<STORY-KEY>`, `BASE_SHA`, `WORK_KIND` (from step 2), `STORY_POINTS` (read per `refs/jira-fetch.md` "Reading story points" only when the `Reviewer model threshold` token is set, else `missing`), the `RESOLVED_BRANCH`, and the story summary +
    ACs. **`WORK_KIND` is required**: on `defect` the QA playbook's Step-7 verification requires the
    defect regression-evidence contract instead of the feature AC/plan checklist — without it a defect
    branch would silently pass the feature gate. Fix commits are pushed to `RESOLVED_BRANCH` (landing on

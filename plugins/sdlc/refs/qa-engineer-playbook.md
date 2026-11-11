@@ -46,6 +46,8 @@ verification, and return a single verdict (`clean`, `capped` or `blocked`) to th
   > `WORK_KIND` (see `commands/review-fix.md`) — a defect has no plan doc, so that verification is
   > correctly skipped. The defect regression-evidence contract is enforced on the `/auto`/`/impl` and
   > `/review` paths, which do supply `WORK_KIND`.
+- `STORY_POINTS` — `N` | `missing`, optional (default `missing`); from the triage block or `commands/review.md`.
+  Only picks the round-1 reviewer model.
 - The phase ledger — **optional**; a cache Step 3 resolves (git-reconstruction fallback) before
   dispatching each fix agent, never a STOP when absent (D3).
 
@@ -122,7 +124,7 @@ Captured round files are not committed, so also read them:
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --kind review`
 
 Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exists, else
-`general-purpose`) with `model: "opus"`; it loads `requesting-code-review` itself. The prompt MUST include:
+`general-purpose`) with the `REVIEWER_MODEL` from `refs/qa-review-rounds.md` "Reviewer model"; it loads `requesting-code-review` itself. The prompt MUST include:
 
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).

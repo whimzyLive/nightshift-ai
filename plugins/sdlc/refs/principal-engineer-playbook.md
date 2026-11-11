@@ -26,6 +26,8 @@ and create the PR only after QA returns a `clean` verdict (a draft PR on `capped
   approved spec on the story branch — `SPEC := docs/superpowers/specs/<STORY-KEY>.md`, its
   `## Implementation tasks` (a plan doc `docs/superpowers/plans/<STORY-KEY>.md` on the branch, when one
   exists, is used instead).
+- `STORY_POINTS` — `N` | `missing`, from the caller's inline `refs/triage.md` block; default `missing`.
+  Passed on to QA, which uses it only to pick the round-1 reviewer model.
 - `WORK_KIND` — `defect` | `feature`, from the caller's inline `refs/triage.md`; default `feature`.
   `defect` → read `${CLAUDE_PLUGIN_ROOT}/refs/defect-variant.md` now (the systematic-debugging
   ladder) and use the `fix/` prefix. `LIGHTWEIGHT` and `WORK_KIND` are **orthogonal** — a lightweight
@@ -245,6 +247,7 @@ return; discard the rest.
 - `<STORY-KEY>`, `BASE_SHA` (Step 1), the pushed `<BRANCH_PREFIX>/<STORY-KEY>` branch
 - The Jira story summary + acceptance criteria, and the task source (`SPEC` or the plan doc path)
 - `WORK_KIND` — `defect` re-points QA Step 7 to the regression-evidence contract
+- `STORY_POINTS` (from your inputs) — picks the round-1 reviewer model
 - The phase ledger (`LEDGER_FILE`) — **optional**: QA Step 3 falls back to git when absent (D3)
 
 It returns `## QA verdict: <STORY-KEY>` with `Status: clean | capped | blocked`.
