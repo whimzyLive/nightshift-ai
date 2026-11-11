@@ -206,6 +206,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
 | Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
+| Reviewer model threshold | OPTIONAL — story points at/under which the first QA review round uses `sonnet` instead of `opus` (Bugs and unpointed stories stay `opus`); default unset = `opus` always |
 | Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` is read (NA-104) — `spec`/`plan` are ignored entirely (no reviewer request either, unconditionally). Default (omitted) = `impl` reviews. Not an interactive picker — the only value that changes anything **excludes** `impl` (e.g. `spec`); writing `impl` itself is a no-op, same as omitting the row. **Excluding `impl` downgrades it to `REVIEW_MODE=none`, which skips the checks-green wait too — under `Full Auto` the impl PR auto-merges unreviewed and without waiting for CI**, and its `@copilot` request still fires but sits unaddressed. |
 | Plan step | OPTIONAL — `on` \| `off`; default `off` (spec → implementation, no plan). Not an interactive picker — write the row only if the founder asks for a plan step on full-path stories. |
 | Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
@@ -251,6 +252,10 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
 3. **Lightweight threshold** — `header: "LW threshold"`, `multiSelect: false`,
    `options: [3 (default), 2, 5, 1]` (labels are the point values; mark `3` recommended). The choice
    is the `Lightweight threshold` value.
+3b. **Reviewer model threshold** — `header: "Reviewer"`, `multiSelect: false`,
+   `options: [Opus always (default, omit the row), 3, 5, 2]`. A number writes the
+   `Reviewer model threshold (story points, inclusive)` row; the default deletes the row from the
+   written file.
 4. **Active agents** — `header: "Agents"`, `multiSelect: true`, `options:` the five domain agents
    below, each `label` the agent name and `description` its "select when…" row from the table. This
    is the ONLY multi-select picker; the result is the active-agent set.
@@ -533,6 +538,7 @@ are documented in that template file. Token slots to substitute:
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
+| `<reviewer-model-threshold>` | Reviewer model picker (Step 3) — omit the row for the default `Opus always` |
 | `<review-retention-window>` | Review retention window (Step 3) — `6 months` default unless the founder requests otherwise; accepted formats are exactly `<n> months` or `<n> stories` |
 | workspace→agent rows | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
 
