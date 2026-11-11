@@ -63,8 +63,9 @@ printf '%s' "$block" | grep -qF -- 'full content' \
   && bad "(G-15c) block no longer contains 'full content'" "still pastes content" \
   || ok "(G-15c) block no longer contains 'full content'"
 
-hunk_b="$(awk 'NR==132 || NR==133' "$qa" | wc -c | tr -d ' ')"
-[ "$hunk_b" -le 211 ] && ok "(G-15d) qa:132-133 hunk $hunk_b <= 211" \
-  || bad "(G-15d) qa:132-133 hunk <= 211" "actual $hunk_b"
+# Anchored on the hunk's first line, not a line number, so lines added above it don't move it.
+hunk_b="$(awk '/^  \*\*lightweight\*\* path there is no plan doc/{print;getline;print;exit}' "$qa" | wc -c | tr -d ' ')"
+[ "$hunk_b" -gt 0 ] && [ "$hunk_b" -le 211 ] && ok "(G-15d) lightweight-path hunk $hunk_b <= 211" \
+  || bad "(G-15d) lightweight-path hunk found and <= 211" "actual $hunk_b"
 
 exit "$fail"
