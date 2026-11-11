@@ -1,3 +1,13 @@
+## 0.47.7 (2026-11-11)
+
+### 🚀 Features
+
+- **sdlc:** pick the QA reviewer model from a story-point threshold ([846a740](https://github.com/whimzyLive/nightshift-ai/commit/846a740))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.6 (2026-11-03)
 
 ### 🩹 Fixes
