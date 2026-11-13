@@ -18,7 +18,7 @@ ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null
            | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]')"
 ```
 
-- `story` **or** `bug` (any non-epic implementable type) → **Step 1** (single-story flow). **Retain
+- `story` **or** `bug` (any non-epic implementable type) → **Step 0b**, then **Step 1** (single-story flow). **Retain
   `ITYPE`** — it feeds the inline triage (zero extra Jira I/O) and the Step-2 missing-points bypass.
   A `bug` triages `WORK_KIND=defect` + `TRIAGE=lightweight` → Workflow B (systematic debugging).
 - `epic` → **read `${CLAUDE_PLUGIN_ROOT}/refs/epic-orchestration.md` (explicit path) and follow it —
@@ -26,6 +26,28 @@ ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null
   path never reads this ref.
 - `sub-task` / any other type / empty probe → **STOP**: "STORY_KEY is not a Story, Bug, or Epic
   (issuetype=`<name>`) — unsupported input type." Spawn nothing; bare release (**Final action**).
+
+## Step 0b — Blocker gate
+
+A Story or Bug is checked against its Jira blockers before any assess, spec or code work, so a
+spec is never written, and a screen never built, ahead of the work it waits for:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh STORY_KEY   # BLOCKERS=, `<key> PR:` lines, DESIGN_BLOCKERS=, REASON=, GATE=PASS|STOP
+```
+
+- `GATE=PASS` → **Step 1**. A story with no blockers, or with no parent Epic to derive them from,
+  always passes, as does one whose blockers are Done or have their PR.
+- `GATE=STOP` → **STOP**. Name the open blockers (the `PR: NO|unmerged|design` lines) and print every
+  `REASON=` line verbatim. `DESIGN_BLOCKERS=` not empty → lead with "STORY_KEY is blocked by the
+  Design story `<key>` — run `/sdlc:design <EPIC> --final` first, then move `<key>` to Done when the
+  design PR merges." `SDLC_SESSION_KEY` set → post the same text as one comment on STORY_KEY (site
+  guard first). Spawn nothing; bare release (**Final action**).
+
+The rules are the script's (its header): a blocker passes when it is Done in Jira or has a `feat/` or
+`fix/` PR (merged, for `UI-Components`); a blocker labelled `Design` passes only when Done; a Bug is
+not held by a Design story. The playbook runs the same gate again in `pre-impl.sh`. It sees blockers
+under the story's own Epic only.
 
 ## Step 1 — Assess
 
@@ -193,7 +215,7 @@ PR raised, tail ran or no <NEXT>  -> release WITH the PR URL (Session boundary r
 no PR was raised at all           -> bare release
 ```
 
-**Bare** — Step 0 unsupported type; the epic session's own end (E0 reject, E0b, E1 `GATE=STOP`, E3
+**Bare** — Step 0 unsupported type; the Step-0b blocker stop; the epic session's own end (E0 reject, E0b, E1 `GATE=STOP`, E3
 `abort`, E4 HALT, or all children done — the epic keeps `SDLC_SESSION_KEY=EPIC_KEY` and releases its
 own slot here); the Step-2 missing-points stop; A0/A1 stops; any early error:
 

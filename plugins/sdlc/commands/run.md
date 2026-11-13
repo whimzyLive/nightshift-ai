@@ -25,11 +25,15 @@ resume procedure and the monitor tick prompt). This command does not restate the
    - Existing run: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/bg-status.sh KEY`. Verdict `RUNNING`,
      `STALLED` or `NEEDS_HUMAN` -> do not launch a second session; list it as `already running` and
      track it. Verdict `DONE` -> skip it.
-   - Blockers: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh KEY`, read only its `BLOCKERS=` line
-     (the gate's STOP for a blocker without a PR is expected here). For each blocker read its Jira
-     status (`acli jira workitem view <blocker> --fields status --json`, `.fields.status.name`). Any
-     blocker not at `DONE_STATUS` -> the key is `waiting` on those blockers. **Never launch a story with
-     an open blocker.** A story with no parent epic has no derivable blockers; say so in the table.
+   - Blockers: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh KEY`, read only its `BLOCKERS=` and
+     `DESIGN_BLOCKERS=` lines (the gate's STOP for a blocker without a PR is expected here). For each
+     blocker read its Jira status (`acli jira workitem view <blocker> --fields status --json`,
+     `.fields.status.name`). Any blocker not at `DONE_STATUS` -> the key is `waiting` on those blockers,
+     named in the table. A key listed in `DESIGN_BLOCKERS=` is the Epic's open Design story: the reason
+     reads `blocked by the Design story <key> — run /sdlc:design <EPIC> --final` (`<EPIC>` is the gate's
+     `EPIC=` line), and no run can close it, a person does. A `REASON=` saying KEY is itself the Design
+     story -> never launch it; list it as `design story: closed by a person`. **Never launch a story
+     with an open blocker.** A story with no parent epic has no derivable blockers; say so in the table.
    - Size: read the story points per `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` "Reading story points"
      and apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`. A `full` story (points above `T`, or missing) will
      stop for spec approval: mark it `full: stops for spec approval` so the user knows to expect a
@@ -48,7 +52,8 @@ resume procedure and the monitor tick prompt). This command does not restate the
    | Key | State | Session | Size | Attach | Logs | Stop |
    | --- | ----- | ------- | ---- | ------ | ---- | ---- |
 
-   `State` is `started`, `already running`, `waiting on <blockers>` or `done`. `Attach` is
+   `State` is `started`, `already running`, `waiting on <blockers>` (with `blocked by the Design story`
+   where that is the reason) or `done`. `Attach` is
    `claude attach KEY`, `Logs` is `claude logs KEY`, `Stop` is `claude stop <session id>`. Below the
    table state the concurrency used (`N of MAX`) and that decision questions are asked here, in this
    session, when a `NEEDS YOU` push arrives.

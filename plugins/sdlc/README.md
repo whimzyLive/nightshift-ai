@@ -143,7 +143,8 @@ agent, publishes to the design canvas, asks the human gates and raises the PR.
 - `--plan` — `docs/design/<slug>/component-plan.md` (surface, pattern, template, component, reuse/extend/new, explore, story), the two tests before a `?` becomes new, and one library story per new or extended component.
 - `--final` — runs only when `scripts/library-blockers.sh` lists no open library story; screen boards mounted only from the design bundle, then the existing ingest (the plain `/sdlc:design <KEY> <files>` form is kept). The ingest refuses a draft board and a final board with no template, and lists board kinds in a `## Boards` table of `index.md`.
 - `/sdlc:ui-audit [<EPIC>]` — Sonnet scan of the repo's UI paths for patterns built twice, display logic in pages, restyled shared components and pages off a template; proposes library stories, creates none unconfirmed. Suggested at the end of an epic run.
-- Epic runs gain a design preflight (E0c): a UI child whose Design row names a draft, or whose library story is not Done, stops the run before any spawn.
+- `/sdlc:stories` run before the finals adds one `Design` story to the Epic (`scripts/design-story.sh`): blocked by every library story, blocking every UI screen story, closed by a person once `/sdlc:design <EPIC> --final` has merged. `/sdlc:auto`, `/sdlc:impl` and `/sdlc:run` refuse a story it still blocks (`scripts/dep-gate.sh`); backend stories and Bugs are not held.
+- Epic runs gain a design preflight (E0c): a UI child whose Design row names a draft, or whose library story is not Done, stops the run before any spawn. An open Design story holds only the stories it blocks.
 - Specs gain a `## Reuse` section, stories a `UI surfaces` section, and QA flags duplicated or restyled shared components.
 
 Principles, board kinds and gates: `refs/design-workflow.md`; plan format: `refs/component-plan.md`.
@@ -155,7 +156,7 @@ and in `.claude/project/agents/designer.md`, which `/sdlc:init` scaffolds for a 
 ## `/sdlc:run` — background story runs
 
 `/sdlc:run <KEY> [<KEY> ...] [--max N]` runs each story as its own background `claude --bg` session
-(`/sdlc:auto` inside), skips a story whose blockers are not Done, staggers the starts, and arms a
+(`/sdlc:auto` inside), skips a story whose blockers are not Done (naming an open Design story as the reason), staggers the starts, and arms a
 10-minute session-local monitor tick that push-notifies when a run needs a person, stalls, or finishes.
 `scripts/run-bg.sh KEY [note] [session-id]` starts or resumes one run; per-repo settings go in the optional
 `.claude/project/bg-run.env`. `scripts/bg-status.sh KEY...` prints one line per story with a verdict
