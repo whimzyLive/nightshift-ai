@@ -124,7 +124,9 @@ Captured round files are not committed, so also read them:
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --kind review`
 
 Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exists, else
-`general-purpose`) with the `REVIEWER_MODEL` from `refs/qa-review-rounds.md` "Reviewer model"; it loads `requesting-code-review` itself. The prompt MUST include:
+`general-purpose`) with the `REVIEWER_MODEL` from `refs/qa-review-rounds.md` "Reviewer model". The prompt MUST include:
+
+- The output of `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh qa-reviewer --print-prompt` (it names `requesting-code-review`).
 
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
@@ -241,11 +243,9 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
    quality-gate run in Step 6."
 3. Story key.
 4. The reviewer findings for that domain, **verbatim**.
-5. **Applicable override skills** — EITHER name the target agent's applicable project skills
-   (from its override `.claude/project/agents/<agent-name>.md`, the override's skills section —
-   whatever heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke
-   these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
-   skills apply for this task." Exactly one of the two.
+5. **Skills for this dispatch** — paste the output of
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <the domain's owned paths> --print-prompt`
+   (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
 6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Fix ONLY these issues, run your **Comments**
    self-check (no comment cites a finding, round or story), and commit (use the
@@ -253,7 +253,7 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 7. "Capture any admitted rule entries per the admission test in
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s memory-write section."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 10. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md."
 11. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
@@ -296,14 +296,12 @@ attempt to fix or revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.
+- Commit subjects not conventional: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-commits.sh "<pre-dispatch HEAD>..HEAD" "$WORKTREE"`
+  exits 1 (`BAD=` lines) → **return `blocked`** with the lines, no redispatch.
 - `Status: blocked` → **return `blocked`** immediately; do not attempt the fix yourself.
-- **Verify `Skills loaded` covers the named set.** Same mechanical rule as principal playbook Step 5
-  (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
-  return `blocked` immediately, no redispatch. (Applies only to `Status: complete` returns, and
-  extra skills the agent lists beyond the named set still pass, per Step 5.)
 - **Verify the return carries `Rules applied:`** (4 lines complete, 5 lines blocked, per
-  `domain-agent-handoff.md`) — an absent line is the same contract violation as a missing
-  `Skills loaded:` line: return `blocked` immediately, no redispatch. `none` is a valid value.
+  `domain-agent-handoff.md`) — an absent line returns `blocked` immediately,
+  no redispatch. `none` is a valid value.
 
 ## Step 4 — Re-review
 

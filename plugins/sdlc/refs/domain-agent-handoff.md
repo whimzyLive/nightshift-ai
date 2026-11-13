@@ -155,7 +155,7 @@ Return only these lines to the Principal Engineer (no other prose). The line cou
 ```
 Status: complete
 Summary: <one line — what files changed, key entities/handlers/screens touched>
-Skills loaded: <comma-separated override skill names | none>
+Skills loaded: <comma-separated skill names | none>
 Rules applied: <rule-id>, <rule-id> | none
 ```
 
@@ -165,20 +165,17 @@ Rules applied: <rule-id>, <rule-id> | none
 Status: blocked
 Note: <one line — why blocked>
 Summary: <one line — what was attempted>
-Skills loaded: <comma-separated override skill names | none>
+Skills loaded: <comma-separated skill names | none>
 Rules applied: <rule-id>, <rule-id> | none
 ```
 
-- `Skills loaded:` is **required on every return** (complete, blocked, or early abort). An absent line is a contract violation.
-- Its value lists every **runtime override (project) skill** you invoked/applied this dispatch (e.g. `tailwind-design-system, react-components`) — including any skill the dispatch prompt named that happens to also be one of your agent's own required first-turn skills (loaded via the Skill tool per your agent's "Required skills (load FIRST)" section, not frontmatter — frontmatter `skills:` preloads are re-injected in full on every SendMessage resume, harness bug anthropics/claude-code#76337, which is why NA-25 moved every generic skill to a first-turn Skill-tool load instead). For those, "invoked" means you applied it to the task; listing it is what satisfies the orchestrator's set-coverage check. Only omit a first-turn generic skill the dispatch prompt did **not** name — never pad the line with those.
-- Emit the literal `none` only when no applicable override skill was loaded. Whether `none` is a pass or a failure is decided **mechanically against your dispatch prompt** by the orchestrator: `none` passes iff the dispatch prompt declared no applicable skills; if the prompt named skills, `none`/missing/empty/partial is a failure.
-- If your dispatch prompt neither names skills nor declares none applicable, select the applicable skills from your override yourself, invoke them, and list them — `none` then means none were applicable to the task.
+- `Skills loaded:` is **required on every return** (complete, blocked, or early abort) as information. A missing line or a short list never fails a return.
+- Its value lists every skill you invoked this dispatch, from the dispatch prompt's skills block or your own judgement (e.g. `conventional-commit, test-driven-development`), or the literal `none`.
 - `Rules applied:` is **required on every return**, same as `Skills loaded:`. Its value cites the rule
   `id`s (yours or `shared/`) that collection surfaced and that you actually followed this dispatch —
   the same set you incremented `uses` on. `none` is valid and expected whenever collection emitted
   nothing applicable; it is not a sign anything went wrong. An agent that applied a rule but omitted
-  the line is a contract violation, handled exactly as a missing `Skills loaded:` line — the
-  orchestrator re-dispatches.
+  the line is a contract violation — the orchestrator re-dispatches once.
 
 - With a design check run, `Summary:` also carries its part (`refs/design-references.md` Domain agent duties).
 

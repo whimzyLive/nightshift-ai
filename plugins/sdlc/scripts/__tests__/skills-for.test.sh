@@ -38,6 +38,9 @@ cat >"$work/m2.json" <<'JSON'
   { "name": "tracked-only", "source": "custom", "addedBy": "init", "agents": [] }
 ] }
 JSON
+cat >"$work/m3.json" <<'JSON'
+{ "version": 2, "skills": [ { "name": "entity-skill", "agents": ["platform-engineer"], "when": { "paths": ["**/entities/**"] } } ] }
+JSON
 args=(--manifest "$work/m2.json" --contract "$work/contract.json")
 
 check "repo row replaces contract row entirely" \
@@ -52,6 +55,8 @@ check "empty agents is tracked only" 0 "$(run platform-engineer "${args[@]}" | g
 check "path filter: dispatch path inside the glob matches" 1 "$(run platform-engineer "${args[@]}" --paths backend/internal/x.go | grep -c golang-testing)"
 check "path filter: owned directory containing the glob matches" 1 "$(run platform-engineer "${args[@]}" --paths backend/ | grep -c golang-testing)"
 check "path filter: parent of the glob prefix matches" 1 "$(run web-engineer "${args[@]}" --paths apps/ | grep -c react-components)"
+check "path filter: a directory may hold a glob that starts with a wildcard" 1 "$(run platform-engineer --manifest "$work/m3.json" --contract "$work/contract.json" --paths backend/ | grep -c entity-skill)"
+check "path filter: a file outside a leading-wildcard glob does not match" 0 "$(run platform-engineer --manifest "$work/m3.json" --contract "$work/contract.json" --paths backend/main.go | grep -c entity-skill)"
 check "path filter: unrelated path does not match" 0 "$(run platform-engineer "${args[@]}" --paths infra/,docs/ | grep -c golang-testing)"
 check "path filter: any of several paths matches" 1 "$(run platform-engineer "${args[@]}" --paths infra/,backend/ | grep -c golang-testing)"
 check "path filter: no --paths matches conservatively" 1 "$(run platform-engineer "${args[@]}" | grep -c golang-testing)"

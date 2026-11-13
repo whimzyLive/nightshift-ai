@@ -7,6 +7,11 @@
 #   when        — detection conditions that cause this skill to be suggested
 #                 (any matching condition adds the skill to the candidate list;
 #                  the skill appears at most once even if multiple conditions match)
+#   dispatch    — (optional) how /init writes the skill's row in .claude/project/skills.json
+#                 (refs/skills-manifest.md): `paths` (globs a dispatch's owned paths must
+#                 overlap), `mode` (agent modes the row applies to) and `step` (the phrase shown
+#                 to the agent as the point of use). Absent → `when: {}` in the manifest, so the
+#                 skill is named on every dispatch to its domain agents.
 #
 # Install source — how /init Step 4f gets the skill content. Resolved in this
 # precedence order; declare the first that applies:
@@ -40,6 +45,8 @@ skills:
   - name: hono-api
     description: Schema-first Hono + @hono/zod-openapi architecture — composable routers, class-based service layer, webhook strategy pattern, typed validation
     domains: [platform-engineer]
+    dispatch:
+      step: before adding or changing a route, service or webhook handler
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/hono-api
     when:
@@ -48,6 +55,8 @@ skills:
   - name: api-routes
     description: REST/HTTP handler structure, input validation, and error response shapes
     domains: [platform-engineer]
+    dispatch:
+      step: before adding or changing an HTTP handler
     when:
       - framework: Express
       - framework: NestJS
@@ -56,6 +65,8 @@ skills:
   - name: vercel-react-best-practices
     description: Next.js / React patterns optimised for Vercel deployment
     domains: [web-engineer]
+    dispatch:
+      step: before writing or changing a React component or page
     # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
     source: https://github.com/vercel-labs/agent-skills.git
     path: skills/react-best-practices
@@ -67,6 +78,8 @@ skills:
   - name: vercel-composition-patterns
     description: Vercel monorepo workspace layout and composition patterns
     domains: [web-engineer]
+    dispatch:
+      step: before changing workspace layout or a shared package
     # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
     source: https://github.com/vercel-labs/agent-skills.git
     path: skills/composition-patterns
@@ -79,6 +92,8 @@ skills:
   - name: react-components
     description: React component patterns, hooks, and composition conventions
     domains: [web-engineer]
+    dispatch:
+      step: before writing or changing a component
     # Third-party: Google Labs' Stitch skill — downloaded from upstream, not copied.
     source: https://github.com/google-labs-code/stitch-skills.git
     path: plugins/stitch-build/skills/react-components
@@ -91,6 +106,9 @@ skills:
   - name: typeorm
     description: TypeORM entity, migration, query, and Data Mapper conventions for TypeScript
     domains: [platform-engineer, database-administrator]
+    dispatch:
+      paths: ["**/entities/**", "**/entity/**", "**/migrations/**"]
+      step: before changing an entity, a migration or a query
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/typeorm
     when:
@@ -99,6 +117,9 @@ skills:
   - name: electrodb
     description: ElectroDB DynamoDB ORM — entity schema, index/access-pattern modeling, CRUD and update expressions, single-table design
     domains: [platform-engineer, database-administrator]
+    dispatch:
+      paths: ["**/entities/**", "**/entity/**"]
+      step: before modeling an entity or an access pattern
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/electrodb
     when:
@@ -106,7 +127,9 @@ skills:
 
   - name: atomic-design
     description: Framework-agnostic atomic design methodology — decompose any UI into atoms, molecules, organisms, templates, and pages
-    domains: [web-engineer, mobile-engineer]
+    domains: [web-engineer, mobile-engineer, designer]
+    dispatch:
+      step: before decomposing a UI into components
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/atomic-design
     when:
@@ -138,6 +161,7 @@ skills:
 # platform-engineer  : hono-api, api-routes, typeorm, electrodb
 # web-engineer       : react-components, vercel-react-best-practices, vercel-composition-patterns, atomic-design
 # mobile-engineer    : atomic-design
+# designer           : atomic-design
 # database-administrator : typeorm, electrodb
 # sync-engineer      : (no built-in suggestions; add custom sync skills via "Other")
 

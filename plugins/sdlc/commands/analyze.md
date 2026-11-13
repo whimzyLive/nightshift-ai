@@ -3,7 +3,8 @@ description: Manually-triggered repo-wide scan for AI-config drift, gaps, and co
 ---
 
 `/sdlc:analyze` is **manual only** — there is no scheduling/background trigger. Dispatch the
-`ai-enablement-engineer` agent to scan this repo's AI-configuration surface (`CLAUDE.md`,
+`ai-enablement-engineer` agent (with the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh ai-enablement-engineer --mode analyze --print-prompt`) to scan this repo's AI-configuration surface (`CLAUDE.md`,
 `AGENT(S).md`, `.agents/**`, `.claude/**`, etc.) plus `plugins/**`/`skills/**` — when the repo has
 opted in — for drift, gaps, and config-vs-memory conflicts, and report the findings.
 

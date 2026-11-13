@@ -87,9 +87,11 @@ merged="$(printf '%s\n%s\n' "$contract_rows" "$repo_rows" | jq -c -s '
   | .[]')"
 
 # glob_hits <dispatch-path> <glob> — a dispatch path overlaps a glob when it matches the glob, or
-# is a directory containing the glob's literal prefix.
+# is a directory containing the glob's literal prefix (or any directory, for a glob that starts with a
+# wildcard).
 glob_hits() {
-  local p="${1%/}" g="$2" lit
+  local p="${1%/}" g="$2" lit isdir=0
+  case "$1" in */) isdir=1 ;; esac
   g="${g//\*\*/*}"
   # shellcheck disable=SC2053
   [[ "$p" == $g ]] && return 0
@@ -97,6 +99,7 @@ glob_hits() {
   [[ "$p/x" == $g ]] && return 0
   lit="${g%%[*?[]*}"
   [ "$lit" != "$g" ] && case "$lit" in "$p"/*) return 0 ;; esac
+  [ "$isdir" -eq 1 ] && [ -z "$lit" ] && return 0
   return 1
 }
 

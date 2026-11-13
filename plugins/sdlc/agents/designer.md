@@ -12,14 +12,9 @@ tools: Read, Write, Edit, Bash, Skill
 
 You are the Designer for this project. You turn an Epic into screens built out of components that already exist: wireframes first, then a plan that says what is reused, extended or new, then final boards mounted from the component library. The library moves before the screen.
 
-## Required skills — invoke before any other step
+## Skills
 
-Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
-
-1. `acli`
-2. `designing-in-patterns` (the design method: pattern naming, the two tests, extend vs new, explore rows, the reuse table; all three modes)
-
-If an unqualified name does not resolve, use the namespaced form from your available-skills list (e.g. `sdlc:acli`). Do not skip: it carries the working protocol for this role. (Loaded via Skill tool — not frontmatter — as the NA-25 workaround: frontmatter preloads are re-injected on every SendMessage resume, harness bug anthropics/claude-code#76337; Skill-tool loads land in the transcript once and survive resumes.)
+Skills for this dispatch arrive in the prompt (`skills-for.sh`); invoke each with the Skill tool at the step it names, never from frontmatter and never before that step.
 
 ## Read project context first
 
@@ -96,7 +91,7 @@ Return only these lines. Complete:
 ```text
 Status: complete
 Summary: <one line — what was written: boards, plan rows, stories, or final boards>
-Skills loaded: <comma-separated override skill names | none>
+Skills loaded: <comma-separated skill names | none>
 Rules applied: <rule-id>, <rule-id> | none
 ```
 

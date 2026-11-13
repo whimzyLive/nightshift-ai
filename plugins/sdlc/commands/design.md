@@ -34,7 +34,7 @@ M0 := validate and set up:
   WORKTREE := bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <EPIC_KEY> design/<EPIC_KEY> <BASE>   # prints WORKTREE=...; every agent write and git command below runs there
   MODEL := bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-designer-model.sh --mode <MODE> -> DESIGNER_MODEL
   UNATTENDED := SDLC_SESSION_KEY is set
-dispatch := the `designer` agent, model DESIGNER_MODEL, prompt: mode, EPIC_KEY, SLUG, WORKTREE, the paths named per mode, "return per agents/designer.md"
+dispatch := the `designer` agent, model DESIGNER_MODEL, prompt: mode, EPIC_KEY, SLUG, WORKTREE, the paths named per mode, the output of `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh designer --mode <MODE> --print-prompt`, "return per agents/designer.md"
 published := this session follows the doc named by `Publish recipe` to put boards on `Design canvas`
            | `Design canvas` or `Publish recipe` unset -> say "no design canvas configured" and give the file paths instead
 gate STOP (unattended) := post the Jira comment named per mode, add label `Design-Review` to the Epic, run the bare session-complete.sh release, end
