@@ -148,7 +148,11 @@ if [ "$PRINT_PROMPT" -eq 1 ]; then
     if [ "$required" = "yes" ]; then
       [ "$step" = "-" ] && phrase="required: before starting work" || phrase="required: before ${step#before }"
     else
-      [ "$step" = "-" ] && phrase="optional: if it applies" || phrase="optional: if ${step#when } applies"
+      case "$step" in
+        -)     phrase="optional: if it applies" ;;
+        if\ *) phrase="optional: $step" ;;
+        *)     phrase="optional: if ${step#when } applies" ;;
+      esac
     fi
     echo "- $name — $phrase"
   done <<<"$out"

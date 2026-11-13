@@ -170,7 +170,7 @@ Rules applied: <rule-id>, <rule-id> | none
 ```
 
 - `Skills loaded:` is **required on every return** (complete, blocked, or early abort) as information. A missing line or a short list never fails a return.
-- Its value lists every skill you invoked this dispatch, from the dispatch prompt's skills block or your own judgement (e.g. `conventional-commit, test-driven-development`), or the literal `none`.
+- Its value lists every skill you invoked this dispatch, from the dispatch prompt's skills block or your own judgement (e.g. `conventional-commit, verification-before-completion`), or the literal `none`.
 - `Rules applied:` is **required on every return**, same as `Skills loaded:`. Its value cites the rule
   `id`s (yours or `shared/`) that collection surfaced and that you actually followed this dispatch —
   the same set you incremented `uses` on. `none` is valid and expected whenever collection emitted

@@ -36,7 +36,7 @@ The file is a regenerated per-session cache — **gitignore it**.
 - **superpowers plugin** — **auto-installed.** Declared as a cross-marketplace dependency
   (`superpowers@claude-plugins-official`), so `/plugin install sdlc@nightshift` reuses an existing
   superpowers install or pulls it from the official marketplace. Agents invoke its skills:
-  executing-plans, test-driven-development, verification-before-completion, requesting-code-review,
+  verification-before-completion, requesting-code-review,
   receiving-code-review, writing-plans — the domain agents, reviewer and verifier subagents load
   them. The orchestrating PE/QA playbooks load none: they carry their own dispatch and triage rules.
 - **claude-mem plugin** — **auto-installed.** Declared as a cross-marketplace dependency

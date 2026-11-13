@@ -44,41 +44,9 @@
         "ai-enablement-engineer",
         "knowledge-engineer"
       ],
-      "required": true,
+      "required": false,
       "when": {
-        "step": "before each commit"
-      }
-    },
-    {
-      "name": "executing-plans",
-      "source": "plugin",
-      "addedBy": "plugin",
-      "agents": [
-        "web-engineer",
-        "mobile-engineer",
-        "platform-engineer",
-        "database-administrator",
-        "sync-engineer"
-      ],
-      "required": true,
-      "when": {
-        "step": "before the first task"
-      }
-    },
-    {
-      "name": "test-driven-development",
-      "source": "plugin",
-      "addedBy": "plugin",
-      "agents": [
-        "web-engineer",
-        "mobile-engineer",
-        "platform-engineer",
-        "database-administrator",
-        "sync-engineer"
-      ],
-      "required": true,
-      "when": {
-        "step": "before writing implementation code"
+        "step": "if unsure of the conventional format; check-commits.sh verifies every commit"
       }
     },
     {

@@ -106,6 +106,12 @@ check "shipped contract: scrum-master decompose gets both story skills" 2 \
   "$(run scrum-master --manifest "$no_manifest" --contract "$shipped_contract" --mode decompose | grep -c '^SKILL=user-story-')"
 check "shipped contract: knowledge-engineer seed-adr gets writing-adrs, not writing-docs" "1 0" \
   "$(o="$(run knowledge-engineer --manifest "$no_manifest" --contract "$shipped_contract" --mode seed-adr)"; echo "$(grep -c writing-adrs <<<"$o") $(grep -c writing-docs <<<"$o")")"
+check "shipped contract: conventional-commit is optional with its own step" "SKILL=conventional-commit REQUIRED=no STEP=if unsure of the conventional format; check-commits.sh verifies every commit" \
+  "$(run web-engineer --manifest "$no_manifest" --contract "$shipped_contract" | grep conventional-commit)"
+check "shipped contract: executing-plans and test-driven-development are not rows" 0 \
+  "$(for a in $(ls "$(dirname "$sf")/../agents" | sed 's/\.md$//'); do bash "$sf" "$a" --manifest "$no_manifest" --contract "$shipped_contract" --mode analyze; done | grep -c 'executing-plans\|test-driven-development')"
+check "print-prompt: a step starting with if is not re-prefixed" "- conventional-commit — optional: if unsure of the conventional format; check-commits.sh verifies every commit" \
+  "$(run web-engineer --manifest "$no_manifest" --contract "$shipped_contract" --print-prompt | grep conventional-commit)"
 check "shipped contract: a namespaced skill name resolves intact" "SKILL=anthropic-skills:skill-creator REQUIRED=yes STEP=when a gap or a new skill is needed" \
   "$(run ai-enablement-engineer --manifest "$no_manifest" --contract "$shipped_contract" --mode analyze | grep 'skill-creator')"
 
