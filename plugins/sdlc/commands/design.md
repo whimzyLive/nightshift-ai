@@ -65,10 +65,14 @@ P2  DRAFTS := the approved wireframes, downloaded from the canvas per `Publish r
 P3  dispatch(plan, DRAFTS) -> Plan, Open questions, Stories
 P4  open questions -> UNATTENDED: gate STOP with a comment listing each `Q:`; else ask them with AskUserQuestion (at most 4 per call, recommended first, `Leave open` last — the same model as commands/spec.md Step 2), then dispatch(plan, DRAFTS, answers) so the agent writes the settled plan
 P5  confirm the library stories before they are created: list the extend/new rows with their Components; AskUserQuestion `Create` (Recommended) | `Edit the plan` | `Stop`; UNATTENDED -> gate STOP   # nothing is raised without a person
-P6  the agent raises the stories (refs/component-plan.md Library stories) and writes their keys into the plan
+P6  the agent raises the stories (refs/component-plan.md Library stories) and writes their keys into the plan, then ensures the Epic's `Design` story
+    (refs/design-workflow.md "The design story") with `scripts/design-story.sh <EPIC_KEY> ensure --plan <plan path>`: created once, blocked by every library story,
+    blocking nothing yet (`/stories` links the screen stories to it later); a re-run reuses it, never a second one; no library story -> still created; no screen in the plan -> none
+    -> DESIGN_STORY := the agent's `Design story:` line (a key | `none — no screens` | `proposed in a comment` | `stopped: <REASON>`)
 P7  Step 3 (branch) skipped, WORKTREE is on it; Step 6's commit/push/raise-pr for `docs/design/<SLUG>/component-plan.md` with message `docs(design): <EPIC_KEY> component plan`
-P8  comment on the Epic: `Design plan: docs/design/<SLUG>/component-plan.md | PR: <PR_URL> | Stories: <keys>`
-P9  return: plan path, PR URL, story keys, next step `/stories <EPIC>` (it reads the plan) and building the library stories
+P8  comment on the Epic: `Design plan: docs/design/<SLUG>/component-plan.md | PR: <PR_URL> | Stories: <keys> | Design story: <DESIGN_STORY>`
+P9  return: plan path, PR URL, story keys, the Design story (key, created or reused; already Done -> say so: reopen it by hand when this plan adds screens),
+    next steps in order: build the library stories, `/design <EPIC> --final`, then `/stories <EPIC>` (it reads the plan and links the screen stories to the Design story)
 ```
 
 ### `--final`

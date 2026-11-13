@@ -83,6 +83,7 @@ ACs (3-6):
   - explore rows: the variants are built as stories, the winner is chosen in review, the losers are deleted
   - cleanup rows: <old site> uses <Component>
 write the key back into the plan's Story column, commit
+then the Epic's design story: bash scripts/design-story.sh <EPIC> ensure --plan <this plan> --description-file <file>   # refs/design-workflow.md "The design story"; created once, blocked by every library story
 headless -> acli create can be refused by policy: propose the stories in a Jira comment on the Epic instead (the plan's Story column stays `—`)
 ```
 
@@ -94,7 +95,7 @@ Any other label still blocks `--final` through `scripts/library-blockers.sh`.
 
 ```text
 scrum-master (Mode 1 step 2a, 6b, 6c, 6c1, 12a) := reads the plan when present: library stories exist already (reuse them, never a second one); screen stories get a Blocks link from every library story whose Screens names their board, and a `UI surfaces` line (pattern names)
-                       while a screen has no final board: one `Design` story, blocked by every library story and blocking every screen story (refs/design-workflow.md "The design story")
+                       the Epic's `Design` story, created by `/design --plan`, is reused and linked to block every screen story; Done already -> nothing is held (refs/design-workflow.md "The design story")
 solutions-architect := copies the story's plan rows into the spec's `## Reuse` section (surface, template, component, action, story); an action `new` row with no Story is an open question the spec cannot be approved with
 domain agent := receives the story's plan rows with its Design paths; builds the screen from the listed components; a row whose component does not behave as the board shows -> stop and report
 no plan for a UI Epic -> consumers fall back to components.md alone; nothing blocks

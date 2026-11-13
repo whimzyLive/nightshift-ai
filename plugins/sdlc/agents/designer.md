@@ -66,9 +66,15 @@ Input: approved drafts (a path), vocabulary, inventory. Output: `docs/design/<sl
 4. `?` rows still open -> do not guess: return them as Q: blocks and stop before step 5
 5. only when the command re-dispatches you with the answers (or no `?` was open): write the final plan, then raise one library story per extend/new row under the Epic (acli, label `Library label`),
    description from refs/jira-story-template.md with the ACs listed in component-plan.md "Library stories"; write the keys into the plan's Story column
+6. same dispatch, after step 5, also when it raised no library story: ensure the Epic's Design story (refs/design-workflow.md "The design story").
+   Write its description (that section's `description`, ADF per refs/jira-adf.md) to a temp file, then:
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-story.sh <EPIC> ensure --plan <plan path> --description-file <file>
+   never create it with acli yourself: the script reuses an existing one and never makes a second
+   DESIGN_STORY=<key> -> `Design story: <key> (created|reused[, already Done])`; SKIPPED=no-screens -> `Design story: none — no screens`
+   RESULT=stop -> `Design story: stopped: <REASON>`; a refused create (headless policy) -> add the drafted story to the Epic comment that proposes the library stories, `Design story: proposed in a comment`
 ```
 
-The command settles open rows with the user, then dispatches you again with the answers; that second dispatch writes the plan and raises the stories. Return the plan path, open questions, story keys.
+The command settles open rows with the user, then dispatches you again with the answers; that second dispatch writes the plan, raises the stories and ensures the Design story. Return the plan path, open questions, story keys, the Design story line.
 
 ## Mode final
 
@@ -102,5 +108,5 @@ Blocked adds `Note: <one line — why>` after `Status:`. `Skills loaded:` and `R
 | Mode | Extra lines |
 | --- | --- |
 | draft | `Boards: <paths, comma-separated>`, `Journey: <WF_DIR>/journey.md`, `Not linked: <screen: control, ...> \| none`, `Gaps: <n> ? blocks` |
-| plan | `Plan: <path>`, `Open questions: none` or the `Q:` / `WHY:` / `OPTIONS:` blocks, `Stories: <keys> \| none` |
+| plan | `Plan: <path>`, `Open questions: none` or the `Q:` / `WHY:` / `OPTIONS:` blocks, `Stories: <keys> \| none`, `Design story: <step 6's line>` (omitted while questions are open) |
 | final | `Slug: <slug>`, `Boards: <paths, comma-separated>` |

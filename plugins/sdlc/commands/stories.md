@@ -9,7 +9,7 @@ Dispatch the `scrum-master` agent in **decompose mode**, with the output of
 $ARGUMENTS
 ```
 
-The scrum-master agent owns the full decompose workflow — Epic fetch, story mapping, decomposition, dependency ordering, and story creation. Do not repeat its instructions here. When the Epic has a component plan and its screens have no final boards yet, the agent also adds one `Design` story that blocks every UI screen story until `/sdlc:design <EPIC> --final` has merged; report its key with the rest.
+The scrum-master agent owns the full decompose workflow — Epic fetch, story mapping, decomposition, dependency ordering, and story creation. Do not repeat its instructions here. `/sdlc:design <EPIC> --plan` creates the Epic's `Design` story; the agent reuses it and links every UI screen story to it, so report its key with the rest. When that story is already Done, the screen stories name the final boards in their Design row and need no gate; when it is open, they are blocked by it until `/sdlc:design <EPIC> --final` has merged and a person closes it.
 
 ## Final action — release the session (required)
 
