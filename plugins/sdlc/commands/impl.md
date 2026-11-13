@@ -89,10 +89,12 @@ STOP and surface it — do not improvise around it.
 
 **Dependency gate (Step 1 of the playbook):** before any work, run
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/dep-gate.sh <STORY-KEY>` — it resolves the parent epic, reads `<STORY-KEY>`'s
-Jira `Blocks` links (by sibling-inversion) and requires every blocker to already have a
-`feat/<blocker>` PR (open or merged). `GATE=STOP` (exit 1) → the whole flow STOPs and REJECTs —
-no branch, no domain agents — and the `REASON=` line says which upstream story must ship first.
-Do not bypass this.
+Jira `Blocks` links (by sibling-inversion) and requires every blocker to be Done in Jira or to
+already have a `feat/<blocker>` or `fix/<blocker>` PR (open or merged). A blocker labelled `Design`
+(the Epic's high-fidelity design story) passes only when Done: the stop reads "run `/sdlc:design
+<EPIC> --final` first". A Bug is not held by a Design story. `GATE=STOP` (exit 1) → the whole flow
+STOPs and REJECTs — no branch, no domain agents — and the `REASON=` line says which upstream story
+must ship first. Do not bypass this. `/auto` runs the same gate up front (its Step 0b).
 
 ## Final action — release at PR raise (when run standalone)
 

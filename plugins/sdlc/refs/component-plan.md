@@ -93,7 +93,8 @@ Any other label still blocks `--final` through `scripts/library-blockers.sh`.
 ## Consumers
 
 ```text
-scrum-master (Mode 1 step 2a, 6b, 6c) := reads the plan when present: library stories exist already (reuse them, never a second one); screen stories get a Blocks link from every library story whose Screens names their board, and a `UI surfaces` line (pattern names)
+scrum-master (Mode 1 step 2a, 6b, 6c, 6c1, 12a) := reads the plan when present: library stories exist already (reuse them, never a second one); screen stories get a Blocks link from every library story whose Screens names their board, and a `UI surfaces` line (pattern names)
+                       while a screen has no final board: one `Design` story, blocked by every library story and blocking every screen story (refs/design-workflow.md "The design story")
 solutions-architect := copies the story's plan rows into the spec's `## Reuse` section (surface, template, component, action, story); an action `new` row with no Story is an open question the spec cannot be approved with
 domain agent := receives the story's plan rows with its Design paths; builds the screen from the listed components; a row whose component does not behave as the board shows -> stop and report
 no plan for a UI Epic -> consumers fall back to components.md alone; nothing blocks

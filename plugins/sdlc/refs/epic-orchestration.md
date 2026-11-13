@@ -61,6 +61,8 @@ approved **here, in the epic session, before any child spawns**. Run it right af
 ```text
 NEEDS := every S in ORDER, in dependency order (later specs may rely on earlier ones), except:
   issuetype Bug | status == <Pipeline done status> | triage(S) == lightweight
+  | S is the Design story (label `Design`; a person closes it, it gets no spec)
+  | S is held by an open Design story (E2a2)   # its spec is approved on the re-run, from the final boards
   | triage(S) STORY_POINTS=missing   # the child stops on missing points anyway; set them first
   | assess-ready.sh S -> SPEC_APPROVED=yes AND origin/feat/S has docs/superpowers/specs/S.md
   | /auto A0's LEGACY=yes for S (spec merged under the old flow, or a plan doc)
@@ -122,6 +124,15 @@ story. (`<Pipeline done status>` — the consuming repo's terminal status, read 
 auto-merge-then-transition hook resolves `<DONE_STATUS>` from. No new terminal status is
 introduced here.) This makes re-running `/auto EPIC_KEY` idempotent: already-finished stories are
 passed over.
+
+**E2a2 — The Design story is never spawned.** `bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-story.sh EPIC_KEY find`
+once per run gives `DESIGN_STORY` (`refs/design-workflow.md` "The design story"). `S == DESIGN_STORY`
+and Done → skipped as above. Not Done → hold it: spawn nothing for `S` or for any later story that
+it blocks, directly or through another held story (E1's `<key> BLOCKERS=` lines); the stories it does
+not block, the library stories among them, still run in `ORDER`. When only held stories are left,
+comment the Epic `Library stories are built. Run /sdlc:design EPIC_KEY --final, merge the design PR,
+move <DESIGN_STORY> to Done, then re-run /auto EPIC_KEY — held: <keys>` and take the bare release. A
+re-run resumes with the held stories.
 
 **E2b — Decide whether `S` is gated.** Resolve `S`'s effective mode:
 

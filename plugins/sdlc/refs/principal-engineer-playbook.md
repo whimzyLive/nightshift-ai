@@ -73,6 +73,8 @@ sub-task probe, `scripts/worktree-setup.sh`, and the branch push. Keep `BASE_SHA
   These must reach at least an open feat/* or fix/* PR (merged, for UI-Components) first.
   Next step: implement <blocker-key> first (or remove the Jira "Blocks" link if stale).
   ```
+  A `PR: design` line is the Epic's open Design story (`refs/design-workflow.md` "The design story"):
+  the next step is `/sdlc:design <EPIC> --final`, then moving that story to Done once the design PR merges.
   The gate enforces the Jira dependency graph — never implement a story ahead of its blockers.
 - `PR_STATE=open` → the existing branch is reused (the script merged the base in when
   `UI_BLOCKERS` is non-empty); a merged PR already stopped the run.

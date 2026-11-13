@@ -63,6 +63,10 @@ This is guidance, not a hard limit. A repo can set `Max parallel runs` (an integ
 
 - Launch a story only when every story that blocks it is Done (the `Pipeline done status` of
   project-context; `scripts/dep-gate.sh KEY` prints `BLOCKERS=`). A story with open blockers waits.
+- A blocker on the gate's `DESIGN_BLOCKERS=` line is the Epic's Design story
+  (`refs/design-workflow.md` "The design story"). No run closes it: the story waits with the reason
+  `blocked by the Design story <key>` until a person runs `/sdlc:design <EPIC> --final`, merges the
+  design PR and moves it to Done. The Design story itself is never launched.
 - Stories that touch the same files run one after the other, even when Jira links no dependency.
   If unsure, launch the second one only after the first has a PR.
 
@@ -118,6 +122,7 @@ Monitor tick for background runs: <KEYS>.
    On a change to NEEDS_HUMAN, STALLED or DONE, or when its PR becomes merged, send ONE PushNotification
    for that story naming the key, the verdict, the reason and the PR. Never notify twice for the same state.
 3. Launch each waiting story whose blockers are now Done (<WAITING>), staggered 30 seconds apart,
+   never one still blocked by the Design story,
    within the concurrency guidance of refs/bg-runs.md, with run-bg.sh in its own background shell.
 4. When every tracked story is DONE, send one final PushNotification and delete this cron job (CronDelete).
 Do not ask questions, resume, stop or fix anything here. This tick only notifies and launches.

@@ -79,6 +79,10 @@ F1  bash ${CLAUDE_PLUGIN_ROOT}/scripts/library-blockers.sh <EPIC_KEY> -> BLOCKER
 F2  dispatch(final) -> Slug, final boards written to a temp dir the prompt names; each declares <meta name="board-kind" content="final"> and a board-template
 F3  publish the boards for review (orchestrator step)
 F4  Steps 0-8 below with <path> := the final boards; REPLACE and SLUG as Step 2 decides; Step 3 skipped (WORKTREE is on design/<EPIC_KEY>; an open design PR for it is revised, never duplicated)
+F5  bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-story.sh <EPIC_KEY> find -> DESIGN_STORY   # the Epic's design story, refs/design-workflow.md "The design story"
+    DESIGN_STORY set -> comment it (site guard first): `Final boards: docs/design/<SLUG>/index.md | PR: <PR_URL>`; after the PR is raised, and again each time it is revised
+                        never transition it: whether the docs PR has merged is not known here. The user moves it to Done when the design PR merges, which unblocks the screen stories
+    DESIGN_STORY empty | non-zero exit -> no comment; say "no Design story under <EPIC_KEY>" in the return
 ```
 
 ## Ingest form
@@ -262,6 +266,7 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
   check owns it. Name this as a next step.
 - `NOTICE<TAB>board-kind-missing<TAB><file>` lines from Step 4: list the pages and say they were treated as final; a new design declares kind and template on every board.
 - Tab-separated `WARN<TAB>font-not-bundled<TAB><family><TAB><url>` lines from Step 4: list each family and url — a renderer must serve them.
+- `--final`: the Design story key and its `Final boards:` comment (F5), with the line `Move <DESIGN_STORY> to Done when this PR merges — the screen stories it blocks cannot start before that`, and the screen stories whose Design section must still name its board. No Design story → say so.
 - The draft wireframes can now be moved to an archive page on the canvas; nothing is deleted automatically.
 - Next step: merge the PR, then refine — `/stories <EPIC>`, or `/refine-issue <STORY>`. Refinement
   puts the matching design rows in each story's **Design** section.
