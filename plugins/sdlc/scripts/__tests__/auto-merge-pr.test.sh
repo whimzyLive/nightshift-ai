@@ -108,7 +108,9 @@ trap 'rm -rf "$mockdir"' EXIT
 #                                                                pending-then-pass |
 #                                                                nonrequired-pending-then-pass |
 #                                                                fail-query | empty-then-pass |
-#                                                                garbage | empty-then-fail;
+#                                                                garbage | empty-then-fail |
+#                                                                none-exit1 (real gh with zero
+#                                                                checks: exit 1, empty stdout);
 #                                                                default none). pending-then-pass
 #                                                                counts calls via
 #                                                                MOCK_GH_CHECKS_COUNTER_FILE and
@@ -228,7 +230,17 @@ case "${1:-}" in
         state="${MOCK_GH_STATE:-MERGED}"
         automerge="${MOCK_GH_AUTOMERGE:-null}"
         mss="${MOCK_GH_MERGE_STATE_STATUS:-BLOCKED}"
-        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge,\"mergeStateStatus\":\"$mss\",\"isDraft\":${MOCK_GH_DRAFT:-false}}"
+        case "${MOCK_GH_CHECKS_MODE:-none}" in
+          none|none-exit1) rollup='[]' ;;
+          *) rollup='[{"name":"ci-main"}]' ;;
+        esac
+        for arg in "$@"; do
+          if [ "$arg" = "statusCheckRollup" ] && [ "${MOCK_GH_CHECKS_MODE:-none}" = "fail-query" ]; then
+            echo "gh: HTTP 502 (transient API failure)" >&2
+            exit 1
+          fi
+        done
+        payload="{\"state\":\"$state\",\"autoMergeRequest\":$automerge,\"mergeStateStatus\":\"$mss\",\"isDraft\":${MOCK_GH_DRAFT:-false},\"statusCheckRollup\":$rollup}"
         if [ -n "$jqexpr" ]; then
           echo "$payload" | jq -r "$jqexpr"
         else
@@ -239,6 +251,10 @@ case "${1:-}" in
       checks)
         case "${MOCK_GH_CHECKS_MODE:-none}" in
           none) echo '[]' ;;
+          none-exit1)
+            echo "no checks reported on the 'feat/EX-1' branch" >&2
+            exit 1
+            ;;
           fail) echo '[{"bucket":"fail","name":"ci-main"}]' ;;
           pending-forever) echo '[{"bucket":"pending","name":"ci-main"}]' ;;
           pending-then-pass)
@@ -765,18 +781,54 @@ else
   failures=$((failures + 1))
 fi
 
-# Case 24: --wait-checks runs seconds after PR creation, so a PR reporting no checks is NOT
-# believed within the 30s --auto grace — the 120s default outlasts this 3s budget and times out.
+# Case 24: a PR with no checks (real gh: `gh pr checks` exits 1, empty stdout; the empty
+# statusCheckRollup is the signal) is not trusted on the first read — it must stay empty for the
+# none-grace — and is then merged as a repo without CI.
 waitnone_stderr="$mockdir/stderr-waitnone.log"
-waitnone_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=none MOCK_GH_MERGE_REJECT=1 \
-  AUTO_MERGE_CHECKS_TIMEOUT_SECS=3 AUTO_MERGE_CHECKS_POLL_SECS=1 \
+waitnone_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=none-exit1 \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=30 AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_NONE_GRACE_SECS=2 \
   bash "$script" --wait-checks 999999 EX-1 Done 2>"$waitnone_stderr")"
 waitnone_status=$?
-if [ "$waitnone_status" -eq 3 ] && [ -z "$waitnone_out" ] && ! grep -q 'has reported no checks' "$waitnone_stderr"; then
-  echo "PASS: --wait-checks does not trust an early no-checks read (120s grace)"
+if [ "$waitnone_status" -eq 0 ] && [ "$waitnone_out" = "MERGED" ] \
+  && grep -q 'reports no checks yet' "$waitnone_stderr" \
+  && grep -q 'has reported no checks for 2s' "$waitnone_stderr" \
+  && ! grep -q 'query failed' "$waitnone_stderr" \
+  && grep -q '^merged: PR 999999' "$waitnone_stderr"; then
+  echo "PASS: --wait-checks merges a PR with zero checks after the grace period"
 else
-  echo "FAIL: --wait-checks no-checks grace — exit=$waitnone_status output=${waitnone_out:-<empty>}"
+  echo "FAIL: --wait-checks zero checks — exit=$waitnone_status output=${waitnone_out:-<empty>}"
   cat "$waitnone_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 25: zero checks is not believed before the grace ends (grace > timeout -> exit 3, no merge).
+earlynone_stderr="$mockdir/stderr-earlynone.log"
+earlynone_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=none-exit1 MOCK_GH_MERGE_REJECT=1 \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=2 AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_NONE_GRACE_SECS=30 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$earlynone_stderr")"
+earlynone_status=$?
+if [ "$earlynone_status" -eq 3 ] && [ -z "$earlynone_out" ] && ! grep -q 'has reported no checks' "$earlynone_stderr"; then
+  echo "PASS: --wait-checks does not trust an early no-checks read"
+else
+  echo "FAIL: --wait-checks early no-checks — exit=$earlynone_status output=${earlynone_out:-<empty>}"
+  cat "$earlynone_stderr"
+  failures=$((failures + 1))
+fi
+
+# Case 26: a failing gh (checks query AND rollup read both error) is a transient query failure,
+# never "no checks": exit 3, no merge.
+transient_stderr="$mockdir/stderr-transient.log"
+transient_out="$(PATH="$mockdir:$PATH" MOCK_GH_CHECKS_MODE=fail-query MOCK_GH_MERGE_REJECT=1 \
+  AUTO_MERGE_CHECKS_TIMEOUT_SECS=2 AUTO_MERGE_CHECKS_POLL_SECS=1 AUTO_MERGE_CHECKS_NONE_GRACE_SECS=1 \
+  bash "$script" --wait-checks 999999 EX-1 Done 2>"$transient_stderr")"
+transient_status=$?
+if [ "$transient_status" -eq 3 ] && [ -z "$transient_out" ] \
+  && grep -q 'gh pr checks query failed' "$transient_stderr" \
+  && ! grep -q 'reported no checks' "$transient_stderr" && ! grep -q '^merged:' "$transient_stderr"; then
+  echo "PASS: --wait-checks a transient gh error is not mistaken for no checks"
+else
+  echo "FAIL: --wait-checks transient gh error — exit=$transient_status output=${transient_out:-<empty>}"
+  cat "$transient_stderr"
   failures=$((failures + 1))
 fi
 

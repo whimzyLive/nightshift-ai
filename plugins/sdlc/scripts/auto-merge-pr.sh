@@ -5,8 +5,9 @@ set -euo pipefail
 # `--wait-checks` (/auto's Full-Auto impl tail — no review loop runs first): always wait for the
 # PR's checks to settle exactly as `--auto`'s non-arming path does (same exit 1 / exit 3), then
 # merge and run the transition below. Unlike `--auto` it accepts story-key/done-status. It runs
-# seconds after the PR is created, so "no checks" must persist for 120s (not 30s) before it is
-# believed — CI that registers late must never let the PR merge unchecked.
+# seconds after the PR is created, so "no checks" must persist for the none-grace (default 30s)
+# before it is believed. A PR that still has no checks after that has no CI: it is merged as if
+# green (the story run already passed the repo's local gate).
 #
 # Merge a pull request using the repository's allowed merge method, resolved DYNAMICALLY at
 # merge time — never a hard-coded flag. Used by /auto's Full-Auto terminal action, after the
@@ -104,7 +105,7 @@ WAIT_CHECKS=false
 NONE_GRACE_DEFAULT=30
 case "${1:-}" in
   --auto) AUTO=true; shift ;;
-  --wait-checks) WAIT_CHECKS=true; NONE_GRACE_DEFAULT=120; shift ;;
+  --wait-checks) WAIT_CHECKS=true; shift ;;
 esac
 
 PR="${1:?PR number or URL required}"
@@ -137,7 +138,7 @@ echo "auto-merge: $SLUG PR $PR using $METHOD" >&2
 wait_for_checks() {
   local pr="$1" timeout="${AUTO_MERGE_CHECKS_TIMEOUT_SECS:-720}" poll="${AUTO_MERGE_CHECKS_POLL_SECS:-15}"
   local none_grace="${AUTO_MERGE_CHECKS_NONE_GRACE_SECS:-$NONE_GRACE_DEFAULT}" elapsed=0 first_empty_at=""
-  local checks failing names query_rc total settled_ok passing
+  local checks failing names query_rc total settled_ok passing rollup_len
   case "$timeout" in ''|*[!0-9]*) timeout=720 ;; esac
   case "$poll" in ''|*[!0-9]*) poll=15 ;; esac
   [ "$poll" -lt 1 ] && poll=1
@@ -149,6 +150,15 @@ wait_for_checks() {
     else
       query_rc=$?
       checks=""
+      # `gh pr checks` exits 1 with empty stdout ("no checks reported on the '<branch>' branch")
+      # on a PR with no checks, so the exit code alone cannot tell "no CI" from a failed query.
+      # Only an empty statusCheckRollup, read successfully, means no checks; a failed read stays a
+      # query failure.
+      if rollup_len=$(gh pr view "$pr" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null) \
+        && [ "$rollup_len" = "0" ]; then
+        checks="[]"
+        query_rc=0
+      fi
     fi
     if [ "$query_rc" -ne 0 ]; then
       echo "checks: PR $pr — gh pr checks query failed (exit $query_rc); retrying within the timeout budget" >&2
