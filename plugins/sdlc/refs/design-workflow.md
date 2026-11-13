@@ -71,6 +71,7 @@ targets       := project-context `Wireframe targets`: web (default when the row 
 states        := the main path, plus the empty state and the main error state of a screen where they exist; the rest wait for finals
 tags          := every structural block carries `data-pattern="<vocabulary name>"` or `?`; no visible label; `--plan` reads the tags
 notes         := `.sticky` for an open question or a rule a reviewer should see on the board
+canvas        := when one is configured it is the only copy; the temp folder is a hand-off, deleted after publish, and another pass starts from a fresh download so hand edits survive
 project parts := shell + one starter per page template of the vocabulary, generated on the project's first --draft run, reused after; the vocabulary's optional `Wireframe` column names the kit classes that draw a pattern, a row without one is a plain `.sk` box
 checks        := scripts/wireframe-check.sh runs in the designer before it returns and in the orchestrator before it publishes
 return        := `Design draft:` Jira comment lists screens in journey order, the patterns used and each gap; controls that go nowhere are named as not linked
@@ -117,9 +118,9 @@ kit assets      := wireframe.css and strokes/*.svg uploaded once per canvas and 
 link rewriting  := each `<a href="<screen>.html">` rewritten to the canvas's own board target, so the journey plays there; the standalone pages keep the plain hrefs
 layout          := one page per Epic named `<EPIC> wireframes`; web boards left to right in journey order, phone boards in a row beneath
 kind            := marked draft and interactive; an Approve drafts review happens here
-shared shell    := the shell parts published once (a "Wireframe kit" page, when the canvas has one) and reused by later runs; a later run downloads them instead of redrawing
-round trip      := the recipe says how to download an approved board set back to disk with its `data-pattern` tags intact (plan mode reads them)
-no canvas       := nothing is published; the command hands back the temp-dir paths of the standalone pages
+shell           := recovered from the downloaded boards; a separate "Wireframe kit" page is optional, not required
+round trip      := the recipe says how to download boards back into the designer's working-folder form (fragments and shell parts, hand edits and `data-pattern` tags intact); another pass and plan mode read them
+no canvas       := nothing is published; the command keeps the temp folder and hands back the paths of the standalone pages
 ```
 
 

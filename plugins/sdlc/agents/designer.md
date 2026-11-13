@@ -45,7 +45,8 @@ Input: Epic, vocabulary, the folder the command names (WF_DIR, under `scripts/tm
 
 ```text
 1. journey map := ordered screens; per navigating control its target screen; one journey (A/B only on another pass)
-2. parts       := reuse WF_DIR/parts/* when the command put them there, else write the shell(s) and one page starter per vocabulary page template; add only what is missing
+2. parts       := reuse what the download put in WF_DIR/parts, else write the shell(s) and one page starter per vocabulary page template; add only what is missing
+   another pass := the downloaded fragments and parts are the starting point; keep the content of every hand edit; where one used styling outside the kit (a colour, a custom size, an unknown class) keep the content and restyle it with kit classes so wireframe-check.sh passes; never discard a hand edit, never regenerate a screen from scratch unless the change request asks for it
 3. screens     := WF_DIR/<screen>.main.html (+ <screen>.phone.main.html per `Wireframe targets`: phone-only -> phone files only; web, phone -> a phone board for every screen);
                   kit classes, real copy, `<a href>` links styled as buttons, `data-pattern` on every structural block (a vocabulary name or `?`), states: main path + empty + main error where they exist
 4. bash ${CLAUDE_PLUGIN_ROOT}/scripts/wireframe-build.sh WF_DIR, then bash ${CLAUDE_PLUGIN_ROOT}/scripts/wireframe-check.sh WF_DIR --vocabulary <Pattern vocabulary> -> fix every FAIL line before returning
