@@ -2,7 +2,8 @@
 description: Refine a raw idea (or an existing Jira ticket) and create or update a Jira Epic. First step in the SDLC pipeline. Returns an Epic key for /prd (optional), then /design and /stories.
 ---
 
-Dispatch the `product-manager` agent to refine the input and create or update a Jira Epic.
+Dispatch the `product-manager` agent, with the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh product-manager --print-prompt`, to refine the input and create or update a Jira Epic.
 
 Jira project key: read the `Jira project key` row from `.claude/project/project-context.md` before
 anything else — use the resolved value as `<PROJECT-KEY>` for every step below. If the row is

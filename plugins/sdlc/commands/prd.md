@@ -7,7 +7,8 @@ pause for you (a subagent cannot).
 
 ## Step 1 — Draft (agent)
 
-Dispatch the `product-manager` agent to draft the PRD from the Jira Epic. The agent should:
+Dispatch the `product-manager` agent, with the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh product-manager --print-prompt`, to draft the PRD from the Jira Epic. The agent should:
 
 1. Read `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and apply the protocol with `<KEY>=<EPIC-KEY>` from $ARGUMENTS
 2. Extract summary, description, all comments, linked tickets, and attachments — use everything as the source of truth for the feature

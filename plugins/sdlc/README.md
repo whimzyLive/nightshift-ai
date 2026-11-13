@@ -36,7 +36,7 @@ The file is a regenerated per-session cache — **gitignore it**.
 - **superpowers plugin** — **auto-installed.** Declared as a cross-marketplace dependency
   (`superpowers@claude-plugins-official`), so `/plugin install sdlc@nightshift` reuses an existing
   superpowers install or pulls it from the official marketplace. Agents invoke its skills:
-  executing-plans, test-driven-development, verification-before-completion, requesting-code-review,
+  verification-before-completion, requesting-code-review,
   receiving-code-review, writing-plans — the domain agents, reviewer and verifier subagents load
   them. The orchestrating PE/QA playbooks load none: they carry their own dispatch and triage rules.
 - **claude-mem plugin** — **auto-installed.** Declared as a cross-marketplace dependency
@@ -106,24 +106,32 @@ modes (`sync`/
 `refs/adr-pipeline.md` for the full pipeline and `skills/writing-adrs/SKILL.md` for the ADR
 body/lifecycle/frontmatter contract it renders against.
 
-## Project-skill loading enforcement
+## Skills: point-of-use loading
 
-Domain-agent dispatches enforce project-skill loading via a three-part contract: the **dispatch
-prompt names** the applicable override skills (or explicitly declares that no project skills apply),
-the **domain agent declares** the skills it invoked/applied on a required `Skills loaded:` return
-line — including any named skill that happens to be one of the agent's own required first-turn
-skills (loaded via the Skill tool per the agent's "Required skills (load FIRST)" section, not
-frontmatter — NA-25 moved every generic skill off frontmatter `skills:` since the harness
-re-injects it in full on every SendMessage resume, anthropics/claude-code#76337) — and the
-**orchestrator verifies** the returned set covers the named set, but only on `Status: complete` returns (a
-`Status: blocked` return, including an early-abort `Skills loaded: none`, is exempt). Verification is
-mechanical: when the prompt declared no applicable skills, a present non-empty line passes —
-`none`, or a line listing extra skills the agent chose to load, both pass; a missing, empty, or
-(when skills were named) partial line fails. On failure the principal playbook redispatches the
-phase once (a return-contract-only redispatch — zero new commits is an acceptable outcome) then
-STOPs; the QA fix loop returns `blocked` immediately. See
-`plugins/sdlc/refs/principal-engineer-playbook.md` (Steps 4-5) and
-`plugins/sdlc/refs/qa-engineer-playbook.md` (Step 3).
+No agent loads skills upfront. `.claude/project/skills.json` (schema v2, `refs/skills-manifest.md`)
+says which skills exist, which agents use them and when; the plugin ships its own contract rows in
+`refs/skills-contract.json` (the skills its templates and gates depend on), merged under the repo's
+rows by name, repo wins. `scripts/skills-for.sh <agent> [--mode <m>] [--paths <globs>] --print-prompt`
+resolves the rows for a dispatch and prints the block the playbooks and commands paste into the
+prompt: each skill with the step at which the agent invokes it, never earlier. A repo override no
+longer lists skills.
+
+Returns are verified by artefact, not by load: the spec against the writing-specs template
+(`scripts/check-spec.sh`, run by `/spec` before approval and by the principal playbook when it reads
+the spec), the plan against the tech-lead template (`scripts/check-plan.sh`, run by `/plan`), and each
+phase's commit subjects against the conventional format (`scripts/check-commits.sh`, run in the
+principal playbook Step 5). `Skills loaded:` stays on every return as information; no return passes or
+fails on it. The `Rules applied:` line is still checked. See `plugins/sdlc/refs/principal-engineer-playbook.md`
+(Steps 2, 4-5) and `plugins/sdlc/refs/qa-engineer-playbook.md` (Step 3).
+
+### Upgrading a consumer repo
+
+1. Update the plugin, then re-run `/sdlc:init`. On a v1 `skills.json` it infers each row's `agents` from the
+   overrides' `## Project skills`, prints the rows for confirmation, writes v2, and removes those sections
+   from the overrides.
+2. Narrow a row with `when` (`paths`, `mode`, `step`) where a skill only applies to part of the repo.
+3. Run `bash plugins/sdlc/scripts/skills-for.sh <agent> --print-prompt` to see what a dispatch will name.
+4. Until step 1, a v1 file injects nothing and `skills-for.sh` warns; the plugin's contract rows still apply.
 
 ## `designer` and `/sdlc:design` — library-first design workflow
 
@@ -156,17 +164,17 @@ branch when run standalone.
 
 ## Bundled default skills (vendored)
 
-`skill-creator` and `find-skills` ship **vendored** into `plugins/sdlc/skills/<name>/` (same layout as
-every other skill under `plugins/sdlc/skills/`) rather than as marketplace dependencies, because both
-originate from [skills.sh](https://www.skills.sh) — a skills registry, not a Claude plugin
-marketplace. The `ai-enablement-engineer` agent uses `find-skills` during a scan to surface candidate
-skills for detected gaps, and `skill-creator` to scaffold a new skill when a gap warrants one (AC-6).
+`find-skills` ships **vendored** into `plugins/sdlc/skills/find-skills/` (same layout as every other
+skill under `plugins/sdlc/skills/`) rather than as a marketplace dependency, because it originates
+from [skills.sh](https://www.skills.sh) — a skills registry, not a Claude plugin marketplace.
+`skill-creator` is not bundled: Claude Code ships it as `anthropic-skills:skill-creator`, and the
+contract row names that. The `ai-enablement-engineer` agent uses `find-skills` during a scan to surface candidate
+skills for detected gaps, and `anthropic-skills:skill-creator` to scaffold a new skill when a gap warrants one (AC-6).
 Both degrade gracefully if unavailable or offline (the scan still emits structural drift and notes
 the skip).
 
 | Skill | Upstream | Pinned ref | License | Local deviations |
 | --- | --- | --- | --- | --- |
-| `skill-creator` | [`anthropics/skills`](https://www.skills.sh/anthropics/skills/skill-creator) (Anthropic official) | `9d2f1ae187231d8199c64b5b762e1bdf2244733d` | Apache-2.0 (upstream `LICENSE.txt` carried verbatim) | Local modification: removed remote CDN loads (Google Fonts `<link>`s, `cdn.sheetjs.com` SheetJS `<script>`) — security/offline (no remote network loads at render time; fonts fall back to the system stack). Applied to all three files that emitted them: `eval-viewer/viewer.html` (also degrades XLSX preview to a "preview unavailable offline" message instead of loading remote JS), `assets/eval_review.html`, and `scripts/generate_report.py` (its HTML-report string template). |
 | `find-skills` | [`vercel-labs/skills`](https://www.skills.sh/vercel-labs/skills/find-skills) (Vercel Labs) | `4ce6d48ac44c8b637db87b2102fea3baca719df1` | MIT (no upstream `LICENSE` file at this commit — MIT text transcribed from `package.json`/README with a provenance footer, not copied verbatim) | Usage constraint (not a file edit — vendored `SKILL.md` is unmodified): `ai-enablement-engineer` uses this skill for surfacing/suggesting skill-gap candidates only; its `npx skills add`/`update` install commands are never run during a scan or apply — see `analyze-protocol.md#skill-usage-guardrails`. |
 
 **Refresh strategy:** manual only. The optional vendored-skill-staleness drift check (advisory) may

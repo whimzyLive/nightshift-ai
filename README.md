@@ -198,7 +198,7 @@ You almost never fork nightshift. The agents are generic; you teach them your st
 repo** — no edits to the shipped plugin, so upstream updates never fight your customizations. In short:
 
 1. **Add a skill** — your stack's know-how in `.claude/skills/<name>/SKILL.md` (an ORM convention, a routing pattern, a deploy recipe…).
-2. **Bind it to a role** — list it in that agent's override `.claude/project/agents/<agent>.md`; the agent invokes it via the Skill tool at runtime.
+2. **Bind it to a role** — add a row to `.claude/project/skills.json` naming the agents that use it and, optionally, when; the dispatch prompt names it and the agent invokes it via the Skill tool at the step that needs it.
 3. **Declare ownership + tooling once** — the workspace→agent table and quality-gate commands in `.claude/project/project-context.md`.
 
 > **Rule of thumb:** project-specific knowledge → your repo's `.claude/`; generic role behavior → the plugin.

@@ -85,7 +85,8 @@ sub-task probe, `scripts/worktree-setup.sh`, and the branch push. Keep `BASE_SHA
 (`git show origin/<BRANCH_PREFIX>/<STORY-KEY>:<SPEC>`) — its `## Implementation tasks` lines are the
 tasks. Group them by agent tag: `[database-administrator]`, `[platform-engineer]`,
 `[ai-enablement-engineer]`, `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`; drop Standby
-phases with no tasks.
+phases with no tasks. When `SPEC` is the source, run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-spec.sh "$WORKTREE/<SPEC>"` —
+`MISSING=`/`TBD=` lines → STOP: the spec fails the writing-specs template; list them.
 
 **Lightweight path:** fetch the story (summary, description, ACs) via
 `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and turn it into an ordered, agent-tagged task list —
@@ -145,10 +146,9 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
 4. Plan doc: `SLICE=` path from Step 4 (`## Plan slice`, `refs/domain-agent-handoff.md`). No plan
    doc: the story's ACs verbatim — plus, on the full path, the `SPEC` path and this agent's
    `## Implementation tasks` lines.
-5. **Applicable override skills** — EITHER name the project skills to invoke (from the target
-   agent's override, `.claude/project/agents/<agent-name>.md`, its skills section) with "Invoke these
-   via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state "No project skills
-   apply for this task." Exactly one of the two.
+5. **Skills for this dispatch** — paste the output of
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <owned paths of this phase> --print-prompt`
+   (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
 6. The story's Design paths — each page path WITH its render/screenshot PNG path, the agent reads the PNG (none: Grep for the region, then a bounded Read of the page) before building. When the story's Design row names no PNG (older or AI-Ready stories), resolve it from the design index (the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins) — + the story's component-plan rows (surface, component, action; `docs/design/<slug>/component-plan.md`, none when the Epic has no plan) + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
    and any plan "grounding corrections" verbatim — short items only; spec sections by name, not by
    paste.
@@ -163,7 +163,7 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
     `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s rule-file flow and stage them with your
     commit — most dispatches admit nothing, and that's expected."
 11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 13. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md." Also carries this phase's ledger row — `LEDGER_PHASE`, `LEDGER_AGENT`, `LEDGER_PLAN_SECTION`, `LEDGER_START_SHA`, `LEDGER_END_SHA`, `LEDGER_FILES_CHANGED`, `LEDGER_FILES_READ` (shape computed in Step 5), real values substituted — it names paths, not content.
 14. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
@@ -216,6 +216,11 @@ The assert is exact-match against the snapshot — a pre-dirty primary that stay
 passes; only a *change* is a violation. A stray file in the shared `$WORKTREE` would otherwise be
 swept into a LATER agent's commit as an unattributed change.
 
+After the assert, check the commit subjects the phase added:
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-commits.sh "$LEDGER_START_SHA..HEAD" "$WORKTREE"`. Exit 1 (`BAD=` lines) →
+redispatch that phase once to reword the named commits (the work already landed; no push before the
+fix), then re-check; still failing → **STOP and report**.
+
 - `Status: blocked` → **STOP** immediately:
   ```
   BLOCKED at Phase N (<agent-name>).
@@ -223,18 +228,11 @@ swept into a LATER agent's commit as an unattributed change.
   Next step: <what user must do>
   Remaining phases NOT dispatched.
   ```
-  Never fix the blocker yourself. Unconditional — a blocked return carries no skill-coverage
-  obligation (`Skills loaded: none` on an early abort is expected).
-- **Verify `Skills loaded` covers the named set — `Status: complete` returns only.** Prompt named
-  skills `S`: pass iff the line is present and **every** skill in `S` appears (missing line, empty,
-  `none`, or a named skill absent → failure). Prompt declared none: pass iff the line is present and
-  non-empty (`none`, or extra skills the agent chose to load). On failure → **redispatch that phase
-  once** as a RETURN-CONTRACT redispatch: the work already landed; invoke the named skills now,
-  verify the committed work against them, fix only if a skill mandates it, and re-emit a compliant
-  return. Zero new commits is acceptable here (exempt from the silent-failure STOP). Still failing →
-  **STOP and report**.
+  Never fix the blocker yourself. Unconditional.
 - **Verify the return carries `Rules applied:`** — `Status: complete` returns only. Absent or empty →
-  the same RETURN-CONTRACT redispatch once. `none` is valid and expected.
+  **redispatch that phase once** as a RETURN-CONTRACT redispatch: the work already landed; re-emit a
+  compliant return. Zero new commits is acceptable here (exempt from the silent-failure STOP). Still
+  failing → **STOP and report**. `none` is valid and expected.
 
 Extract only `Status` / `Note` / `Summary` / `Skills loaded` / `Rules applied` from each agent
 return; discard the rest.

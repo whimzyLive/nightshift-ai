@@ -130,8 +130,7 @@ The plugin declares two other plugins as cross-marketplace dependencies, both au
 with it:
 
 - **superpowers** provides the reusable skills the domain agents invoke — writing-plans,
-  executing-plans, subagent-driven-development, test-driven-development,
-  verification-before-completion, and the requesting/receiving-code-review skills the QA loop
+  subagent-driven-development, verification-before-completion, and the requesting/receiving-code-review skills the QA loop
   runs against. The plugin leans on these rather than reimplementing disciplined
   plan-execution and review inside its own agents.
 - **claude-mem** provides the persistent cross-session observation store that the

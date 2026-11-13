@@ -2,7 +2,8 @@
 description: Decompose a Jira Epic into user stories linked to the Epic. Run after the /prd and /design PRs are merged — both are optional; without a PRD the Epic description is the source.
 ---
 
-Dispatch the `scrum-master` agent in **decompose mode** with the following input:
+Dispatch the `scrum-master` agent in **decompose mode**, with the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh scrum-master --mode decompose --print-prompt`, and the following input:
 
 ```
 $ARGUMENTS

@@ -78,16 +78,18 @@ write-scope above.
 
 | Check | Drift/gap detected |
 | --- | --- |
-| Skills on disk vs skills-lock (`.claude/project/skills.json` and/or lockfile) | Skill dir present but not in manifest, or manifest entry with no dir |
-| Agent overrides vs skills | Override lists a skill that resolves to no installed/bundled/project skill |
+| Manifest row names a skill that is not installed | A `skills.json` row whose name has no `.claude/skills/<name>/SKILL.md` or `.agents/skills/<name>/SKILL.md` and no providing plugin |
+| Installed skill with no manifest row (advisory) | A skill dir present under `.claude/skills/` or `.agents/skills/` that no `skills.json` row names |
+| Manifest row names an unknown agent | A row's `agents` lists a name that is not an agent in the plugin (`skills-for.sh` exits 2 on it) |
+| Override still lists skills (migration) | An agent override that still has `## Project skills` — hint: re-run `/sdlc:init` to move the rows into `skills.json` v2 |
 | Override directory guides vs disk | Override references a `CLAUDE.md` guide that does not exist |
 | Dangling refs/scripts | A `refs/*.md` or `scripts/*` path referenced by an agent/command resolves to no file |
 | Workspace→agent table vs disk | Table lists a path that no longer exists, or an area with no owner |
 | AI-config-file freshness | Documented structure in any owned AI-config convention diverges from disk |
 | Plugin/skill metadata | `SKILL.md` missing required front-matter; `plugin.json`/`marketplace.json` referencing a missing plugin path |
 | **Config-vs-memory semantic conflict** | An owned AI-config file (`CLAUDE.md`/`AGENTS.md`/override/etc.) asserts one semantic while agent-learning memory (`<memory-root>/agents/**`) records a contradictory one — see [Memory-conflict analysis & resolution](#memory-conflict-analysis--resolution) |
-| Vendored-skill staleness (advisory) | Recorded pinned ref (README) older than reachable upstream — advisory only; refresh is manual |
-| **Skill gaps (AC-6)** | For gaps, run `find-skills` to surface candidates (see [Skill usage guardrails](#skill-usage-guardrails)); if none fit, note `skill-creator` can scaffold one |
+| Vendored-skill staleness (advisory) | A vendored plugin skill's recorded pinned ref (README) older than reachable upstream, or a `refs/skills-map.yml` row's `ref` older than its `source`'s default branch — advisory only; refresh is manual |
+| **Skill gaps (AC-6)** | For gaps, run `find-skills` to surface candidates (see [Skill usage guardrails](#skill-usage-guardrails)); if none fit, note `anthropic-skills:skill-creator` can scaffold one |
 | ~~**Memory bloat (recommendation-only)**~~ | **SUPERSEDED by `memory-gc-overdue` below** (NA-73) — the old recommendation-only "run `/sdlc:docs distill`" finding is replaced by a real gated apply path (the maintenance op) keyed on the retention window, rather than a size/duplication heuristic |
 | **`legacy-memory-layout`** | `<memory-root>/agents/<name>.md` exists as a regular file, and/or `<memory-root>/reviews/patterns.md` exists — v1 flat-diary layout not yet migrated (NA-74). Gated apply path, with the migration instructions inline in the finding |
 | **`malformed-memory-frontmatter`** | `bash plugins/sdlc/scripts/check-frontmatter.sh` exits non-zero against this repo's `<memory-root>/**`. Gated apply — fix the offending frontmatter the script names |
@@ -102,7 +104,7 @@ apply — those run unpinned, unvetted third-party code at install time, a suppl
 plugin does not accept implicitly. Any skill that should actually be installed goes through the
 normal human-confirmed vet-and-pin vendoring flow (clone at a pinned ref, vet bundled
 scripts/network calls, carry the license, record provenance in `plugins/sdlc/README.md`) — the same
-process `skill-creator` and `find-skills` themselves were vendored through. `find-skills`'s own
+process `find-skills` itself was vendored through. `find-skills`'s own
 `SKILL.md` (vendored verbatim from upstream) is not edited to add this constraint — it is enforced
 here, in the agent's own usage of the skill, not in the vendored skill's instructions.
 
@@ -192,7 +194,7 @@ never without human confirmation.
    to be checked out. **Dispatched mode does not branch here** — commits land on the
    already-checked-out impl branch per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`.
 3. Apply the scoped edits (Edit/Write) only within resolved write-scope; for "create a missing
-   skill", drive it through `skill-creator`.
+   skill", drive it through `anthropic-skills:skill-creator`.
 4. Commit via the `conventional-commit` skill.
 5. **Reviewable diff:**
    - **Dispatched by `principal-engineer`:** commit on the impl branch per
@@ -238,6 +240,6 @@ command — defined exactly once here; each references this anchor instead of re
 | Apply target outside resolved write-scope | Refuse and abort; print the offending path(s); make no writes (AC-5). |
 | Memory conflict with no human decision (deferred) | Report only; reset nothing. |
 | Cross-agent memory write attempted outside the two named exceptions and the two no-gate carve-outs (see [Memory-ownership exceptions](#memory-ownership-exceptions)) | Refuse — a reset must be human-arbitrated (Exception 1) and a maintenance-op promotion-and-deletion must be founder-gated (Exception 2); a write that isn't a counter-only edit, a capture write, or QA's Step-5 fixing-agent rule capture is refused. |
-| `find-skills` / `skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
+| `find-skills` / `anthropic-skills:skill-creator` unavailable or offline | Degrade gracefully — skip the skill-suggestion step, still emit structural drift; note the skip. |
 | `find-skills` install/update commands would run | Refuse — see [Skill usage guardrails](#skill-usage-guardrails); surfacing/suggesting only. |
 | `raise-pr.sh` fails during standalone apply | Surface the failure; leave branch + local commit for manual recovery; do not retry silently. |
