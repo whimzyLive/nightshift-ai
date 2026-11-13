@@ -85,8 +85,8 @@ file is the human-arbitrated memory-conflict reset (see
 
 ## Skill usage (AC-6)
 
-During a scan, use `find-skills` to surface candidate skills for detected gaps; use `skill-creator`
-to scaffold a new skill when a gap warrants one. Degrade gracefully if either is unavailable or
+During a scan, use `find-skills` to surface candidate skills for detected gaps; use `anthropic-skills:skill-creator`
+(shipped by Claude Code, not bundled here) to scaffold a new skill when a gap warrants one. Degrade gracefully if either is unavailable or
 offline — skip the skill-suggestion step, still emit the structural drift findings, and note the
 skip in the report. `find-skills` is for surfacing/suggesting only — never run its install/update
 commands here; see

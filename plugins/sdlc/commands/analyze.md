@@ -74,7 +74,7 @@ per-finding fields (`area` · `kind` · `detail` · `proposed fix` · `target pa
 Canonical table (defined exactly once):
 [`analyze-protocol.md#error-handling`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling).
 Gist: not-Active/unreadable project-context → STOP, report-only; no drift found → report and exit
-clean; apply without confirmation or outside write-scope → refuse; `find-skills`/`skill-creator`
+clean; apply without confirmation or outside write-scope → refuse; `find-skills`/`anthropic-skills:skill-creator`
 offline → degrade gracefully; `find-skills` install/update commands → refuse (surfacing/suggesting
 only, see [Skill usage guardrails](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#skill-usage-guardrails)).
 

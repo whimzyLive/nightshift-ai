@@ -190,7 +190,7 @@
       }
     },
     {
-      "name": "skill-creator",
+      "name": "anthropic-skills:skill-creator",
       "source": "plugin",
       "addedBy": "plugin",
       "agents": ["ai-enablement-engineer"],

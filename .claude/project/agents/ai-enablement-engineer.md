@@ -2,7 +2,7 @@
 
 ## Skills (plugin-bundled — invoke via the Skill tool)
 
-1. skill-creator
+1. anthropic-skills:skill-creator
 2. find-skills
 3. conventional-commit
 

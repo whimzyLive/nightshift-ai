@@ -67,9 +67,11 @@ skills:
     domains: [web-engineer]
     dispatch:
       step: before writing or changing a React component or page
-    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
+    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied; `ref` pins the
+    # upstream main commit verified with `git ls-remote` (refresh = re-verify the path, bump `ref`).
     source: https://github.com/vercel-labs/agent-skills.git
     path: skills/react-best-practices
+    ref: 1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62
     when:
       - framework: Next.js
       - framework: Remix
@@ -80,9 +82,11 @@ skills:
     domains: [web-engineer]
     dispatch:
       step: before changing workspace layout or a shared package
-    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied.
+    # Third-party: Vercel Labs' official skill — downloaded from upstream, not copied; `ref` pins the
+    # upstream main commit verified with `git ls-remote` (refresh = re-verify the path, bump `ref`).
     source: https://github.com/vercel-labs/agent-skills.git
     path: skills/composition-patterns
+    ref: 1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62
     when:
       - framework: Next.js
       # Also suggested when pnpm monorepo is detected (see monorepo_detection below).

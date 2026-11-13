@@ -106,6 +106,8 @@ check "shipped contract: scrum-master decompose gets both story skills" 2 \
   "$(run scrum-master --manifest "$no_manifest" --contract "$shipped_contract" --mode decompose | grep -c '^SKILL=user-story-')"
 check "shipped contract: knowledge-engineer seed-adr gets writing-adrs, not writing-docs" "1 0" \
   "$(o="$(run knowledge-engineer --manifest "$no_manifest" --contract "$shipped_contract" --mode seed-adr)"; echo "$(grep -c writing-adrs <<<"$o") $(grep -c writing-docs <<<"$o")")"
+check "shipped contract: a namespaced skill name resolves intact" "SKILL=anthropic-skills:skill-creator REQUIRED=yes STEP=when a gap or a new skill is needed" \
+  "$(run ai-enablement-engineer --manifest "$no_manifest" --contract "$shipped_contract" --mode analyze | grep 'skill-creator')"
 
 if [ "$failures" -eq 0 ]; then echo "PASS: skills-for"; exit 0; fi
 echo "FAIL: $failures skills-for case(s) failed"; exit 1

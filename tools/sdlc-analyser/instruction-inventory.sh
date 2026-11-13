@@ -69,7 +69,7 @@ category_of() { # $1=repo-relative path under $scan_root
 
 is_vendored() { # $1=repo-relative path under plugins/sdlc
   case "$1" in
-    "$scan_root"/skills/find-skills/*|"$scan_root"/skills/skill-creator/*) return 0 ;;
+    "$scan_root"/skills/find-skills/*) return 0 ;;
     *) return 1 ;;
   esac
 }
