@@ -52,8 +52,7 @@ generated file — every slot must be replaced with an actual value.
 | Pattern vocabulary | `<pattern-vocabulary-path>` |
 | Bundle inventory | `<bundle-inventory-path>` |
 | Bundle global | `<bundle-global>` |
-| Draft folder | `<draft-folder>` |
-| Draft page prefix | `<draft-page-prefix>` |
+| Wireframe targets | `<web | phone | web, phone>` |
 | Final page prefix | `<final-page-prefix>` |
 | Component review | `<component-review-cmd>` |
 | Library label | `<library-label>` |
@@ -113,7 +112,8 @@ generated file — every slot must be replaced with an actual value.
   verifier reads a stale or missing report. Line format: `refs/design-references.md` Design check.
 - **Design** — all rows optional unless a mode needs them; omit any blank row, and the whole section when the repo has no design workflow. `/init` never asks for them; a repo adds the section once its design system exists.
   - `Pattern vocabulary` (required by every mode) — path to the file of fixed pattern names, each naming its template or component. `Bundle inventory` (plan, final) — folder with one entry per component the design bundle exports; the plan's "exists in the bundle" test greps it, never reads source. `Bundle global` (final) — the global name the bundle exposes in the browser (e.g. `window.<Name>`); boards mount `<Global>.<Component>`.
-  - `Draft folder` / `Draft page prefix` (draft) — where draft board HTML is written in the worktree, and the file-name prefix; `Final page prefix` (final) — the prefix of final board files.
+  - `Wireframe targets` (draft) — which frames `--draft` draws: `web` (browser-frame boards; the default when the row is absent), `phone` (device-frame boards only), or `web, phone` (every screen of the journey, empty and error states included, also gets a phone board; no web-only screens). Draft boards are written to the session temp dir, never the repo. `Final page prefix` (final) — the prefix of final board files.
+  - The `Pattern vocabulary` file may carry an optional `Wireframe` column naming the kit classes or snippet that draw each pattern in a wireframe (`refs/wireframe-kit/README.md`); a row without one is drawn as a plain `.sk` box tagged with the pattern name.
   - `Component review` — the command that serves the library's variant stories for the explore step (e.g. a Storybook run). `Library label` — the Jira label of library stories, default `Library`; set `UI-Components` to ride the existing hard block (`refs/ui-components.md`).
   - `Design canvas` (id or URL) and `Publish recipe` (path of the doc that says how to publish a board there) — optional; both unset = nothing is published and the commands hand back file paths.
   - `Designer model draft|plan|final` — a model alias or id; defaults opus, sonnet, sonnet (`scripts/resolve-designer-model.sh`).

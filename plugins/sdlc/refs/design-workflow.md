@@ -31,14 +31,14 @@ library, story.
 
 | Kind | What it is | Ingested | A story may name it |
 | --- | --- | --- | --- |
-| draft | greyscale wireframe: grey tokens only, no colour, no accuracy; phone and desktop frames where both matter; several layouts side by side allowed; every box labelled with a pattern name or `?` | never | no |
+| draft | Balsamiq-style wireframe built from the plugin's kit (`refs/wireframe-kit/`), one linked board per screen; every structural block tagged `data-pattern` with a pattern name or `?` | never | no |
 | final | a screen mounted only from the design bundle (the `Bundle global` token), strict board lint, built on a named template | yes, by the `--final` ingest | yes |
 
 ```text
 kind is declared in the board page: <meta name="board-kind" content="draft|final"> and, on a final, <meta name="board-template" content="<template>">
 index.md lists the declared kinds in its `## Boards` table (File | Board kind | Template); scripts/design-kind.sh reads it, a canvas.json or a page
 no declared kind -> unknown: design-ingest.sh treats it as final and prints a NOTICE; consumers still treat unknown as not nameable by new stories
-draft board lint := skipped by kind (it is a wireframe); final board lint := the repo's own board rules, plus: template mandatory,
+draft board lint := skipped by kind; drafts are checked by scripts/wireframe-check.sh instead (below); final board lint := the repo's own board rules, plus: template mandatory,
                     no token-drawn shape the bundle already has, component key empty or all system components
 ```
 
@@ -46,7 +46,7 @@ draft board lint := skipped by kind (it is a wireframe); final board lint := the
 
 ```text
 Epic (+ PRD) -> draft -> [human approves drafts] -> plan -> [human settles `?` rows] -> library stories built and merged -> final -> ingest -> /stories
-draft := one wireframe board per screen, pattern names or `?`
+draft := one linked, playable wireframe board per screen in journey order, `data-pattern` names or `?`; written to a temp dir, never the repo
 plan  := docs/design/<slug>/component-plan.md (refs/component-plan.md): what is reused, extended or new, and which rows need exploring
 final := precondition: every library story under the Epic is Done (scripts/library-blockers.sh -> BLOCKERS= empty)
          screen boards mounted from the fresh bundle, then the existing ingest path of commands/design.md
@@ -57,6 +57,24 @@ Order against the rest of the pipeline: `/prd` (optional) -> `/design --draft` -
 blocked by them) -> library stories land -> `/design --final` -> screen stories build from finals.
 When `/stories` already ran, `--plan` raises the library stories itself (component-plan.md "Library
 stories") and the scrum-master links screen stories to them on its next pass.
+
+## Wireframe drafts
+
+Rules for draft mode; the kit, class vocabulary and working-folder layout are `refs/wireframe-kit/README.md`.
+
+```text
+journey map   := first, the ordered screens and, per control that navigates, its target screen; one journey per run; A/B layouts only when the user asks for another pass
+boards        := kit classes only (inline layout allowed), real context-appropriate copy, no emoji; links are `<a href="<screen>.html">` styled as the button, so the journey plays in a plain browser
+shell         := written once per run as parts/shell.* (browser frame nav, phone bottom nav) with the project's real nav items; assembled into every page by scripts/wireframe-build.sh, never pasted
+targets       := project-context `Wireframe targets`: web (default when the row is absent) | phone | web, phone
+                 web -> browser-frame boards; phone -> device-frame boards; both -> every screen of the journey, empty and error states included, also gets a phone board (no web-only screens), phone boards link among themselves
+states        := the main path, plus the empty state and the main error state of a screen where they exist; the rest wait for finals
+tags          := every structural block carries `data-pattern="<vocabulary name>"` or `?`; no visible label; `--plan` reads the tags
+notes         := `.sticky` for an open question or a rule a reviewer should see on the board
+project parts := shell + one starter per page template of the vocabulary, generated on the project's first --draft run, reused after; the vocabulary's optional `Wireframe` column names the kit classes that draw a pattern, a row without one is a plain `.sk` box
+checks        := scripts/wireframe-check.sh runs in the designer before it returns and in the orchestrator before it publishes
+return        := `Design draft:` Jira comment lists screens in journey order, the patterns used and each gap; controls that go nowhere are named as not linked
+```
 
 ## The explore step
 
@@ -89,6 +107,21 @@ orchestrator   := the command session; it publishes drafts and finals to the pro
                   the plugin never learns the canvas tool; the recipe doc owns it
 approved drafts come back to disk: the orchestrator downloads them to a temp dir (scripts/tmp-dir.sh) and hands that path to plan mode
 ```
+
+### What a publish recipe covers for wireframes
+
+The plugin names the outcome; the recipe doc (project-context `Publish recipe`) owns how a canvas does it.
+
+```text
+kit assets      := wireframe.css and strokes/*.svg uploaded once per canvas and referenced by every board, not copied into each; the font link kept
+link rewriting  := each `<a href="<screen>.html">` rewritten to the canvas's own board target, so the journey plays there; the standalone pages keep the plain hrefs
+layout          := one page per Epic named `<EPIC> wireframes`; web boards left to right in journey order, phone boards in a row beneath
+kind            := marked draft and interactive; an Approve drafts review happens here
+shared shell    := the shell parts published once (a "Wireframe kit" page, when the canvas has one) and reused by later runs; a later run downloads them instead of redrawing
+round trip      := the recipe says how to download an approved board set back to disk with its `data-pattern` tags intact (plan mode reads them)
+no canvas       := nothing is published; the command hands back the temp-dir paths of the standalone pages
+```
+
 
 ## Who reads what
 

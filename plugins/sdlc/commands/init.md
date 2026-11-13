@@ -533,7 +533,7 @@ are documented in that template file. Token slots to substitute:
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
 | `<design-check cmd>` | the repo's design-fidelity command when one exists (e.g. `pnpm exec nx affected -t fidelity`) — otherwise omit the `Design check` row; never ask for it, a repo adds it when its check exists |
 | `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
-| `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<draft-folder>`, `<draft-page-prefix>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
+| `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<wireframe-targets>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked, except `Wireframe targets`: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. When the section is written, ask `Wireframe targets` once: `web` (Recommended) \| `phone` \| `web, phone` — the frames `/sdlc:design --draft` draws; `web` when skipped. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
@@ -567,8 +567,7 @@ run-order table above, since its owned paths are fixed by the agent definition, 
 Step 3.5 stack suggestions.
 
 **`designer` is scaffolded separately.** When `web-engineer` or `mobile-engineer` is active, write
-`.claude/project/agents/designer.md` from `refs/agent-override-template.md` (no skills section — the designer's skills are rows in `skills.json`); `owns: docs/design/` plus the `Draft folder` when the Design
-section sets one; `never:` every other agent's owned paths and the shared component library (a
+`.claude/project/agents/designer.md` from `refs/agent-override-template.md` (no skills section — the designer's skills are rows in `skills.json`); `owns: docs/design/` (drafts are written to the session temp dir, not the repo); `never:` every other agent's owned paths and the shared component library (a
 component change is a library story, never a design-mode edit); `runs after: product-manager ·
 before: scrum-master`; `## Tech rules` records the repo's board lint rules, page template names and
 the bundle sync recipe when known, else a `# Add the board rules and the bundle sync recipe` note.
