@@ -1,3 +1,22 @@
+## 0.50.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** make the canvas the only copy of wireframe drafts ([2442b39](https://github.com/whimzyLive/nightshift-ai/commit/2442b39))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** make the canvas the only copy of wireframe drafts  ([2442b39](https://github.com/whimzyLive/nightshift-ai/commit/2442b39))
+  a publish recipe must now cover downloading wireframe
+  boards back to the working-folder form (fragments and shell parts, hand
+  edits and data-pattern tags intact); a recipe without a download step can
+  no longer run another pass.
+  Claude-Session: https://claude.ai/code/session_01QXL4EcjWoTxkhbyDXaRizS
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.49.0 (2026-11-13)
 
 ### 🚀 Features
