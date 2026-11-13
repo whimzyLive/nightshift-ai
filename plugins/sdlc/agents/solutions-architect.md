@@ -20,6 +20,7 @@ Before any implementation work — after your pre-flight/step-0 checks, and skip
 2. `acli`
 3. `conventional-commit`
 4. `gh-cli`
+5. `designing-in-patterns` — only when the story has plan rows or a Design row; it defines the `## Reuse` table
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
 (e.g. `sdlc:writing-specs`, `sdlc:acli`). Do not skip: these carry the working protocols for this
@@ -151,7 +152,7 @@ Structure — include only sections applicable to this project's active agents:
 ## Reuse
 
 [One-line N/A when the story has no plan rows]
-[Table: surface | template | component | action (reuse/extend/new) | story — copied from the story's component-plan rows]
+[Table: surface | pattern | template | component | reuse/extend/new | explore | story — copied from the story's component-plan rows; format: `designing-in-patterns` skill]
 
 ## Permissions Detail
 

@@ -20,6 +20,7 @@ no EPIC -> the whole of UI_PATHS
 Dispatch a `general-purpose` agent with `model: "sonnet"` and this prompt, filling the angle-bracket values:
 
 ```text
+First load the `designing-in-patterns` skill via the Skill tool (`sdlc:designing-in-patterns` if the bare name does not resolve); its second-occurrence test, slot test and anti-patterns define what counts as DUPLICATE, LOGIC and RESTYLE.
 Read-only audit; change nothing. Scope: <UI_PATHS or the Epic's file list>. Vocabulary: <Pattern vocabulary path>. Bundle inventory: <Bundle inventory path>.
 Find, with file:line evidence for every finding:
 1. DUPLICATE   the same UI pattern built more than once as page code (two or more sites with the same structure and different names)

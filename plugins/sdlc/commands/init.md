@@ -576,7 +576,7 @@ Step 3.5 stack suggestions.
 
 **`designer` is scaffolded separately.** When `web-engineer` or `mobile-engineer` is active, write
 `.claude/project/agents/designer.md` from `refs/agent-override-template.md`: skills filtered with the
-`designer` row of its domain mapping; `owns: docs/design/` plus the `Draft folder` when the Design
+`designer` row of its domain mapping (`## Project skills` lists the repo's taste, design-system docs and brand-voice skills; `designing-in-patterns` is loaded by the agent, not listed); `owns: docs/design/` plus the `Draft folder` when the Design
 section sets one; `never:` every other agent's owned paths and the shared component library (a
 component change is a library story, never a design-mode edit); `runs after: product-manager ·
 before: scrum-master`; `## Tech rules` records the repo's board lint rules, page template names and

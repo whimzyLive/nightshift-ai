@@ -60,7 +60,8 @@ reference summary; do not duplicate or diverge the skill assignments here.
 | `mobile-engineer` | Mobile skills: any custom mobile skills; no built-in suggestions map here |
 | `database-administrator` | ORM/migration skills: `typeorm`, `electrodb`, and any custom DB skills |
 | `sync-engineer` | Sync-layer skills: no built-in suggestions; any custom sync skills |
-| `designer` | Design skills: design-system and shadcn skills, and any custom skill that teaches the repo's pattern vocabulary or bundle sync; the override also records the board lint rules, template names and the bundle sync recipe |
+| `designer` | Design skills the repo lists in the override's `## Project skills`: taste (visual quality), design-system docs (the repo's components and tokens), brand voice (copy), shadcn skills, and any custom skill that teaches the pattern vocabulary or bundle sync. `designing-in-patterns` is loaded by the agent itself, never listed. The override also records the board lint rules, template names and the bundle sync recipe |
+| `web-engineer`, `mobile-engineer` (note) | Design decision rules (reuse/extend/new, shadcn parts for a new pattern, restyling) belong to `designer`; the engineer override keeps construction rules only (layering, Storybook keyboard tests, bundle membership, accessibility, fidelity-gate operation) and never restates them |
 
 ---
 

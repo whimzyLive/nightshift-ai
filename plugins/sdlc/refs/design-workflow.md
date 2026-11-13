@@ -21,11 +21,8 @@ library, story.
 2. Two board kinds    := draft | final (below); a story's Design row may name finals only
 3. Component wins     := a deliberate design change is made to the shared component for everyone, never as a per-page override;
                          a conflict found while building -> stop and report (domain-agent-handoff.md), never keep a copy
-4. Pattern vocabulary := every visible surface carries one of the repo's fixed pattern names, or `?`;
-                         a name counts only when the bundle has that component — checked against the inventory folder, never by reading
-5. Two tests before a `?` becomes a new component:
-     second occurrence := the pattern is already in the app once as page code -> it is shared; the old site is a cleanup task in the same story
-     slot              := different children in an existing component meet the need -> not new
+4. Pattern vocabulary := every surface is named with a pattern or `?`, and `?` passes two tests before it is new; the method is the
+                         `designing-in-patterns` skill (skills/designing-in-patterns/SKILL.md), the single home of those rules
 6. Nothing high-fidelity by hand := composition and feel are explored in code as variant stories on the library branch,
                          reviewed before merge, losers deleted in the same PR
 ```

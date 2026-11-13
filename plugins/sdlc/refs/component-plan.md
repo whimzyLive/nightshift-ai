@@ -35,7 +35,7 @@ Drafts: <paths or canvas link>
 | Pattern | a vocabulary name, or `?` while unsettled |
 | Template | the page template the screen is built on; `—` for a surface that is not a page |
 | Component | the bundle component that builds it (PascalCase export); `—` when none |
-| Action | `reuse` (in the bundle, fits) · `extend` (in the bundle, needs a variant, state or prop) · `new` (not in the bundle) |
+| Action | `reuse` · `extend` · `new` (definitions: the skill) |
 | Explore | `yes` · `no` |
 | Story | the library story key once raised; `—` for `reuse`; screen stories are linked by the scrum-master later, so the row also records `Screens:` below |
 
@@ -45,31 +45,19 @@ under the table, per extend/new row: `Screens: <draft board names that use it>` 
 two rows naming the same Component -> one library story, Gap and Screens unioned
 ```
 
-## The two tests (run on every `?` row before it may become `new`)
+## The method
+
+The two tests, extend versus new, the explore step and the table's meaning live in the `designing-in-patterns` skill (`skills/designing-in-patterns/SKILL.md`); the designer loads it. Here: the file's shape, and what the plan's consumers do with it.
 
 ```text
-second occurrence := Grep the app's UI paths (workspace->agent rows owned by web/mobile engineers) for the pattern
-                     found once as page code -> it is a shared pattern: Action := extend or new, AND the old site is listed
-                     as a cleanup task in the same library story ("Replace <path> with <Component>")
-slot              := can an existing component do it with different children, no new prop or variant? -> Action := reuse, note the slot in a trailing `Note:` line
-neither test applies -> new
-```
-
-## Explore rows
-
-A row with `Explore: yes` carries, below the table, one block per row:
-
-```text
+second-occurrence cleanup -> listed in the row's library story as "Replace <path> with <Component>"
+slot -> Action := reuse, with a trailing `Note:` line naming the slot
+Explore: yes -> below the table, one block per row:
 ### Explore: <Component>
-- Variant A: <shadcn parts it composes> — phone: <behaviour>; desktop: <behaviour>
+- Variant A: <shadcn parts> — phone: <behaviour>; desktop: <behaviour>
 - Variant B: ...
-- Variant C: ... (optional)
 Keyboard: <keys and focus order common to all variants>
 ```
-
-Two or three variants, each a composition of shadcn parts the repo already allows (never a hand-drawn
-look). The library story builds them as variant stories, the human picks one in review, the losers are
-deleted in the same PR (`refs/design-workflow.md` The explore step).
 
 ## Settling `?` rows
 
