@@ -1,3 +1,27 @@
+## 0.48.0 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** write skills.json v2 from /init and drop skills from agent overrides ([cfad761](https://github.com/whimzyLive/nightshift-ai/commit/cfad761))
+- ⚠️  **sdlc:** load skills at the step that needs them, never upfront ([e7609e0](https://github.com/whimzyLive/nightshift-ai/commit/e7609e0))
+- **sdlc:** add skills-for.sh, the plugin skills contract and artefact checks ([7cc4325](https://github.com/whimzyLive/nightshift-ai/commit/7cc4325))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** load skills at the step that needs them, never upfront  ([e7609e0](https://github.com/whimzyLive/nightshift-ai/commit/e7609e0))
+  agent overrides' `## Project skills` sections are no longer read; skills are
+  named only through `.claude/project/skills.json` v2 rows (a v1 file is tracked-only and injects
+  nothing); the `Skills loaded` set-coverage check and its RETURN-CONTRACT redispatch are removed;
+  the bundled design-md, enhance-prompt, graphify, to-issues, user-story and skill-creator skills
+  are removed (use anthropic-skills:skill-creator); the vercel-* skills install from
+  vercel-labs/agent-skills through skills-map instead of a vendored copy; the executing-plans and
+  test-driven-development contract rows are gone and conventional-commit is optional. Re-run /sdlc:init to upgrade a consumer repo.
+  Claude-Session: https://claude.ai/code/session_01QXL4EcjWoTxkhbyDXaRizS
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.8 (2026-11-13)
 
 ### 🚀 Features
