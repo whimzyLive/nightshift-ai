@@ -60,6 +60,7 @@ reference summary; do not duplicate or diverge the skill assignments here.
 | `mobile-engineer` | Mobile skills: any custom mobile skills; no built-in suggestions map here |
 | `database-administrator` | ORM/migration skills: `typeorm`, `electrodb`, and any custom DB skills |
 | `sync-engineer` | Sync-layer skills: no built-in suggestions; any custom sync skills |
+| `designer` | Design skills: design-system and shadcn skills, and any custom skill that teaches the repo's pattern vocabulary or bundle sync; the override also records the board lint rules, template names and the bundle sync recipe |
 
 ---
 

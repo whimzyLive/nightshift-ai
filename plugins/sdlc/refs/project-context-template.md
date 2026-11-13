@@ -44,6 +44,25 @@ generated file — every slot must be replaced with an actual value.
 | UI library | `<shared component package path>` |
 | Design check | `<design-check cmd>` |
 
+## Design
+<!-- OPTIONAL section for repos with a UI. Delete the whole section when there is no design workflow; /sdlc:design --draft|--plan|--final needs the rows marked required. -->
+
+| Token | Value |
+| ----- | ----- |
+| Pattern vocabulary | `<pattern-vocabulary-path>` |
+| Bundle inventory | `<bundle-inventory-path>` |
+| Bundle global | `<bundle-global>` |
+| Draft folder | `<draft-folder>` |
+| Draft page prefix | `<draft-page-prefix>` |
+| Final page prefix | `<final-page-prefix>` |
+| Component review | `<component-review-cmd>` |
+| Library label | `<library-label>` |
+| Design canvas | `<design-canvas>` |
+| Publish recipe | `<publish-recipe-path>` |
+| Designer model draft | `<model>` |
+| Designer model plan | `<model>` |
+| Designer model final | `<model>` |
+
 ## Memory
 
 | Token                   | Value                       |
@@ -92,6 +111,12 @@ generated file — every slot must be replaced with an actual value.
   (`/init` git-ignores `.tmp/`); a custom path MUST be git-ignored too, or the gate's stray-file check stops on it. The command must write that report on every run, even when nothing is
   affected, from one non-cached aggregate step covering every board (e.g. Nx `cache: false`), or the
   verifier reads a stale or missing report. Line format: `refs/design-references.md` Design check.
+- **Design** — all rows optional unless a mode needs them; omit any blank row, and the whole section when the repo has no design workflow. `/init` never asks for them; a repo adds the section once its design system exists.
+  - `Pattern vocabulary` (required by every mode) — path to the file of fixed pattern names, each naming its template or component. `Bundle inventory` (plan, final) — folder with one entry per component the design bundle exports; the plan's "exists in the bundle" test greps it, never reads source. `Bundle global` (final) — the global name the bundle exposes in the browser (e.g. `window.<Name>`); boards mount `<Global>.<Component>`.
+  - `Draft folder` / `Draft page prefix` (draft) — where draft board HTML is written in the worktree, and the file-name prefix; `Final page prefix` (final) — the prefix of final board files.
+  - `Component review` — the command that serves the library's variant stories for the explore step (e.g. a Storybook run). `Library label` — the Jira label of library stories, default `Library`; set `UI-Components` to ride the existing hard block (`refs/ui-components.md`).
+  - `Design canvas` (id or URL) and `Publish recipe` (path of the doc that says how to publish a board there) — optional; both unset = nothing is published and the commands hand back file paths.
+  - `Designer model draft|plan|final` — a model alias or id; defaults opus, sonnet, sonnet (`scripts/resolve-designer-model.sh`).
 - **Omit none-detected stack rows** — in `## Detected stack`, omit any row
   whose detected value is empty or `none`. Do not write `none` into the file.
 - **Package manager appears twice** — once in the top table (user-confirmed
