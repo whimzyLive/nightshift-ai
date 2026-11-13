@@ -72,7 +72,7 @@ creation) is **advisory** — its comments never block the merge.
 3. **Post the Jira comment FIRST** — `jira-site-guard.sh` once; guard fails → **STOP**, release with
    the PR URL (nothing may write to a possibly-wrong Jira):
    - QA `capped` (any mode, async too): the step-1 round-cap comment — it replaces both below.
-   - `Full Auto` (not async): `Implementation complete (Full Auto). PR: <PR_URL>. <NOTE> Waiting for checks, then auto-merging and moving the story to <DONE_STATUS>. Copilot review is advisory.`
+   - `Full Auto` (not async): `Implementation complete (Full Auto). PR: <PR_URL>. <NOTE> Waiting for checks, then auto-merging and moving the story to <DONE_STATUS>. Copilot review is advisory. A PR that still has no checks after a 30s grace is merged as a repo without CI (the local gate already ran).`
    - otherwise, and every `ASYNC_REVIEW=true` run: `Implementation complete. PR: <PR_URL>. <NOTE> Ready for review and merge (Copilot review is advisory).`
    - `<NOTE>`: A2 → `Includes the approved spec.`; B1 → `Small story — direct implementation path.`
 4. **`<NEXT>`** — `Full Auto` → `Run bash ${CLAUDE_PLUGIN_ROOT}/scripts/auto-merge-pr.sh --wait-checks <PR_URL> STORY_KEY "<DONE_STATUS>"; on a non-zero exit comment STORY_KEY per /sdlc:auto Tail step 5, then run session-complete.sh <PR_URL>.`
