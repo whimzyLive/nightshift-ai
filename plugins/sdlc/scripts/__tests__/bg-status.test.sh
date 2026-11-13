@@ -141,6 +141,19 @@ contains "run-bg resume: --resume with the full id" "[--bg][--resume][$SID]"
 contains "run-bg resume: note is the prompt" "[carry on]"
 if grep -qF -- "[-n]" "$work/claude.log"; then bad "run-bg resume: no -n"; else ok "run-bg resume: no -n"; fi
 
+rm -f "$work/claude.log"
+rc_is "run-bg: empty third arg refuses" 2 S-1 "carry on" ""
+rc_is "run-bg: short resume id refuses" 2 S-1 "carry on" 39d88595
+if [ -e "$work/claude.log" ]; then bad "run-bg: refusals launch nothing"; else ok "run-bg: refusals launch nothing"; fi
+(cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" bash scripts/run-bg.sh S-1 "carry on" "" 2>"$work/err.txt")
+if grep -q "resume session id was expected" "$work/err.txt"; then ok "run-bg: empty id error names the cause"; else bad "run-bg: empty id error names the cause"; fi
+(cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" bash scripts/run-bg.sh S-1 "carry on" 39d88595 2>"$work/err.txt")
+if grep -q "claude agents --json" "$work/err.txt"; then ok "run-bg: short id error says to expand it"; else bad "run-bg: short id error says to expand it"; fi
+(cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" bash scripts/run-bg.sh S-1 "carry on" "$SID")
+contains "run-bg: full id resumes" "[--bg][--resume][$SID]"
+(cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" bash scripts/run-bg.sh S-1)
+contains "run-bg: no third arg starts fresh" "[--bg][-n][S-1]"
+
 cat > "$repo/.claude/project/bg-run.env" <<'ENV'
 BG_RUN_PERMISSION_MODE=acceptEdits
 BG_RUN_EXTRA_RULES="Repo rule: use the local database."

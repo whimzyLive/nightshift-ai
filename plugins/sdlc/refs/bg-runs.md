@@ -100,6 +100,10 @@ as a handoff). Set them in the environment to change them.
 The resumed session keeps its conversation and gets the note as its next prompt. After a human
 decision, resume the same way with the answer as the note.
 
+A third argument that is empty, or not a full 8-4-4-4-12 hex session id, is refused and nothing is
+launched, so a failed id lookup can never start a fresh run. Expand a short id (like `39d88595`) to the
+full `sessionId` from `claude agents --json`.
+
 ## Monitor tick
 
 A session-local recurring wakeup that watches the runs and notifies. Create it with `CronCreate` right
