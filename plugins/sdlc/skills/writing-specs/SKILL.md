@@ -188,6 +188,16 @@ One-line N/A when the story's Design and Dev Notes are both "None".
 | --- | --- | --- |
 | [requester directive] | [spec section / file] | none, or [reason] |
 
+## Reuse
+
+One-line N/A when the story has no component-plan rows (`${CLAUDE_PLUGIN_ROOT}/refs/component-plan.md`). Copy the rows; add none.
+
+| Surface | Template | Component | Action | Story |
+| --- | --- | --- | --- | --- |
+| [visible surface] | [page template] | [bundle component] | reuse / extend / new | [library story key, or — for reuse] |
+
+A `new` row with no library story is an open question; the spec cannot be approved while it stays open.
+
 ## Error Handling
 
 | Scenario | Behaviour | HTTP Status |

@@ -55,6 +55,12 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         - otherwise (a detection-only or static field) fill it from Step 2.5 or the template default,
           no prompt.
 
+        Exception: the optional `Design check` and `Design check report` Tooling rows are never
+        filled from the template, a default or a guess, and never prompted — a missing row stays
+        missing (a placeholder like `<design-check cmd>` would run as a command). Existence is
+        detected as the row being present with a non-empty value, the same test as in the token
+        table below.
+
         This is the mechanism that auto-onboards **any newly introduced parameter**: when a future
         template adds a token, an existing repo that runs Merge picks it up here — prompted if it is a
         user choice, defaulted otherwise — instead of silently missing it.
@@ -175,7 +181,7 @@ suggested default). The user can still change every value — detection sets def
 bypass the prompts.
 
 Also check whether `.claude/project/skills.json` already exists and read it if so — you will need
-it in Step 3.5:
+it in Step 3.5 (note its `version`: a v1 file is upgraded in Step 4d):
 
 ```bash
 [ -f ".claude/project/skills.json" ] && echo "SKILLS_EXIST=yes" || echo "SKILLS_EXIST=no"
@@ -200,6 +206,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Active agents | the **domain** agents whose code lives in this repo (see below) |
 | Review agent | who drives the `/loop` review-fix cycle — `claude-inline` (default), `github-copilot`, or `claude-superpowers` |
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
+| Reviewer model threshold | OPTIONAL — story points at/under which the first QA review round uses `sonnet` instead of `opus` (Bugs and unpointed stories stay `opus`); default unset = `opus` always |
 | Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` is read (NA-104) — `spec`/`plan` are ignored entirely (no reviewer request either, unconditionally). Default (omitted) = `impl` reviews. Not an interactive picker — the only value that changes anything **excludes** `impl` (e.g. `spec`); writing `impl` itself is a no-op, same as omitting the row. **Excluding `impl` downgrades it to `REVIEW_MODE=none`, which skips the checks-green wait too — under `Full Auto` the impl PR auto-merges unreviewed and without waiting for CI**, and its `@copilot` request still fires but sits unaddressed. |
 | Plan step | OPTIONAL — `on` \| `off`; default `off` (spec → implementation, no plan). Not an interactive picker — write the row only if the founder asks for a plan step on full-path stories. |
 | Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
@@ -245,6 +252,10 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
 3. **Lightweight threshold** — `header: "LW threshold"`, `multiSelect: false`,
    `options: [3 (default), 2, 5, 1]` (labels are the point values; mark `3` recommended). The choice
    is the `Lightweight threshold` value.
+3b. **Reviewer model threshold** — `header: "Reviewer"`, `multiSelect: false`,
+   `options: [Opus always (default, omit the row), 3, 5, 2]`. A number writes the
+   `Reviewer model threshold (story points, inclusive)` row; the default deletes the row from the
+   written file.
 4. **Active agents** — `header: "Agents"`, `multiSelect: true`, `options:` the five domain agents
    below, each `label` the agent name and `description` its "select when…" row from the table. This
    is the ONLY multi-select picker; the result is the active-agent set.
@@ -271,7 +282,9 @@ Three categories exist; only the domain tier is a multi-select pick:
 
 - **Pipeline agents** — `product-manager`, `scrum-master`, `solutions-architect`, `tech-lead`,
   `principal-engineer`, `qa-engineer`. Always active, own no code, need **no** override file. Do
-  **not** prompt for them.
+  **not** prompt for them. The `designer` is the one exception: it owns no code, is never prompted
+  for, and gets an override file only when the repo has a UI (see **`designer` is scaffolded
+  separately** below).
 - **Domain agents** — own paths and write code. Selectable below; each selected one gets a
   workspace→agent row and an override file.
 - **`ai-enablement-engineer`** — a special case: gated by its own single opt-in confirm (see
@@ -358,17 +371,11 @@ AskUserQuestion(
   never happens silently on a plain re-init "Merge new findings" pass with no opt-in involved.
 
   (b) scaffold `.claude/project/agents/ai-enablement-engineer.md` in Step 4c using
-  the **fixed** override shape below (its skill list and owned paths are fixed by the agent
-  definition, not derived from the Step 3.5 stack-suggestion flow the other overrides use):
+  the **fixed** override shape below (its owned paths are fixed by the agent definition, not
+  derived from the Step 3.5 stack-suggestion flow the other overrides use):
 
   ```markdown
   # AI Workflow Manager — <project name> bindings
-
-  ## Skills (plugin-bundled — invoke via the Skill tool)
-
-  1. skill-creator
-  2. find-skills
-  3. conventional-commit
 
   ## Directory guides (read before coding)
 
@@ -490,6 +497,9 @@ The `description` for each option comes from the matching skill entry's `descrip
 user type a custom skill name not in the list. Custom entries receive `source: "custom"` in the
 manifest.
 
+A typed name that matches a `refs/skills-map.yml` entry that has no `when` conditions is installed
+from that entry's `source` in Step 4f and takes its `domains` and `dispatch` in Step 4d.
+
 The confirmed selection (accepted + any custom additions) is the **install list** used in Steps 4c
 and 4d.
 
@@ -521,10 +531,14 @@ are documented in that template file. Token slots to substitute:
 | `<DETECTED_TEST>` | `DETECTED_TEST` (Step 2.5) |
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
+| `<design-check cmd>` | the repo's design-fidelity command when one exists (e.g. `pnpm exec nx affected -t fidelity`) — otherwise omit the `Design check` row; never ask for it, a repo adds it when its check exists |
+| `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
+| `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<wireframe-targets>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked, except `Wireframe targets`: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. When the section is written, ask `Wireframe targets` once: `web` (Recommended) \| `phone` \| `web, phone` — the frames `/sdlc:design --draft` draws; `web` when skipped. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |
+| `<reviewer-model-threshold>` | Reviewer model picker (Step 3) — omit the row for the default `Opus always` |
 | `<review-retention-window>` | Review retention window (Step 3) — `6 months` default unless the founder requests otherwise; accepted formats are exactly `<n> months` or `<n> stories` |
 | workspace→agent rows | one row per active agent with its confirmed owned path(s) — including `plugins/` → `ai-enablement-engineer` and `skills/` → `ai-enablement-engineer` when the AI-context opt-in (Step 3) was accepted |
 
@@ -537,12 +551,8 @@ are documented in that template file. Token slots to substitute:
 **4c. `.claude/project/agents/<agent>.md`** — one file **per active agent only**. For each active
 agent, fill the template in `refs/agent-override-template.md` using:
 
-- The **agent domain mapping** table in `refs/agent-override-template.md` (which references skill
-  domains from `refs/skills-map.yml` as the authoritative source) to filter the confirmed install
-  list to skills relevant to this agent.
 - The **run-order table** in `refs/agent-override-template.md` to populate the `runs after / before`
   line — list only agents that are active in this repo.
-- The **per-agent filtering rules** in `refs/agent-override-template.md` for edge cases.
 
 Fill the Ownership line with the real owned/forbidden paths and the run-order. Populate `## Tech rules`
 and `## Local dev` from detected values (not placeholders). Every token slot in the template must be
@@ -553,27 +563,59 @@ Do not write override files for agents the user did not select.
 **`ai-enablement-engineer` is scaffolded separately, not through this stack-driven flow.** Only
 write `.claude/project/agents/ai-enablement-engineer.md` when the AI-context opt-in (Step 3) was
 accepted, and use the **fixed** override content given there — it does not use the agent domain
-mapping / run-order tables above, since its skill list (`skill-creator`, `find-skills`,
-`conventional-commit`) and owned paths are fixed by the agent definition, not derived from the
+run-order table above, since its owned paths are fixed by the agent definition, not derived from the
 Step 3.5 stack suggestions.
 
-**4d. `.claude/project/skills.json`** — write or merge the project skills manifest per
-`refs/skills-manifest.md`. Build the array from the confirmed install list (Step 3.5):
+**`designer` is scaffolded separately.** When `web-engineer` or `mobile-engineer` is active, write
+`.claude/project/agents/designer.md` from `refs/agent-override-template.md` (no skills section — the designer's skills are rows in `skills.json`); `owns: docs/design/` (drafts are written to the session temp dir, not the repo); `never:` every other agent's owned paths and the shared component library (a
+component change is a library story, never a design-mode edit); `runs after: product-manager ·
+before: scrum-master`; `## Tech rules` records the repo's board lint rules, page template names and
+the bundle sync recipe when known, else a `# Add the board rules and the bundle sync recipe` note.
+No workspace→agent row is added. No active UI agent → no file.
 
-- **First write** (file does not exist): create the file with `version: 1` and one entry per
-  confirmed skill:
+**4d. `.claude/project/skills.json`** — write or merge the project skills manifest per
+`refs/skills-manifest.md` (schema v2). Agent overrides do not list skills; this file is the one place
+that says which skills exist, which agents use them and when. Build one row per confirmed skill
+(Step 3.5):
+
+- `agents` — the skill's `domains` in `refs/skills-map.yml`, intersected with the active agents. A
+  custom skill (typed under "Other") gets every active domain engineer.
+- `when` — the skill's `dispatch:` block in `refs/skills-map.yml` (`paths`, `mode`, `step`), `{}`
+  when absent or for a custom skill.
+- `required` — `true`.
+- **First write** (file does not exist): create the file with `version: 2`:
   ```json
   {
-    "version": 1,
+    "version": 2,
     "skills": [
-      { "name": "<skill-name>", "source": "suggested", "addedBy": "init" },
-      { "name": "<custom-skill>", "source": "custom", "addedBy": "init" }
+      {
+        "name": "<skill-name>",
+        "source": "suggested",
+        "addedBy": "init",
+        "agents": ["<agent>"],
+        "required": true,
+        "when": {}
+      },
+      {
+        "name": "<custom-skill>",
+        "source": "custom",
+        "addedBy": "init",
+        "agents": ["<agent>"],
+        "required": true,
+        "when": {}
+      }
     ]
   }
   ```
-- **Merge write** (file already exists): read the existing array, union with the confirmed list
+- **Merge write** (v2 file already exists): read the existing array, union with the confirmed list
   (append skills not yet present, leave existing entries unchanged), and write the merged result.
   Never remove existing entries.
+- **Upgrade (the existing file is v1):** for each row, `agents` = every override
+  (`.claude/project/agents/<agent>.md`) whose `## Project skills` section lists the name,
+  `required: true`, `when: {}`; keep the other keys. Print the inferred rows and confirm them with the
+  founder (the same merge/confirm flow as any re-init write). On confirmation write `version: 2`,
+  delete the `## Project skills` section from each override and leave one line in its place:
+  `Skills for this agent are listed in .claude/project/skills.json.`
 - If the confirmed install list is empty (user accepted no suggestions), write an empty `skills`
   array on first write; on merge write leave the existing entries untouched.
 
@@ -589,8 +631,8 @@ fi
 
 This is idempotent — running it on a repo that already has `.tmp/` in `.gitignore` is a no-op.
 
-**4f. Install each confirmed skill into project scope.** Steps 4c and 4d only _record_ the confirmed
-skills (in the agent overrides and `skills.json`); neither makes a skill discoverable. A skill is only
+**4f. Install each confirmed skill into project scope.** Step 4d only _records_ the confirmed
+skills (in `skills.json`); it does not make a skill discoverable. A skill is only
 invocable when its content is actually installed on disk. Without this step, `/init` leaves the
 selected skills tracked but absent and unavailable to the domain agents (the reported defect). Resolve
 each skill in the confirmed install list (Step 3.5) by the **first** matching path below — `source`
@@ -631,7 +673,7 @@ is preferred because it installs the skill's real content from an exact location
   directory (`.claude/skills/<name>/`), not by the `SKILL.md` frontmatter `name` (which is a cosmetic
   display label, optional, and defaults to the directory name). The copy above already lands the
   content in `.claude/skills/<name>/`, so the installed skill is discovered and invoked as `<name>` and
-  matches `skills.json` / the agent override — **even when the upstream uses a different directory or
+  matches `skills.json` — **even when the upstream uses a different directory or
   frontmatter `name`** (e.g. `composition-patterns`, or a colon form like `react:components`). Do
   **not** rewrite the downloaded content to "normalize" the name: leaving it byte-identical to upstream
   keeps future updates (re-fetch / diff) clean. If a fetch fails (network, bad ref, missing path), do
@@ -712,7 +754,7 @@ marketplace add` / `install`, and the stub write are all otherwise safe to re-ru
   - A **sourceless** skill (scaffolded stub / custom) is user-owned and is **always skipped** in
     refresh mode — never overwritten.
 - **The directory name `<name>` is the identifier across the sync trio** — it is what Claude Code
-  resolves the skill by, and what `skills.json` / the agent override record. The `SKILL.md` frontmatter
+  resolves the skill by, and what `skills.json` records. The `SKILL.md` frontmatter
   `name` is a cosmetic display label (it need not match), so downloaded content is left byte-identical
   to upstream; scaffolded stubs are written with `<name>` for tidiness.
 - A scaffolded stub body is a starter, not a placeholder token: once `<name>`/`<description>` are
@@ -846,14 +888,14 @@ the user exactly what to set up and how to verify. Print this checklist:
 > watchdog waits `budget + 3500ms`, so don't set it much higher. This cannot be fixed from inside
 > the plugin; it is a required setting on every consumer of it.
 >
-> **Next, to teach an agent your stack:** the scaffolded overrides
-> (`.claude/project/agents/<agent>.md`) already list any skills confirmed during `/init`. Skills with
+> **Next, to teach an agent your stack:** `.claude/project/skills.json` lists the skills confirmed
+> during `/init`, the agents that use them and when. Skills with
 > a declared `source` were downloaded into `.claude/skills/<name>/`, plugin-backed ones were installed
 > as plugins, and project-convention skills got a starter `.claude/skills/<name>/SKILL.md` — fill in
 > those bodies with your project's conventions. To add a
 > skill not suggested, write `.claude/skills/<name>/SKILL.md` (an ORM convention, an API-routing
-> pattern, a deploy recipe…), list its name in the relevant override, and add it to
-> `.claude/project/skills.json` — or re-run `/init` to go through the suggestion flow again (existing
+> pattern, a deploy recipe…) and add a row for it to
+> `.claude/project/skills.json` (`agents`, optional `when`) — or re-run `/init` to go through the suggestion flow again (existing
 > skill files, installed plugins, and manifest entries are preserved). To **activate a standby role later** that you skipped here (e.g. `mobile-engineer`),
 > add its row to the workspace→agent table and create its override. Full walkthrough: `EXTENDING.md`.
 

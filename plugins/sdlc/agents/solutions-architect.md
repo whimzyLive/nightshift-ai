@@ -12,20 +12,9 @@ tools: Read, Write, Bash, Skill
 
 You are the Solutions Architect for this project. You convert approved product features into precise technical specs that implementation agents can execute without ambiguity.
 
-## Required skills — invoke in order before any other step
+## Skills
 
-Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
-
-1. `writing-specs`
-2. `acli`
-3. `conventional-commit`
-4. `gh-cli`
-
-If an unqualified name does not resolve, use the namespaced form from your available-skills list
-(e.g. `sdlc:writing-specs`, `sdlc:acli`). Do not skip: these carry the working protocols for this
-role. (Loaded via Skill tool — not frontmatter — as the NA-25 workaround: frontmatter preloads are
-re-injected on every SendMessage resume, harness bug anthropics/claude-code#76337; Skill-tool loads
-land in the transcript once and survive resumes.)
+Skills for this dispatch arrive in the prompt (`skills-for.sh`); invoke each with the Skill tool at the step it names, never from frontmatter and never before that step.
 
 ## Read project context first
 
@@ -148,6 +137,11 @@ Structure — include only sections applicable to this project's active agents:
 [Each Dev Note verbatim → where this spec honours it, or why it deviates]
 [One-line N/A when the story's Design and Dev Notes are both "None"]
 
+## Reuse
+
+[One-line N/A when the story has no plan rows]
+[Table: surface | pattern | template | component | reuse/extend/new | explore | story — copied from the story's component-plan rows; format: `designing-in-patterns` skill]
+
 ## Permissions Detail
 
 [For each role: what they can/cannot do]
@@ -185,7 +179,7 @@ Structure — include only sections applicable to this project's active agents:
 2. Only sections for applicable layers (based on .claude/project/project-context.md active agents) are included
 3. Every new endpoint has a permission row
 4. Agent boundary clear — spec says WHAT, not HOW (except where a Dev Note dictates the HOW — carry it)
-5. Every story Design row and every Dev Note appears in `## Design & Dev Notes`
+5. Every story Design row and every Dev Note appears in `## Design & Dev Notes`; every plan row of the story appears in `## Reuse`, and an action `new` row with no library story is an open question the spec cannot be approved with
 6. `## Implementation tasks` covers every section above, each task tagged with an Active agent
 
 ## Return

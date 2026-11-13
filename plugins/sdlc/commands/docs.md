@@ -4,6 +4,10 @@ description: Generate and maintain this repo's public docs surface via the doc-t
 
 ## Modes (dispatched from `$ARGUMENTS`)
 
+Every `knowledge-engineer` dispatch below also carries the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh knowledge-engineer --mode <mode> --print-prompt`, where `<mode>` is
+`sync`, `release`, `seed`, `audit`, `seed-adr` (`seed adr`) or `distill`.
+
 | Invocation | Mode | v1 status |
 | --- | --- | --- |
 | `/sdlc:docs sync <STORY-KEY>` | **sync** | Shipped (NA-52) |

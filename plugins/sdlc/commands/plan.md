@@ -27,7 +27,8 @@ setup_out=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <STORY-KEY> fea
 WORKTREE=$(printf '%s\n' "$setup_out" | grep '^WORKTREE=' | cut -d= -f2-)
 ```
 
-Dispatch the `tech-lead` agent in standard mode with `<STORY-KEY>` and `WORKTREE`. It reads the spec
+Dispatch the `tech-lead` agent in standard mode with `<STORY-KEY>`, `WORKTREE` and the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh tech-lead --print-prompt`. It reads the spec
 in `$WORKTREE`, fetches the story (`${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`), and writes
 `$WORKTREE/docs/superpowers/plans/<STORY-KEY>.md`:
 
@@ -40,6 +41,9 @@ in `$WORKTREE`, fetches the story (`${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md`), 
 - **Never commit, push, raise a PR, or write to Jira** — leave the file for Step 2.
 
 ## Step 2 — Commit to the story branch
+
+First run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-plan.sh "$WORKTREE/docs/superpowers/plans/<STORY-KEY>.md"`; any
+`MISSING=`/`NO_TASKS=`/`NO_VERIFY=`/`TBD=` line → re-dispatch `tech-lead` once with the lines, then STOP.
 
 ```bash
 git -C "$WORKTREE" add docs/superpowers/plans/<STORY-KEY>.md

@@ -46,6 +46,8 @@ verification, and return a single verdict (`clean`, `capped` or `blocked`) to th
   > `WORK_KIND` (see `commands/review-fix.md`) — a defect has no plan doc, so that verification is
   > correctly skipped. The defect regression-evidence contract is enforced on the `/auto`/`/impl` and
   > `/review` paths, which do supply `WORK_KIND`.
+- `STORY_POINTS` — `N` | `missing`, optional (default `missing`); from the triage block or `commands/review.md`.
+  Only picks the round-1 reviewer model.
 - The phase ledger — **optional**; a cache Step 3 resolves (git-reconstruction fallback) before
   dispatching each fix agent, never a STOP when absent (D3).
 
@@ -122,7 +124,9 @@ Captured round files are not committed, so also read them:
 `bash ${CLAUDE_PLUGIN_ROOT}/scripts/list-captured.sh --kind review`
 
 Dispatch the reviewer subagent (`agent-skills:code-reviewer` when that type exists, else
-`general-purpose`) with `model: "opus"`; it loads `requesting-code-review` itself. The prompt MUST include:
+`general-purpose`) with the `REVIEWER_MODEL` from `refs/qa-review-rounds.md` "Reviewer model". The prompt MUST include:
+
+- The output of `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh qa-reviewer --print-prompt` (it names `requesting-code-review`).
 
 - `DESCRIPTION`: Story mode — "Implementation of <STORY-KEY> — <story summary>"; Diff mode —
   the change's own intent (commit subjects + changed-file summary).
@@ -239,11 +243,9 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
    quality-gate run in Step 6."
 3. Story key.
 4. The reviewer findings for that domain, **verbatim**.
-5. **Applicable override skills** — EITHER name the target agent's applicable project skills
-   (from its override `.claude/project/agents/<agent-name>.md`, the override's skills section —
-   whatever heading it uses, the section listing skills to invoke via the Skill tool) with "Invoke
-   these via the Skill tool BEFORE fixing: `<skill-a>, <skill-b>`", OR state explicitly "No project
-   skills apply for this task." Exactly one of the two.
+5. **Skills for this dispatch** — paste the output of
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <the domain's owned paths> --print-prompt`
+   (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
 6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Fix ONLY these issues, run your **Comments**
    self-check (no comment cites a finding, round or story), and commit (use the
@@ -251,7 +253,7 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 7. "Capture any admitted rule entries per the admission test in
    `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s memory-write section."
 8. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+9. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — what changed>\n Skills loaded: <comma-separated skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 10. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md."
 11. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
@@ -294,14 +296,12 @@ attempt to fix or revert it yourself. Never self-repair.
 
 - No new commit since pre-dispatch HEAD (on `$WORKTREE`) → agent failed silently. **Return `blocked`**
   to the Principal Engineer with the reason.
+- Commit subjects not conventional: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-commits.sh "<pre-dispatch HEAD>..HEAD" "$WORKTREE"`
+  exits 1 (`BAD=` lines) → **return `blocked`** with the lines, no redispatch.
 - `Status: blocked` → **return `blocked`** immediately; do not attempt the fix yourself.
-- **Verify `Skills loaded` covers the named set.** Same mechanical rule as principal playbook Step 5
-  (source of truth — do not re-derive here); the QA-specific consequence differs: missing/failed →
-  return `blocked` immediately, no redispatch. (Applies only to `Status: complete` returns, and
-  extra skills the agent lists beyond the named set still pass, per Step 5.)
 - **Verify the return carries `Rules applied:`** (4 lines complete, 5 lines blocked, per
-  `domain-agent-handoff.md`) — an absent line is the same contract violation as a missing
-  `Skills loaded:` line: return `blocked` immediately, no redispatch. `none` is a valid value.
+  `domain-agent-handoff.md`) — an absent line returns `blocked` immediately,
+  no redispatch. `none` is a valid value.
 
 ## Step 4 — Re-review
 
@@ -381,8 +381,9 @@ committed rule file.
 ## Step 6 — Quality gate
 
 ```text
-offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA>,
+offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA> <RUN_DESIGN_CHECK>,
   # RUN_INFRA := yes when a changed path belongs to platform-engineer infra, else no
+  # RUN_DESIGN_CHECK := yes WHEN `Design check` is set AND (a Design row OR a changed web/mobile-owned path), else no
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")
 Stray files non-empty -> STOP, list; never clean
 Gate:fail -> dispatch Owning agent w/Error(Step3), push, re-offload fresh
@@ -390,6 +391,8 @@ Gate:pass,Evidence="" | no Gate: key -> re-offload once, fallback
 fallback := Read qa-gate-runner.md, run INLINE; offload=inline-fallback
 carry Evidence -> Step-8 `Quality gate:`
 ```
+
+A design-check failure is a gate failure; the verifier reads its report file (`refs/design-references.md`).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
 **exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean.
@@ -403,10 +406,11 @@ checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live
 offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
 Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
+Design not checked non-empty -> ONCE per run: ask the owner for a REAL check entry per board (`refs/design-references.md`), push, rerun 6-7; still `uncovered`|`not-checked` -> capped, `Open (capped)`: `design uncovered: <KEY>` | `design not checked: <KEY> <ticket>`
 WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
 no Verification: -> re-offload once, fallback
 fallback := Read ac-verification.md INLINE; offload=inline-fallback
-never -> clean while Unmet non-empty
+never -> clean while Unmet non-empty OR a Design board uncovered | not-checked
 carry result -> Step-8 AC check:
 ```
 
@@ -433,15 +437,17 @@ Minor noted (not fixed): <list, or "none">
 Follow-ups: <issues in code the fix did not change, or "none">
 Open (capped): <each open Important finding, file:line — only if Status: capped>
 AC check: <met — all N ACs evidenced | UNMET: <which> >
+Design not checked: <KEY ticket | KEY uncovered | none>
 Quality gate: typecheck pass | tests pass   (paste evidence)
 Learnings: captured to <N> file(s): <ids, or "none">
 Blocked reason: <one line — only if Status: blocked>
 ```
 
 - `Status: clean` only when: review has no Critical/Important findings, every AC is evidenced,
-  the gate is green with pasted output, and learnings are captured.
-- `Status: capped` only at the round cap with Important findings open, the gate green, and every
-  AC evidenced (`refs/qa-review-rounds.md` § Round cap) — the caller opens a draft PR, never merges.
+  no Design board is uncovered or not-checked, the gate is green with pasted output, and learnings are captured.
+- `Status: capped` only (a) at the round cap with Important findings open, the gate green, and every
+  AC evidenced (`refs/qa-review-rounds.md` § Round cap), or (b) a Design board still
+  uncovered or not-checked after Step 7's one ask — the caller opens a draft PR, never merges.
 - `Status: blocked` at any unrecoverable point (agent blocked, push conflict, AC cannot be met)
   → return immediately with the reason; do not improvise around it.
 

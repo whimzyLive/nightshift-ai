@@ -62,6 +62,14 @@ interface ReferenceExample {
 
 **N/A** — reference artifact has no design or dev notes.
 
+## Reuse
+
+**N/A** — reference artifact has no component-plan rows (`${CLAUDE_PLUGIN_ROOT}/refs/component-plan.md`).
+
+| Surface | Template | Component | Action | Story |
+| --- | --- | --- | --- | --- |
+| Reference page | List page | Table | reuse | — |
+
 ## Error Handling
 
 **N/A** — reference artifact, no error scenarios.

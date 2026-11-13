@@ -53,6 +53,18 @@ revision replacing assets -> rewrite from every page row now in index.md
 LIBRARY none -> do not write the file
 ```
 
+## Pattern vocabulary and the component plan
+
+The designer's `component-plan.md` (`refs/component-plan.md`) names every surface with a pattern from the project-context `Pattern vocabulary` token and says reuse, extend or new before any screen is drawn; this file's inventory is the after-the-fact check of a finished design. Do not restate the vocabulary here: the token's file owns the names. A plan's library stories carry the `Library label`; with `UI-Components` as that label the Hard block below covers them.
+
+## Look logic
+
+```text
+logic that decides how something looks (initials, tints, number/date formats, status colours) := lives in ONE design-system component that boards and screens both mount
+board computes it in its own script, or hard-codes the colour -> fix the board to mount the component; never tune app code to match a board that uses a different rule
+design check mismatch on such a rule -> change the component (or the board), never add a deviation or retune one side
+```
+
 ## Components story (written by the scrum-master)
 
 ```text

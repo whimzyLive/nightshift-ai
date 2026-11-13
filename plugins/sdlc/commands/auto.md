@@ -66,7 +66,7 @@ creation) is **advisory** — its comments never block the merge.
 1. **Resolve `MODE`** — `eval "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-ai-workflow-mode.sh STORY_KEY)"`
    (ladder: `${CLAUDE_PLUGIN_ROOT}/refs/ai-workflow-mode-resolution.md`). Only `Full Auto` merges;
    empty or a read error takes the human-merge path. A QA `capped` verdict (draft PR) takes it too,
-   whatever `MODE` is, and its comment reads `Implementation stopped at the review round cap. Draft
+   whatever `MODE` is, and its comment reads `Implementation stopped at the review round cap (or a design board was left unchecked). Draft
    PR: <PR_URL> lists the open findings — fix them or merge it yourself.`
 2. **Resolve `DONE_STATUS`** — the `Pipeline done status` row of `.claude/project/project-context.md`.
 3. **Post the Jira comment FIRST** — `jira-site-guard.sh` once; guard fails → **STOP**, release with
@@ -162,7 +162,7 @@ raise** with `<NOTE>` for B1.
 
 After the impl PR is raised (A2 or B1), post the Step-3 comment, fire both events, and stop
 without the tail — the service owns the merge. Release with the PR URL. `DRAFT` := `true` on a QA
-`capped` verdict (draft PR, review round cap — the service must not merge it), else `false`.
+`capped` verdict (draft PR, review round cap or a design board uncovered or not checked — the service must not merge it), else `false`.
 
 ```bash
 curl -s --retry 3 -X POST http://localhost:9001 -H "Content-Type: application/json" \

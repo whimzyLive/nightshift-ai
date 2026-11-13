@@ -6,11 +6,12 @@
 #   re-injects the FULL TEXT of every frontmatter `skills:` preload — ~8k tokens per resume,
 #   verified byte-identical duplicates. Every agent under plugins/sdlc/agents/*.md that declares a
 #   frontmatter `skills:` key pays this tax on each resume. The verified workaround is to load
-#   skills via explicit Skill-tool calls in the agent's own first turn instead (immune to
-#   re-injection) rather than declaring them in frontmatter.
+#   skills via explicit Skill-tool calls instead (immune to re-injection) rather than declaring them
+#   in frontmatter. Agents no longer load skills upfront: the dispatch prompt carries the skills
+#   block from skills-for.sh and the agent invokes each skill at the step it names.
 #
 #   This script is a regression guard: it fails loudly while any agent still declares frontmatter
-#   `skills:`, and stays green once every agent has been converted to first-turn Skill-tool loads.
+#   `skills:`, and stays green once every agent carries the point-of-use skills marker.
 #
 # WHAT IT CHECKS
 #   Two checks, both must pass:
@@ -19,7 +20,7 @@
 #      is an offender. The body of the file may legitimately mention the word "skills:" in prose
 #      or code fences (e.g. explaining the Skill-tool workaround) — that must never trip this check.
 #   2. POSITIVE — every plugins/sdlc/agents/*.md must contain, verbatim on one physical line, the
-#      first-turn Skill-tool load marker sentence (see MARKER below). This proves the agent was
+#      point-of-use skills marker sentence (see `marker=` below). This proves the agent was
 #      actually converted, not just stripped of its frontmatter `skills:` block. A file missing the
 #      marker is an offender even if it has zero frontmatter `skills:`.
 #
@@ -56,10 +57,10 @@ if [ "${#files[@]}" -eq 0 ]; then
   exit 1
 fi
 
-# The literal first-turn Skill-tool load marker every converted agent must carry, verbatim on one
-# physical line (see the "Required skills" sections in plugins/sdlc/agents/*.md). Grepped with
+# The literal point-of-use skills marker every agent must carry, verbatim on one physical line
+# (the `## Skills` section of plugins/sdlc/agents/*.md). Grepped with
 # `grep -F` (fixed-string) so em dashes and punctuation are matched literally, not as regex.
-marker='Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:'
+marker='Skills for this dispatch arrive in the prompt (`skills-for.sh`); invoke each with the Skill tool at the step it names, never from frontmatter and never before that step.'
 
 preload_offenders=""
 marker_offenders=""
@@ -105,14 +106,14 @@ fi
 
 if [ -n "$marker_offenders" ]; then
   fail=1
-  echo "check-agent-skill-preloads: FAILED (missing first-turn Skill-tool load marker)"
+  echo "check-agent-skill-preloads: FAILED (missing point-of-use skills marker)"
   echo
-  echo "The following agents are missing the first-turn Skill-tool load marker sentence, so"
+  echo "The following agents are missing the point-of-use skills marker sentence, so"
   echo "there's no proof they were actually converted (not just stripped of frontmatter skills:):"
   echo
   printf '%s' "$marker_offenders" | sed 's/^/  - /'
   echo
-  echo "Fix: add a \"Required skills\" section whose lead-in is, verbatim on one line:"
+  echo "Fix: add a \"Skills\" section carrying, verbatim on one line:"
   echo "  $marker"
   echo
 fi
@@ -121,5 +122,5 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
-echo "check-agent-skill-preloads: OK — no agent declares frontmatter skills:, and every agent carries the first-turn Skill-tool load marker"
+echo "check-agent-skill-preloads: OK — no agent declares frontmatter skills:, and every agent carries the point-of-use skills marker"
 exit 0

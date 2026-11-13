@@ -33,8 +33,11 @@ Write the description using this block structure (verbatim section headers):
 **Dependencies**
 - [Story titles or keys that must complete first, or "None"]
 
+**UI surfaces**
+- [Pattern names this story shows, from the repo's pattern vocabulary (one per line), or "None" for a story with no UI]
+
 **Design**
-- [Repo path of a design asset this story implements + what to take from it, or "None"]
+- [Repo path of a FINAL design board this story implements + what to take from it, or "None"]
 
 **Dev Notes**
 - [Implementation directive from the requester — the HOW — or "None"]
@@ -43,14 +46,15 @@ Write the description using this block structure (verbatim section headers):
 - [Supporting material that is not a design — doc, URL, ticket, repo path — or "None"]
 ```
 
-All seven section headings (Context through References) are always present — an empty section
+All eight section headings (Context through References, `UI surfaces` included) are always present — an empty section
 renders `None`, never disappears.
 
 ## Design, Dev Notes, References — what goes where
 
 | Section | Holds | Never holds |
 | --- | --- | --- |
-| Design | Repo paths under `docs/design/<slug>/` from a merged `/design` PR — the design's `index.md` plus the specific page/render/screenshot rows THIS story implements, each with a one-line "take from it" (e.g. `pages/automations-admin-v3.html` + `renders/automations-admin-v3.png` — rule list table, empty state; ignore sidebar) | Files outside the repo, external links, whole-design dumps with no row picked |
+| UI surfaces | The vocabulary pattern names of the story's visible surfaces, copied from the component plan's rows when one exists (`refs/component-plan.md`) | Invented names, component code, anything not in the repo's `Pattern vocabulary` |
+| Design | FINAL boards only (a draft board is never named; `refs/design-workflow.md`). Repo paths under `docs/design/<slug>/` from a merged `/design` PR — the design's `index.md` plus the specific page/render/screenshot rows THIS story implements, each with a one-line "take from it". Name each board by its FULL page path AND its render/screenshot PNG path (screenshot wins) from the index (e.g. `docs/design/<slug>/pages/automations-admin-v3.html` + `docs/design/<slug>/renders/automations-admin-v3.png` — rule list table, empty state; ignore sidebar); with a project-context `Design check`, the story's first UI task writes that board's check entry | Files outside the repo, external links, whole-design dumps with no row picked |
 | Dev Notes | How the requester wants it built: a library, pattern, file to extend, constraint, approach to avoid | Testable outcomes (those are ACs), product rationale (that is Context) |
 | References | Non-design material: specs/docs, API docs, related tickets/PRs, external URLs, `docs/design/<slug>/references/` files, existing code to mirror | Designs (Design section), requirements (ACs) |
 

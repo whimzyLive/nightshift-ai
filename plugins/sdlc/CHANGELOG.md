@@ -1,3 +1,160 @@
+## 0.51.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** drop the rtk wrapper and context-mode from the pipeline ([d2216d8](https://github.com/whimzyLive/nightshift-ai/commit/d2216d8))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** drop the rtk wrapper and context-mode from the pipeline  ([d2216d8](https://github.com/whimzyLive/nightshift-ai/commit/d2216d8))
+  the knowledge-engineer agent no longer lists the
+  context-mode MCP tools, so a repo that relied on ctx_index during
+  /sdlc:docs distill now clusters from the on-disk corpus only. The
+  rtk-line-scan hook and rtk-coverage instrument are gone; repos that
+  copied the hook keep their own copy and must drop it themselves.
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.50.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** make the canvas the only copy of wireframe drafts ([2442b39](https://github.com/whimzyLive/nightshift-ai/commit/2442b39))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** make the canvas the only copy of wireframe drafts  ([2442b39](https://github.com/whimzyLive/nightshift-ai/commit/2442b39))
+  a publish recipe must now cover downloading wireframe
+  boards back to the working-folder form (fragments and shell parts, hand
+  edits and data-pattern tags intact); a recipe without a download step can
+  no longer run another pass.
+  Claude-Session: https://claude.ai/code/session_01QXL4EcjWoTxkhbyDXaRizS
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.49.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** draft mode produces linked wireframes in a temp dir ([7765dc7](https://github.com/whimzyLive/nightshift-ai/commit/7765dc7))
+- **sdlc:** ship a wireframe kit with build and check scripts ([89788c5](https://github.com/whimzyLive/nightshift-ai/commit/89788c5))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** draft mode produces linked wireframes in a temp dir  ([7765dc7](https://github.com/whimzyLive/nightshift-ai/commit/7765dc7))
+  the project-context Design rows `Draft folder` and
+  `Draft page prefix` are removed; draft boards are no longer written to
+  the repo. Add `Wireframe targets` (`web`, `phone` or `web, phone`;
+  default `web` when absent) and update the publish recipe to cover
+  wireframes (see refs/design-workflow.md).
+  Claude-Session: https://claude.ai/code/session_01QXL4EcjWoTxkhbyDXaRizS
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.48.0 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** write skills.json v2 from /init and drop skills from agent overrides ([cfad761](https://github.com/whimzyLive/nightshift-ai/commit/cfad761))
+- ⚠️  **sdlc:** load skills at the step that needs them, never upfront ([e7609e0](https://github.com/whimzyLive/nightshift-ai/commit/e7609e0))
+- **sdlc:** add skills-for.sh, the plugin skills contract and artefact checks ([7cc4325](https://github.com/whimzyLive/nightshift-ai/commit/7cc4325))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** load skills at the step that needs them, never upfront  ([e7609e0](https://github.com/whimzyLive/nightshift-ai/commit/e7609e0))
+  agent overrides' `## Project skills` sections are no longer read; skills are
+  named only through `.claude/project/skills.json` v2 rows (a v1 file is tracked-only and injects
+  nothing); the `Skills loaded` set-coverage check and its RETURN-CONTRACT redispatch are removed;
+  the bundled design-md, enhance-prompt, graphify, to-issues, user-story and skill-creator skills
+  are removed (use anthropic-skills:skill-creator); the vercel-* skills install from
+  vercel-labs/agent-skills through skills-map instead of a vendored copy; the executing-plans and
+  test-driven-development contract rows are gone and conventional-commit is optional. Re-run /sdlc:init to upgrade a consumer repo.
+  Claude-Session: https://claude.ai/code/session_01QXL4EcjWoTxkhbyDXaRizS
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.47.8 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** add designing-in-patterns skill and move component decisions to the designer ([e70a5e9](https://github.com/whimzyLive/nightshift-ai/commit/e70a5e9))
+- **sdlc:** add Design tokens to project-context and init, document the designer ([f745ff8](https://github.com/whimzyLive/nightshift-ai/commit/f745ff8))
+- **sdlc:** carry the component plan through stories, specs, QA and epic runs ([42aa411](https://github.com/whimzyLive/nightshift-ai/commit/42aa411))
+- **sdlc:** add designer agent, draft/plan/final design modes and ui-audit ([1a97283](https://github.com/whimzyLive/nightshift-ai/commit/1a97283))
+- **sdlc:** add design-kind, library-blockers and designer model scripts ([6d2d648](https://github.com/whimzyLive/nightshift-ai/commit/6d2d648))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.47.7 (2026-11-11)
+
+### 🚀 Features
+
+- **sdlc:** pick the QA reviewer model from a story-point threshold ([846a740](https://github.com/whimzyLive/nightshift-ai/commit/846a740))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.47.6 (2026-11-03)
+
+### 🩹 Fixes
+
+- **sdlc:** accept extra fields on the design check report line and reject dirty runs ([ba5e654](https://github.com/whimzyLive/nightshift-ai/commit/ba5e654))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.47.5 (2026-11-03)
+
+### 🩹 Fixes
+
+- **sdlc:** point the handoff at the design-check duties ([efdef2a](https://github.com/whimzyLive/nightshift-ai/commit/efdef2a))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
+## 0.47.4 (2026-11-03)
+
+### 🚀 Features
+
+- **sdlc:** pass the design image and fidelity-first rule to UI implementation ([93dd683](https://github.com/whimzyLive/nightshift-ai/commit/93dd683))
+- **sdlc:** add the look-logic principle to ui-components and design-references ([8b26bb8](https://github.com/whimzyLive/nightshift-ai/commit/8b26bb8))
+- **sdlc:** point /design at the board check and surface font warnings ([34a7853](https://github.com/whimzyLive/nightshift-ai/commit/34a7853))
+- **sdlc:** have UI domain agents run the design check and report its result ([327e598](https://github.com/whimzyLive/nightshift-ai/commit/327e598))
+- **sdlc:** run the design check in the QA gate and govern deviations ([aa4d939](https://github.com/whimzyLive/nightshift-ai/commit/aa4d939))
+- **sdlc:** require design check evidence for Design lines when configured ([561ccc8](https://github.com/whimzyLive/nightshift-ai/commit/561ccc8))
+- **sdlc:** add optional Design check row to project-context Tooling ([a638472](https://github.com/whimzyLive/nightshift-ai/commit/a638472))
+- **sdlc:** keep page names stable on design revision and warn on unbundled fonts ([6791745](https://github.com/whimzyLive/nightshift-ai/commit/6791745))
+
+### 🩹 Fixes
+
+- **sdlc:** start the design check entry from a scaffolded shell ([a6c0cbe](https://github.com/whimzyLive/nightshift-ai/commit/a6c0cbe))
+- **sdlc:** scope design image authority and keep deviations owner-approved ([0f1dd84](https://github.com/whimzyLive/nightshift-ai/commit/0f1dd84))
+- **sdlc:** name both design causes in capped status text ([f73678c](https://github.com/whimzyLive/nightshift-ai/commit/f73678c))
+- **sdlc:** treat not-checked like uncovered for a story's own design boards ([dc11aa6](https://github.com/whimzyLive/nightshift-ai/commit/dc11aa6))
+- **sdlc:** tidy wording for the uncovered-board cap ([b387e1f](https://github.com/whimzyLive/nightshift-ai/commit/b387e1f))
+- **sdlc:** let the QA verdict rules cap on an uncovered design board ([35d6727](https://github.com/whimzyLive/nightshift-ai/commit/35d6727))
+- **sdlc:** cap the verdict when a story's design board stays uncovered ([96868f4](https://github.com/whimzyLive/nightshift-ai/commit/96868f4))
+- **sdlc:** restore plain stray-file guard, add not-checked design state ([c6533ad](https://github.com/whimzyLive/nightshift-ai/commit/c6533ad))
+- **sdlc:** default design-check report to .tmp, define board key, keep font warnings ([0c7dd4b](https://github.com/whimzyLive/nightshift-ai/commit/0c7dd4b))
+- **sdlc:** make design-check evidence reachable and design-ingest renames safe ([c142936](https://github.com/whimzyLive/nightshift-ai/commit/c142936))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.3 (2026-10-27)
 
 ### 🚀 Features

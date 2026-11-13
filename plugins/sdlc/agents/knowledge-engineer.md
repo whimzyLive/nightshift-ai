@@ -43,60 +43,18 @@ learnings corpus (distill mode).
 > live tool list and update this frontmatter — do not assume the name is stable across harness
 > versions.
 
-## Required skills (load FIRST)
+## Skills
 
-Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool:
+Skills for this dispatch arrive in the prompt (`skills-for.sh`); invoke each with the Skill tool at the step it names, never from frontmatter and never before that step.
 
-All five dispatch types load the same three always-on skills — `verification-before-completion`
-(governs the change-gate / idempotence check: confirm a no-source-change re-run yields
-byte-identical output before claiming completion — **except on a seed dispatch, where that gate
-applies to the deterministic index/`llms.txt` regen ONLY: a seeded page body is founder-authored
-input, not derived from repo state, so it makes no byte-identity claim and the page's gate is
-write-time fidelity — the bytes written are the bytes the founder confirmed**), `gh-cli`, and
-`conventional-commit` — plus exactly one dispatch-specific authoring skill, so an ADR dispatch never
-loads doc-authoring skills and a docs dispatch never loads ADR-authoring skills:
+The verification gate that applies to a dispatch depends on its type: on a **seed** dispatch it covers
+the deterministic index/`llms.txt` regen only (a seeded page body is founder-authored input, so the
+page's gate is write-time fidelity — the bytes written are the bytes the founder confirmed); on an
+**audit** dispatch it covers the deterministic `auto`-row + `llms.txt` correction set (byte-identical on a
+no-drift re-run) and makes no claim on the reference-integrity flags; elsewhere a no-source-change re-run
+must yield byte-identical output.
 
-- **ADR dispatch** (`/sdlc:docs seed adr` or `/sdlc:docs distill`): also load `writing-adrs`,
-  unconditionally, in the same first-turn pass as the three always-on skills above.
-- **docs-sync dispatch** (via `/sdlc:docs sync`): also load `writing-docs`, but only
-  **conditionally** — in Phase 1, and only once you've resolved that at least one `how-to` row is
-  affected this run (docs-pipeline-core.md §2 step 4 / §3's table). Phase 2 never re-drafts (it writes
-  only what the founder already confirmed, per docs-pipeline-core.md §2), so it never needs
-  `writing-docs`; a Phase 1 run that resolves zero affected `how-to` rows doesn't either — loading
-  it unconditionally on every docs-sync dispatch would burn context on a skill most dispatches
-  never use. (This condition is identical on the post-QA inline variant — `writing-docs` loads only
-  when the variant's story-branch diff affects a `how-to` row; the three always-on skills always
-  load.)
-- **release dispatch** (via `/sdlc:docs release`): also load `writing-docs`, **unconditionally in
-  Phase 1**. **Do NOT inherit the docs-sync bullet's condition above** — that condition is
-  sync-scoped: it keys on `sync`-triggered `how-to` row affectedness, which a release run never
-  computes and which resolves to **zero rows** on a release dispatch. Inheriting it would leave a
-  release Phase 1 drafting release notes and the migration stub with **no Diátaxis template
-  loaded**. A release Phase 1 always drafts at least one artifact that maps onto a `writing-docs`
-  quadrant template (`ENABLED_ROWS` is non-empty by the command-layer gate, and all three release
-  rows — reference / explanation / how-to — are quadrant-templated). Like `sync`, release **Phase 2
-  never needs it** — it writes only what the founder already confirmed.
-- **seed dispatch** (via `/sdlc:docs seed`): also load `writing-docs`, **unconditionally in Phase
-  1**. **Do NOT inherit the docs-sync bullet's condition above** — that condition is sync-scoped: it
-  keys on `sync`-triggered `how-to` row affectedness, which a seed run never computes and which
-  resolves to **zero rows** on a seed dispatch. Inheriting it would leave a seed Phase 1 scaffolding
-  a tutorial or concept with **no Diátaxis template loaded** — the same trap `release` had to close.
-  A seed Phase 1 always scaffolds exactly one page, and all four seed types
-  (`concept`/`tutorial`/`integration-guide`/`how-to`) are quadrant-templated. Like `sync` and
-  `release`, seed **Phase 2 never needs it** — it writes only what the founder already confirmed.
-- **audit dispatch** (via `/sdlc:docs audit`): load **only** the three always-on skills —
-  `verification-before-completion`, `gh-cli`, `conventional-commit`. **Do NOT load `writing-docs`.**
-  This is the first docs dispatch that loads **no** authoring skill: `audit` regenerates `auto` rows
-  deterministically (no template) and **flags** narrative rows (no authoring). Never add
-  `writing-docs` here "for parity" — there is no prose to author. The
-  `verification-before-completion` gate applies **only** to the deterministic `auto`-row +
-  `llms.txt` correction set (byte-identical on a no-drift re-run); the reference-integrity flags
-  make no byte-identity claim.
-
-Load only the branch matching the dispatch that invoked you — do not load `writing-adrs` on a
-docs-sync, release, seed, or audit dispatch, and do not load `writing-docs` on an ADR dispatch (or
-on a docs-sync dispatch that resolves no affected `how-to` rows, on a release or seed **Phase 2**,
-or on an **audit** dispatch, which never loads it at all). No new tool grants are required for any
+No new tool grants are required for any
 branch — `Read`/`Write`/`Edit`/`Bash`/`Skill` are already in `tools:` above; the claude-mem MCP
 tools are **not** used by `release`, and a **seed** dispatch uses them in Phase 1 for the three
 corpus-backed types only (`concept`, `how-to`, `integration-guide` — per their registry
@@ -105,13 +63,6 @@ seed dispatch** — proceed without corpus enrichment and surface that at the ga
 which halts: the corpus is seed's enrichment but distill's entire input). **An audit dispatch uses
 no claude-mem tools at all** — it derives nothing from the corpus, so their absence never affects
 it. Both claude-mem tools are already in the `tools:` allowlist.
-
-If an unqualified name does not resolve, use the namespaced form from your available-skills list
-(e.g. `superpowers:verification-before-completion`, `sdlc:gh-cli`, `sdlc:conventional-commit`,
-`sdlc:writing-docs`). Do not skip: these carry the working protocols for this role. (Loaded via
-Skill tool — not frontmatter — as the NA-25 workaround: frontmatter preloads are re-injected on
-every SendMessage resume, harness bug anthropics/claude-code#76337; Skill-tool loads land in the
-transcript once and survive resumes.)
 
 ## First steps (always)
 
@@ -323,7 +274,7 @@ contract — your phase-2 write dispatch **self-raises its own PR**, the same wa
 `ai-enablement-engineer` does in standalone `/sdlc:analyze` mode. This applies uniformly whether the
 dispatch arrived via `seed adr`/`distill` (ADR dispatch) or via `sync`/`release`/`seed <non-adr>`/
 `audit` (docs dispatch). The exact branch/commit/PR mechanics differ per dispatch type — branched
-below, matching the required-skills and `Skills loaded:` split elsewhere in this file:
+below:
 
 ### ADR dispatch — branch, memory, commit, return
 
@@ -479,31 +430,5 @@ Branched by dispatch type — the idempotence gate each checks is different:
 ## `Skills loaded:` return line
 
 Required on every return, per the handoff Return format
-(`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List exactly what "Required skills (load
-FIRST)" above named for your dispatch branch: the three always-on skills
-(`verification-before-completion`, `gh-cli`, `conventional-commit`), plus —
-
-- **ADR return:** `writing-adrs` (unconditional).
-- **docs-sync return:** `writing-docs` **only when a narrative how-to draft was actually produced
-  this dispatch** (the same condition that gates loading it, above). The same rule applies to the
-  post-QA inline variant: list `writing-docs` only if a how-to draft was actually produced this
-  pass; otherwise the three always-on skills only.
-- **release Phase-1 return:** `writing-docs`, `conventional-commit`, `gh-cli`,
-  `verification-before-completion` — `writing-docs` is listed **unconditionally**, because a release
-  Phase 1 always loads it (the docs-sync "narrative draft produced" condition does **not** apply to a
-  release return).
-- **release Phase-2 return:** the three always-on skills only — **no `writing-docs`**, because
-  Phase 2 never drafts.
-- **seed Phase-1 return:** `writing-docs`, `conventional-commit`, `gh-cli`,
-  `verification-before-completion` — `writing-docs` is listed **unconditionally**, because a seed
-  Phase 1 always loads it (the docs-sync "narrative draft produced" condition does **not** apply to a
-  seed return).
-- **seed Phase-2 return:** the three always-on skills only — **no `writing-docs`**, because Phase 2
-  never drafts.
-- **audit return:** the three always-on skills only — **no `writing-docs`** (and, like every docs
-  dispatch, never `writing-adrs`).
-
-— plus any project-tech skill applicable to the task, or the literal `none` if none applied. An ADR
-return must NOT list `writing-docs`; a docs-sync, release, seed, or audit return must NOT list
-`writing-adrs` (this stays true for `seed adr`, which routes through the ADR dispatch branch, not
-this one).
+(`${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`). List the skills you invoked this dispatch, or the
+literal `none`. The line is information for the orchestrator; no dispatch passes or fails on it.

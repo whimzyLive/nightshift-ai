@@ -117,11 +117,15 @@ Each child run of `/auto <STORY>`:
    `Plan step` to `on` in its project context gets a tech-lead plan committed to the same branch
    first; it needs no approval, so it runs unattended too.
 4. **Implement** — domain agents run in dependency order (database → backend → sync → web →
-   mobile). `dep-gate.sh` holds a story whose blockers have not merged.
+   mobile). `dep-gate.sh` holds a story whose blockers have not merged. A UI agent is handed each
+   Design row's page and its image and reads the image before building; with a `Design check` set,
+   it writes the board's check entry first and builds until the check passes.
 5. **QA, in session** — review, fix, re-review until clean and every acceptance criterion has
    evidence. Round 1 is the one full review; later rounds check only the fixes, and review stops
    after 3 rounds. Important findings still open at that point make the PR a **draft** that lists
-   them, and it waits for you even in `Full Auto`.
+   them, and it waits for you even in `Full Auto`. A project that sets the optional `Design check`
+   row in its project context also runs that check in the gate for UI stories, and a Design row
+   counts as met only when the check's report shows the board passed.
 6. **One PR** — spec (and plan, when on) and code together. Copilot review is advisory.
 7. **Tail** — `Full Auto`: wait for checks, merge, move the story to Done. Otherwise the PR waits
    for you.

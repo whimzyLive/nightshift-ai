@@ -2,7 +2,8 @@
 description: Triage an unpolished Jira story or a raw text/idea blob into a well-formed story. Refines existing tickets in-place or creates new ones. Use when a story is incomplete, when you receive a rough ticket from a stakeholder, or when raw input needs to be formalised into Jira before it enters the /spec pipeline.
 ---
 
-Dispatch the `scrum-master` agent in **triage mode** with the following input:
+Dispatch the `scrum-master` agent in **triage mode**, with the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh scrum-master --mode triage --print-prompt`, and the following input:
 
 ```
 $ARGUMENTS

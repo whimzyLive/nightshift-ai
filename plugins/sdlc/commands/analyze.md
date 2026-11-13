@@ -3,7 +3,8 @@ description: Manually-triggered repo-wide scan for AI-config drift, gaps, and co
 ---
 
 `/sdlc:analyze` is **manual only** — there is no scheduling/background trigger. Dispatch the
-`ai-enablement-engineer` agent to scan this repo's AI-configuration surface (`CLAUDE.md`,
+`ai-enablement-engineer` agent (with the output of
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh ai-enablement-engineer --mode analyze --print-prompt`) to scan this repo's AI-configuration surface (`CLAUDE.md`,
 `AGENT(S).md`, `.agents/**`, `.claude/**`, etc.) plus `plugins/**`/`skills/**` — when the repo has
 opted in — for drift, gaps, and config-vs-memory conflicts, and report the findings.
 
@@ -73,7 +74,7 @@ per-finding fields (`area` · `kind` · `detail` · `proposed fix` · `target pa
 Canonical table (defined exactly once):
 [`analyze-protocol.md#error-handling`](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#error-handling).
 Gist: not-Active/unreadable project-context → STOP, report-only; no drift found → report and exit
-clean; apply without confirmation or outside write-scope → refuse; `find-skills`/`skill-creator`
+clean; apply without confirmation or outside write-scope → refuse; `find-skills`/`anthropic-skills:skill-creator`
 offline → degrade gracefully; `find-skills` install/update commands → refuse (surfacing/suggesting
 only, see [Skill usage guardrails](${CLAUDE_PLUGIN_ROOT}/refs/analyze-protocol.md#skill-usage-guardrails)).
 

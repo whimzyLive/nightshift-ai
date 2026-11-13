@@ -42,6 +42,25 @@ generated file — every slot must be replaced with an actual value.
 | Typecheck | `<typecheck cmd>` |
 | Test | `<test cmd>` |
 | UI library | `<shared component package path>` |
+| Design check | `<design-check cmd>` |
+
+## Design
+<!-- OPTIONAL section for repos with a UI. Delete the whole section when there is no design workflow; /sdlc:design --draft|--plan|--final needs the rows marked required. -->
+
+| Token | Value |
+| ----- | ----- |
+| Pattern vocabulary | `<pattern-vocabulary-path>` |
+| Bundle inventory | `<bundle-inventory-path>` |
+| Bundle global | `<bundle-global>` |
+| Wireframe targets | `<web | phone | web, phone>` |
+| Final page prefix | `<final-page-prefix>` |
+| Component review | `<component-review-cmd>` |
+| Library label | `<library-label>` |
+| Design canvas | `<design-canvas>` |
+| Publish recipe | `<publish-recipe-path>` |
+| Designer model draft | `<model>` |
+| Designer model plan | `<model>` |
+| Designer model final | `<model>` |
 
 ## Memory
 
@@ -63,6 +82,8 @@ generated file — every slot must be replaced with an actual value.
 | Review agent | `<review-agent>` |
 | Review mode  | `<review-mode>`  |
 | Review gate  | `<review-gate>`  |
+<!-- OPTIONAL: delete this row to keep the QA reviewer on opus. -->
+| Reviewer model threshold (story points, inclusive) | `<reviewer-model-threshold>` |
 
 ## Pipeline
 
@@ -80,6 +101,22 @@ generated file — every slot must be replaced with an actual value.
 - **UI library** — the shared component package other workspaces import (e.g.
   `packages/ui/`); omit the row when there is none. `/design` inventories
   components against it (`refs/ui-components.md`).
+- **Design check** — optional command that renders each design board and the screen that builds
+  it and fails on any unaccepted difference (e.g. `pnpm exec nx affected -t fidelity`); omit the
+  row when there is none. Row absent or empty = the design-fidelity gate is off and every
+  pipeline step behaves as it did before (`refs/design-references.md` Design check). The check is
+  not a Quality Gate command: only the QA gate's design step runs it. An optional `Design check
+  report` row (not in the table above; add it only when the path differs) names the report file, default `.tmp/design-check/report.txt`
+  (`/init` git-ignores `.tmp/`); a custom path MUST be git-ignored too, or the gate's stray-file check stops on it. The command must write that report on every run, even when nothing is
+  affected, from one non-cached aggregate step covering every board (e.g. Nx `cache: false`), or the
+  verifier reads a stale or missing report. Line format: `refs/design-references.md` Design check.
+- **Design** — all rows optional unless a mode needs them; omit any blank row, and the whole section when the repo has no design workflow. `/init` never asks for them; a repo adds the section once its design system exists.
+  - `Pattern vocabulary` (required by every mode) — path to the file of fixed pattern names, each naming its template or component. `Bundle inventory` (plan, final) — folder with one entry per component the design bundle exports; the plan's "exists in the bundle" test greps it, never reads source. `Bundle global` (final) — the global name the bundle exposes in the browser (e.g. `window.<Name>`); boards mount `<Global>.<Component>`.
+  - `Wireframe targets` (draft) — which frames `--draft` draws: `web` (browser-frame boards; the default when the row is absent), `phone` (device-frame boards only), or `web, phone` (every screen of the journey, empty and error states included, also gets a phone board; no web-only screens). Draft boards are written to the session temp dir, never the repo. `Final page prefix` (final) — the prefix of final board files.
+  - The `Pattern vocabulary` file may carry an optional `Wireframe` column naming the kit classes or snippet that draw each pattern in a wireframe (`refs/wireframe-kit/README.md`); a row without one is drawn as a plain `.sk` box tagged with the pattern name.
+  - `Component review` — the command that serves the library's variant stories for the explore step (e.g. a Storybook run). `Library label` — the Jira label of library stories, default `Library`; set `UI-Components` to ride the existing hard block (`refs/ui-components.md`).
+  - `Design canvas` (id or URL) and `Publish recipe` (path of the doc that says how to publish a board there) — optional; both unset = nothing is published and the commands hand back file paths.
+  - `Designer model draft|plan|final` — a model alias or id; defaults opus, sonnet, sonnet (`scripts/resolve-designer-model.sh`).
 - **Omit none-detected stack rows** — in `## Detected stack`, omit any row
   whose detected value is empty or `none`. Do not write `none` into the file.
 - **Package manager appears twice** — once in the top table (user-confirmed
@@ -108,6 +145,9 @@ generated file — every slot must be replaced with an actual value.
   > project-context files. `/init` writes `claude-inline` **explicitly**, so new
   > repos get the in-session reviewer; pre-existing repos without the token keep
   > the historical Copilot behaviour.
+- **Reviewer model threshold** — OPTIONAL. Integer story points; a non-Bug story at or under it gets a
+  `sonnet` first-round QA reviewer, everything else `opus`. Omit the row (the default) to keep `opus`
+  always. Substitute the `/init` answer, or delete the row when left unset.
 - **Review retention window** — default `6 months` when the founder does not request otherwise.
   Accepted formats are **exactly** `<n> months` (wall-clock age) or `<n> stories` (activity-based —
   preferred for low-activity repos, where wall-clock decay would expire still-relevant rules

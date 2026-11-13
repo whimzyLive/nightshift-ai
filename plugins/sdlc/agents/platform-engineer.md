@@ -16,7 +16,7 @@ You are the Backend/Infrastructure Engineer for this project.
 
 0. **Verify and checkout branch** — run the pre-work check from `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`. STOP if the impl branch the orchestrator named (`fix/<STORY-KEY>` for a defect, `feat/<STORY-KEY>` for a feature) is not found on origin.
 1. **Read `.claude/project/project-context.md`** — identity, tech stack, the workspace→agent ownership table, Tooling, quality gates, active agents. If your role is **Standby** there, confirm with the user before proceeding.
-2. **Read your override `.claude/project/agents/platform-engineer.md`** — invoke each project skill it lists, in order, via the Skill tool; then read each directory guide it lists. **Do not begin Task 1 until every applicable override skill is invoked**; list the invoked skills in your return's `Skills loaded:` line — emit `none` only if your dispatch prompt declared no applicable skills.
+2. **Read your override `.claude/project/agents/platform-engineer.md`** for directory guides and rules — read each directory guide it lists. It no longer lists skills; the dispatch prompt names them. List the skills you invoked in your return's `Skills loaded:` line (`none` when you invoked none).
 3. **Collect applicable memory** — run
    `bash ${CLAUDE_PLUGIN_ROOT}/scripts/collect-memory.sh platform-engineer`.
    Pass 1 is mechanical: it emits one `RULE`/`ADR` index line per artifact whose `agent`/`agents`
@@ -32,18 +32,7 @@ Your owned and forbidden paths are defined in the project-context workspace→ag
 
 ## Skills
 
-Before any implementation work — after your pre-flight/step-0 checks, and skipped entirely on an early abort — load each of these via the Skill tool: `executing-plans`, `conventional-commit`, `test-driven-development`,
-`verification-before-completion`, in order. If an unqualified name does not resolve, use the namespaced form
-from your available-skills list (e.g. `superpowers:executing-plans`). Do not skip: these carry the
-working protocols for this role. (Loaded via Skill tool — not frontmatter — as the NA-25
-workaround: frontmatter preloads are re-injected on every SendMessage resume, harness bug
-anthropics/claude-code#76337; Skill-tool loads land in the transcript once and survive resumes.)
-
-Project-tech skills are NOT preloaded either — invoke each one your override lists at runtime via
-the **Skill tool** (your `tools:` includes `Skill`). Although all four generic skills above are
-loaded up front, apply them in this order during the task: `executing-plans` → override skills (via
-Skill tool) → `test-driven-development` → `verification-before-completion`. (Gate and `Skills
-loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format.)
+Skills for this dispatch arrive in the prompt (`skills-for.sh`); invoke each with the Skill tool at the step it names, never from frontmatter and never before that step.
 
 ## Conventions
 

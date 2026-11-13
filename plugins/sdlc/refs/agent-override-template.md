@@ -2,7 +2,8 @@
 
 This file is the canonical template for `.claude/project/agents/<agent>.md`.
 `/init` Step 4c generates one file per active domain agent by filling the
-token slots below. No placeholder tokens (`<...>`) may remain in the generated
+token slots below. Overrides carry directory guides, ownership and rules; skills live in
+`.claude/project/skills.json`. No placeholder tokens (`<...>`) may remain in the generated
 files — every slot must be replaced with an actual value.
 
 ---
@@ -11,11 +12,6 @@ files — every slot must be replaced with an actual value.
 
 ```markdown
 # <Agent display name> — <project name> bindings
-
-## Project skills (invoke in order via the Skill tool)
-
-<list each confirmed skill relevant to this agent's domain, one per line, numbered>
-<if no skills are relevant to this agent, write: # No project skills configured yet.>
 
 ## Directory guides (read before coding)
 
@@ -46,23 +42,6 @@ files — every slot must be replaced with an actual value.
 
 ---
 
-## Agent domain mapping
-
-Use this table to filter the confirmed install list (from Step 3.5) to skills
-relevant to each agent. The authoritative per-skill domain list is in
-`refs/skills-map.yml` (each skill's `domains` array). This table is a quick
-reference summary; do not duplicate or diverge the skill assignments here.
-
-| Agent | Relevant skill domains |
-| --- | --- |
-| `platform-engineer` | API/backend skills: `hono-api`, `api-routes`, `typeorm`, `electrodb`, and any custom backend skills |
-| `web-engineer` | Frontend skills: `react-components`, `vercel-react-best-practices`, `vercel-composition-patterns` |
-| `mobile-engineer` | Mobile skills: any custom mobile skills; no built-in suggestions map here |
-| `database-administrator` | ORM/migration skills: `typeorm`, `electrodb`, and any custom DB skills |
-| `sync-engineer` | Sync-layer skills: no built-in suggestions; any custom sync skills |
-
----
-
 ## Run-order table
 
 Use this table to populate the `runs after / before` line in `## Ownership`.
@@ -79,13 +58,17 @@ an agent has no active upstream, write `—`; if no active downstream, write `�
 
 ---
 
-## Per-agent filtering rules
+## Skills
 
-When populating `## Project skills` for a given agent:
+An override does not list skills. `.claude/project/skills.json` (`refs/skills-manifest.md`) names the
+skills each agent uses and when, and the dispatch prompt carries them (`scripts/skills-for.sh`).
 
-1. Start from the confirmed install list produced in Step 3.5.
-2. Retain only skills whose `domains` array (in `refs/skills-map.yml`) includes
-   this agent's name.
-3. If no confirmed skills are relevant, write the placeholder comment:
-   `# No project skills configured yet.`
-4. Do not write override files for agents the user did not select.
+## Designer notes
+
+The `designer` override records the board lint rules, page template names and the bundle sync
+recipe in `## Tech rules`. `web-engineer` and `mobile-engineer` overrides keep construction rules
+only (layering, Storybook keyboard tests, bundle membership, accessibility, fidelity-gate operation)
+and never restate the design decision rules (reuse/extend/new, shadcn parts for a new pattern,
+restyling), which belong to `designer`.
+
+Do not write override files for agents the user did not select.

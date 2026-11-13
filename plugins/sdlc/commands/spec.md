@@ -32,8 +32,9 @@ ITYPE="$(acli jira workitem view <STORY-KEY> --fields issuetype --json 2>/dev/nu
 ## Step 1 — Write the spec (inline — never a subagent)
 
 The spec is approved by a human in this session, so it is never dispatched. Read
-`${CLAUDE_PLUGIN_ROOT}/agents/solutions-architect.md` and follow it as yourself: required skills,
-input validation, source-of-truth rules, first steps, the output structure, accuracy rules and
+`${CLAUDE_PLUGIN_ROOT}/agents/solutions-architect.md` and follow it as yourself: the skills block
+(`bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh solutions-architect --print-prompt`, each skill invoked at
+the step it names), input validation, source-of-truth rules, first steps, the output structure, accuracy rules and
 self-review. Path: `docs/superpowers/specs/<STORY-KEY>.md`. It already exists on
 `origin/feat/<STORY-KEY>` → revise it there instead of STOPping.
 
@@ -57,7 +58,9 @@ unattended `/auto` implements it as written and cannot ask.
 Summarise the spec (data model, API surface, UI, the task list by agent, out of scope) and ask with
 `AskUserQuestion`: **Approve spec for <STORY-KEY>?** — `Approve (Recommended)` | `Request changes`.
 Changes → revise, then ask again. Never continue without an explicit Approve, and never ask while
-the spec still has an open question (back to Step 2).
+the spec still has an open question (back to Step 2). Before asking, run
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-spec.sh docs/superpowers/specs/<STORY-KEY>.md`; `MISSING=`/`TBD=` lines →
+fix the spec and re-run, never ask while it fails.
 
 ## Step 4 — Commit to the story branch and record the approval
 

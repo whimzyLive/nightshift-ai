@@ -26,6 +26,8 @@ and create the PR only after QA returns a `clean` verdict (a draft PR on `capped
   approved spec on the story branch — `SPEC := docs/superpowers/specs/<STORY-KEY>.md`, its
   `## Implementation tasks` (a plan doc `docs/superpowers/plans/<STORY-KEY>.md` on the branch, when one
   exists, is used instead).
+- `STORY_POINTS` — `N` | `missing`, from the caller's inline `refs/triage.md` block; default `missing`.
+  Passed on to QA, which uses it only to pick the round-1 reviewer model.
 - `WORK_KIND` — `defect` | `feature`, from the caller's inline `refs/triage.md`; default `feature`.
   `defect` → read `${CLAUDE_PLUGIN_ROOT}/refs/defect-variant.md` now (the systematic-debugging
   ladder) and use the `fix/` prefix. `LIGHTWEIGHT` and `WORK_KIND` are **orthogonal** — a lightweight
@@ -83,7 +85,8 @@ sub-task probe, `scripts/worktree-setup.sh`, and the branch push. Keep `BASE_SHA
 (`git show origin/<BRANCH_PREFIX>/<STORY-KEY>:<SPEC>`) — its `## Implementation tasks` lines are the
 tasks. Group them by agent tag: `[database-administrator]`, `[platform-engineer]`,
 `[ai-enablement-engineer]`, `[sync-engineer]`, `[web-engineer]`, `[mobile-engineer]`; drop Standby
-phases with no tasks.
+phases with no tasks. When `SPEC` is the source, run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-spec.sh "$WORKTREE/<SPEC>"` —
+`MISSING=`/`TBD=` lines → STOP: the spec fails the writing-specs template; list them.
 
 **Lightweight path:** fetch the story (summary, description, ACs) via
 `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` and turn it into an ordered, agent-tagged task list —
@@ -143,11 +146,10 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
 4. Plan doc: `SLICE=` path from Step 4 (`## Plan slice`, `refs/domain-agent-handoff.md`). No plan
    doc: the story's ACs verbatim — plus, on the full path, the `SPEC` path and this agent's
    `## Implementation tasks` lines.
-5. **Applicable override skills** — EITHER name the project skills to invoke (from the target
-   agent's override, `.claude/project/agents/<agent-name>.md`, its skills section) with "Invoke these
-   via the Skill tool BEFORE starting Task 1: `<skill-a>, <skill-b>`", OR state "No project skills
-   apply for this task." Exactly one of the two.
-6. The story's Design paths + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
+5. **Skills for this dispatch** — paste the output of
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <owned paths of this phase> --print-prompt`
+   (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
+6. The story's Design paths — each page path WITH its render/screenshot PNG path, the agent reads the PNG (none: Grep for the region, then a bounded Read of the page) before building. When the story's Design row names no PNG (older or AI-Ready stories), resolve it from the design index (the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins) — + the story's component-plan rows (surface, component, action; `docs/design/<slug>/component-plan.md`, none when the Epic has no plan) + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
    and any plan "grounding corrections" verbatim — short items only; spec sections by name, not by
    paste.
 7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
@@ -161,7 +163,7 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
     `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`'s rule-file flow and stage them with your
     commit — most dispatches admit nothing, and that's expected."
 11. "Use the package manager and infra stage flag from project-context (Tooling) on every infra CLI command."
-12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated override skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
+12. "Return exactly (per `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — 4 lines complete, 5 lines blocked):\n Status: complete|blocked\n Note: <one line if blocked, else omit>\n Summary: <one line — files changed, key entities/handlers touched>\n Skills loaded: <comma-separated skill names | none>\n Rules applied: <rule-id>, <rule-id> | none"
 13. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md." Also carries this phase's ledger row — `LEDGER_PHASE`, `LEDGER_AGENT`, `LEDGER_PLAN_SECTION`, `LEDGER_START_SHA`, `LEDGER_END_SHA`, `LEDGER_FILES_CHANGED`, `LEDGER_FILES_READ` (shape computed in Step 5), real values substituted — it names paths, not content.
 14. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
@@ -214,6 +216,11 @@ The assert is exact-match against the snapshot — a pre-dirty primary that stay
 passes; only a *change* is a violation. A stray file in the shared `$WORKTREE` would otherwise be
 swept into a LATER agent's commit as an unattributed change.
 
+After the assert, check the commit subjects the phase added:
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-commits.sh "$LEDGER_START_SHA..HEAD" "$WORKTREE"`. Exit 1 (`BAD=` lines) →
+redispatch that phase once to reword the named commits (the work already landed; no push before the
+fix), then re-check; still failing → **STOP and report**.
+
 - `Status: blocked` → **STOP** immediately:
   ```
   BLOCKED at Phase N (<agent-name>).
@@ -221,18 +228,11 @@ swept into a LATER agent's commit as an unattributed change.
   Next step: <what user must do>
   Remaining phases NOT dispatched.
   ```
-  Never fix the blocker yourself. Unconditional — a blocked return carries no skill-coverage
-  obligation (`Skills loaded: none` on an early abort is expected).
-- **Verify `Skills loaded` covers the named set — `Status: complete` returns only.** Prompt named
-  skills `S`: pass iff the line is present and **every** skill in `S` appears (missing line, empty,
-  `none`, or a named skill absent → failure). Prompt declared none: pass iff the line is present and
-  non-empty (`none`, or extra skills the agent chose to load). On failure → **redispatch that phase
-  once** as a RETURN-CONTRACT redispatch: the work already landed; invoke the named skills now,
-  verify the committed work against them, fix only if a skill mandates it, and re-emit a compliant
-  return. Zero new commits is acceptable here (exempt from the silent-failure STOP). Still failing →
-  **STOP and report**.
+  Never fix the blocker yourself. Unconditional.
 - **Verify the return carries `Rules applied:`** — `Status: complete` returns only. Absent or empty →
-  the same RETURN-CONTRACT redispatch once. `none` is valid and expected.
+  **redispatch that phase once** as a RETURN-CONTRACT redispatch: the work already landed; re-emit a
+  compliant return. Zero new commits is acceptable here (exempt from the silent-failure STOP). Still
+  failing → **STOP and report**. `none` is valid and expected.
 
 Extract only `Status` / `Note` / `Summary` / `Skills loaded` / `Rules applied` from each agent
 return; discard the rest.
@@ -245,6 +245,7 @@ return; discard the rest.
 - `<STORY-KEY>`, `BASE_SHA` (Step 1), the pushed `<BRANCH_PREFIX>/<STORY-KEY>` branch
 - The Jira story summary + acceptance criteria, and the task source (`SPEC` or the plan doc path)
 - `WORK_KIND` — `defect` re-points QA Step 7 to the regression-evidence contract
+- `STORY_POINTS` (from your inputs) — picks the round-1 reviewer model
 - The phase ledger (`LEDGER_FILE`) — **optional**: QA Step 3 falls back to git when absent (D3)
 
 It returns `## QA verdict: <STORY-KEY>` with `Status: clean | capped | blocked`.
@@ -253,7 +254,8 @@ It returns `## QA verdict: <STORY-KEY>` with `Status: clean | capped | blocked`.
 - `Status: clean` → Step 6.5. QA already wrote learnings, ran the gate, and evidenced every AC —
   carry its verdict fields into your report; never repeat the work.
 - `Status: capped` → Step 6.5, then Step 7 as a **draft** PR (review round cap hit, Important
-  findings open, gate green, ACs met). Never merged automatically — a person decides.
+  findings open, gate green, ACs met; or a Design board still uncovered or not-checked after QA's one ask). Never
+  merged automatically — a person decides.
 
 ## Step 6.5 — Post-QA docs sync (on a clean or capped QA verdict, before the PR)
 
@@ -293,8 +295,10 @@ The docs commit, when made, is the last commit before the PR.
 
 Title keeps the parent `<STORY-KEY>`; head `<BRANCH_PREFIX>/<STORY-KEY>`. On the full path the PR
 already carries the approved spec commit. Sub-tasks → body by file (`refs/subtask-sequencing.md`).
-QA `Follow-ups:` or `capped` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
-`## Open review findings (round cap)` list from `Open (capped):`, then a `## Follow-ups` list.
+QA `Follow-ups:`, `capped` or `Design not checked:` → write `$BODY_FILE` (`tmp-dir.sh`/pr-body.md): on `capped` a first
+`## Open review findings (round cap)` list (omit the heading when it has no entries) from `Open (capped):` (omit `design uncovered:` and `design not checked:` entries — they go only under `## Design not checked`), then a `## Follow-ups` list.
+QA `Design not checked:` non-empty (either kind) → also write a `## Design not checked` section into `$BODY_FILE`
+(each `<KEY ticket>` or `<KEY uncovered>`); any such entry on a story's own board arrives as `capped`, so it is a draft like any cap.
 `capped` → `DRAFT=--draft`, else `DRAFT=` (unquoted below, so empty adds nothing).
 Create, mark ready, request Copilot (advisory — best-effort, never fails creation), and tear the
 worktree down, in one call:
@@ -302,7 +306,7 @@ worktree down, in one call:
 ```bash
 # sub-tasks: --body-file "$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/pr-body.md" in place of --body
 PR_URL=$(gh pr view <BRANCH_PREFIX>/<STORY-KEY> --json url,state -q 'select(.state=="OPEN").url' 2>/dev/null)
-# capped / follow-ups: --body-file "$BODY_FILE" in place of --body
+# capped / follow-ups / design not checked: --body-file "$BODY_FILE" in place of --body
 [ -n "$PR_URL" ] || PR_URL=$(gh pr create $DRAFT \
   --title "[<STORY-KEY>] <story summary>" \
   --body "Implementation for <STORY-KEY>. All phases complete, review clean, quality gate passed." \
@@ -334,7 +338,7 @@ Carry the QA verdict fields — never re-derive them. `Docs sync:` reports Step 
 ### Quality gate: typecheck pass | tests pass   (QA evidence)
 ### Docs sync: <no changes | committed on the branch | no manifest-tracked files touched — skipped | WARN: <failure> — recover with `/sdlc:docs sync <STORY-KEY>` after merge | skipped (no docs manifest)>
 ### PR: <PR_URL>
-### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped: "QA capped at the round cap — draft PR, <N> open findings, needs a human"
+### Status: all phases complete, QA verdict clean, gate passed, PR ready.   # capped (round cap | design board uncovered or not checked): "QA capped at the round cap | on a design board uncovered or not checked — draft PR, <N> open findings, needs a human"
 ```
 
 ## Constraints

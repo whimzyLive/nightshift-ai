@@ -25,7 +25,7 @@ back to `plugins/sdlc`. `--padding` and `--base` compose with `--root` unchanged
 its `git ls-tree` by the resolved `$scan_root`).
 
 One row per file: `path`, `bytes`, `estTokens`, `category`, `vendored` (`true` for
-`plugins/sdlc/skills/find-skills/**` and `plugins/sdlc/skills/skill-creator/**`, which only ever
+`plugins/sdlc/skills/find-skills/**`, which only ever
 fires when `--root` resolves under `plugins/sdlc`). Vendored rows are excluded from every total.
 
 **The `category` rule.** Determined once per run: if `<root>` contains at least one of the
@@ -860,8 +860,7 @@ the same transcript rows), not ported.
 ## Shared conventions
 
 - `estTokens = floor(bytes / 3.7)`.
-- Vendored exclusion: `plugins/sdlc/skills/find-skills/**` and
-  `plugins/sdlc/skills/skill-creator/**` are counted in `instruction-inventory.sh` rows but
+- Vendored exclusion: `plugins/sdlc/skills/find-skills/**` is counted in `instruction-inventory.sh` rows but
   excluded from every total — path-based, so it only ever fires when `--root` resolves under
   `plugins/sdlc` (the default).
 - None of these tools write to the repo or to `~/.claude/`.

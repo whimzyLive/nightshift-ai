@@ -73,7 +73,7 @@ case "$body" in *'## Workspace → agent'*)
 
 When you hand a code change to a subagent outside the sdlc commands, dispatch the owning \`sdlc:<agent>\` from the Workspace → agent table above, never \`general-purpose\`: a general-purpose agent inherits this session's model and skips the domain agent's rules. Read-only search, review, and research may still use \`general-purpose\` or \`Explore\`.
 
-Every \`general-purpose\` or \`Explore\` dispatch passes \`model: \"sonnet\"\` instead of inheriting this session's model — unless the command, playbook, or ref you are following names a model for that dispatch (the QA code reviewer is \`opus\`). A dispatch that only runs fixed commands and reports their output — a predefined command, a test or CI run, a build, a lint — passes \`model: \"haiku\"\`: it needs no reasoning."
+Every \`general-purpose\` or \`Explore\` dispatch passes \`model: \"sonnet\"\` instead of inheriting this session's model — unless the command, playbook, or ref you are following names a model for that dispatch (the QA code reviewer's model comes from the optional \`Reviewer model threshold\` in \`## Code Review\`: \`opus\` unless the story is at or under it, and \`sonnet\` on fresh scoped re-reviews). A dispatch that only runs fixed commands and reports their output — a predefined command, a test or CI run, a build, a lint — passes \`model: \"haiku\"\`: it needs no reasoning."
   ;;
 esac
 

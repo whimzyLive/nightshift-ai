@@ -1,18 +1,89 @@
 ---
-description: Attach a design to a Jira ticket. Ingests HTML exports (standalone bundles are unpacked into one readable page each, with a headless render per page), screenshots, handoff folders, and any non-design reference files into docs/design/<slug>/, writes the design index and component inventory, raises a docs PR, and links it on the ticket and its parent Epic. Run when the design is final — after /prd settles the requirements (when the feature has one), before /stories or /refine-issue — so refinement can put the right part of the design on each story.
+description: Design an Epic's UI library-first, or attach a finished design to a Jira ticket. --draft (Balsamiq-style linked wireframe boards tagged with pattern names), --plan (component-plan.md plus one library story per new or extended component), --final (screen boards mounted only from the design bundle, then the ingest), or file paths for the plain ingest. The ingest unpacks HTML exports into one readable page each with a headless render, indexes screenshots and handoff folders, writes the design index and component inventory, raises a docs PR, and links it on the ticket and its parent Epic. Run drafts after /prd (when the feature has one), the plan before /stories, the final once the library stories are Done.
 ---
 
-Runs **inline** (no agent dispatch) — every step is a script call, a small index edit, or a
-git/gh/acli call.
+Runs **inline**: every step is a script call, a small edit, a git/gh/acli call, or a `designer` agent
+dispatch (modes below). The agent never publishes to a design canvas, commits, pushes or asks the user;
+this session does, because only a top-level session can.
 
-**Input** — `$ARGUMENTS` := `<KEY> <path> [<path> ...] [--slug <slug>] [--add]`
+**Input** — `$ARGUMENTS` := `<KEY> [--draft | --plan | --final | <path> [<path> ...]] [--slug <slug>] [--add]`
 
-- `<KEY>` — the ticket the design belongs to: a design ticket, an Epic, or a Story.
-- `<path>` — files or folders, anywhere on disk (quote paths with spaces). `.html` → design page
+- `<KEY>` — an Epic, a Story (its parent Epic is used for the three modes), or a design ticket.
+- `--draft` / `--plan` / `--final` — the library-first workflow (`${CLAUDE_PLUGIN_ROOT}/refs/design-workflow.md`).
+- `<path>` — the ingest form: files or folders, anywhere on disk (quote paths with spaces). `.html` → design page
   (standalone bundles unpacked); `.png/.jpg/.jpeg/.webp/.gif/.svg` → screenshot; a folder → copied
-  verbatim (handoff exports); anything else → reference.
+  verbatim (handoff exports); anything else → reference. `--final` runs this same ingest on the boards it composes.
 - `--slug <slug>` — folder name override (default: from the ticket summary).
 - `--add` — on a revision, add these files to the existing design instead of replacing its assets.
+
+```text
+MODE := draft | plan | final   WHEN the matching flag is given AND no <path> is given
+      | ingest                 WHEN >= 1 <path> is given AND no mode flag
+      | STOP "usage: /design <KEY> [--draft | --plan | --final | <path> ...] [--slug <slug>] [--add]"   # a mode flag with paths, two mode flags, or neither
+```
+
+## Modes
+
+Applies to `--draft`, `--plan`, `--final`; the ingest form skips to Step 0.
+
+```text
+M0 := validate and set up:
+  read project-context: <PROJECT-KEY>, <BASE>, and the `## Design` tokens (refs/project-context-template.md); a token the mode needs is missing -> STOP naming it
+  Apply refs/jira-fetch.md to <KEY>; EPIC_KEY := <KEY> WHEN ITYPE == Epic | its parent (--fields parent) | STOP "no Epic for <KEY>"
+  SLUG := Step 2's rule, from the Epic summary and its newest `Design:` or `Design plan:` breadcrumb
+  WORKTREE := bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh <EPIC_KEY> design/<EPIC_KEY> <BASE>   # prints WORKTREE=...; every agent write and git command below runs there
+  MODEL := bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-designer-model.sh --mode <MODE> -> DESIGNER_MODEL
+  UNATTENDED := SDLC_SESSION_KEY is set
+dispatch := the `designer` agent, model DESIGNER_MODEL, prompt: mode, EPIC_KEY, SLUG, WORKTREE, the paths named per mode, the output of `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh designer --mode <MODE> --print-prompt`, "return per agents/designer.md"
+published := this session follows the doc named by `Publish recipe` to put boards on `Design canvas`
+           | `Design canvas` or `Publish recipe` unset -> say "no design canvas configured" and give the file paths instead
+gate STOP (unattended) := post the Jira comment named per mode, add label `Design-Review` to the Epic, run the bare session-complete.sh release, end
+```
+
+### `--draft`
+
+```text
+D1  WF_DIR := fresh `$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/wireframes`; TARGETS := `Wireframe targets` (web | phone | web, phone; absent -> web)
+    canvas configured AND boards already published -> download them per `Publish recipe` into WF_DIR (fragments + parts, hand edits intact); the canvas is the only copy, WF_DIR a hand-off
+D2  dispatch(draft; WF_DIR, TARGETS) -> Boards, Journey, Not linked, Gaps; the agent has already posted the `Design draft:` comment on the Epic (screens in journey order, patterns, gaps)
+D3  bash ${CLAUDE_PLUGIN_ROOT}/scripts/wireframe-check.sh WF_DIR --vocabulary <Pattern vocabulary>; a FAIL line -> back to the agent, never published
+D4  publish per `Publish recipe` (what it must cover: refs/design-workflow.md "What a publish recipe covers for wireframes"): kit stylesheet and strokes once, one page `<EPIC> wireframes`,
+    boards left to right in journey order, phone row beneath, marked draft and interactive; add a second `Design draft: canvas <link>` comment; then delete WF_DIR
+    `Design canvas` or `Publish recipe` unset -> say "no design canvas configured", keep WF_DIR and hand back the paths of the standalone pages (they play in a plain browser)
+D5  UNATTENDED -> gate STOP, comment is D2's already posted one
+    else AskUserQuestion: `Approve drafts` (Recommended) | `Another pass` (then ask what to change; canvas configured -> a fresh WF_DIR from the canvas per the recipe, never a WF_DIR left from an earlier dispatch, so hand edits are in it; no canvas -> edit the kept WF_DIR; re-run D2-D4) | `Stop`
+D6  return: board paths, the canvas link, the open `?` count, the not-linked controls, next step `/design <EPIC> --plan`
+```
+
+Drafts are never ingested and never committed: the canvas is the only copy (the temp dir is a hand-off, deleted after publish) and, with the Jira comment, their record; with no canvas they stay in the git-ignored session temp dir. `design-ingest.sh` still refuses a board declaring `board-kind` draft.
+
+### `--plan`
+
+```text
+P1  ASSERT the Epic has a `Design draft:` comment ELSE STOP "no approved draft — run /design <EPIC> --draft first"
+P2  DRAFTS := the approved wireframes, downloaded from the canvas per `Publish recipe` into a fresh folder under bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh | the kept WF_DIR pages only when no canvas is configured (otherwise WF_DIR no longer exists); the designer reads their `data-pattern` tags (`?` = gap)
+P3  dispatch(plan, DRAFTS) -> Plan, Open questions, Stories
+P4  open questions -> UNATTENDED: gate STOP with a comment listing each `Q:`; else ask them with AskUserQuestion (at most 4 per call, recommended first, `Leave open` last — the same model as commands/spec.md Step 2), then dispatch(plan, DRAFTS, answers) so the agent writes the settled plan
+P5  confirm the library stories before they are created: list the extend/new rows with their Components; AskUserQuestion `Create` (Recommended) | `Edit the plan` | `Stop`; UNATTENDED -> gate STOP   # nothing is raised without a person
+P6  the agent raises the stories (refs/component-plan.md Library stories) and writes their keys into the plan
+P7  Step 3 (branch) skipped, WORKTREE is on it; Step 6's commit/push/raise-pr for `docs/design/<SLUG>/component-plan.md` with message `docs(design): <EPIC_KEY> component plan`
+P8  comment on the Epic: `Design plan: docs/design/<SLUG>/component-plan.md | PR: <PR_URL> | Stories: <keys>`
+P9  return: plan path, PR URL, story keys, next step `/stories <EPIC>` (it reads the plan) and building the library stories
+```
+
+### `--final`
+
+```text
+F1  bash ${CLAUDE_PLUGIN_ROOT}/scripts/library-blockers.sh <EPIC_KEY> -> BLOCKERS
+    BLOCKERS non-empty | non-zero exit -> STOP "library stories not Done: <keys>" (unattended: with a Jira comment naming them, no label)
+F2  dispatch(final) -> Slug, final boards written to a temp dir the prompt names; each declares <meta name="board-kind" content="final"> and a board-template
+F3  publish the boards for review (orchestrator step)
+F4  Steps 0-8 below with <path> := the final boards; REPLACE and SLUG as Step 2 decides; Step 3 skipped (WORKTREE is on design/<EPIC_KEY>; an open design PR for it is revised, never duplicated)
+```
+
+## Ingest form
+
+Everything below is the ingest, run directly for `<path>` input and by `--final` at F4.
 
 ## Step 0 — Validate
 
@@ -20,7 +91,7 @@ Read `.claude/project/project-context.md`: `<PROJECT-KEY>` (`Jira project key` r
 (`Base branch` row). Either row missing → **STOP** naming the row.
 
 ```text
-ASSERT first token matches <PROJECT-KEY>-\d+          ELSE STOP "usage: /design <KEY> <path> [<path> ...] [--slug <slug>] [--add]"
+ASSERT first token matches <PROJECT-KEY>-\d+          ELSE STOP "usage: /design <KEY> [--draft | --plan | --final | <path> ...] [--slug <slug>] [--add]"
 ASSERT >= 1 path AND every path exists (test -e)       ELSE STOP listing each missing path
 ASSERT `git status --porcelain` is empty                ELSE STOP "commit or stash local changes first"
 ```
@@ -72,6 +143,16 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-ingest.sh $REPLACE --ticket "<KEY>" --
 ```
 
 Non-zero exit → **STOP**, surface its stderr verbatim. Keep the final `SUMMARY …` line for Step 6.
+The script refuses a page that declares `board-kind` draft, and a final page with no `board-template`
+(`${CLAUDE_PLUGIN_ROOT}/refs/design-workflow.md` Board kinds): such an exit is a STOP, never worked
+around by editing the page's meta tags. A page with no declared kind is ingested as final; keep each
+`NOTICE<TAB>board-kind-missing<TAB><file>` line for Step 8.
+On a revision (`--replace`), a board keeps its page and render names when its dc name matches, else when
+its `<head>` `<title>` is unique in both the old pages and the new bundle, so story Design references and
+Step 5c's diff stay valid; only new boards get new names, removed boards go. With `--add` nothing is
+matched by title and no existing page is renamed or overwritten by title.
+Keep every tab-separated `WARN<TAB>font-not-bundled<TAB><family><TAB><url>` line for Step 8 (the index also
+notes them); none printed means every font resolved.
 `render=skipped:<why>` and `render=chrome:failed=<n>` are not errors — the pages and screenshots
 still land; say which pages have no render in the return (a failed render on Linux is usually the
 browser refusing to run as root without a sandbox). `note: dropped dotfile` lines on stderr are
@@ -174,6 +255,14 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
 - The component inventory: counts of Reused / Changed / New, or "no UI library configured".
 - Revision: the `DIFF` rows (Step 5c). Next step: merge the PR, then `/auto <EPIC>` — its E0a routes
   the change to the stories it reaches (`${CLAUDE_PLUGIN_ROOT}/refs/design-revisions.md` Routing).
+- Design check set (project-context Tooling): the design-check config should lint boards for visual
+  logic computed in board scripts (initials, tints, formats, status colours) and for hard-coded
+  colours, and boards must mount the design system's components, never look-alikes
+  (`${CLAUDE_PLUGIN_ROOT}/refs/ui-components.md` Look logic). The plugin ships no lint; the repo's
+  check owns it. Name this as a next step.
+- `NOTICE<TAB>board-kind-missing<TAB><file>` lines from Step 4: list the pages and say they were treated as final; a new design declares kind and template on every board.
+- Tab-separated `WARN<TAB>font-not-bundled<TAB><family><TAB><url>` lines from Step 4: list each family and url — a renderer must serve them.
+- The draft wireframes can now be moved to an archive page on the canvas; nothing is deleted automatically.
 - Next step: merge the PR, then refine — `/stories <EPIC>`, or `/refine-issue <STORY>`. Refinement
   puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its

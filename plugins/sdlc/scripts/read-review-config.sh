@@ -15,6 +15,7 @@ set -euo pipefail
 #   Review agent : github-copilot | claude-inline | claude-superpowers   (default: github-copilot)
 #   Review mode  : none | on-create | on-update      (default: on-update)
 #   Review gate  : comma-separated subset of {spec,plan,impl}  (default: empty = impl reviews)
+#   Reviewer model threshold (story points, inclusive) : non-negative integer  (default: empty = unset)
 #
 # - Review agent selects WHO reviews: the GitHub Copilot bot (assigned as a PR
 #   reviewer, async), Claude inline (the loop runs /code-review in-session), or
@@ -38,6 +39,10 @@ set -euo pipefail
 #   empty/absent, NO downgrade happens — every phase reviews (back-compatible
 #   default; no regression). Unknown phase tokens in the gate are ignored with a
 #   WARNING on stderr; they never fail the read.
+#
+# - Reviewer model threshold is emitted as REVIEW_MODEL_THRESHOLD (an integer, or empty when the
+#   row is absent). A present-but-non-integer value is emitted empty with a WARNING on stderr.
+#   `scripts/resolve-reviewer-model.sh` turns it into the QA code reviewer's model.
 #
 # Defaulting (AC-5): when "Review agent" is absent OR holds an unrecognised
 # value, fall back to github-copilot AND emit a WARNING on stderr. The echoed
@@ -102,6 +107,14 @@ read_token_csv() {
     | head -1 | tr '[:upper:]' '[:lower:]' || true
 }
 
+# Raw value of a numeric token row: whatever sits in the value cell, backticks and surrounding
+# spaces stripped. Empty when the row is absent. The caller validates it.
+read_token_raw() {
+  grep -iE "^\|[[:space:]]*$1[[:space:]]*\|" "$CTX" 2>/dev/null \
+    | sed -E 's/^\|[^|]*\|[[:space:]]*([^|]*[^|[:space:]])?[[:space:]]*\|.*/\1/' \
+    | head -1 | tr -d '` ' || true
+}
+
 REVIEW_AGENT="$(read_token 'Review agent')"
 REVIEW_MODE="$(read_token 'Review mode')"
 REVIEW_GATE_RAW="$(read_token_csv 'Review gate')"
@@ -153,6 +166,16 @@ if [ -n "$PHASE" ] && [ -n "$REVIEW_GATE" ]; then
   esac
 fi
 
+REVIEW_MODEL_THRESHOLD="$(read_token_raw 'Reviewer model threshold \(story points, inclusive\)')"
+case "$REVIEW_MODEL_THRESHOLD" in
+  ''|*[!0-9]*)
+    if [ -n "$REVIEW_MODEL_THRESHOLD" ]; then
+      echo "WARNING: malformed Reviewer model threshold '$REVIEW_MODEL_THRESHOLD' in $CTX — expected a non-negative integer; reviewer stays opus" >&2
+    fi
+    REVIEW_MODEL_THRESHOLD="" ;;
+esac
+
 printf 'REVIEW_AGENT=%s\n' "$REVIEW_AGENT"
 printf 'REVIEW_MODE=%s\n' "$REVIEW_MODE"
 printf 'REVIEW_GATE=%s\n' "$REVIEW_GATE"
+printf 'REVIEW_MODEL_THRESHOLD=%s\n' "$REVIEW_MODEL_THRESHOLD"

@@ -189,7 +189,7 @@ done
 # 3b. every "Required skills"-headed section anywhere under plugins/sdlc/ must not name it
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  case "$f" in plugins/sdlc/skills/find-skills/*|plugins/sdlc/skills/skill-creator/*) continue ;; esac
+  case "$f" in plugins/sdlc/skills/find-skills/*) continue ;; esac
   hit="$(awk '
     BEGIN { insect = 0 }
     /^#+[ \t]/ {

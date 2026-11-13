@@ -27,3 +27,6 @@ plugins/sdlc/scripts/__tests__/fixtures/*/expected/
 # plugins/sdlc/**/*.md removes that corruption risk outright and lets a one-time manual table
 # unpad (padded-row cost: 40,225 static / 54,161 per-story tokens) stay stable going forward.
 plugins/sdlc/**/*.md
+
+# Wireframe kit: the stylesheet and strokes are render-verified byte for byte; skeletons are templates
+plugins/sdlc/refs/wireframe-kit/

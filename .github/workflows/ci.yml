@@ -124,3 +124,9 @@ jobs:
         run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/branch-inventory.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash tools/__tests__/ci-retry.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/skills-for.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/artefact-checks.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/wireframe.test.sh
