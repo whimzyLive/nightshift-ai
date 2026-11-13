@@ -78,8 +78,10 @@ write-scope above.
 
 | Check | Drift/gap detected |
 | --- | --- |
-| Skills on disk vs skills-lock (`.claude/project/skills.json` and/or lockfile) | Skill dir present but not in manifest, or manifest entry with no dir |
-| Agent overrides vs skills | Override lists a skill that resolves to no installed/bundled/project skill |
+| Manifest row names a skill that is not installed | A `skills.json` row whose name has no `.claude/skills/<name>/SKILL.md` or `.agents/skills/<name>/SKILL.md` and no providing plugin |
+| Installed skill with no manifest row (advisory) | A skill dir present under `.claude/skills/` or `.agents/skills/` that no `skills.json` row names |
+| Manifest row names an unknown agent | A row's `agents` lists a name that is not an agent in the plugin (`skills-for.sh` exits 2 on it) |
+| Override still lists skills (migration) | An agent override that still has `## Project skills` — hint: re-run `/sdlc:init` to move the rows into `skills.json` v2 |
 | Override directory guides vs disk | Override references a `CLAUDE.md` guide that does not exist |
 | Dangling refs/scripts | A `refs/*.md` or `scripts/*` path referenced by an agent/command resolves to no file |
 | Workspace→agent table vs disk | Table lists a path that no longer exists, or an area with no owner |
