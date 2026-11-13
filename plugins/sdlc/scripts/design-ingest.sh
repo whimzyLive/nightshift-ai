@@ -47,6 +47,11 @@
 # size from $SDLC_DESIGN_RENDER_SIZE (default 1440,2000). No browser -> renders skipped, never fatal;
 # a browser that produced no png for some pages -> render=chrome:failed=<n>, also never fatal.
 #
+# Board kinds: a page declares `<meta name="board-kind" content="draft|final">` and `board-template`.
+# A draft page, or a final one without a template, is refused (exit 1, before anything is written). A page with
+# no kind is treated as final and prints `NOTICE<TAB>board-kind-missing<TAB><file>`; the declared kinds are
+# listed in a `## Boards` table of index.md (scripts/design-kind.sh reads it).
+#
 # stdout: one `INGESTED <kind> <path>` line per asset, then one summary line:
 #   SUMMARY pages=<n> screenshots=<n> references=<n> folders=<n> rendered=<n> render=<chrome|chrome:failed=<n>|skipped:<why>|disabled>
 # Exit: 0 ok | 1 failure (missing input/tool, malformed bundle, undecodable page) | 2 usage.
@@ -112,6 +117,40 @@ for f in "$@"; do
   is_bundle "$f" || continue
   script_body "__bundler/manifest" "$f" | jq -e 'type == "object"' >/dev/null 2>&1 \
     || { echo "ERROR: $f: __bundler/manifest is not a JSON object" >&2; exit 1; }
+done
+
+# board_meta <name> <file> -> content of <meta name="<name>" content="..."> in the page, empty when absent.
+board_meta() {
+  perl -0ne 'print $1 if m{<meta\s+name="\Q'"$1"'\E"\s+content="([^"]*)"}i || m{<meta\s+content="([^"]*)"\s+name="\Q'"$1"'\E"}i' "$2"
+}
+# check_board <label> <file>: a draft board is never ingested; a final board names its template.
+check_board() {
+  local kind tpl
+  kind="$(board_meta board-kind "$2")"; tpl="$(board_meta board-template "$2")"
+  if [ "$kind" = "draft" ]; then
+    echo "ERROR: $1 is a draft board (board-kind=draft) — drafts are never ingested; build the final board with /sdlc:design --final" >&2; return 1
+  fi
+  if [ "$kind" = "final" ] && [ -z "$tpl" ]; then
+    echo "ERROR: $1 is a final board with no board-template — name the page template it is built on" >&2; return 1
+  fi
+  return 0
+}
+
+# Board kinds are checked up front, like bundles, so a refusal happens before --replace deletes anything.
+for f in "$@"; do
+  [ -f "$f" ] || continue
+  case "$(lower "${f##*.}")" in html|htm) ;; *) continue ;; esac
+  if is_bundle "$f"; then
+    mf="$WORK/precheck-manifest.json"; script_body "__bundler/manifest" "$f" >"$mf"
+    pc="$WORK/precheck-page.html"
+    while IFS="$(printf '\t')" read -r uuid compressed; do
+      if [ "$compressed" = "true" ]; then jq -r --arg u "$uuid" '.[$u].data' "$mf" | base64 --decode | gzip -dc >"$pc" 2>/dev/null
+      else jq -r --arg u "$uuid" '.[$u].data' "$mf" | base64 --decode >"$pc" 2>/dev/null; fi
+      [ -s "$pc" ] && { check_board "$(basename "$f") page $uuid" "$pc" || exit 1; }
+    done < <(jq -r 'to_entries[] | select(.value.mime == "text/html") | [.key, (.value.compressed // false | tostring)] | @tsv' "$mf")
+  else
+    check_board "$f" "$f" || exit 1
+  fi
 done
 
 # Old bundle-derived pages, snapshotted BEFORE --replace deletes pages/, so a revision keeps names:
@@ -396,6 +435,16 @@ done
 sort -u "$FONTS" -o "$FONTS"
 while IFS="$(printf '\t')" read -r fam url; do printf 'WARN\tfont-not-bundled\t%s\t%s\n' "$fam" "$url"; done <"$FONTS"
 
+BOARDS="$WORK/boards.tsv"; : >"$BOARDS"
+for pf in "$DEST_ABS"/pages/*.html; do
+  [ -f "$pf" ] || continue
+  bk="$(board_meta board-kind "$pf")"
+  case "$bk" in
+    draft|final) printf '%s\t%s\t%s\n' "pages/$(basename "$pf")" "$bk" "$(cell "$(board_meta board-template "$pf")")" >>"$BOARDS" ;;
+    *) printf 'NOTICE\tboard-kind-missing\tpages/%s\n' "$(basename "$pf")" ;;
+  esac
+done
+
 {
   echo "# Design — ${TITLE:-$(basename "$DEST_ABS")}"
   echo
@@ -414,6 +463,17 @@ while IFS="$(printf '\t')" read -r fam url; do printf 'WARN\tfont-not-bundled\t%
     | cut -f2- | while IFS="$(printf '\t')" read -r kind title file png desc; do
         printf '| %s | %s | %s | %s | %s |\n' "$kind" "$title" "$file" "$png" "$desc"
       done
+  if [ -s "$BOARDS" ]; then
+    echo
+    echo "## Boards"
+    echo
+    echo "Board kind per page: \`final\` boards are mounted from the design bundle and are the only kind a story's Design row may name."
+    echo "A page not listed here has no declared kind and is treated as final."
+    echo
+    echo "| File | Board kind | Template |"
+    echo "|---|---|---|"
+    while IFS="$(printf '\t')" read -r bf bk bt; do printf '| %s | %s | %s |\n' "$bf" "$bk" "${bt:--}"; done <"$BOARDS"
+  fi
   if [ -s "$FONTS" ]; then
     echo
     echo "## Fonts not bundled"

@@ -348,4 +348,31 @@ out23="$(run "$d22" "$in/hero.png")"
 echo "$out23" | grep -qxF "$want1" && ok "(23) a re-run that adds an unrelated file still reports earlier pages' fonts" || bad "(23) scan scope" "$out23"
 grep -q 'Fonts not bundled' "$tmp/d1/index.md" && bad "(22d) no unbundled font, no section" "section present" || ok "(22d) no Fonts section when nothing is unbundled"
 
+# (24) board kinds: drafts and template-less finals are refused; no kind is treated final with a notice
+mk_page() { printf '<!DOCTYPE html><html><head>%s<title>%s</title></head><body>x</body></html>' "$2" "$1" >"$tmp/$1.html"; }
+kdir="$(cd "$here/.." && pwd)/design-kind.sh"
+mk_page draft-board '<meta name="board-kind" content="draft">'
+d24a="$tmp/d24a"; out24a="$(run "$d24a" "$tmp/draft-board.html" 2>&1)"; rc24a=$?
+[ "$rc24a" = 1 ] && echo "$out24a" | grep -q 'draft board' && [ ! -e "$d24a/pages/draft-board.html" ] \
+  && ok "(24a) a draft board is refused before anything is written" || bad "(24a) draft refused" "rc=$rc24a $out24a"
+mk_page final-bare '<meta name="board-kind" content="final">'
+out24b="$(run "$tmp/d24b" "$tmp/final-bare.html" 2>&1)"; rc24b=$?
+[ "$rc24b" = 1 ] && echo "$out24b" | grep -q 'no board-template' && ok "(24b) a final board without a template is refused" || bad "(24b) template required" "rc=$rc24b $out24b"
+mk_page final-ok '<meta name="board-kind" content="final"><meta name="board-template" content="AppShell">'
+mk_page legacy-board ''
+d24c="$tmp/d24c"; out24c="$(run "$d24c" "$tmp/final-ok.html" "$tmp/legacy-board.html" 2>/dev/null)"; rc24c=$?
+[ "$rc24c" = 0 ] && echo "$out24c" | grep -qxF "$(printf 'NOTICE\tboard-kind-missing\tpages/legacy-board.html')" \
+  && ! echo "$out24c" | grep -q 'NOTICE.*final-ok' && ok "(24c) a board without a kind is ingested with a notice; a final one is not noticed" || bad "(24c) legacy notice" "rc=$rc24c $out24c"
+grep -q '^| pages/final-ok.html | final | AppShell |$' "$d24c/index.md" && ! grep -q 'legacy-board.html | ' <(sed -n '/^## Boards/,$p' "$d24c/index.md") \
+  && ok "(24d) index.md lists declared kinds in a Boards table" || bad "(24d) boards table" "$(cat "$d24c/index.md")"
+[ "$(bash "$kdir" "$d24c/index.md" final-ok | paste -sd' ' -)" = "KIND=final TEMPLATE=AppShell" ] \
+  && [ "$(bash "$kdir" "$d24c/index.md" pages/legacy-board.html)" = "KIND=unknown" ] \
+  && ok "(24e) design-kind.sh reads the ingested index" || bad "(24e) design-kind round trip" ""
+mk_bundle_page() { printf '%s' "$1" | gzip -c | base64 | tr -d '\n'; }
+bd_b64="$(mk_bundle_page '<html><head><meta name="board-kind" content="draft"></head><x-dc>d</x-dc></html>')"
+bd_manifest="$(jq -cn --arg a "$bd_b64" '{"u-a": {mime: "text/html", compressed: true, data: $a}}')"
+printf '<!DOCTYPE html><html><body><script type="__bundler/manifest">%s</script><script type="__bundler/ext_resources">[{"id":"./Draft.dc.html","uuid":"u-a"}]</script><script type="__bundler/template">"<x-dc></x-dc>"</script></body></html>' "$bd_manifest" >"$tmp/draft-bundle.html"
+out24f="$(run "$tmp/d24f" "$tmp/draft-bundle.html" 2>&1)"; rc24f=$?
+[ "$rc24f" = 1 ] && echo "$out24f" | grep -q 'draft board' && ok "(24f) a draft page inside a bundle is refused" || bad "(24f) bundle draft" "rc=$rc24f $out24f"
+
 exit "$fail"
