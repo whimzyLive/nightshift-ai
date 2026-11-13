@@ -1,3 +1,24 @@
+## 0.49.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** draft mode produces linked wireframes in a temp dir ([7765dc7](https://github.com/whimzyLive/nightshift-ai/commit/7765dc7))
+- **sdlc:** ship a wireframe kit with build and check scripts ([89788c5](https://github.com/whimzyLive/nightshift-ai/commit/89788c5))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** draft mode produces linked wireframes in a temp dir  ([7765dc7](https://github.com/whimzyLive/nightshift-ai/commit/7765dc7))
+  the project-context Design rows `Draft folder` and
+  `Draft page prefix` are removed; draft boards are no longer written to
+  the repo. Add `Wireframe targets` (`web`, `phone` or `web, phone`;
+  default `web` when absent) and update the publish recipe to cover
+  wireframes (see refs/design-workflow.md).
+  Claude-Session: https://claude.ai/code/session_01QXL4EcjWoTxkhbyDXaRizS
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.48.0 (2026-11-13)
 
 ### 🚀 Features
