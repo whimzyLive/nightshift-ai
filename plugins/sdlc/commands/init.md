@@ -497,9 +497,8 @@ The `description` for each option comes from the matching skill entry's `descrip
 user type a custom skill name not in the list. Custom entries receive `source: "custom"` in the
 manifest.
 
-A typed name that matches a `refs/skills-map.yml` entry that has no `when` conditions (for example
-`graphify`, `to-issues`) is installed from that entry's `source` in Step 4f and takes its `domains` and
-`dispatch` in Step 4d.
+A typed name that matches a `refs/skills-map.yml` entry that has no `when` conditions is installed
+from that entry's `source` in Step 4f and takes its `domains` and `dispatch` in Step 4d.
 
 The confirmed selection (accepted + any custom additions) is the **install list** used in Steps 4c
 and 4d.

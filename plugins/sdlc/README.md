@@ -133,9 +133,6 @@ fails on it. The `Rules applied:` line is still checked. See `plugins/sdlc/refs/
 3. Run `bash plugins/sdlc/scripts/skills-for.sh <agent> --print-prompt` to see what a dispatch will name.
 4. Until step 1, a v1 file injects nothing and `skills-for.sh` warns; the plugin's contract rows still apply.
 
-The `design-md`, `enhance-prompt`, `graphify` and `to-issues` skills moved from the plugin to the repo-root
-`skills/` folder; install them through `/sdlc:init` (type the name under "Other") or copy the folder.
-
 ## `designer` and `/sdlc:design` — library-first design workflow
 
 The `designer` agent (`agents/designer.md`) turns a UI Epic into screens built from components that
