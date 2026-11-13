@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # design-story.sh <EPIC> find
-# design-story.sh <EPIC> ensure --description-file <file> [--screens "<KEY> ..."]
+# design-story.sh <EPIC> ensure --description-file <file> [--screens "<KEY> ..."] [--plan <component-plan.md>]
 #                               [--context <project-context.md>] [--library-label <label>]
 #
 # The Epic's high-fidelity design story (refs/design-workflow.md "The design story"): one story
@@ -11,6 +11,11 @@
 #   find    reads only. Prints the story, whether it is Done, and any second Design story.
 #   ensure  idempotent: reuses the Epic's Design story, creates it only when there is none, then
 #           adds the Blocks links that are missing. Run it again after new screen stories exist.
+#           --plan <component-plan.md> is the plan-time call (/sdlc:design --plan): no screen story
+#           and no final board exists yet, so the story is created from the plan alone, blocked by
+#           the library stories and blocking nothing. A plan whose table has no surface row has no
+#           screen to design: nothing is created (SKIPPED=no-screens); an existing story is still
+#           relinked.
 #
 # acli direction: `link create --out <BLOCKED> --in <BLOCKER>`. The success message prints the
 # pair backwards, so the links are read back from `view --fields issuelinks`, where a blocker is
@@ -21,6 +26,7 @@
 #   DESIGN_DONE=yes|no
 #   EXTRA=<other Design-labelled children; never created here, a person removes them>
 #   CREATED=yes|no                 ensure only
+#   SKIPPED=no-screens             ensure --plan only, when nothing was created for that reason
 #   BLOCKED_BY=<library keys>      ensure only, as read back
 #   BLOCKS=<screen keys>           ensure only, as read back
 #   RESULT=ok                      exit 0
@@ -28,17 +34,18 @@
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-usage='usage: design-story.sh <EPIC> find | ensure --description-file <file> [--screens "<KEY> ..."] [--context <file>] [--library-label <label>]'
+usage='usage: design-story.sh <EPIC> find | ensure --description-file <file> [--screens "<KEY> ..."] [--plan <component-plan.md>] [--context <file>] [--library-label <label>]'
 epic="${1:?$usage}"
 action="${2:?$usage}"
 shift 2
 
 DESIGN_LABEL="Design"
-CTX=".claude/project/project-context.md"; LIB_LABEL=""; DESC=""; SCREENS=""
+CTX=".claude/project/project-context.md"; LIB_LABEL=""; DESC=""; SCREENS=""; PLAN=""; plan_time=no
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --description-file) DESC="${2:-}"; shift 2 ;;
     --screens)          SCREENS="${2:-}"; shift 2 ;;
+    --plan)             PLAN="${2:-}"; plan_time=yes; shift 2 ;;
     --context)          CTX="${2:-}"; shift 2 ;;
     --library-label)    LIB_LABEL="${2:-}"; shift 2 ;;
     *) echo "design-story.sh: unknown argument '$1'" >&2; exit 2 ;;
@@ -93,6 +100,28 @@ case "$LIB_LABEL" in *[!A-Za-z0-9_-]*) stop "unusable library label '$LIB_LABEL'
 for s in $SCREENS; do
   is_key "$s" || stop "'$s' in --screens is not a Jira key"
 done
+
+plan_surfaces=0
+if [ "$plan_time" = yes ]; then
+  [ -n "$PLAN" ] && [ -r "$PLAN" ] || stop "no readable component plan at '$PLAN' (--plan)"
+  plan_surfaces="$(awk -F'|' '
+    function cell(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    !/^[ \t]*\|/ { in_table = 0; next }
+    cell($2) == "Surface" { in_table = 1; next }
+    in_table && cell($2) !~ /^:?-+:?$/ && cell($2) != "" { n++ }
+    END { print n + 0 }' "$PLAN")"
+  if [ -z "$design" ] && [ "$plan_surfaces" -eq 0 ]; then
+    echo "DESIGN_STORY="
+    echo "DESIGN_DONE=no"
+    echo "EXTRA="
+    echo "CREATED=no"
+    echo "SKIPPED=no-screens"
+    echo "BLOCKED_BY="
+    echo "BLOCKS="
+    echo "RESULT=ok"
+    exit 0
+  fi
+fi
 
 libraries="$(keys_of "parent = $epic AND labels = \"$LIB_LABEL\" ORDER BY created ASC")" \
   || stop "cannot list the library stories of $epic (cannot verify)"

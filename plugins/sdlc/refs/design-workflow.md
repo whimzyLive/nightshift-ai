@@ -53,23 +53,38 @@ final := precondition: every library story under the Epic is Done (scripts/libra
 ```
 
 Order against the rest of the pipeline, the default: `/prd` (optional) -> `/design --draft` ->
-`/design --plan` (raises the library stories, component-plan.md "Library stories") -> library stories
-built and merged -> `/design --final` -> `/stories` (each screen story names its final board from the
-start) -> screen stories build from finals. Library first, then designs, then stories.
+`/design --plan` (raises the library stories, component-plan.md "Library stories", and the Epic's
+design story, below) -> library stories built and merged -> `/design --final` (its PR merges, a person
+closes the design story) -> `/stories` (each screen story names its final board from the start) ->
+screen stories build from finals. Library first, then designs, then stories: `/stories` runs last.
 
 `/stories` may also run before the final: the plan already names the library stories and the screens.
-The screen stories then exist before their boards, and the design story below is what keeps them from
-starting early. The order of the work does not change: library stories, then `/design --final`, then
-the screen stories.
+The screen stories then exist before their boards, and `/stories` links each one to the design story
+the plan created, which keeps them from starting early. The order of the work does not change: library
+stories, then `/design --final`, then the screen stories.
 
 ## The design story
 
 ```text
 what     := one story per Epic: `High-fidelity designs for <EPIC> (final boards from the bundle)`, label `Design`, never `AI-Ready`
-created  := by the scrum-master at decompose, only when a plan exists and a screen story has no final board to name
-            scripts/design-story.sh ensure: an existing one is reused and relinked, a second is never created
-links    := blocked by every library story under the Epic; blocks every UI screen story (a `UI surfaces` line that is not `None`, or web/mobile UI work)
+created  := by `/design <EPIC> --plan`, once the library stories are raised: scripts/design-story.sh ensure --plan <component-plan.md>
+            at plan time no screen story and no final board exists: it is created from the plan alone, blocked by the library stories, blocking nothing
+            a plan with no extend/new row (no library story) still gets one, blocked by nothing; a plan with no surface row has no screen and gets none
+            idempotent: a second plan run and `/stories` reuse and relink it, a second is never created
+            `/stories` creates one only as a fallback: a plan exists, the Epic has no design story, and a screen story has no final board to name
+description := the story template (refs/jira-story-template.md); the user-story line is for the person who signs off the designs;
+            Design := the plan path and the draft boards; `UI surfaces` := `None`; ACs:
+            (1) a final board exists for every screen in the component plan, one per target in `Wireframe targets` (web, phone), mounted only from the design bundle
+            (2) `docs/design/<slug>/index.md` lists every board with kind `final` and its template
+            (3) the repo's Design check and board lint pass on every board (when project-context sets `Design check`)
+            (4) each screen story's Design section names its final board
+            (5) the boards are published to the design canvas and match the merged files, no drift (when a canvas is configured)
+            (6) the design PR is merged
+links    := blocked by every library story under the Epic (made at plan time, completed on every later run)
+            `/stories` links it to block every UI screen story (a `UI surfaces` line that is not `None`, or web/mobile UI work)
             a story with `UI surfaces: None` (backend, contract, engine) is not blocked by it
+            already Done when `/stories` runs (the default order) -> the screen stories name their final boards in their Design row and need no gate:
+            the links are still made and a Done blocker holds nothing; still open -> the screen stories are blocked by it
 closed   := by a person. `/design <EPIC> --final` comments it `Final boards: <index.md> | PR: <url>` when the design PR is raised and on each revision;
             the person moves it to Done when that PR merges. Nothing transitions it automatically
 enforced := scripts/dep-gate.sh, run by `/auto` (Step 0b), `/impl` and `/run`: an open Design blocker stops the story with
@@ -147,7 +162,7 @@ no canvas       := nothing is published; the command keeps the temp folder and h
 
 | Role | Reads |
 | --- | --- |
-| scrum-master | `component-plan.md` at decompose: library stories, screen stories blocked by them, a `UI surfaces` line per story, the design story while finals are missing |
+| scrum-master | `component-plan.md` at decompose: library stories, screen stories blocked by them, a `UI surfaces` line per story, the plan-created design story linked to every screen story |
 | solutions-architect | the story's plan rows -> the spec's `## Reuse` section |
 | domain agents | the plan rows with the Design paths (principal-engineer playbook item 6); component wins over board |
 | QA, AC verifier | finals only on Design rows; plan rows honoured; duplicates and restyles are Important findings (`refs/qa-review-rounds.md`, `refs/ac-verification.md`) |

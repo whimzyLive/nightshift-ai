@@ -8,7 +8,7 @@ set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/scripts" "$work/bin"
-cp "$here/../design-story.sh" "$work/scripts/"
+cp "$here/../design-story.sh" "$here/../dep-gate.sh" "$work/scripts/"
 printf '#!/usr/bin/env bash\n[ "${MOCK_GUARD_FAIL:-0}" = 1 ] && { echo wrong-site >&2; exit 1; }\nexit 0\n' >"$work/scripts/jira-site-guard.sh"
 
 cat >"$work/bin/acli" <<'EOF2'
@@ -34,6 +34,18 @@ case "$*" in
     n=$(( $(wc -l <"$MOCK_STATE/design") + 1 ))
     echo "D-$n" >>"$MOCK_STATE/design"
     echo "{\"key\":\"D-$n\"}" ;;
+  'jira workitem search --jql key = '*' AND labels = "Design" --json')
+    k="${5#key = }"; grep -x "${k%% *}" "$MOCK_STATE/design" | arr ;;
+  'jira workitem search --jql parent = EP-1 --json')
+    { cat "$MOCK_STATE/design"; tr ' ' '\n' <"$MOCK_STATE/links"; } | sort -u | arr ;;
+  'jira workitem view '*' --fields parent --json')
+    echo '{"fields":{"parent":{"key":"EP-1"}}}' ;;
+  'jira workitem view '*' --fields issuetype --json')
+    echo '{"fields":{"issuetype":{"name":"Story"}}}' ;;
+  'jira workitem link list --key '*' --json')
+    awk -v k="$6" 'BEGIN{printf "{\"issueLinks\":["}
+      $1==k{printf "%s{\"typeName\":\"Blocks\",\"outwardIssueKey\":\"%s\"}", (n++?",":""), $2}
+      END{print "]}"}' "$MOCK_STATE/links" ;;
   'jira workitem view '*' --fields issuelinks --json')
     key="$4"
     [ "${MOCK_VIEW_FAIL:-0}" = 1 ] && exit 1
@@ -49,7 +61,8 @@ case "$*" in
   *) echo '[]' ;;
 esac
 EOF2
-chmod +x "$work/bin/acli" "$work/scripts/"*.sh
+printf '#!/usr/bin/env bash\necho "[]"\n' >"$work/bin/gh"
+chmod +x "$work/bin/acli" "$work/bin/gh" "$work/scripts/"*.sh
 echo "ACs" >"$work/desc.txt"
 
 failures=0
@@ -62,6 +75,11 @@ run() {
   done
   env PATH="$work/bin:$PATH" MOCK_STATE="$work/state" ${envs[@]+"${envs[@]}"} bash "$work/scripts/design-story.sh" EP-1 "$@" 2>&1
   echo "rc=$?"
+}
+gate() {
+  local envs=()
+  while [ "$#" -gt 1 ]; do envs+=("$1"); shift; done
+  env PATH="$work/bin:$PATH" MOCK_STATE="$work/state" ${envs[@]+"${envs[@]}"} bash "$work/scripts/dep-gate.sh" "$1" 2>&1
 }
 line() { printf '%s\n' "$1" | sed -n "s/^$2=//p"; }
 count() { grep -c "$@" "$work/state/log" || true; }
@@ -146,6 +164,82 @@ check "bad screen key stops before any write" "rc=1|0" "$(run ensure --descripti
 check "search failure fails closed"      "rc=1" "$(run MOCK_SEARCH_FAIL=1 find | tail -1)"
 check "site guard fails closed"          "rc=1" "$(run MOCK_GUARD_FAIL=1 find | tail -1)"
 check "unknown action is a usage error"  "rc=2" "$(run nope | tail -1)"
+
+plan="$work/component-plan.md"
+cat >"$plan" <<'EOF3'
+# Component plan — Projects
+
+Epic: EP-1
+Drafts: canvas
+
+| Surface | Pattern | Template | Component | Action | Explore | Story |
+| --- | --- | --- | --- | --- | --- | --- |
+| Project header | Page title | Detail page | PageTitle | reuse | no | — |
+| Budget bar | Budget | — | BudgetBar | extend | no | L-1 |
+
+Screens: project-detail
+EOF3
+empty_plan="$work/empty-plan.md"
+cat >"$empty_plan" <<'EOF3'
+# Component plan — Nothing to show
+
+Epic: EP-1
+
+| Surface | Pattern | Template | Component | Action | Explore | Story |
+| --- | --- | --- | --- | --- | --- | --- |
+
+| Other | Table |
+| --- | --- |
+| not a surface | row |
+EOF3
+
+state
+out="$(run ensure --plan "$plan" --description-file "$work/desc.txt")"
+check "plan time: creates the story with no screen story and no final board" "D-1|yes" "$(line "$out" DESIGN_STORY)|$(line "$out" CREATED)"
+check "plan time: blocked by every library story" "L-1 L-2" "$(line "$out" BLOCKED_BY)"
+check "plan time: blocks nothing yet"    "|rc=0" "$(line "$out" BLOCKS)|$(printf '%s\n' "$out" | tail -1)"
+check "plan time: only the library links are made" "2|0" "$(count 'link create --out D-1 --in L-')|$(count 'link create --out [^D]')"
+
+out="$(run ensure --plan "$plan" --description-file "$work/desc.txt")"
+check "second plan run reuses the story" "D-1|no" "$(line "$out" DESIGN_STORY)|$(line "$out" CREATED)"
+check "second plan run creates nothing and links nothing" "1|2" "$(count 'workitem create')|$(count 'link create')"
+
+out="$(run MOCK_LIBS="L-1 L-2 L-3" ensure --plan "$plan" --description-file "$work/desc.txt")"
+check "a library story raised by a later plan run is linked" "L-1 L-2 L-3" "$(line "$out" BLOCKED_BY)"
+
+check "open plan-created story holds nothing before /stories" 0 "$(grep -c ' S-' "$work/state/links" || true)"
+out="$(run MOCK_LIBS="L-1 L-2 L-3" ensure --description-file "$work/desc.txt" --screens "S-1 S-2")"
+check "/stories after the plan reuses the plan-created story" "D-1|no" "$(line "$out" DESIGN_STORY)|$(line "$out" CREATED)"
+check "/stories links every screen story to it" "S-1 S-2" "$(line "$out" BLOCKS)"
+check "/stories creates no second Design story" "1|1" "$(count 'workitem create')|$(wc -l <"$work/state/design" | tr -d ' ')"
+out="$(gate S-1)"
+check "an open plan-created story holds its screen stories" "D-1|GATE=STOP" "$(line "$out" DESIGN_BLOCKERS)|$(printf '%s\n' "$out" | tail -1)"
+
+state
+out="$(run MOCK_LIBS= ensure --plan "$plan" --description-file "$work/desc.txt")"
+check "plan with no library stories: still created, blocked by nothing" "D-1|yes||rc=0" "$(line "$out" DESIGN_STORY)|$(line "$out" CREATED)|$(line "$out" BLOCKED_BY)|$(printf '%s\n' "$out" | tail -1)"
+
+state
+out="$(run ensure --plan "$empty_plan" --description-file "$work/desc.txt")"
+check "plan with no screens: creates none" "|no|no-screens|rc=0" "$(line "$out" DESIGN_STORY)|$(line "$out" CREATED)|$(line "$out" SKIPPED)|$(printf '%s\n' "$out" | tail -1)"
+check "plan with no screens: writes nothing" 0 "$(count 'workitem create\|link create')"
+echo "D-1" >"$work/state/design"
+out="$(run ensure --plan "$empty_plan")"
+check "plan with no screens: an existing story is still relinked" "D-1|L-1 L-2|" "$(line "$out" DESIGN_STORY)|$(line "$out" BLOCKED_BY)|$(line "$out" SKIPPED)"
+
+state
+out="$(run ensure --plan "$work/missing.md" --description-file "$work/desc.txt")"
+check "unreadable plan stops before any write" "1|0" "$(printf '%s\n' "$out" | grep -c 'REASON=no readable component plan')|$(count 'workitem create')"
+out="$(run ensure --plan "$plan")"
+check "plan time with no description stops" "rc=1|0" "$(printf '%s\n' "$out" | tail -1)|$(count 'workitem create')"
+
+state
+run ensure --plan "$plan" --description-file "$work/desc.txt" >/dev/null
+out="$(run MOCK_DONE=1 ensure --screens "S-1 S-2")"
+check "Done Design story: /stories links the screen stories without error" "D-1|yes|no|S-1 S-2|rc=0" "$(line "$out" DESIGN_STORY)|$(line "$out" DESIGN_DONE)|$(line "$out" CREATED)|$(line "$out" BLOCKS)|$(printf '%s\n' "$out" | tail -1)"
+check "Done Design story: no second one is created" 1 "$(count 'workitem create')"
+out="$(gate MOCK_DONE=1 S-1)"
+check "Done Design story: the screen story is not held" "D-1 PR: done||GATE=PASS" "$(printf '%s\n' "$out" | grep '^D-1 PR')|$(line "$out" DESIGN_BLOCKERS)|$(printf '%s\n' "$out" | tail -1)"
 
 if [ "$failures" -eq 0 ]; then echo "PASS: design-story"; exit 0; fi
 echo "FAIL: $failures design-story case(s) failed"; exit 1
