@@ -1,5 +1,5 @@
 ---
-description: Design an Epic's UI library-first, or attach a finished design to a Jira ticket. --draft (greyscale wireframes labelled with pattern names), --plan (component-plan.md plus one library story per new or extended component), --final (screen boards mounted only from the design bundle, then the ingest), or file paths for the plain ingest. The ingest unpacks HTML exports into one readable page each with a headless render, indexes screenshots and handoff folders, writes the design index and component inventory, raises a docs PR, and links it on the ticket and its parent Epic. Run drafts after /prd (when the feature has one), the plan before /stories, the final once the library stories are Done.
+description: Design an Epic's UI library-first, or attach a finished design to a Jira ticket. --draft (Balsamiq-style linked wireframe boards tagged with pattern names), --plan (component-plan.md plus one library story per new or extended component), --final (screen boards mounted only from the design bundle, then the ingest), or file paths for the plain ingest. The ingest unpacks HTML exports into one readable page each with a headless render, indexes screenshots and handoff folders, writes the design index and component inventory, raises a docs PR, and links it on the ticket and its parent Epic. Run drafts after /prd (when the feature has one), the plan before /stories, the final once the library stories are Done.
 ---
 
 Runs **inline**: every step is a script call, a small edit, a git/gh/acli call, or a `designer` agent
@@ -43,20 +43,25 @@ gate STOP (unattended) := post the Jira comment named per mode, add label `Desig
 ### `--draft`
 
 ```text
-D1  dispatch(draft) -> Boards: paths under <Draft folder> in WORKTREE; the agent has already posted the `Design draft:` comment on the Epic
-D2  publish the boards                                                  # orchestrator step; add a second `Design draft: canvas <link>` comment when a link results
-D3  UNATTENDED -> gate STOP, comment is D1's already posted one
-    else AskUserQuestion: `Approve drafts` (Recommended) | `Another pass` (then ask what to change, re-run D1-D2) | `Stop`
-D4  return: board paths, the canvas link, the open `?` count, next step `/design <EPIC> --plan`
+D1  WF_DIR := `$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/wireframes`; TARGETS := `Wireframe targets` (web | phone | web, phone; absent -> web)
+    parts for a later run := downloaded from the canvas's "Wireframe kit" page per `Publish recipe` into WF_DIR/parts, when one exists
+D2  dispatch(draft; WF_DIR, TARGETS) -> Boards, Journey, Not linked, Gaps; the agent has already posted the `Design draft:` comment on the Epic (screens in journey order, patterns, gaps)
+D3  bash ${CLAUDE_PLUGIN_ROOT}/scripts/wireframe-check.sh WF_DIR --vocabulary <Pattern vocabulary>; a FAIL line -> back to the agent, never published
+D4  publish per `Publish recipe` (what it must cover: refs/design-workflow.md "What a publish recipe covers for wireframes"): kit stylesheet and strokes once, one page `<EPIC> wireframes`,
+    boards left to right in journey order, phone row beneath, marked draft and interactive; the shell parts to the "Wireframe kit" page when configured; add a second `Design draft: canvas <link>` comment
+    `Design canvas` or `Publish recipe` unset -> say "no design canvas configured" and hand back the WF_DIR paths of the standalone pages (they play in a plain browser)
+D5  UNATTENDED -> gate STOP, comment is D2's already posted one
+    else AskUserQuestion: `Approve drafts` (Recommended) | `Another pass` (then ask what to change; edit the boards in WF_DIR, or re-download them per the recipe, re-run D2-D4) | `Stop`
+D6  return: board paths, the canvas link, the open `?` count, the not-linked controls, next step `/design <EPIC> --plan`
 ```
 
-Drafts are never ingested and never committed; the canvas and the Jira comment are their record. The board files stay in the worktree for the next pass.
+Drafts are never ingested and never committed: they live in the git-ignored session temp dir; the canvas and the Jira comment are their record. `design-ingest.sh` still refuses a board declaring `board-kind` draft.
 
 ### `--plan`
 
 ```text
 P1  ASSERT the Epic has a `Design draft:` comment ELSE STOP "no approved draft — run /design <EPIC> --draft first"
-P2  DRAFTS := the approved drafts, downloaded from the canvas per `Publish recipe` into bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh | the files under <Draft folder> in WORKTREE when no canvas is configured
+P2  DRAFTS := the approved wireframes, downloaded from the canvas per `Publish recipe` into bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh | the WF_DIR pages when no canvas is configured; the designer reads their `data-pattern` tags (`?` = gap)
 P3  dispatch(plan, DRAFTS) -> Plan, Open questions, Stories
 P4  open questions -> UNATTENDED: gate STOP with a comment listing each `Q:`; else ask them with AskUserQuestion (at most 4 per call, recommended first, `Leave open` last — the same model as commands/spec.md Step 2), then dispatch(plan, DRAFTS, answers) so the agent writes the settled plan
 P5  confirm the library stories before they are created: list the extend/new rows with their Components; AskUserQuestion `Create` (Recommended) | `Edit the plan` | `Stop`; UNATTENDED -> gate STOP   # nothing is raised without a person
@@ -257,6 +262,7 @@ acli jira workitem comment create --key <EPIC_KEY> --body "Design: docs/design/<
   check owns it. Name this as a next step.
 - `NOTICE<TAB>board-kind-missing<TAB><file>` lines from Step 4: list the pages and say they were treated as final; a new design declares kind and template on every board.
 - Tab-separated `WARN<TAB>font-not-bundled<TAB><family><TAB><url>` lines from Step 4: list each family and url — a renderer must serve them.
+- The draft wireframes can now be moved to an archive page on the canvas; nothing is deleted automatically.
 - Next step: merge the PR, then refine — `/stories <EPIC>`, or `/refine-issue <STORY>`. Refinement
   puts the matching design rows in each story's **Design** section.
 - A story already labelled `AI-Ready` is never rewritten — it still resolves the design through its

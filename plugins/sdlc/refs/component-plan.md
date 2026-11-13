@@ -11,7 +11,7 @@ which inventories a finished design's pages against the library exports.
 ## Inputs
 
 ```text
-drafts     := the approved draft boards; a path the orchestrator hands in (downloaded from the canvas)
+drafts     := the approved wireframe boards; a path the orchestrator hands in (downloaded from the canvas, or the temp dir); rows come from their `data-pattern` tags, `?` tags are the gaps
 vocabulary := project-context `Pattern vocabulary` (a path): the fixed pattern names, each with its template or component
 inventory  := project-context `Bundle inventory` (a folder): one entry per component the design bundle exports
 ASSERT vocabulary and inventory exist ELSE STOP naming the missing token
@@ -31,7 +31,7 @@ Drafts: <paths or canvas link>
 
 | Column | Content |
 | --- | --- |
-| Surface | the visible thing, named as on the draft ("Project header", "Invoice list row"); one row per surface per screen it appears on |
+| Surface | the visible thing, named as on the draft (its block's `data-pattern`) ("Project header", "Invoice list row"); one row per surface per screen it appears on |
 | Pattern | a vocabulary name, or `?` while unsettled |
 | Template | the page template the screen is built on; `—` for a surface that is not a page |
 | Component | the bundle component that builds it (PascalCase export); `—` when none |

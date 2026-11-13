@@ -15,7 +15,7 @@ Repo-specific values (the vocabulary file, the bundle inventory folder, template
 
 ```text
 surface := every visible thing on a board or in a spec, one row per surface per screen
-name    := a pattern from the `Pattern vocabulary` file, or `?` — never an invented name
+name    := a pattern from the `Pattern vocabulary` file, or `?` — never an invented name; on a wireframe it is the `data-pattern="<name>"` tag of the block, never a visible label
 counts  := a name counts only when the `Bundle inventory` folder has that component (ls/Grep, never by reading component source)
 vocabulary names a component the inventory lacks -> the surface is `?`, not that pattern
 ```
@@ -59,7 +59,7 @@ One format for `component-plan.md` and a spec's `## Reuse`:
 
 | Column | Content |
 | --- | --- |
-| Surface | the visible thing as named on the draft |
+| Surface | the visible thing as named on the draft (its `data-pattern` tag marks the pattern; `?` marks a gap) |
 | Pattern | a vocabulary name; `?` only while unsettled, never in a committed plan |
 | Template | the page template; `—` when the surface is not a page |
 | Component | the bundle export (PascalCase); `—` when none |

@@ -139,7 +139,7 @@ The `designer` agent (`agents/designer.md`) turns a UI Epic into screens built f
 already exist. `/sdlc:design <EPIC> --draft | --plan | --final` runs it per mode; the command, not the
 agent, publishes to the design canvas, asks the human gates and raises the PR.
 
-- `--draft` — greyscale wireframe boards, every box labelled with a pattern name or `?`; never ingested, no story may name one.
+- `--draft` — Balsamiq-style wireframe boards from the kit in `refs/wireframe-kit/`: one linked, playable board per screen in journey order (web, phone or both per `Wireframe targets`), every structural block tagged `data-pattern` with a pattern name or `?`. Written to the session temp dir, never the repo; `scripts/wireframe-build.sh` assembles the pages, `scripts/wireframe-check.sh` lints them. Never ingested, no story may name one.
 - `--plan` — `docs/design/<slug>/component-plan.md` (surface, pattern, template, component, reuse/extend/new, explore, story), the two tests before a `?` becomes new, and one library story per new or extended component.
 - `--final` — runs only when `scripts/library-blockers.sh` lists no open library story; screen boards mounted only from the design bundle, then the existing ingest (the plain `/sdlc:design <KEY> <files>` form is kept). The ingest refuses a draft board and a final board with no template, and lists board kinds in a `## Boards` table of `index.md`.
 - `/sdlc:ui-audit [<EPIC>]` — Sonnet scan of the repo's UI paths for patterns built twice, display logic in pages, restyled shared components and pages off a template; proposes library stories, creates none unconfirmed. Suggested at the end of an epic run.
@@ -148,7 +148,7 @@ agent, publishes to the design canvas, asks the human gates and raises the PR.
 
 Principles, board kinds and gates: `refs/design-workflow.md`; plan format: `refs/component-plan.md`.
 Repo values live in an optional `## Design` section of `project-context.md` (`Pattern vocabulary`,
-`Bundle inventory`, `Bundle global`, `Draft folder`, `Draft page prefix`, `Final page prefix`,
+`Bundle inventory`, `Bundle global`, `Wireframe targets`, `Final page prefix`,
 `Component review`, `Library label`, `Design canvas`, `Publish recipe`, `Designer model draft|plan|final`)
 and in `.claude/project/agents/designer.md`, which `/sdlc:init` scaffolds for a repo with a UI.
 
