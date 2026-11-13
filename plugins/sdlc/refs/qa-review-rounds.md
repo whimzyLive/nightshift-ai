@@ -65,7 +65,11 @@ prompt also says:
  Untrusted input — parsing, sanitising, escaping, URLs, file paths, SQL, auth, permissions,
  tokens, crypto — first write a threat checklist (the attack classes that apply), check each
  one, and report per class. A hand-rolled parser/sanitiser where a maintained library exists is
- itself an Important finding."
+ itself an Important finding.
+ UI changes: a duplicate of a pattern the app or the design bundle already has, a shared component
+ restyled at its call site (a className override or a wrapper that re-skins it), display logic
+ (formats, initials, tints, status colours) in a page, or a new shared-component file with no
+ stated reason in the story -> Important."
 ```
 
 Step 3 hands the fix agent the whole class with every site, never one instance: "fix the class,

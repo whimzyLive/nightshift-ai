@@ -282,7 +282,9 @@ Three categories exist; only the domain tier is a multi-select pick:
 
 - **Pipeline agents** — `product-manager`, `scrum-master`, `solutions-architect`, `tech-lead`,
   `principal-engineer`, `qa-engineer`. Always active, own no code, need **no** override file. Do
-  **not** prompt for them.
+  **not** prompt for them. The `designer` is the one exception: it owns no code, is never prompted
+  for, and gets an override file only when the repo has a UI (see **`designer` is scaffolded
+  separately** below).
 - **Domain agents** — own paths and write code. Selectable below; each selected one gets a
   workspace→agent row and an override file.
 - **`ai-enablement-engineer`** — a special case: gated by its own single opt-in confirm (see
@@ -534,6 +536,7 @@ are documented in that template file. Token slots to substitute:
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
 | `<design-check cmd>` | the repo's design-fidelity command when one exists (e.g. `pnpm exec nx affected -t fidelity`) — otherwise omit the `Design check` row; never ask for it, a repo adds it when its check exists |
 | `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
+| `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<draft-folder>`, `<draft-page-prefix>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
 | `<threshold>` | lightweight threshold (Step 3) |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
@@ -570,6 +573,15 @@ accepted, and use the **fixed** override content given there — it does not use
 mapping / run-order tables above, since its skill list (`skill-creator`, `find-skills`,
 `conventional-commit`) and owned paths are fixed by the agent definition, not derived from the
 Step 3.5 stack suggestions.
+
+**`designer` is scaffolded separately.** When `web-engineer` or `mobile-engineer` is active, write
+`.claude/project/agents/designer.md` from `refs/agent-override-template.md`: skills filtered with the
+`designer` row of its domain mapping (`## Project skills` lists the repo's taste, design-system docs and brand-voice skills; `designing-in-patterns` is loaded by the agent, not listed); `owns: docs/design/` plus the `Draft folder` when the Design
+section sets one; `never:` every other agent's owned paths and the shared component library (a
+component change is a library story, never a design-mode edit); `runs after: product-manager ·
+before: scrum-master`; `## Tech rules` records the repo's board lint rules, page template names and
+the bundle sync recipe when known, else a `# Add the board rules and the bundle sync recipe` note.
+No workspace→agent row is added. No active UI agent → no file.
 
 **4d. `.claude/project/skills.json`** — write or merge the project skills manifest per
 `refs/skills-manifest.md`. Build the array from the confirmed install list (Step 3.5):

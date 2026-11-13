@@ -29,6 +29,7 @@ EPIC_KEY := `acli jira workitem view <KEY> --fields parent --json`   # the defau
 bare "None" or no Design section -> fall back down the list (the story predates its design)
 none -> no design applies; never list or search docs/design/ speculatively
 ASSERT every resolved path exists on disk ELSE STOP "Design not on the base branch — merge the /design PR first"
+ASSERT every named board's kind is final (Board kinds below) ELSE STOP "Design row names a draft board: <path> — drafts are wireframes; run /design <EPIC> --final"
 Epic designs only (story names no rows) -> pick the rows whose Description matches the story's ACs; name them in your output
 ```
 
@@ -100,6 +101,17 @@ return Summary with a design check run -> `design check: <pass|fail> — <n> boa
 asked to cover an uncovered or not-checked board -> add a real check entry or report why you cannot
 ```
 
+## Board kinds and the component plan
+
+```text
+kind := the Kind of the board in index.md's `## Boards` table (scripts/design-kind.sh <index.md> <board> -> KIND=draft|final|unknown); refs/design-workflow.md Board kinds
+Design rows may name finals only; a Design row naming a draft -> STOP (above); unknown (an older ingest, no table) -> treated as final
+plan rows := the story's rows of docs/design/<slug>/component-plan.md (its `UI surfaces`, or the rows whose Screens name its boards); they are part of the resolved design (refs/component-plan.md)
+component wins over board := where a final board and the shared component it mounts disagree, the component is right for this story; a deliberate design change is made to the component for everyone,
+                            never as a per-page override; the agent stops and reports (refs/domain-agent-handoff.md), never keeps a copy
+no plan (older Epic) -> components.md alone; nothing blocks
+```
+
 ## Reading rules
 
 ```text
@@ -139,5 +151,5 @@ Dev Note conflicts with an AC or a project rule -> follow the AC/rule, record th
 | solutions-architect | Spec gets a `## Design & Dev Notes` section: each UI surface -> the design row(s) it implements; each Dev Note verbatim + where the spec honours it or why it deviates |
 | tech-lead | Every UI task names the design path(s) it implements; each Dev Note rides on the task(s) it constrains |
 | principal-engineer | Resolve the design (above) before Step 3; pass Design paths + Dev Notes verbatim in every domain-agent prompt (item 6), on both the full and lightweight paths |
-| domain agents | With `Design check` set, run it for a UI story and report counts + pixel ratio, with the report/heat-map path, in `Summary:` (Domain agent duties above). Before a UI task, Read the named render/screenshot (Grep-then-window any `.html` page); follow every Dev Note; a deviation goes in the return `Summary:` with its reason |
+| domain agents | Build from the story's plan rows' components; a conflict with the board is a stop and report, never a kept copy. With `Design check` set, run it for a UI story and report counts + pixel ratio, with the report/heat-map path, in `Summary:` (Domain agent duties above). Before a UI task, Read the named render/screenshot (Grep-then-window any `.html` page); follow every Dev Note; a deviation goes in the return `Summary:` with its reason |
 | QA | With `Design check` set, the gate runs it and verification requires its evidence per Design row. The reviewer sees Dev Notes + Design through the story description (lightweight) or the plan tasks (full); verification adds `Dev Note <n>:` / `Design <n>:` lines (`refs/ac-verification.md`) |

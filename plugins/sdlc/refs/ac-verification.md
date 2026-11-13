@@ -26,6 +26,7 @@ evidence (git log, file existence, or test output) — no item checked off on as
     (name the component/page path). With `Design check` unset, visual fidelity is the reviewer's
     judgement, not this checklist. With it set, a Design row is `met` only with evidence the check
     passed for that row's board (below).
+        Every Design row must name a final board (`scripts/design-kind.sh <index.md> <board>` -> `KIND=final`, or `unknown` for a pre-kind index); a draft -> `unmet` (`Design <n>: names a draft board`). Every plan row of the story (`docs/design/<slug>/component-plan.md`, `refs/component-plan.md`) is honoured: the screen uses the row's component, no local copy of it exists -> `met` with the usage path; a copy -> `unmet`.
     Both lists come from the story description (`refs/design-references.md`); a story whose Dev
     Notes and Design are `None` emits neither line type.
 4. Read the range:

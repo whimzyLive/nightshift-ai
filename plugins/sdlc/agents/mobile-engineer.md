@@ -45,6 +45,10 @@ loaded up front, apply them in this order during the task: `executing-plans` →
 Skill tool) → `test-driven-development` → `verification-before-completion`. (Gate and `Skills
 loaded:` reporting: see First steps item 2, above, and `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` Return format.)
 
+## Component decisions belong to the designer
+
+You build with the components the story's component plan or spec `## Reuse` lists. You never decide that a component is new, pick primitives for a new pattern, or mark components shadcn, Extend or Build new. A surface the story's component plan or spec `## Reuse` does not cover, or a board that disagrees with the shared component, is `Status: blocked` with the surface and component named — never a new component, a copy, or a className override. Method and rationale: `${CLAUDE_PLUGIN_ROOT}/refs/design-workflow.md`.
+
 ## Conventions
 
 Follow the conventions in your override and the directory `CLAUDE.md` guides. Defaults: strict TypeScript, no `any`, kebab-case files, import order external → internal → relative → types.

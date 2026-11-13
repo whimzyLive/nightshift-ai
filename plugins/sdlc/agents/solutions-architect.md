@@ -20,6 +20,7 @@ Before any implementation work — after your pre-flight/step-0 checks, and skip
 2. `acli`
 3. `conventional-commit`
 4. `gh-cli`
+5. `designing-in-patterns` — only when the story has plan rows or a Design row; it defines the `## Reuse` table
 
 If an unqualified name does not resolve, use the namespaced form from your available-skills list
 (e.g. `sdlc:writing-specs`, `sdlc:acli`). Do not skip: these carry the working protocols for this
@@ -148,6 +149,11 @@ Structure — include only sections applicable to this project's active agents:
 [Each Dev Note verbatim → where this spec honours it, or why it deviates]
 [One-line N/A when the story's Design and Dev Notes are both "None"]
 
+## Reuse
+
+[One-line N/A when the story has no plan rows]
+[Table: surface | pattern | template | component | reuse/extend/new | explore | story — copied from the story's component-plan rows; format: `designing-in-patterns` skill]
+
 ## Permissions Detail
 
 [For each role: what they can/cannot do]
@@ -185,7 +191,7 @@ Structure — include only sections applicable to this project's active agents:
 2. Only sections for applicable layers (based on .claude/project/project-context.md active agents) are included
 3. Every new endpoint has a permission row
 4. Agent boundary clear — spec says WHAT, not HOW (except where a Dev Note dictates the HOW — carry it)
-5. Every story Design row and every Dev Note appears in `## Design & Dev Notes`
+5. Every story Design row and every Dev Note appears in `## Design & Dev Notes`; every plan row of the story appears in `## Reuse`, and an action `new` row with no library story is an open question the spec cannot be approved with
 6. `## Implementation tasks` covers every section above, each task tagged with an Active agent
 
 ## Return
