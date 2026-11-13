@@ -43,25 +43,25 @@ gate STOP (unattended) := post the Jira comment named per mode, add label `Desig
 ### `--draft`
 
 ```text
-D1  WF_DIR := `$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/wireframes`; TARGETS := `Wireframe targets` (web | phone | web, phone; absent -> web)
-    parts for a later run := downloaded from the canvas's "Wireframe kit" page per `Publish recipe` into WF_DIR/parts, when one exists
+D1  WF_DIR := fresh `$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)/wireframes`; TARGETS := `Wireframe targets` (web | phone | web, phone; absent -> web)
+    canvas configured AND boards already published -> download them per `Publish recipe` into WF_DIR (fragments + parts, hand edits intact); the canvas is the only copy, WF_DIR a hand-off
 D2  dispatch(draft; WF_DIR, TARGETS) -> Boards, Journey, Not linked, Gaps; the agent has already posted the `Design draft:` comment on the Epic (screens in journey order, patterns, gaps)
 D3  bash ${CLAUDE_PLUGIN_ROOT}/scripts/wireframe-check.sh WF_DIR --vocabulary <Pattern vocabulary>; a FAIL line -> back to the agent, never published
 D4  publish per `Publish recipe` (what it must cover: refs/design-workflow.md "What a publish recipe covers for wireframes"): kit stylesheet and strokes once, one page `<EPIC> wireframes`,
-    boards left to right in journey order, phone row beneath, marked draft and interactive; the shell parts to the "Wireframe kit" page when configured; add a second `Design draft: canvas <link>` comment
-    `Design canvas` or `Publish recipe` unset -> say "no design canvas configured" and hand back the WF_DIR paths of the standalone pages (they play in a plain browser)
+    boards left to right in journey order, phone row beneath, marked draft and interactive; add a second `Design draft: canvas <link>` comment; then delete WF_DIR
+    `Design canvas` or `Publish recipe` unset -> say "no design canvas configured", keep WF_DIR and hand back the paths of the standalone pages (they play in a plain browser)
 D5  UNATTENDED -> gate STOP, comment is D2's already posted one
-    else AskUserQuestion: `Approve drafts` (Recommended) | `Another pass` (then ask what to change; edit the boards in WF_DIR, or re-download them per the recipe, re-run D2-D4) | `Stop`
+    else AskUserQuestion: `Approve drafts` (Recommended) | `Another pass` (then ask what to change; canvas configured -> a fresh WF_DIR from the canvas per the recipe, never a WF_DIR left from an earlier dispatch, so hand edits are in it; no canvas -> edit the kept WF_DIR; re-run D2-D4) | `Stop`
 D6  return: board paths, the canvas link, the open `?` count, the not-linked controls, next step `/design <EPIC> --plan`
 ```
 
-Drafts are never ingested and never committed: they live in the git-ignored session temp dir; the canvas and the Jira comment are their record. `design-ingest.sh` still refuses a board declaring `board-kind` draft.
+Drafts are never ingested and never committed: the canvas is the only copy (the temp dir is a hand-off, deleted after publish) and, with the Jira comment, their record; with no canvas they stay in the git-ignored session temp dir. `design-ingest.sh` still refuses a board declaring `board-kind` draft.
 
 ### `--plan`
 
 ```text
 P1  ASSERT the Epic has a `Design draft:` comment ELSE STOP "no approved draft — run /design <EPIC> --draft first"
-P2  DRAFTS := the approved wireframes, downloaded from the canvas per `Publish recipe` into bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh | the WF_DIR pages when no canvas is configured; the designer reads their `data-pattern` tags (`?` = gap)
+P2  DRAFTS := the approved wireframes, downloaded from the canvas per `Publish recipe` into a fresh folder under bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh | the kept WF_DIR pages only when no canvas is configured (otherwise WF_DIR no longer exists); the designer reads their `data-pattern` tags (`?` = gap)
 P3  dispatch(plan, DRAFTS) -> Plan, Open questions, Stories
 P4  open questions -> UNATTENDED: gate STOP with a comment listing each `Q:`; else ask them with AskUserQuestion (at most 4 per call, recommended first, `Leave open` last — the same model as commands/spec.md Step 2), then dispatch(plan, DRAFTS, answers) so the agent writes the settled plan
 P5  confirm the library stories before they are created: list the extend/new rows with their Components; AskUserQuestion `Create` (Recommended) | `Edit the plan` | `Stop`; UNATTENDED -> gate STOP   # nothing is raised without a person

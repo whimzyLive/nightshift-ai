@@ -48,7 +48,7 @@ Allowed beyond classes: inline layout only (`display`, `flex*`, `grid*`, `gap`, 
 ## Working folder
 
 ```text
-WF_DIR := $(bash scripts/tmp-dir.sh)/wireframes       # git-ignored; never the repo
+WF_DIR := $(bash scripts/tmp-dir.sh)/wireframes       # git-ignored; never the repo; a hand-off: deleted after a canvas publish, the canvas is the only copy
 WF_DIR/parts/shell.side.html                           # web nav, written once per run
 WF_DIR/parts/shell.bottomnav.html                      # phone nav, written once per run
 WF_DIR/parts/page-<template>.main.html                 # one starter per page template of the vocabulary
