@@ -17,9 +17,23 @@ key="${1:-}"
 note="${2:-}"
 resume="${3:-}"
 
+resume_given=0
+[ "$#" -ge 3 ] && resume_given=1
+
 if ! printf '%s' "$key" | grep -qE '^[A-Za-z][A-Za-z0-9]*-[0-9]+$'; then
   echo "usage: run-bg.sh KEY [note] [resume-session-id]  (KEY like ABC-123)" >&2
   exit 2
+fi
+
+if [ "$resume_given" = 1 ]; then
+  if [ -z "$resume" ]; then
+    echo "run-bg.sh: a resume session id was expected as the third argument but it is empty; refusing to start a fresh run (look the id up with 'claude agents --json')" >&2
+    exit 2
+  fi
+  if ! printf '%s' "$resume" | grep -qE '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+    echo "run-bg.sh: '$resume' is not a full session id (8-4-4-4-12 hex); expand a short id like 39d88595 to the full sessionId from 'claude agents --json'" >&2
+    exit 2
+  fi
 fi
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "run-bg.sh: not inside a git repository" >&2; exit 1; }
@@ -40,7 +54,7 @@ command_name="${BG_RUN_COMMAND:-/sdlc:auto}"
 rules="Dispatch every agent in the foreground and wait for its result; never end a turn while an agent is running. Use a fresh agent for each fix round and each re-review; never resume an agent with SendMessage. Never grow an allowance list, skip a check or silence a gate to get a pass; report the failure instead. Work only in your own worktree and never touch the uncommitted files of the primary checkout. HUMAN HANDOFF: when you stop because a person must decide, open the PR as a DRAFT, put a section headed 'Needs a human' in the PR body that lists each decision, comment the same list on the Jira story, and start your last message with 'NEEDS YOU:' followed by the decisions."
 [ -n "${BG_RUN_EXTRA_RULES:-}" ] && rules="$rules $BG_RUN_EXTRA_RULES"
 
-if [ -n "$resume" ]; then
+if [ "$resume_given" = 1 ]; then
   exec claude --bg --resume "$resume" --permission-mode "$mode" --append-system-prompt "$rules" "${note:-continue}"
 fi
 
