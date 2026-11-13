@@ -139,6 +139,37 @@ skills:
       - framework: React Native
       - framework: Expo
 
+  # Bundled with this repo under skills/ (moved out of the plugin so they stop adding to every
+  # subagent's skill catalogue). No domain agent and no detection condition: never suggested,
+  # installable by typing the name under "Other" in the Step 3.5 picker.
+  - name: design-md
+    description: Analyze Stitch projects and synthesize a semantic design system into DESIGN.md files
+    domains: []
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/design-md
+    when: []
+
+  - name: enhance-prompt
+    description: Transforms vague UI ideas into polished, Stitch-optimized prompts
+    domains: []
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/enhance-prompt
+    when: []
+
+  - name: graphify
+    description: Any input (code, docs, papers, images) into a knowledge graph, clustered communities, HTML + JSON + audit report
+    domains: []
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/graphify
+    when: []
+
+  - name: to-issues
+    description: Break a plan, spec, or PRD into independently-grabbable issues on the project issue tracker using tracer-bullet vertical slices
+    domains: []
+    source: https://github.com/whimzyLive/nightshift-ai.git
+    path: skills/to-issues
+    when: []
+
 # Frameworks / ORMs with no built-in skill suggestion — user must add via "Other":
 #   Svelte       → no built-in suggestion
 #   FastAPI      → no built-in suggestion
@@ -154,7 +185,7 @@ skills:
 #   Drizzle      → no built-in suggestion (same — not covered by the typeorm skill)
 
 # Agent-to-skill domain mapping.
-# Used by /init Step 4c to filter the confirmed install list per agent.
+# Used by /init Step 4d to set each manifest row's `agents`.
 # Each skill's `domains` list above is the authoritative source;
 # this summary lists the built-in skills per agent for quick reference.
 #
