@@ -1,3 +1,13 @@
+## 0.51.1 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** run stories in the background and watch them ([548c5fb](https://github.com/whimzyLive/nightshift-ai/commit/548c5fb))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.0 (2026-11-13)
 
 ### 🚀 Features
