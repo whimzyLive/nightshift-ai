@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded
 agents: [ai-enablement-engineer, platform-engineer]
 source-stories: [NA-57, NA-62, NA-63]
 trigger: [rtk proxy mismatch, wrapped command exit code disagreement, tsc prettier false success]
@@ -9,7 +9,8 @@ trigger: [rtk proxy mismatch, wrapped command exit code disagreement, tsc pretti
 
 ## Status
 
-Accepted
+Superseded by [ADR-0022](0022-no-cli-output-wrapper-in-front-of-bash.md) — the wrapper is no
+longer installed, so there is nothing to fall back from.
 
 ## Decision
 

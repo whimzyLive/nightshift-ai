@@ -91,8 +91,6 @@ jobs:
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/memory-root.test.sh
       - if: '!cancelled()'
-        run: bash tools/ci-retry.sh bash .claude/hooks/__tests__/rtk-line-scan.test.sh
-      - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/auto-merge-pr.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/docs-pipeline-slicing.test.sh
@@ -122,8 +120,6 @@ jobs:
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/pre-impl.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/artifact-contract.test.sh
-      - if: '!cancelled()'
-        run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/rtk-coverage.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/branch-inventory.test.sh
       - if: '!cancelled()'
