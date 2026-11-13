@@ -74,12 +74,17 @@ SessionStart hook or manifests, start a **fresh** Claude Code session (hooks fir
 ## How to contribute, by type
 
 - **A new skill** → `plugins/sdlc/skills/<name>/SKILL.md`. Keep it generic; reference `project-context`
-  tokens instead of literals.
+  tokens instead of literals. Only a skill that a plugin template or gate depends on belongs in the plugin;
+  add a row for it to `plugins/sdlc/refs/skills-contract.json` (same schema as a repo's `skills.json`,
+  `refs/skills-manifest.md`) naming the agents and the step. Anything else goes in the repo-root `skills/`
+  folder and is installed through a `refs/skills-map.yml` entry.
 - **A new command** → `plugins/sdlc/commands/<name>.md`. Scripts it runs go in `scripts/` and are
   invoked as `${CLAUDE_PLUGIN_ROOT}/scripts/...` (command context expands the variable).
 - **A new agent / role** → `plugins/sdlc/agents/<name>.md`. Mirror an existing agent's structure
   (first-steps that read project-context + the override, ownership from the workspace→agent table,
-  generic `skills:` preload only). No project tech in the body.
+  the shared `## Skills` marker sentence that `scripts/check-agent-skill-preloads.sh` greps for, no
+  `skills:` frontmatter). Skills reach the agent through the dispatch prompt (`scripts/skills-for.sh`), so name no
+  skill in the body that a contract row should carry. No project tech in the body.
 - **A stack starter-config** → docs/example `project-context.md` + override files for a common stack.
 - **An adapter** (GitLab/Linear/etc.) → discuss in an issue first; these touch refs + commands broadly.
 

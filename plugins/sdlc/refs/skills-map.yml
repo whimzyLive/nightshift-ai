@@ -107,7 +107,7 @@ skills:
     description: TypeORM entity, migration, query, and Data Mapper conventions for TypeScript
     domains: [platform-engineer, database-administrator]
     dispatch:
-      paths: ["**/entities/**", "**/entity/**", "**/migrations/**"]
+      paths: ['**/entities/**', '**/entity/**', '**/migrations/**']
       step: before changing an entity, a migration or a query
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/typeorm
@@ -118,7 +118,7 @@ skills:
     description: ElectroDB DynamoDB ORM — entity schema, index/access-pattern modeling, CRUD and update expressions, single-table design
     domains: [platform-engineer, database-administrator]
     dispatch:
-      paths: ["**/entities/**", "**/entity/**"]
+      paths: ['**/entities/**', '**/entity/**']
       step: before modeling an entity or an access pattern
     source: https://github.com/whimzyLive/nightshift-ai.git
     path: skills/electrodb

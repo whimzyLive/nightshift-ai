@@ -106,24 +106,35 @@ modes (`sync`/
 `refs/adr-pipeline.md` for the full pipeline and `skills/writing-adrs/SKILL.md` for the ADR
 body/lifecycle/frontmatter contract it renders against.
 
-## Project-skill loading enforcement
+## Skills: point-of-use loading
 
-Domain-agent dispatches enforce project-skill loading via a three-part contract: the **dispatch
-prompt names** the applicable override skills (or explicitly declares that no project skills apply),
-the **domain agent declares** the skills it invoked/applied on a required `Skills loaded:` return
-line — including any named skill that happens to be one of the agent's own required first-turn
-skills (loaded via the Skill tool per the agent's "Required skills (load FIRST)" section, not
-frontmatter — NA-25 moved every generic skill off frontmatter `skills:` since the harness
-re-injects it in full on every SendMessage resume, anthropics/claude-code#76337) — and the
-**orchestrator verifies** the returned set covers the named set, but only on `Status: complete` returns (a
-`Status: blocked` return, including an early-abort `Skills loaded: none`, is exempt). Verification is
-mechanical: when the prompt declared no applicable skills, a present non-empty line passes —
-`none`, or a line listing extra skills the agent chose to load, both pass; a missing, empty, or
-(when skills were named) partial line fails. On failure the principal playbook redispatches the
-phase once (a return-contract-only redispatch — zero new commits is an acceptable outcome) then
-STOPs; the QA fix loop returns `blocked` immediately. See
-`plugins/sdlc/refs/principal-engineer-playbook.md` (Steps 4-5) and
-`plugins/sdlc/refs/qa-engineer-playbook.md` (Step 3).
+No agent loads skills upfront. `.claude/project/skills.json` (schema v2, `refs/skills-manifest.md`)
+says which skills exist, which agents use them and when; the plugin ships its own contract rows in
+`refs/skills-contract.json` (the skills its templates and gates depend on), merged under the repo's
+rows by name, repo wins. `scripts/skills-for.sh <agent> [--mode <m>] [--paths <globs>] --print-prompt`
+resolves the rows for a dispatch and prints the block the playbooks and commands paste into the
+prompt: each skill with the step at which the agent invokes it, never earlier. A repo override no
+longer lists skills.
+
+Returns are verified by artefact, not by load: the spec against the writing-specs template
+(`scripts/check-spec.sh`, run by `/spec` before approval and by the principal playbook when it reads
+the spec), the plan against the tech-lead template (`scripts/check-plan.sh`, run by `/plan`), and each
+phase's commit subjects against the conventional format (`scripts/check-commits.sh`, run in the
+principal playbook Step 5). `Skills loaded:` stays on every return as information; no return passes or
+fails on it. The `Rules applied:` line is still checked. See `plugins/sdlc/refs/principal-engineer-playbook.md`
+(Steps 2, 4-5) and `plugins/sdlc/refs/qa-engineer-playbook.md` (Step 3).
+
+### Upgrading a consumer repo
+
+1. Update the plugin, then re-run `/sdlc:init`. On a v1 `skills.json` it infers each row's `agents` from the
+   overrides' `## Project skills`, prints the rows for confirmation, writes v2, and removes those sections
+   from the overrides.
+2. Narrow a row with `when` (`paths`, `mode`, `step`) where a skill only applies to part of the repo.
+3. Run `bash plugins/sdlc/scripts/skills-for.sh <agent> --print-prompt` to see what a dispatch will name.
+4. Until step 1, a v1 file injects nothing and `skills-for.sh` warns; the plugin's contract rows still apply.
+
+The `design-md`, `enhance-prompt`, `graphify` and `to-issues` skills moved from the plugin to the repo-root
+`skills/` folder; install them through `/sdlc:init` (type the name under "Other") or copy the folder.
 
 ## `designer` and `/sdlc:design` — library-first design workflow
 
