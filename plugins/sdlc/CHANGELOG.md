@@ -1,3 +1,17 @@
+## 0.47.8 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** add designing-in-patterns skill and move component decisions to the designer ([e70a5e9](https://github.com/whimzyLive/nightshift-ai/commit/e70a5e9))
+- **sdlc:** add Design tokens to project-context and init, document the designer ([f745ff8](https://github.com/whimzyLive/nightshift-ai/commit/f745ff8))
+- **sdlc:** carry the component plan through stories, specs, QA and epic runs ([42aa411](https://github.com/whimzyLive/nightshift-ai/commit/42aa411))
+- **sdlc:** add designer agent, draft/plan/final design modes and ui-audit ([1a97283](https://github.com/whimzyLive/nightshift-ai/commit/1a97283))
+- **sdlc:** add design-kind, library-blockers and designer model scripts ([6d2d648](https://github.com/whimzyLive/nightshift-ai/commit/6d2d648))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.47.7 (2026-11-11)
 
 ### 🚀 Features
