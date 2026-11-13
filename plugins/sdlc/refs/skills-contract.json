@@ -1,0 +1,215 @@
+{
+  "version": 2,
+  "skills": [
+    {
+      "name": "writing-specs",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["solutions-architect"],
+      "required": true,
+      "when": {
+        "step": "before writing the spec"
+      }
+    },
+    {
+      "name": "writing-plans",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["tech-lead"],
+      "required": true,
+      "when": {
+        "step": "before writing the plan"
+      }
+    },
+    {
+      "name": "designing-in-patterns",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["designer"],
+      "required": true,
+      "when": {
+        "step": "before labelling any surface"
+      }
+    },
+    {
+      "name": "conventional-commit",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": [
+        "web-engineer",
+        "mobile-engineer",
+        "platform-engineer",
+        "database-administrator",
+        "sync-engineer",
+        "ai-enablement-engineer",
+        "knowledge-engineer"
+      ],
+      "required": true,
+      "when": {
+        "step": "before each commit"
+      }
+    },
+    {
+      "name": "executing-plans",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": [
+        "web-engineer",
+        "mobile-engineer",
+        "platform-engineer",
+        "database-administrator",
+        "sync-engineer"
+      ],
+      "required": true,
+      "when": {
+        "step": "before the first task"
+      }
+    },
+    {
+      "name": "test-driven-development",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": [
+        "web-engineer",
+        "mobile-engineer",
+        "platform-engineer",
+        "database-administrator",
+        "sync-engineer"
+      ],
+      "required": true,
+      "when": {
+        "step": "before writing implementation code"
+      }
+    },
+    {
+      "name": "verification-before-completion",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": [
+        "web-engineer",
+        "mobile-engineer",
+        "platform-engineer",
+        "database-administrator",
+        "sync-engineer",
+        "knowledge-engineer"
+      ],
+      "required": true,
+      "when": {
+        "step": "before the final return"
+      }
+    },
+    {
+      "name": "acli",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": [
+        "product-manager",
+        "scrum-master",
+        "solutions-architect",
+        "tech-lead",
+        "designer",
+        "knowledge-engineer"
+      ],
+      "required": true,
+      "when": {
+        "step": "before the first Jira call"
+      }
+    },
+    {
+      "name": "gh-cli",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["knowledge-engineer", "ai-enablement-engineer"],
+      "required": true,
+      "when": {
+        "step": "before the first gh call"
+      }
+    },
+    {
+      "name": "requesting-code-review",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["qa-reviewer"],
+      "required": true,
+      "when": {
+        "step": "before reviewing the diff"
+      }
+    },
+    {
+      "name": "user-story-mapping",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["scrum-master"],
+      "required": true,
+      "when": {
+        "step": "before drafting any stories",
+        "mode": ["decompose"]
+      }
+    },
+    {
+      "name": "user-story-splitting",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["scrum-master"],
+      "required": true,
+      "when": {
+        "step": "before creating a story over 8 points or with several outcomes",
+        "mode": ["decompose"]
+      }
+    },
+    {
+      "name": "to-prd",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["product-manager"],
+      "required": true,
+      "when": {
+        "step": "before writing the PRD"
+      }
+    },
+    {
+      "name": "writing-adrs",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["knowledge-engineer"],
+      "required": true,
+      "when": {
+        "step": "before writing an ADR",
+        "mode": ["seed-adr", "distill"]
+      }
+    },
+    {
+      "name": "writing-docs",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["knowledge-engineer"],
+      "required": true,
+      "when": {
+        "step": "before drafting a docs page",
+        "mode": ["sync", "release", "seed", "audit"]
+      }
+    },
+    {
+      "name": "skill-creator",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["ai-enablement-engineer"],
+      "required": true,
+      "when": {
+        "step": "when a gap or a new skill is needed",
+        "mode": ["analyze"]
+      }
+    },
+    {
+      "name": "find-skills",
+      "source": "plugin",
+      "addedBy": "plugin",
+      "agents": ["ai-enablement-engineer"],
+      "required": true,
+      "when": {
+        "step": "when a gap or a new skill is needed",
+        "mode": ["analyze"]
+      }
+    }
+  ]
+}
