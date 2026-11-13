@@ -1,3 +1,13 @@
+## 0.51.3 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** gate UI stories behind a high-fidelity design story ([f76aaee](https://github.com/whimzyLive/nightshift-ai/commit/f76aaee))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.2 (2026-11-13)
 
 ### 🩹 Fixes
