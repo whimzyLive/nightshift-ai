@@ -13,13 +13,14 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0008. Dispatch-prompt push override of the commit-only handoff default](0008-dispatch-prompt-push-override.md) — accepted
 - [0013. Whole-tree literal grep as the closing step after any shared-contract change](0013-whole-tree-literal-grep-after-shared-contract-change.md) — accepted
 - [0014. Clean Nx "no tasks were run" result is accepted as a pass for plugins-only changes](0014-clean-nx-no-tasks-pass-for-plugins-only-change.md) — accepted
-- [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — accepted
+- [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — superseded
 - [0016. Prettier-ignored plugin markdown](0016-prettier-ignored-plugin-markdown.md) — accepted
 - [0017. Lean pseudocode encoding for procedural instructions](0017-lean-pseudocode-encoding-for-procedural-instructions.md) — accepted
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
 - [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
 - [0020. Loop decision table as a deterministic script, not a Haiku subagent](0020-loop-decision-table-as-a-script.md) — accepted
 - [0021. Plan-doc slicing as a deterministic script, not a pasted-content instruction](0021-plan-slice-as-a-script.md) — accepted
+- [0022. No CLI output wrapper in front of Bash tool calls](0022-no-cli-output-wrapper-in-front-of-bash.md) — accepted
 
 ## knowledge-engineer
 
@@ -32,11 +33,12 @@ hand-edit — fix the source ADR's frontmatter and regenerate instead.
 - [0008. Dispatch-prompt push override of the commit-only handoff default](0008-dispatch-prompt-push-override.md) — accepted
 - [0013. Whole-tree literal grep as the closing step after any shared-contract change](0013-whole-tree-literal-grep-after-shared-contract-change.md) — accepted
 - [0014. Clean Nx "no tasks were run" result is accepted as a pass for plugins-only changes](0014-clean-nx-no-tasks-pass-for-plugins-only-change.md) — accepted
-- [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — accepted
+- [0015. Raw-binary fallback on wrapped-CLI output/exit-code mismatch](0015-raw-binary-fallback-on-wrapped-cli-mismatch.md) — superseded
 - [0018. Top-level session boundary at PR raise](0018-top-level-session-boundary-at-pr-raise.md) — accepted
 - [0019. Offload gate and verification steps to subagents](0019-offload-gate-and-verification-steps-to-subagents.md) — accepted
 - [0020. Loop decision table as a deterministic script, not a Haiku subagent](0020-loop-decision-table-as-a-script.md) — accepted
 - [0021. Plan-doc slicing as a deterministic script, not a pasted-content instruction](0021-plan-slice-as-a-script.md) — accepted
+- [0022. No CLI output wrapper in front of Bash tool calls](0022-no-cli-output-wrapper-in-front-of-bash.md) — accepted
 
 ## qa-engineer
 

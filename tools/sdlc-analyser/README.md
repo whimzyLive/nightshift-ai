@@ -328,9 +328,9 @@ scored against.
 
 **CI wiring (NA-90 orchestrator decision, overriding the plan's Open item #3 default).** The plan
 originally left this test author-run only, following the spec's Out-of-Scope line and the
-`rtk-coverage.test.sh` precedent. That precedent does not transfer here: `rtk-coverage.test.sh`
-needs a locally-installed `rtk` binary; `read-bounding.test.sh` needs only stdlib Python and
-in-repo fixtures, so wiring it costs nothing and stops Gate-2 falsifiability rotting silently.
+precedent of the since-removed `rtk-coverage.test.sh` (NA-89). That precedent did not transfer:
+that test needed a locally-installed `rtk` binary; `read-bounding.test.sh` needs only stdlib Python
+and in-repo fixtures, so wiring it costs nothing and stops Gate-2 falsifiability rotting silently.
 `.github/workflows/ci.yml` now runs `bash tools/sdlc-analyser/__tests__/read-bounding.test.sh`
 directly.
 
@@ -391,9 +391,8 @@ of distinct story keys parsed from `gitBranch` across sized reads; `estTokensPer
 totalEstTokens / storiesObserved` (`0` when `storiesObserved == 0`) is the exact unit Decision 2's
 `9,020` gate is stated in, computed by the tool rather than by hand.
 
-**Prefer `--corpus-list` over positional paths for any before/after comparison** — the
-`rtk-coverage.py` reasoning: a sliding "most-recent-N" window is not the same bytes on both sides
-of a delta.
+**Prefer `--corpus-list` over positional paths for any before/after comparison** — the NA-89
+reasoning: a sliding "most-recent-N" window is not the same bytes on both sides of a delta.
 
 **`--json` emits the full `ReadBoundingReport` contract**: `label`, `corpus`
 (`topLevelTranscripts`, `subagentTranscripts`), `totalReads`, `windowedReads`, `windowedShare`,
@@ -504,10 +503,10 @@ under-captured its own corpus three times (NA-88's 11.7%, NA-90's shallow glob, 
 missed `workflows/` tier). A dropped file is never silent, and a dropped file from a pinned
 `--corpus-list` is a hard failure, not a warning the caller can miss.
 
-**Prefer `--corpus-list` over positional paths for any before/after comparison** — the
-`rtk-coverage.py` reasoning: a sliding "most-recent-N" window is not the same bytes on both sides
-of a delta. Path lists must be built with Python `pathlib`/`glob`, never parsed `ls` — the local
-rtk shell hook size-annotates `ls` output, silently corrupting a naive corpus list.
+**Prefer `--corpus-list` over positional paths for any before/after comparison** — the NA-89
+reasoning: a sliding "most-recent-N" window is not the same bytes on both sides of a delta. Path
+lists must be built with Python `pathlib`/`glob`, never parsed `ls` — a shell wrapper that
+annotates `ls` output silently corrupts a naive corpus list.
 
 **`--json` emits the full `ContextResidencyReport` contract**: `label`, `topLevelTranscripts`,
 `subagentTranscripts`, `assistantTurns`, `toolResultExposure`, `boundaryTurn`, `boundaryCommand`,
@@ -857,90 +856,6 @@ real (empty) result.
 The spec named `scratchpad/cost8.py` as the source for `--per-story`; that file does not exist in
 this repo. `--per-story` was written fresh from its stated contract (a per-story cost roll-up over
 the same transcript rows), not ported.
-
-## `rtk-coverage.py`
-
-```text
-python3 tools/sdlc-analyser/rtk-coverage.py (--engine | --wrapper <path>) [--corpus-list <file> | --count N] [--json]
-```
-
-Replays a transcript corpus through `rtk hook check` and reports how many rewrites the hook
-actually performs against how many are available. `--engine` models the upstream first-line defect
-(NA-89 F3); `--wrapper <path>` pipes each command through a `PreToolUse` wrapper and counts changed
-lines.
-
-Two denominators are always printed. `achievable (raw)` is every line `rtk hook check` would rewrite.
-`achievable-permitted` subtracts the rewrites the wrapper is _required_ to decline — lines inside a
-heredoc, and lines whose top-level segments resolve to a verification-critical head (ADR 0015).
-NA-89's Gate 1 scores `lost-vs-permitted`; `lost-vs-raw` is printed beside it so the guards' cost
-stays visible rather than being absorbed into the denominator.
-
-`--corpus-list <file>` pins the corpus to an explicit list of `.jsonl` paths, one per line, resolved
-relative to the list file. **Prefer it over `--count`** for any before/after comparison: `--count N`
-takes the N most recently modified transcripts, and that window slides between runs, so the two
-sides of a delta would not be replaying the same bytes.
-
-### The classification and guard rules (verbatim — an unstated rule makes before/after non-reproducible)
-
-A line is loaded as one **Bash command string** from the transcript: each transcript line is one
-JSON record; a `Bash` tool-use is any item of `record["message"]["content"]` (when it is a list)
-with `type == "tool_use"` and `name == "Bash"`. The command is `item["input"]["command"]`, taken
-verbatim, unsplit — a multi-line command stays one string until `build_report` splits it on `\n`.
-
-**Achievability, per line, first-match-wins:**
-
-```text
-line is blank (after strip)             -> not achievable, not counted
-rtk hook check -- "<line>" exits 0      -> achievable
-ELSE                                    -> not achievable
-```
-
-**Guard classification of an achievable line, evaluated per whole command, first-match-wins:**
-
-```text
-command contains "<<"                                     -> guardHeredoc  (every achievable line in that command)
-ELSE any top-level segment's resolved head ∈ EXCLUDE       -> guardExclude
-ELSE                                                       -> counts toward achievable-permitted
-```
-
-`achievable-permitted := achievableRaw - guardHeredoc - guardExclude`.
-
-**Segment split (mirrors the wrapper's `line_is_excluded`, G1):** a line is split on `&&`, `||`,
-`;`, `|` (in that order, each pass applied to every fragment from the previous pass) into top-level
-segments. **Resolved head** of a segment: strip leading `KEY=value` assignment words and leading
-runner-prefix words (`pnpm npm yarn bun npx bunx pnpx exec dlx run x`, applied repeatedly), then
-take `basename()` of the first remaining word, lower-cased. Empty after stripping → no head, segment
-never matches `EXCLUDE`. `EXCLUDE = (tsc, prettier, nx, eslint, lint, vitest, jest, pytest)` —
-identical to the wrapper's list (ADR 0015).
-
-**`--engine` mode's `rewrites` count** (models the upstream first-line-only defect, NOT the guard
-rules above): a command scores 1 rewrite iff it contains no heredoc, its first line is non-blank,
-its first line's resolved head is **not** in `EXCLUDE`, and `rtk hook check` accepts that first
-line — 0 otherwise. This deliberately does not use the per-line achievability/guard classification;
-it reproduces exactly what the unfixed engine does today.
-
-**`--wrapper <path>` mode's `rewrites` count:** the command is piped through `<path>` as a
-`PreToolUsePayload` (`{"tool_name":"Bash","tool_input":{"command":<command>}}`). If the wrapper
-emits no stdout, or stdout does not parse to `hookSpecificOutput.updatedInput.command`, the count is 0. Otherwise the count is the number of lines that differ, position-for-position, between the input
-and the updated command. **A wrapper whose updated command has a different line count than the
-input scores 0, not a best-effort diff** — a wrapper that changes line count has violated its own
-contract, and the instrument scores that as a failure rather than silently misaligning the compare.
-
-### NA-88 D11 — this instrument is self-confirming, not independent evidence
-
-`rtk-coverage.py` and the wrapper it scores (`.claude/hooks/rtk-line-scan.sh`) are authored by the
-same story. A passing `--wrapper` run over the pinned corpus proves only that the wrapper does what
-its own author designed it to do — it does **not** prove the rewritten commands still execute
-correctly, that their output remains trustworthy, or that any token was actually saved. Gate 1 (the
-`lost-vs-permitted <= 5%` check) is a smoke test and is reported as one, both in this README and in
-the tool's own printed output.
-
-**Falsifiability, as the check that this smoke test is not vacuous:** the same instrument, same
-pinned corpus, must return two different answers depending on what it is pointed at —
-`--engine` (unwrapped, models the shipped defect) returns the ~72–79% loss figure measured for this
-story; `--wrapper` (post-fix) returns near-0%. A gate that returned the same number against both
-inputs would be evidence about nothing. See Gate 2 in `docs/superpowers/specs/NA-89.md` for the
-independent, non-self-confirming confirmation this instrument cannot provide on its own.
 
 ## Shared conventions
 
