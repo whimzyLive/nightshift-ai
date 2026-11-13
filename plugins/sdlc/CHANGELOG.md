@@ -1,3 +1,14 @@
+## 0.51.2 (2026-11-13)
+
+### 🩹 Fixes
+
+- **sdlc:** refuse an empty or short resume id in run-bg.sh ([b417c5c](https://github.com/whimzyLive/nightshift-ai/commit/b417c5c))
+- **sdlc:** merge a PR with no checks after the local gate instead of waiting ([bc56d47](https://github.com/whimzyLive/nightshift-ai/commit/bc56d47))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.1 (2026-11-13)
 
 ### 🚀 Features
