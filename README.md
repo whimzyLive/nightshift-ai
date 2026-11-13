@@ -300,7 +300,7 @@ All commands are namespaced by plugin — `/sdlc:*`.
 | **Shape work** | `/sdlc:refine-feature` · `/sdlc:design` · `/sdlc:prd` · `/sdlc:stories` · `/sdlc:refine-issue` |
 | **Build**      | `/sdlc:triage` · `/sdlc:spec` · `/sdlc:plan` (opt-in) · `/sdlc:impl`                           |
 | **Review**     | `/sdlc:review` · `/sdlc:review-fix` · `/sdlc:loop`                                             |
-| **End to end** | `/sdlc:auto`                                                                                   |
+| **End to end** | `/sdlc:auto` · `/sdlc:run` (several stories in the background)                                 |
 | **Document**   | `/sdlc:docs`                                                                                   |
 
 📖 **Full command list with usage, always current → [`docs/reference/commands/`](docs/reference/commands/)** — generated from the command sources, so a newly added command shows up automatically and this README never advertises a stale set.

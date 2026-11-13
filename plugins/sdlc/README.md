@@ -152,6 +152,18 @@ Repo values live in an optional `## Design` section of `project-context.md` (`Pa
 `Component review`, `Library label`, `Design canvas`, `Publish recipe`, `Designer model draft|plan|final`)
 and in `.claude/project/agents/designer.md`, which `/sdlc:init` scaffolds for a repo with a UI.
 
+## `/sdlc:run` — background story runs
+
+`/sdlc:run <KEY> [<KEY> ...] [--max N]` runs each story as its own background `claude --bg` session
+(`/sdlc:auto` inside), skips a story whose blockers are not Done, staggers the starts, and arms a
+10-minute session-local monitor tick that push-notifies when a run needs a person, stalls, or finishes.
+`scripts/run-bg.sh KEY [note] [session-id]` starts or resumes one run; per-repo settings go in the optional
+`.claude/project/bg-run.env`. `scripts/bg-status.sh KEY...` prints one line per story with a verdict
+(`RUNNING`, `NEEDS_HUMAN`, `STALLED`, `DONE`, `NO_SESSION`) taken from the transcript, the PR and Jira, not
+from the session state. A run that must stop for a decision opens a draft PR with a `Needs a human`
+section and ends with `NEEDS YOU:`. Concurrency guidance, ordering, resume and the monitor prompt:
+`plugins/sdlc/refs/bg-runs.md`.
+
 ## `/sdlc:analyze` — manual AI-config drift/gap scan
 
 `plugins/sdlc/commands/analyze.md` dispatches `ai-enablement-engineer` for a **manual-only** repo-wide
