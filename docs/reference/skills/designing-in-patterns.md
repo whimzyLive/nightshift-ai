@@ -1,6 +1,6 @@
 ---
 title: 'designing-in-patterns'
-description: 'Use when designing, planning or auditing UI against a component library — naming surfaces with the repo''s pattern vocabulary, deciding reuse versus extend versus new, exploring compositions, or writing the reuse table (component-plan.md, a spec''s `## Reuse`, a UI audit). Carries the design method; the repo''s own vocabulary, bundle and board rules come from project-context and the designer override.'
+description: "Use when designing, planning or auditing UI against a component library — naming surfaces with the repo's pattern vocabulary, deciding reuse versus extend versus new, exploring compositions, or writing the reuse table (component-plan.md, a spec's `## Reuse`, a UI audit). Carries the design method; the repo's own vocabulary, bundle and board rules come from project-context and the designer override."
 ---
 
 # designing-in-patterns
