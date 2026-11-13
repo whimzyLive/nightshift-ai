@@ -1,3 +1,22 @@
+## 0.51.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️  **sdlc:** drop the rtk wrapper and context-mode from the pipeline ([d2216d8](https://github.com/whimzyLive/nightshift-ai/commit/d2216d8))
+
+### ⚠️  Breaking Changes
+
+- **sdlc:** drop the rtk wrapper and context-mode from the pipeline  ([d2216d8](https://github.com/whimzyLive/nightshift-ai/commit/d2216d8))
+  the knowledge-engineer agent no longer lists the
+  context-mode MCP tools, so a repo that relied on ctx_index during
+  /sdlc:docs distill now clusters from the on-disk corpus only. The
+  rtk-line-scan hook and rtk-coverage instrument are gone; repos that
+  copied the hook keep their own copy and must drop it themselves.
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.50.0 (2026-11-13)
 
 ### 🚀 Features
