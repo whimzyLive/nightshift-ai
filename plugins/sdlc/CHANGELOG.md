@@ -1,3 +1,13 @@
+## 0.51.4 (2026-11-13)
+
+### 🚀 Features
+
+- **sdlc:** create the design story in --plan ([5ef8e5f](https://github.com/whimzyLive/nightshift-ai/commit/5ef8e5f))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.3 (2026-11-13)
 
 ### 🚀 Features
