@@ -73,6 +73,21 @@ for S in NEEDS: apply commands/spec.md Steps 1-4 INLINE (questions + approval vi
 
 `triage(S)` is `refs/triage.md` applied inline for `S`. Every child then reaches A0 already approved.
 
+## E0c — Design preflight: finals and library blockers
+
+Beside E0b and before any spawn: a UI child cannot build from a draft or from a library that has not landed.
+
+```text
+UI := every S in ORDER whose Design rows name docs/design/<slug>/ boards (refs/design-references.md)
+for S in UI:
+  a Design row names a draft board (scripts/design-kind.sh <index.md> <board> -> KIND=draft) -> REASON "S: Design row names a draft board <path> — run /design <EPIC_KEY> --final"
+  S's plan rows (refs/component-plan.md) name a library story that is neither Done nor in ORDER before S -> REASON "S: library story <key> not Done"
+any REASON -> GATE=STOP: spawn nothing; comment the Epic with every REASON; bare release   # a re-run resumes here
+no design, no plan -> E0c passes
+```
+
+A library story that is in ORDER runs first (E1 orders by the `Blocks` graph), so it is not a blocker here.
+
 ## E1 — Build the dependency-ordered queue
 
 Run the queue builder as **one** statically-analysable invocation (all `acli`/`jq`/loops live inside
@@ -88,7 +103,7 @@ Parse its greppable output:
   that `Blocks` it (the feature-spec dependencies, encoded in the Jira `Blocks` graph).
   Independent stories are tie-broken by Jira `created ASC`.
 - one `<key> BLOCKERS=<…>` line per story (informational).
-- `GATE=PASS` (exit 0) -> **E0b** (spec preflight), then E2 with `ORDER`.
+- `GATE=PASS` (exit 0) -> **E0b** (spec preflight) and **E0c** (design preflight), then E2 with `ORDER`.
 - `GATE=STOP` (exit 1) -> the builder hit an acli failure **or a dependency cycle** (its `REASON=`
   line names the cycle keys). Do not spawn anything — surface the `REASON` to the user, run the
   direct `session-complete.sh` release, and exit.
@@ -169,6 +184,10 @@ waits for checks and merges). A bare sentinel (the child stopped before a PR, e.
 an unapproved spec) or an unmerged PR (failing checks, refused merge) → **HALT** (E4) — never
 advance past an unmerged story. Verified → **no suspend**, advance straight to the next story. With E0b's specs approved up front, an all-Full-Auto epic is **emergent**: no
 story is ever gated, so the whole epic runs to completion in this single epic session, hands-free.
+
+## E3b — End of epic
+
+`ORDER` exhausted with every child Done -> the epic report also suggests `/sdlc:ui-audit <EPIC_KEY>` (a scan for patterns built twice, display logic in pages and restyled shared components; `commands/ui-audit.md`). Suggest only; never run it unprompted.
 
 ## E4 — HALT on child failure
 

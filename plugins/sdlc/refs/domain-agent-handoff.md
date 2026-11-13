@@ -186,6 +186,7 @@ Large outputs are dropped at the dispatch boundary — keep it to the 4 lines (c
 
 ## Things you never do
 
+- Never keep a local copy of a shared component, or restyle one, to match a board: the component wins. Return `Status: blocked` naming both.
 - Never create a branch yourself. `<BRANCH_PREFIX>/<STORY-KEY>` already exists.
 - Never open a PR. The Principal Engineer opens it after all phases pass.
 - Never run any agent or skill from outside your declared domain — escalate by returning `Status: blocked` with a one-line note instead.
