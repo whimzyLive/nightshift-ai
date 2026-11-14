@@ -96,6 +96,78 @@ transcript $SID 1 "Working."
 expect "STALLED: state blocked" "verdict=STALLED reason=state-blocked" -- \
   MOCK_AGENTS="$(agents S-1 $SID blocked)"
 
+# question_transcript <project dir> <sid> <age-minutes> [answered]: last assistant block is an
+# AskUserQuestion tool_use; with `answered`, a user tool_result follows it.
+question_transcript() {
+  local f="$1/$2.jsonl"
+  mkdir -p "$1"
+  printf '%s\n' '{"type":"user","message":{"content":"go"}}' \
+    '{"type":"assistant","message":{"content":[{"type":"text","text":"Checking the design."}]}}' \
+    '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_1","name":"AskUserQuestion","input":{"questions":[{"question":"How should it relate to\nthe existing select?","header":"Reuse","options":[{"label":"New sibling"},{"label":"Generalise"}]},{"question":"Which variants?","header":"Variants","options":[]}]}}]}}' > "$f"
+  [ "${4:-}" = answered ] && printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_1","content":"New sibling"}]}}' >> "$f"
+  printf '%s\n' '{"type":"cost-state","value":1}' '{"type":"last-prompt","value":"go"}' >> "$f"
+  python3 -I -c 'import os,sys; t=int(sys.argv[2])-int(sys.argv[3])*60; os.utime(sys.argv[1],(t,t))' "$f" "$NOW" "$3"
+}
+# agents_in <cwd> <state|null> <status|null>: the two-field shape of `claude agents --json`.
+agents_in() {
+  local st="$2" su="$3"
+  [ "$st" = null ] || st="\"$st\""
+  [ "$su" = null ] || su="\"$su\""
+  printf '[{"name":"S-1","sessionId":"%s","cwd":"%s","kind":"background","state":%s,"status":%s,"startedAt":1}]' "$SID" "$1" "$st" "$su"
+}
+encode() { printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g'; }
+
+rm -f "$tdir"/*.jsonl
+question_transcript "$tdir" $SID 5
+expect "NEEDS_HUMAN: blocked on AskUserQuestion" "verdict=NEEDS_HUMAN reason=question" -- \
+  MOCK_AGENTS="$(agents_in "$repo" blocked waiting)"
+expect "question: header and first question on one line, last field" \
+  "needs_heading=no question=Reuse: How should it relate to the existing select? (+1 more)" -- \
+  MOCK_AGENTS="$(agents_in "$repo" blocked waiting)"
+expect "NEEDS_HUMAN: state blocked with a null status" "verdict=NEEDS_HUMAN reason=question" -- \
+  MOCK_AGENTS="$(agents_in "$repo" blocked null)"
+expect "question: text is cut at QUESTION_MAX" "question=Reuse: How..." -- \
+  MOCK_AGENTS="$(agents_in "$repo" blocked waiting)" QUESTION_MAX=10
+out="$(status MOCK_AGENTS="$(agents_in "$repo" blocked waiting)")"
+if [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ]; then ok "question: status stays one line"; else bad "question: status stays one line" "$out"; fi
+
+expect "RUNNING: pending question but the session is not blocked" "verdict=RUNNING" -- \
+  MOCK_AGENTS="$(agents_in "$repo" working busy)"
+out="$(status MOCK_AGENTS="$(agents_in "$repo" working busy)")"
+case "$out" in *question=*) bad "no question field unless reason=question" "$out" ;; *) ok "no question field unless reason=question" ;; esac
+
+question_transcript "$tdir" $SID 5 answered
+expect "STALLED: blocked after the question was answered" "verdict=STALLED reason=state-blocked" -- \
+  MOCK_AGENTS="$(agents_in "$repo" blocked waiting)"
+transcript $SID 5 "Working."
+expect "STALLED: waiting with no pending question" "verdict=STALLED reason=state-waiting" -- \
+  MOCK_AGENTS="$(agents_in "$repo" null waiting)"
+expect "STALLED: state blocked with a null status, no question" "reason=state-blocked session=$SID state=blocked idle_min=5" -- \
+  MOCK_AGENTS="$(agents_in "$repo" blocked null)"
+
+# Transcript location: a story run's cwd is its worktree, so its project dir is the worktree's encoding.
+rm -f "$tdir"/*.jsonl
+wt="$repo/.claude/worktrees/sdlc-S-1"
+wt_dir="$home/.claude/projects/$(encode "$wt")"
+case "$wt_dir" in *--claude-worktrees-sdlc-S-1) ok "worktree cwd encodes / and . to -" ;; *) bad "worktree cwd encodes / and . to -" "$wt_dir" ;; esac
+question_transcript "$home/.claude/projects/-aaa-stale-copy" $SID 40 answered
+question_transcript "$wt_dir" $SID 7
+expect "transcript: read from the session cwd's project dir, not the repo root's" \
+  "verdict=NEEDS_HUMAN reason=question session=$SID state=waiting idle_min=7" -- \
+  MOCK_AGENTS="$(agents_in "$wt" blocked waiting)"
+rm -rf "$wt_dir" "$home/.claude/projects/-aaa-stale-copy"
+
+question_transcript "$home/.claude/projects/-somewhere-else" $SID 9
+expect "transcript: found by session id when the cwd's project dir has none" \
+  "verdict=NEEDS_HUMAN reason=question session=$SID state=waiting idle_min=9" -- \
+  MOCK_AGENTS="$(agents_in "$wt" blocked waiting)"
+expect "transcript: found by session id when the entry has no cwd" "idle_min=9" -- \
+  MOCK_AGENTS="[{\"name\":\"S-1\",\"sessionId\":\"$SID\",\"state\":\"blocked\",\"startedAt\":1}]"
+rm -rf "$home/.claude/projects/-somewhere-else"
+expect "transcript: none anywhere leaves idle_min empty and the run STALLED" \
+  "verdict=STALLED reason=state-blocked session=$SID state=waiting idle_min=-" -- \
+  MOCK_AGENTS="$(agents_in "$wt" blocked waiting)"
+
 transcript $SID 10 "Done."
 expect "DONE: PR merged" "verdict=DONE reason=merged" -- \
   MOCK_AGENTS="$(agents S-1 $SID idle)" MOCK_PR="$(pr 7 MERGED false body)"
@@ -113,6 +185,109 @@ expect "pending check keeps the run RUNNING" "verdict=RUNNING reason=checks-pend
 expect "failing check needs a human" "reason=checks-failing" -- \
   MOCK_AGENTS="$(agents S-1 $SID working)" \
   MOCK_PR="$(pr 7 OPEN false body '[{"status":"COMPLETED","conclusion":"FAILURE"}]')"
+
+# Resume chain: every resume is a new session id with a new name, and its cwd can differ.
+status_for_key() { local k="$1"; shift; (cd "$repo" && env PATH="$work/bin:$PATH" HOME="$home" BG_STATUS_NOW="$NOW" "$@" bash scripts/bg-status.sh "$k" 2>&1); }
+expect_key() { # name key needle -- env...
+  local name="$1" k="$2" needle="$3" out; shift 4
+  out="$(status_for_key "$k" "$@")"
+  if printf '%s\n' "$out" | grep -qF -- "$needle"; then ok "$name"; else bad "$name (want '$needle')" "$out"; fi
+}
+refute_key() { # name key needle -- env...
+  local name="$1" k="$2" needle="$3" out; shift 4
+  out="$(status_for_key "$k" "$@")"
+  if printf '%s\n' "$out" | grep -qF -- "$needle"; then bad "$name (did not want '$needle')" "$out"; else ok "$name"; fi
+}
+# story_transcript <project dir> <sid> <age-minutes> <first user prompt> [tool command]
+story_transcript() {
+  local f="$1/$2.jsonl"
+  mkdir -p "$1"
+  jq -cn --arg p "$4" --arg c "${5:-ls}" \
+    '{type:"user",isMeta:true,message:{content:"caveat"}},
+     {type:"user",message:{content:$p}},
+     {type:"assistant",message:{content:[{type:"text",text:"Working."}]}},
+     {type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{command:$c}}]}}' > "$f"
+  python3 -I -c 'import os,sys; t=int(sys.argv[2])-int(sys.argv[3])*60; os.utime(sys.argv[1],(t,t))' "$f" "$NOW" "$3"
+}
+entry() { # id-prefix name state status cwd startedAt [kind]
+  local su="$4"
+  [ "$su" = null ] || su="\"$su\""
+  printf '{"id":"%s","name":"%s","kind":"%s","state":"%s","status":%s,"sessionId":"%s","cwd":"%s","startedAt":%s}' \
+    "${1%%-*}" "$2" "${7:-background}" "$3" "$su" "$1" "$5" "$6"
+}
+C1=8b7a08e5-faac-4987-b309-3d6915d06377
+C2=3d5d8fce-ae7a-4047-a0c6-4644078a7ab1
+C3=8f1f623f-4a21-445a-86be-35b5af0ca15f
+wt475="$repo/.claude/worktrees/sdlc-INV-475"
+wt475_dir="$home/.claude/projects/$(encode "$wt475")"
+auto475='<command-message>sdlc:auto</command-message>\n<command-name>/sdlc:auto</command-name>\n<command-args>INV-475</command-args>'
+chain() { # state and status of the second resume, then of the first resume
+  printf '[%s,%s,%s]' \
+    "$(entry $C1 INV-475 blocked waiting "$wt475" 1794626310440)" \
+    "$(entry $C2 'inv-475 entitymultiselect' "${3:-blocked}" "${4:-idle}" "$wt475" 1794627266898)" \
+    "$(entry $C3 entitymultiselect-variant-cleanup "$1" "$2" "$repo" 1794628412179)"
+}
+rm -rf "$tdir"/*.jsonl "$wt475_dir"
+question_transcript "$wt475_dir" $C1 21
+story_transcript "$wt475_dir" $C2 12 "$auto475"
+story_transcript "$tdir" $C3 1 "$auto475"
+
+expect_key "chain: the live second resume is the story's session" INV-475 \
+  "INV-475 verdict=RUNNING reason=active session=$C3 state=busy idle_min=1" -- MOCK_AGENTS="$(chain working busy)"
+expect_key "chain: sessions= counts the matched entries" INV-475 "needs_heading=no sessions=3" -- \
+  MOCK_AGENTS="$(chain working busy)"
+refute_key "chain: the first run's pending question is not reported" INV-475 "question" -- \
+  MOCK_AGENTS="$(chain working busy)"
+expect_key "chain: finished newest with a Needs a human PR reports from the newest" INV-475 \
+  "INV-475 verdict=NEEDS_HUMAN reason=pr-heading session=$C3 state=idle idle_min=1" -- \
+  MOCK_AGENTS="$(chain blocked idle)" MOCK_PR="$(pr 9 OPEN true '## Needs a human\n- decide X')"
+expect_key "chain: two live sessions are duplicates" INV-475 "verdict=NEEDS_HUMAN reason=duplicate-sessions" -- \
+  MOCK_AGENTS="$(chain working busy working busy)"
+expect_key "chain: duplicates lists both live ids, oldest first, as the last field" INV-475 \
+  "sessions=3 duplicates=$C2,$C3" -- MOCK_AGENTS="$(chain working busy working busy)"
+refute_key "chain: no duplicates field with one live session" INV-475 "duplicates=" -- \
+  MOCK_AGENTS="$(chain working busy)"
+expect_key "chain: a merged PR outranks duplicate sessions" INV-475 "verdict=DONE reason=merged" -- \
+  MOCK_AGENTS="$(chain working busy working busy)" MOCK_PR="$(pr 9 MERGED false body)"
+expect_key "key boundary: INV-47 does not match INV-475 sessions" INV-47 \
+  "INV-47 verdict=NO_SESSION reason=no-session-no-pr session=-" -- MOCK_AGENTS="$(chain working busy)"
+expect_key "key boundary: INV-475 does not match an INV-4750 session" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C1 INV-4750 working busy "$repo/.claude/worktrees/sdlc-INV-4750" 1)]"
+rm -rf "$wt475_dir"
+
+rm -f "$tdir"/*.jsonl
+story_transcript "$tdir" $C3 1 "$auto475"
+expect_key "chain: a stopped session with the newer start loses to the live one's newer write" INV-475 "session=$C3" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1000),$(entry $C1 INV-475 stopped null "$repo" 2000)]"
+expect_key "match: cwd under sdlc-<KEY> alone" INV-475 "session=$C1 state=busy" -- \
+  MOCK_AGENTS="[$(entry $C1 cleanup working busy "$wt475" 1)]"
+expect_key "match: an interactive session is never a story's run" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C1 INV-475 working busy "$repo" 1 interactive)]"
+
+rm -f "$tdir"/*.jsonl
+story_transcript "$tdir" $C3 4 "carry on" "git push -u origin feat/INV-475"
+expect_key "match: a tool call on the story's branch" INV-475 "session=$C3 state=busy idle_min=4" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+refute_key "match: a single matched session prints no sessions field" INV-475 "sessions=" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "carry on" 'bash scripts/run-bg.sh "INV-475" "note"'
+expect_key "match: a run-bg.sh tool call with a quoted key" INV-475 "session=$C3" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "carry on" "git log origin/feat/INV-4750"
+expect_key "match: a tool call on a longer key's branch is not the story's" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "/sdlc:auto INV-480" "git log origin/feat/INV-475"
+expect_key "match: another story's run that touches the branch is not the story's" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "Summarise the INV-475 thread" "ls"
+expect_key "match: the key in the first user prompt" INV-475 "session=$C3" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+
+rm -f "$tdir"/*.jsonl
+transcript $SID 2 "Implementing the story."
+out="$(status MOCK_AGENTS="$(agents S-1 $SID working)")"
+want="S-1 verdict=RUNNING reason=active session=$SID state=working idle_min=2 jira=To_Do pr=- checks=- needs_you=no needs_heading=no"
+if [ "$out" = "$want" ]; then ok "single session: the whole line is unchanged"; else bad "single session: the whole line is unchanged" "$out"; fi
 
 # run-bg.sh
 contains() {
@@ -134,11 +309,14 @@ contains "run-bg start: note in prompt" "mind the cache"
 contains "run-bg start: rules carry the handoff convention" "Needs a human"
 contains "run-bg start: rules carry NEEDS YOU" "NEEDS YOU:"
 contains "run-bg start: rules forbid SendMessage resume" "never resume an agent with SendMessage"
+contains "run-bg start: rules forbid AskUserQuestion" "Never call AskUserQuestion in a background run"
+contains "run-bg start: rules send questions through the handoff" "do the human handoff instead"
 contains "run-bg: ANTHROPIC_API_KEY unset" "KEY_SET=unset"
 
 (cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" bash scripts/run-bg.sh S-1 "carry on" "$SID")
 contains "run-bg resume: --resume with the full id" "[--bg][--resume][$SID]"
 contains "run-bg resume: note is the prompt" "[carry on]"
+contains "run-bg resume: rules forbid AskUserQuestion" "Never call AskUserQuestion in a background run"
 if grep -qF -- "[-n]" "$work/claude.log"; then bad "run-bg resume: no -n"; else ok "run-bg resume: no -n"; fi
 
 rm -f "$work/claude.log"
