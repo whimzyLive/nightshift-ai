@@ -1,3 +1,13 @@
+## 0.51.7 (2026-11-14)
+
+### 🚀 Features
+
+- **sdlc:** stop poll-loop waits and scope the QA gate to the diff ([002b43c](https://github.com/whimzyLive/nightshift-ai/commit/002b43c))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.6 (2026-11-14)
 
 ### 🩹 Fixes
