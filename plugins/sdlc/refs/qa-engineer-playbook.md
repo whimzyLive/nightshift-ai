@@ -381,7 +381,7 @@ committed rule file.
 ## Step 6 — Quality gate
 
 ```text
-offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <RUN_INFRA> <RUN_DESIGN_CHECK>,
+offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <BASE_SHA> <RUN_INFRA> <RUN_DESIGN_CHECK>,
   # RUN_INFRA := yes when a changed path belongs to platform-engineer infra, else no
   # RUN_DESIGN_CHECK := yes WHEN `Design check` is set AND (a Design row OR a changed web/mobile-owned path), else no
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/qa-gate-runner.md exactly. Return ONLY its block.")

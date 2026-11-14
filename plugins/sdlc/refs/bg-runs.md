@@ -30,7 +30,8 @@ Repo-specific rules (a test flag, a database URL, a gate base) belong here, neve
 
 ## Run rules (appended to every session)
 
-1. Dispatch every agent in the foreground and wait for it. Never end a turn while an agent runs.
+1. Wait for every agent's handback before acting on its work: end the turn, and the session resumes
+   when the agent hands back. Never wait with a shell loop (`pgrep`, `sleep`, `until`, `while`).
 2. A fresh agent for each fix round and each re-review. Never resume an agent with `SendMessage`.
 3. Never grow an allowance list, skip a check or silence a gate to get a pass. Report the failure.
 4. Work only in your own worktree. Never touch the uncommitted files of the primary checkout.

@@ -4,7 +4,7 @@ Executed by a dispatched `general-purpose` subagent, and — only on the orchest
 inline-fallback path — by the orchestrator itself. Written in the third person for that reason:
 never address "you, the subagent", and never depend on a value the orchestrator does not hold.
 
-Inputs, all passed in the dispatch prompt: `<STORY-KEY>` `<WORKTREE>` `<NX_CACHE_DIRECTORY>` `<BRANCH_PREFIX>`
+Inputs, all passed in the dispatch prompt: `<STORY-KEY>` `<WORKTREE>` `<NX_CACHE_DIRECTORY>` `<BRANCH_PREFIX>` `<BASE_SHA>`
 `<RUN_INFRA>` `<RUN_DESIGN_CHECK>` (each `yes`|`no` — the orchestrator decides; this runner only executes, so it runs on Haiku)
 
 ## Procedure
@@ -37,6 +37,17 @@ return below and let the orchestrator STOP; never silently clean it yourself.
 export NX_CACHE_DIRECTORY="$NX_CACHE_DIRECTORY"
 cd "$WORKTREE"
 # ... run the project-context Tooling + Quality Gate commands here (never `Design check`) ...
+```
+
+   Scope, decided from the diff and never by judgement:
+
+```text
+CHANGED := git -C "$WORKTREE" diff --name-only <BASE_SHA>..HEAD
+Tooling row `Typecheck (affected)` | `Test (affected)` set -> run it IN PLACE OF `Typecheck` | `Test`,
+  with its `<BASE_SHA>` filled in; row absent -> the full command, as before
+a command or story-run rule the project-context ties to a path ("when `backend/` changes") ->
+  run it only when CHANGED lists a path under that path; else leave it out of `Commands`
+every command run once per gate; never a second "to be sure" run of one that exited 0
 ```
 
 4. `RUN_INFRA=yes` → also run the infra build with the stage flag from project-context (still
