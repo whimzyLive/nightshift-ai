@@ -1,3 +1,14 @@
+## 0.51.6 (2026-11-14)
+
+### 🩹 Fixes
+
+- **sdlc:** follow a run's newest session after a resume ([05fa055](https://github.com/whimzyLive/nightshift-ai/commit/05fa055))
+- **sdlc:** detect a background run blocked on a question ([2fdfe97](https://github.com/whimzyLive/nightshift-ai/commit/2fdfe97))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.5 (2026-11-14)
 
 ### 🚀 Features
