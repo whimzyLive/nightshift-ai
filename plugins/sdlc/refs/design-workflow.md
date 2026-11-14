@@ -158,6 +158,17 @@ no canvas       := nothing is published; the command keeps the temp folder and h
 ```
 
 
+### What a publish recipe covers for final boards
+
+```text
+pages           := named Epic key first: `<EPIC> <Epic title>` for finals, `<EPIC> wireframes` for drafts, one kit page for shared parts
+earlier page    := a page an earlier design left under the same name is renamed `Archived - <EPIC> earlier boards` before the new page is created; never reused or merged
+name clash      := canvases are often flat (no slug folder), so the orchestrator compares the final boards' names (the designer's return lists them) with the files already on the canvas BEFORE publishing
+                   a clash -> STOP and ask the user: replace in place after reading the old copy | move the old one aside | publish only the non-colliding boards
+hand edits      := a board the user may have edited by hand is read before it is replaced
+stale mounts    := the orchestrator lists boards on the canvas that mount components the new bundle no longer exports and reports them; it does not fix other boards unless asked
+```
+
 ## Who reads what
 
 | Role | Reads |

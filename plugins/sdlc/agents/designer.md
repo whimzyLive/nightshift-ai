@@ -90,7 +90,7 @@ run the repo's board lint and Design check where the repo has them (project-cont
 check the kinds yourself: bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-kind.sh <board.html> -> KIND=final and TEMPLATE= present, for every board, before returning
 ```
 
-Return: the slug and the board paths.
+Return: the slug, the board paths and the board names you chose, so the orchestrator can check them against the canvas for a name clash before any publish.
 
 ## Return
 
@@ -109,4 +109,4 @@ Blocked adds `Note: <one line — why>` after `Status:`. `Skills loaded:` and `R
 | --- | --- |
 | draft | `Boards: <paths, comma-separated>`, `Journey: <WF_DIR>/journey.md`, `Not linked: <screen: control, ...> \| none`, `Gaps: <n> ? blocks` |
 | plan | `Plan: <path>`, `Open questions: none` or the `Q:` / `WHY:` / `OPTIONS:` blocks, `Stories: <keys> \| none`, `Design story: <step 6's line>` (omitted while questions are open) |
-| final | `Slug: <slug>`, `Boards: <paths, comma-separated>` |
+| final | `Slug: <slug>`, `Boards: <paths, comma-separated>`, `Board names: <names, comma-separated>` |
