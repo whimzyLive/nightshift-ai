@@ -5,7 +5,7 @@
 | Project name     | nightshift-ai                |
 | Jira project key | NA                           |
 | Jira site        | whimzylive.atlassian.net     |
-| Base branch      | develop                      |
+| Base branch      | main                         |
 | Package manager  | pnpm                         |
 | Typecheck / Test | — / pnpm nx run-many -t test |
 

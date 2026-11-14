@@ -73,9 +73,9 @@ To drive a whole **Epic** and every child story in dependency order, pass the ep
    /sdlc:loop <PR-URL>      # keep looping a specific PR until review-clean and checks pass
    ```
 
-   `/sdlc:review` with no key runs Diff mode against the current working changes vs `develop`.
+   `/sdlc:review` with no key runs Diff mode against the current working changes vs the base branch.
 
-Once the PR is review-clean and checks pass, merge it to `develop`.
+Once the PR is review-clean and checks pass, merge it to the base branch.
 
 ## Verify
 

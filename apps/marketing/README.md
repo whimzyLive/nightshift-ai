@@ -78,8 +78,7 @@ Vercel auto-detects Next.js; `vercel.json` only restricts which branches deploy
 
 ### Branch filtering
 
-`apps/marketing/vercel.json` limits automatic deployments to `main` and
-`develop`:
+`apps/marketing/vercel.json` limits automatic deployments to `main`:
 
 ```json
 {
@@ -87,8 +86,7 @@ Vercel auto-detects Next.js; `vercel.json` only restricts which branches deploy
     "deploymentEnabled": {
       "**": false,
       "*": false,
-      "main": true,
-      "develop": true
+      "main": true
     }
   }
 }
@@ -97,13 +95,13 @@ Vercel auto-detects Next.js; `vercel.json` only restricts which branches deploy
 Branch keys are [minimatch](https://github.com/isaacs/minimatch) patterns, and a
 branch matching **any** `true` rule deploys. `*` does not cross `/`, so both `*`
 (e.g. `main`-style names) and `**` (e.g. `feat/NA-1`) are needed to catch
-everything before the two allow rules re-enable them.
+everything before the allow rule re-enables it.
 
 Two consequences worth knowing:
 
 - Vercel reads `vercel.json` **from the commit being deployed**, so a branch
   only stops deploying once it contains this file. Branches cut before it landed
-  keep deploying until rebased onto `develop`.
+  keep deploying until rebased onto `main`.
 - This blocks _automatic_ Git deployments only. `vercel deploy` and deploy hooks
   still work from any branch.
 
