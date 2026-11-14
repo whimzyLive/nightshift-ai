@@ -99,6 +99,10 @@ generated file — every slot must be replaced with an actual value.
 
 - **Omit blank rows** — if the user left Typecheck or Test blank, omit those
   rows from `## Tooling` rather than writing an empty backtick pair.
+- **Typecheck (affected) / Test (affected)** — optional rows (not in the table above) for a repo
+  whose build tool can run only what a diff touches (e.g. `pnpm exec nx affected -t test
+  --base=<BASE_SHA>`). Keep `<BASE_SHA>` literal: the QA gate fills it with the story's base and
+  runs the row in place of `Typecheck` / `Test` (`refs/qa-gate-runner.md`). Absent = the full command.
 - **UI library** — the shared component package other workspaces import (e.g.
   `packages/ui/`); omit the row when there is none. `/design` inventories
   components against it (`refs/ui-components.md`).

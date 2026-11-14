@@ -92,7 +92,7 @@ Design check unset -> none of this applies; Reading rules below stand
 ## Domain agent duties (Design references and check)
 
 ```text
-UI story := its Design rows or web/mobile-owned paths; run the check before committing
+UI story := its Design rows or web/mobile-owned paths; run the check ONCE before committing (again only after fixing a failure it reported)
 dispatch -> each Design row's page path AND its PNG path; read the PNG before building a UI task (none -> Grep for the region, then a bounded Read of the page; pages are large)
 the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins
 the row's "take from it" line vs the image -> the image wins; ACs, Dev Notes and design-system tokens/components still rank above the design (Authority)

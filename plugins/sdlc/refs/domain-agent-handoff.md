@@ -130,7 +130,7 @@ shared/ counter-only STILL needs `agent:` >= 2 (NA-103) — only trigger/rule is
 
 ## Domain verification
 
-Each domain has its own verification commands. Run **all** of them before considering work complete — listed in each agent's body and the directory CLAUDE.md files. See `.claude/project/project-context.md` for project-level quality gate commands.
+Each domain has its own verification commands — listed in each agent's body and the directory CLAUDE.md files. Run each ONCE, on the final tree, scoped to the workspaces you changed; re-run only a command that failed, after its fix. Never run the repo-wide suite, another workspace's tests or the infra build: the QA gate runs the project-context gate on the pushed HEAD (`refs/qa-gate-runner.md`).
 
 **Design references and check** — a UI task's dispatch carries each Design row's page and PNG paths; read the PNG first. With `Design check` set, follow `refs/design-references.md` (Strong references, Fidelity-first, Deviations, Domain agent duties). Unset -> skip the check.
 
