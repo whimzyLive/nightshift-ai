@@ -3,25 +3,34 @@
 # Usage: bg-status.sh KEY...
 #
 # Line: KEY verdict=<V> reason=<r> session=<id|-> state=<s|-> idle_min=<N|-> jira=<status|-> \
-#       pr=<#N:STATE[:draft]|-> checks=<none|pending|failing|passing|-> needs_you=yes|no needs_heading=yes|no
+#       pr=<#N:STATE[:draft]|-> checks=<none|pending|failing|passing|-> needs_you=yes|no needs_heading=yes|no \
+#       [question=<header: first question, one line, cut at QUESTION_MAX>]
+# `question=` is the last field and only present when the run is blocked on a question; its value
+# has spaces and runs to the end of the line.
 #
 # Verdict (first match wins):
 #   DONE         Jira status is the `Pipeline done status` of project-context (default Done), or the PR is merged.
 #   NEEDS_HUMAN  last assistant message starts with 'NEEDS YOU:', the PR body has a 'Needs a human'
-#                heading, or the run has gone quiet with an open PR (draft, failing checks, or ready to merge).
+#                heading, the session is blocked/waiting on an unanswered AskUserQuestion, or the run
+#                has gone quiet with an open PR (draft, failing checks, or ready to merge).
 #   NO_SESSION   no session named KEY and no PR.
-#   STALLED      session state blocked/waiting, or no transcript write for STALL_MIN minutes.
+#   STALLED      session blocked/waiting with no pending question, or no transcript write for
+#                STALL_MIN minutes.
 #   RUNNING      everything else.
 # The session state is not trusted: a run can end its turn with a draft PR while the state still
 # reads `working` and Jira stays To Do. The transcript and the PR decide.
 # "checks=none" means the PR has no checks at all (some repos have no CI), never "waiting".
+# `claude agents --json` carries two fields, `state` and `status`, and either can be null; blocked or
+# waiting in either one counts. The transcript sits under the encoding of the session's own cwd (a
+# story run's worktree, `/` and `.` both become `-`), not the repo root.
 #
 # Env: STALL_MIN (default 25), QUIET_MIN (default 3, quiet time before an open PR counts as handed off),
-#      BG_STATUS_NOW (epoch override for tests).
+#      QUESTION_MAX (default 200, characters of question text printed), BG_STATUS_NOW (epoch override for tests).
 set -uo pipefail
 
 stall_min="${STALL_MIN:-25}"
 quiet_min="${QUIET_MIN:-3}"
+question_max="${QUESTION_MAX:-200}"
 here="$(cd "$(dirname "$0")" && pwd)"
 
 [ "$#" -ge 1 ] || { echo "usage: bg-status.sh KEY..." >&2; exit 2; }
@@ -44,6 +53,7 @@ bash "$here/jira-site-guard.sh" >/dev/null 2>&1 && jira_guard_ok=1
 
 status_for() {
   local key="$1" f entry sid state cwd tpath age last jira pr_json pr_num pr_state pr_draft pr_body checks
+  local blocked="" question=""
   local needs_you=no needs_heading=no verdict reason="" pr_label="-" prefix
 
   entry="$(printf '%s' "$agents_json" | jq -c --arg k "$key" \
@@ -51,7 +61,8 @@ status_for() {
   sid="" state="" cwd=""
   if [ -n "$entry" ]; then
     sid="$(printf '%s' "$entry" | jq -r '.sessionId // empty')"
-    state="$(printf '%s' "$entry" | jq -r '.status // empty')"
+    state="$(printf '%s' "$entry" | jq -r '.status // .state // empty')"
+    blocked="$(printf '%s' "$entry" | jq -r '[.state, .status] | map(select(. == "blocked" or . == "waiting")) | first // empty')"
     cwd="$(printf '%s' "$entry" | jq -r '.cwd // empty')"
   fi
 
@@ -69,6 +80,18 @@ status_for() {
       [ -n "$mt" ] && age=$(( (now - mt) / 60 ))
       last="$(jq -rs '[.[] | select(.type=="assistant") | [.message.content[]? | select(.type=="text") | .text] | join("\n") | select(length>0)] | last // ""' "$tpath" 2>/dev/null)"
       case "$last" in 'NEEDS YOU:'*) needs_you=yes ;; esac
+      # An answered question is followed by a user entry holding its tool_result.
+      question="$(jq -rs '
+        [.[] | select(.type=="assistant" or .type=="user")] | last
+        | select(.type=="assistant")
+        | (.message.content | if type=="array" then last else empty end)
+        | select(.type=="tool_use" and .name=="AskUserQuestion")
+        | (.input.questions // []) as $q
+        | ([($q[0].header // ""), ($q[0].question // "")] | map(select(length>0)) | join(": ")) as $t
+        | (if ($t|length)>0 then $t else "question pending" end)
+          + (if ($q|length)>1 then " (+\(($q|length)-1) more)" else "" end)' "$tpath" 2>/dev/null \
+        | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//')"
+      [ "${#question}" -gt "$question_max" ] && question="${question:0:question_max}..."
     fi
   fi
 
@@ -115,8 +138,10 @@ status_for() {
     verdict=NEEDS_HUMAN; reason="pr-heading"
   elif [ -z "$sid" ] && [ -z "$pr_num" ]; then
     verdict=NO_SESSION; reason="no-session-no-pr"
-  elif [ "$state" = blocked ] || [ "$state" = waiting ]; then
-    verdict=STALLED; reason="state-$state"
+  elif [ -n "$blocked" ] && [ -n "$question" ]; then
+    verdict=NEEDS_HUMAN; reason="question"
+  elif [ -n "$blocked" ]; then
+    verdict=STALLED; reason="state-$blocked"
   elif [ "$pr_state" = OPEN ] && [ "$quiet" = 1 ] && [ "$pr_draft" = true ]; then
     verdict=NEEDS_HUMAN; reason="draft-pr"
   elif [ "$pr_state" = OPEN ] && [ "$quiet" = 1 ] && [ "$checks" = failing ]; then
@@ -130,8 +155,10 @@ status_for() {
     [ "$pr_state" = OPEN ] && [ "$checks" = pending ] && reason="checks-pending"
   fi
 
-  printf '%s verdict=%s reason=%s session=%s state=%s idle_min=%s jira=%s pr=%s checks=%s needs_you=%s needs_heading=%s\n' \
-    "$key" "$verdict" "$reason" "${sid:--}" "${state:--}" "${age:--}" "$jira" "$pr_label" "$checks" "$needs_you" "$needs_heading"
+  local tail=""
+  [ "$reason" = question ] && tail=" question=$question"
+  printf '%s verdict=%s reason=%s session=%s state=%s idle_min=%s jira=%s pr=%s checks=%s needs_you=%s needs_heading=%s%s\n' \
+    "$key" "$verdict" "$reason" "${sid:--}" "${state:--}" "${age:--}" "$jira" "$pr_label" "$checks" "$needs_you" "$needs_heading" "$tail"
 }
 
 for k in "$@"; do status_for "$k"; done

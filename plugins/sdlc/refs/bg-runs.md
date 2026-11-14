@@ -35,6 +35,8 @@ Repo-specific rules (a test flag, a database URL, a gate base) belong here, neve
 3. Never grow an allowance list, skip a check or silence a gate to get a pass. Report the failure.
 4. Work only in your own worktree. Never touch the uncommitted files of the primary checkout.
 5. Human handoff (below).
+6. Never call `AskUserQuestion`. Nobody is watching the terminal and it blocks the session. Do the
+   human handoff instead, with each question, its options and a recommendation.
 
 ## Human handoff convention
 
@@ -47,6 +49,10 @@ waive, a product question), it must:
 4. start its last message with `NEEDS YOU:` followed by the decisions.
 
 `bg-status.sh` reads signals 2 and 4, so the monitor can tell a stopped run from a working one.
+
+A run that asks through `AskUserQuestion` anyway sits blocked on a menu nobody sees. `bg-status.sh`
+reports it as `NEEDS_HUMAN reason=question` and prints the question ("Answering a run blocked on a
+question" below).
 
 ## Concurrency
 
@@ -81,8 +87,8 @@ KEY verdict=RUNNING reason=active session=<id> state=busy idle_min=2 jira=In_Pro
 | Verdict       | Meaning                                                                                           |
 | ------------- | ------------------------------------------------------------------------------------------------- |
 | `RUNNING`     | transcript written within 25 minutes and nothing says it stopped                                  |
-| `NEEDS_HUMAN` | `NEEDS YOU:` last message, a `Needs a human` PR heading, or a quiet run with a draft or ready PR  |
-| `STALLED`     | state `blocked` or `waiting`, or no transcript write for 25 minutes                               |
+| `NEEDS_HUMAN` | `NEEDS YOU:` last message, a `Needs a human` PR heading, a session blocked on a question, or a quiet run with a draft or ready PR |
+| `STALLED`     | `blocked` or `waiting` with no pending question, or no transcript write for 25 minutes            |
 | `DONE`        | Jira status is the done status, or the PR is merged                                               |
 | `NO_SESSION`  | no session named after the key and no PR                                                          |
 
@@ -92,6 +98,18 @@ Two lessons are built in:
   still reads `working` and Jira stays To Do. The transcript age and the PR decide.
 - An open PR is not "waiting for checks". `checks=` is the real rollup: `none` (the repo has no CI),
   `pending`, `failing` or `passing`. Only `pending` keeps a run `RUNNING`.
+
+A session blocked on a question adds one last field, `question=`, with the header and text of the
+first question on one line (cut at `QUESTION_MAX`, 200 characters). Its value has spaces and runs to
+the end of the line:
+
+```
+KEY verdict=NEEDS_HUMAN reason=question session=<id> state=waiting idle_min=5 ... question=Reuse: new sibling or generalise the existing one? (+1 more)
+```
+
+The probe finds the transcript under the session's own `cwd` from `claude agents --json` (a story
+run works in its worktree, so not under the repo root's project folder) and, when that folder has no
+file for the session, in any project folder that holds `<session-id>.jsonl`.
 
 Thresholds are `STALL_MIN` (25) and `QUIET_MIN` (3, how long a run is silent before an open PR counts
 as a handoff). Set them in the environment to change them.
@@ -107,6 +125,15 @@ decision, resume the same way with the answer as the note.
 A third argument that is empty, or not a full 8-4-4-4-12 hex session id, is refused and nothing is
 launched, so a failed id lookup can never start a fresh run. Expand a short id (like `39d88595`) to the
 full `sessionId` from `claude agents --json`.
+
+## Answering a run blocked on a question
+
+A session with `reason=question` cannot be answered from outside: the menu belongs to its terminal.
+
+1. The foreground session asks the person the question from the status line (`claude attach KEY`
+   shows every question and its options).
+2. `claude stop <session-id>`.
+3. `bash ${CLAUDE_PLUGIN_ROOT}/scripts/run-bg.sh KEY "<answers>" <FULL session id>`.
 
 ## Monitor tick
 
@@ -124,7 +151,8 @@ Monitor tick for background runs: <KEYS>.
 1. Run: bash ${CLAUDE_PLUGIN_ROOT}/scripts/bg-status.sh <KEYS>
 2. For each story compare its verdict with the one you notified last (keep a note in this session).
    On a change to NEEDS_HUMAN, STALLED or DONE, or when its PR becomes merged, send ONE PushNotification
-   for that story naming the key, the verdict, the reason and the PR. Never notify twice for the same state.
+   for that story naming the key, the verdict, the reason and the PR, plus the question= text when the
+   reason is question. Never notify twice for the same state.
 3. Launch each waiting story whose blockers are now Done (<WAITING>), staggered 30 seconds apart,
    never one still blocked by the Design story,
    within the concurrency guidance of refs/bg-runs.md, with run-bg.sh in its own background shell.
@@ -134,4 +162,4 @@ Do not ask questions, resume, stop or fix anything here. This tick only notifies
 
 The tick only notifies. The decision questions are asked by the foreground session: when a push says
 `NEEDS_HUMAN`, open the PR body's `Needs a human` list (or `claude attach KEY`), ask the person, then
-resume the run with the answer.
+resume the run with the answer. When the reason is `question`, the push carries the `question=` text.
