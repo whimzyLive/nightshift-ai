@@ -186,6 +186,109 @@ expect "failing check needs a human" "reason=checks-failing" -- \
   MOCK_AGENTS="$(agents S-1 $SID working)" \
   MOCK_PR="$(pr 7 OPEN false body '[{"status":"COMPLETED","conclusion":"FAILURE"}]')"
 
+# Resume chain: every resume is a new session id with a new name, and its cwd can differ.
+status_for_key() { local k="$1"; shift; (cd "$repo" && env PATH="$work/bin:$PATH" HOME="$home" BG_STATUS_NOW="$NOW" "$@" bash scripts/bg-status.sh "$k" 2>&1); }
+expect_key() { # name key needle -- env...
+  local name="$1" k="$2" needle="$3" out; shift 4
+  out="$(status_for_key "$k" "$@")"
+  if printf '%s\n' "$out" | grep -qF -- "$needle"; then ok "$name"; else bad "$name (want '$needle')" "$out"; fi
+}
+refute_key() { # name key needle -- env...
+  local name="$1" k="$2" needle="$3" out; shift 4
+  out="$(status_for_key "$k" "$@")"
+  if printf '%s\n' "$out" | grep -qF -- "$needle"; then bad "$name (did not want '$needle')" "$out"; else ok "$name"; fi
+}
+# story_transcript <project dir> <sid> <age-minutes> <first user prompt> [tool command]
+story_transcript() {
+  local f="$1/$2.jsonl"
+  mkdir -p "$1"
+  jq -cn --arg p "$4" --arg c "${5:-ls}" \
+    '{type:"user",isMeta:true,message:{content:"caveat"}},
+     {type:"user",message:{content:$p}},
+     {type:"assistant",message:{content:[{type:"text",text:"Working."}]}},
+     {type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{command:$c}}]}}' > "$f"
+  python3 -I -c 'import os,sys; t=int(sys.argv[2])-int(sys.argv[3])*60; os.utime(sys.argv[1],(t,t))' "$f" "$NOW" "$3"
+}
+entry() { # id-prefix name state status cwd startedAt [kind]
+  local su="$4"
+  [ "$su" = null ] || su="\"$su\""
+  printf '{"id":"%s","name":"%s","kind":"%s","state":"%s","status":%s,"sessionId":"%s","cwd":"%s","startedAt":%s}' \
+    "${1%%-*}" "$2" "${7:-background}" "$3" "$su" "$1" "$5" "$6"
+}
+C1=8b7a08e5-faac-4987-b309-3d6915d06377
+C2=3d5d8fce-ae7a-4047-a0c6-4644078a7ab1
+C3=8f1f623f-4a21-445a-86be-35b5af0ca15f
+wt475="$repo/.claude/worktrees/sdlc-INV-475"
+wt475_dir="$home/.claude/projects/$(encode "$wt475")"
+auto475='<command-message>sdlc:auto</command-message>\n<command-name>/sdlc:auto</command-name>\n<command-args>INV-475</command-args>'
+chain() { # state and status of the second resume, then of the first resume
+  printf '[%s,%s,%s]' \
+    "$(entry $C1 INV-475 blocked waiting "$wt475" 1794626310440)" \
+    "$(entry $C2 'inv-475 entitymultiselect' "${3:-blocked}" "${4:-idle}" "$wt475" 1794627266898)" \
+    "$(entry $C3 entitymultiselect-variant-cleanup "$1" "$2" "$repo" 1794628412179)"
+}
+rm -rf "$tdir"/*.jsonl "$wt475_dir"
+question_transcript "$wt475_dir" $C1 21
+story_transcript "$wt475_dir" $C2 12 "$auto475"
+story_transcript "$tdir" $C3 1 "$auto475"
+
+expect_key "chain: the live second resume is the story's session" INV-475 \
+  "INV-475 verdict=RUNNING reason=active session=$C3 state=busy idle_min=1" -- MOCK_AGENTS="$(chain working busy)"
+expect_key "chain: sessions= counts the matched entries" INV-475 "needs_heading=no sessions=3" -- \
+  MOCK_AGENTS="$(chain working busy)"
+refute_key "chain: the first run's pending question is not reported" INV-475 "question" -- \
+  MOCK_AGENTS="$(chain working busy)"
+expect_key "chain: finished newest with a Needs a human PR reports from the newest" INV-475 \
+  "INV-475 verdict=NEEDS_HUMAN reason=pr-heading session=$C3 state=idle idle_min=1" -- \
+  MOCK_AGENTS="$(chain blocked idle)" MOCK_PR="$(pr 9 OPEN true '## Needs a human\n- decide X')"
+expect_key "chain: two live sessions are duplicates" INV-475 "verdict=NEEDS_HUMAN reason=duplicate-sessions" -- \
+  MOCK_AGENTS="$(chain working busy working busy)"
+expect_key "chain: duplicates lists both live ids, oldest first, as the last field" INV-475 \
+  "sessions=3 duplicates=$C2,$C3" -- MOCK_AGENTS="$(chain working busy working busy)"
+refute_key "chain: no duplicates field with one live session" INV-475 "duplicates=" -- \
+  MOCK_AGENTS="$(chain working busy)"
+expect_key "chain: a merged PR outranks duplicate sessions" INV-475 "verdict=DONE reason=merged" -- \
+  MOCK_AGENTS="$(chain working busy working busy)" MOCK_PR="$(pr 9 MERGED false body)"
+expect_key "key boundary: INV-47 does not match INV-475 sessions" INV-47 \
+  "INV-47 verdict=NO_SESSION reason=no-session-no-pr session=-" -- MOCK_AGENTS="$(chain working busy)"
+expect_key "key boundary: INV-475 does not match an INV-4750 session" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C1 INV-4750 working busy "$repo/.claude/worktrees/sdlc-INV-4750" 1)]"
+rm -rf "$wt475_dir"
+
+rm -f "$tdir"/*.jsonl
+story_transcript "$tdir" $C3 1 "$auto475"
+expect_key "chain: a stopped session with the newer start loses to the live one's newer write" INV-475 "session=$C3" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1000),$(entry $C1 INV-475 stopped null "$repo" 2000)]"
+expect_key "match: cwd under sdlc-<KEY> alone" INV-475 "session=$C1 state=busy" -- \
+  MOCK_AGENTS="[$(entry $C1 cleanup working busy "$wt475" 1)]"
+expect_key "match: an interactive session is never a story's run" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C1 INV-475 working busy "$repo" 1 interactive)]"
+
+rm -f "$tdir"/*.jsonl
+story_transcript "$tdir" $C3 4 "carry on" "git push -u origin feat/INV-475"
+expect_key "match: a tool call on the story's branch" INV-475 "session=$C3 state=busy idle_min=4" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+refute_key "match: a single matched session prints no sessions field" INV-475 "sessions=" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "carry on" 'bash scripts/run-bg.sh "INV-475" "note"'
+expect_key "match: a run-bg.sh tool call with a quoted key" INV-475 "session=$C3" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "carry on" "git log origin/feat/INV-4750"
+expect_key "match: a tool call on a longer key's branch is not the story's" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "/sdlc:auto INV-480" "git log origin/feat/INV-475"
+expect_key "match: another story's run that touches the branch is not the story's" INV-475 "verdict=NO_SESSION" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+story_transcript "$tdir" $C3 4 "Summarise the INV-475 thread" "ls"
+expect_key "match: the key in the first user prompt" INV-475 "session=$C3" -- \
+  MOCK_AGENTS="[$(entry $C3 cleanup working busy "$repo" 1)]"
+
+rm -f "$tdir"/*.jsonl
+transcript $SID 2 "Implementing the story."
+out="$(status MOCK_AGENTS="$(agents S-1 $SID working)")"
+want="S-1 verdict=RUNNING reason=active session=$SID state=working idle_min=2 jira=To_Do pr=- checks=- needs_you=no needs_heading=no"
+if [ "$out" = "$want" ]; then ok "single session: the whole line is unchanged"; else bad "single session: the whole line is unchanged" "$out"; fi
+
 # run-bg.sh
 contains() {
   if grep -qF -- "$2" "$work/claude.log"; then ok "$1"; else bad "$1 (want '$2')" "$(cat "$work/claude.log" 2>/dev/null)"; fi
