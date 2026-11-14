@@ -4,8 +4,7 @@
     "deploymentEnabled": {
       "**": false,
       "*": false,
-      "main": true,
-      "develop": true
+      "main": true
     }
   }
 }

@@ -140,7 +140,7 @@ Release — releases are maintainer-invoked, not run in CI.
 (`{projectName}@{version}`), falling back to reading `plugin.json` from disk when no tag exists yet.
 Until the first baseline tags exist, every dry/real run recomputes the bump from the plugin's entire
 commit history instead of "since the last release." A maintainer backfills this **once**, cut from
-the tip of `main` (the published branch — not `develop`, which can be ahead of what's shipped):
+the tip of `main` (the published branch):
 
 ```bash
 git checkout main && git pull
