@@ -1,3 +1,13 @@
+## 0.51.5 (2026-11-14)
+
+### 🚀 Features
+
+- **sdlc:** audit every control against the library in --plan ([5700bb7](https://github.com/whimzyLive/nightshift-ai/commit/5700bb7))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.4 (2026-11-13)
 
 ### 🚀 Features
