@@ -36,6 +36,7 @@ M0 := validate and set up:
   UNATTENDED := SDLC_SESSION_KEY is set
 dispatch := the `designer` agent, model DESIGNER_MODEL, prompt: mode, EPIC_KEY, SLUG, WORKTREE, the paths named per mode, the output of `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh designer --mode <MODE> --print-prompt`, "return per agents/designer.md"
 published := this session follows the doc named by `Publish recipe` to put boards on `Design canvas`
+           boards are published under the Epic key and the board names are compared with the canvas first (refs/design-workflow.md "What a publish recipe covers for final boards")
            | `Design canvas` or `Publish recipe` unset -> say "no design canvas configured" and give the file paths instead
 gate STOP (unattended) := post the Jira comment named per mode, add label `Design-Review` to the Epic, run the bare session-complete.sh release, end
 ```
@@ -81,7 +82,8 @@ P9  return: plan path, PR URL, story keys, the Design story (key, created or reu
 F1  bash ${CLAUDE_PLUGIN_ROOT}/scripts/library-blockers.sh <EPIC_KEY> -> BLOCKERS
     BLOCKERS non-empty | non-zero exit -> STOP "library stories not Done: <keys>" (unattended: with a Jira comment naming them, no label)
 F2  dispatch(final) -> Slug, final boards written to a temp dir the prompt names; each declares <meta name="board-kind" content="final"> and a board-template
-F3  publish the boards for review (orchestrator step)
+F3  publish the boards for review (orchestrator step; page names and the name-clash check: refs/design-workflow.md "What a publish recipe covers for final boards")
+    compare the final board names with the files already on the canvas first; a clash -> STOP and ask the user, publish nothing
 F4  Steps 0-8 below with <path> := the final boards; REPLACE and SLUG as Step 2 decides; Step 3 skipped (WORKTREE is on design/<EPIC_KEY>; an open design PR for it is revised, never duplicated)
 F5  bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-story.sh <EPIC_KEY> find -> DESIGN_STORY   # the Epic's design story, refs/design-workflow.md "The design story"
     DESIGN_STORY set -> comment it (site guard first): `Final boards: docs/design/<SLUG>/index.md | PR: <PR_URL>`; after the PR is raised, and again each time it is revised
