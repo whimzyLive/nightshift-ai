@@ -45,9 +45,11 @@ draft board lint := skipped by kind; drafts are checked by scripts/wireframe-che
 ## The flow
 
 ```text
-Epic (+ PRD) -> draft -> [human approves drafts] -> plan -> [human settles `?` rows] -> library stories built and merged -> final -> ingest -> /stories
+Epic (+ PRD) -> draft -> [human approves drafts] -> plan -> [human settles `?` rows and control questions] -> library stories built and merged -> final -> ingest -> /stories
 draft := one linked, playable wireframe board per screen in journey order, `data-pattern` names or `?`; written to a temp dir, never the repo
 plan  := docs/design/<slug>/component-plan.md (refs/component-plan.md): what is reused, extended or new, and which rows need exploring
+         control audit: every control and list row the drafts draw is checked against the bundle and the library (its `Controls checked` table);
+         a control that is not a clean reuse is an open question, so a gap is settled here and never first found on a final board
 final := precondition: every library story under the Epic is Done (scripts/library-blockers.sh -> BLOCKERS= empty)
          screen boards mounted from the fresh bundle, then the existing ingest path of commands/design.md
 ```
@@ -127,7 +129,7 @@ no variant is drawn by hand on a board; a board shows the winner after it is bun
 | Mode | Gate | Interactive | Unattended (`SDLC_SESSION_KEY` set) |
 | --- | --- | --- | --- |
 | draft | approve the drafts on the canvas, or ask for another pass | AskUserQuestion after publishing | STOP: Jira comment `Design draft:` on the Epic, label `Design-Review`, bare release |
-| plan | settle every `?` row; confirm the library stories before they are created | AskUserQuestion, same model as `/spec` Step 2 | STOP: Jira comment listing the open rows, label `Design-Review`, bare release |
+| plan | settle every `?` row and every control-audit question; confirm the library stories (the control-audit ones included) before they are created | AskUserQuestion, same model as `/spec` Step 2 | STOP: Jira comment listing the open rows, label `Design-Review`, bare release |
 | final | none beyond the docs PR review; preconditions are mechanical | STOP when `BLOCKERS=` is not empty | same STOP, with a Jira comment naming the blockers |
 
 A label is a Jira-side signal only (like `Spec-Required` for `/auto` A0); removing it and re-running

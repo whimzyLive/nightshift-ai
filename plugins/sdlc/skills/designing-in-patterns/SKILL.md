@@ -69,6 +69,18 @@ One format for `component-plan.md` and a spec's `## Reuse`:
 
 A `new` row with no Story is an open question; the spec cannot be approved with it.
 
+## 5a. Controls inside a surface
+
+A pattern name settles the block, not what is drawn inside it. Before a plan is final, every distinct control and every list or table row structure is checked against the real bundle and library.
+
+```text
+verdict := reuse (a named export) | shadcn (a named ui part) | in source, not exported | compose (named parts; shared already or not) | missing
+anything but reuse | shadcn -> an open question with options and a recommendation; the human decides: extend, build new, export, accept the composition, or drop
+a container being in the bundle says nothing about its rows, cells or items: check them by name
+```
+
+Table format and the rule: `refs/component-plan.md` "Controls checked".
+
 ## 6. Layering rules (the method respects these)
 
 ```text

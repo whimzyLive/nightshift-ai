@@ -134,3 +134,5 @@ jobs:
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/bg-status.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/design-story.test.sh
+      - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/library-exports.test.sh
