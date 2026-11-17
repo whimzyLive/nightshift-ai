@@ -57,6 +57,8 @@ jobs:
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/context-reuse.test.sh
       - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/repo-behind.test.sh
+      - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/bounded-reads.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash tools/sdlc-analyser/__tests__/read-bounding.test.sh

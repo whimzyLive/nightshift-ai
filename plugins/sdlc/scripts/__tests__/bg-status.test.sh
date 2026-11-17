@@ -303,7 +303,7 @@ rc_is "run-bg: no key is a usage error" 2
 rc_is "run-bg: bad key refused" 2 "x; rm"
 
 (cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" ANTHROPIC_API_KEY=secret bash scripts/run-bg.sh S-1 "mind the cache")
-contains "run-bg start: --bg with name" "[--bg][-n][S-1][--model][opus][--permission-mode][auto]"
+contains "run-bg start: --bg with name" "[--bg][-n][S-1][--model][sonnet][--permission-mode][auto]"
 contains "run-bg start: prompt runs /sdlc:auto" "[/sdlc:auto S-1"
 contains "run-bg start: note in prompt" "mind the cache"
 contains "run-bg start: rules carry the handoff convention" "Needs a human"

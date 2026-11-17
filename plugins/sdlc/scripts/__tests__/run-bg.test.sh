@@ -22,15 +22,15 @@ expect() { # name want
 }
 
 run S-1
-expect "start: default model is opus" "[--model][opus]"
+expect "start: default model is sonnet" "[--model][sonnet]"
 run S-1 "go" "$SID"
-expect "resume: default model is opus" "[--model][opus]"
+expect "resume: default model is sonnet" "[--model][sonnet]"
 
-echo 'BG_RUN_MODEL=sonnet' > "$repo/.claude/project/bg-run.env"
+echo 'BG_RUN_MODEL=opus' > "$repo/.claude/project/bg-run.env"
 run S-1
-expect "start: BG_RUN_MODEL overrides" "[--model][sonnet]"
+expect "start: BG_RUN_MODEL overrides" "[--model][opus]"
 run S-1 "go" "$SID"
-expect "resume: BG_RUN_MODEL overrides" "[--model][sonnet]"
+expect "resume: BG_RUN_MODEL overrides" "[--model][opus]"
 
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]

@@ -8,7 +8,7 @@
 # Per-repo settings are read from the optional .claude/project/bg-run.env (sourced, shell syntax):
 #   BG_RUN_PERMISSION_MODE   default auto
 #   BG_RUN_COMMAND           default /sdlc:auto
-#   BG_RUN_MODEL             default opus; --model of the session (e.g. sonnet to A/B the orchestrator)
+#   BG_RUN_MODEL             default sonnet; --model of the session (e.g. opus to A/B the orchestrator)
 #   BG_RUN_EXTRA_RULES       appended to the rules text below
 #   any other variable is exported to the session (e.g. a gate's base ref)
 # Rules and operating guide: refs/bg-runs.md. Subscription billing: ANTHROPIC_API_KEY is unset.
@@ -51,7 +51,7 @@ unset ANTHROPIC_API_KEY
 
 mode="${BG_RUN_PERMISSION_MODE:-auto}"
 command_name="${BG_RUN_COMMAND:-/sdlc:auto}"
-model="${BG_RUN_MODEL:-opus}"
+model="${BG_RUN_MODEL:-sonnet}"
 
 rules="Wait for every agent's result before acting on its work: end the turn and the session resumes when the agent hands back. Never wait for an agent, a commit or a process with a shell loop (pgrep, sleep, until, while); a handback means every command the agent started has exited. Use a fresh agent for each fix round and each re-review; never resume an agent with SendMessage. Never grow an allowance list, skip a check or silence a gate to get a pass; report the failure instead. Work only in your own worktree and never touch the uncommitted files of the primary checkout. HUMAN HANDOFF: when you stop because a person must decide, open the PR as a DRAFT, put a section headed 'Needs a human' in the PR body that lists each decision, comment the same list on the Jira story, and start your last message with 'NEEDS YOU:' followed by the decisions. Never call AskUserQuestion in a background run: nobody is watching the terminal and it blocks the session. When you need a person, do the human handoff instead, and give each question with its options and your recommendation."
 [ -n "${BG_RUN_EXTRA_RULES:-}" ] && rules="$rules $BG_RUN_EXTRA_RULES"

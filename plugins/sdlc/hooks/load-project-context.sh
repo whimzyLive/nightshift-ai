@@ -17,6 +17,10 @@
 #      additionalContext so the operator restarts/refreshes instead of silently running stale
 #      command/ref/script behavior.
 #
+#   4. REPO-BEHIND WARNING. In the primary checkout, when the base branch (or the current epic/*
+#      trunk) is behind origin, warn so story runs do not start from stale code. Best-effort:
+#      bounded fetch, any failure means no warning.
+#
 # Inert-safe: in a repo with neither a .claude dir nor project-context, emits nothing, exit 0.
 set -euo pipefail
 
@@ -49,6 +53,37 @@ if [ -n "$plugin_root" ]; then
   fi
 fi
 
+# (1.6) REPO-BEHIND DETECTION (best-effort, read-only apart from one bounded fetch). Primary
+# checkout only; compares HEAD with origin/<ref> where <ref> is the current branch when it is the
+# base branch or epic/*, else the base branch. Every failure path leaves `behind_warn` empty.
+behind_warn=""
+if gdir="$(git -C "$proj" rev-parse --git-dir 2>/dev/null)" \
+  && gcommon="$(git -C "$proj" rev-parse --git-common-dir 2>/dev/null)" \
+  && [ "$(cd "$proj" && cd "$gdir" && pwd -P)" = "$(cd "$proj" && cd "$gcommon" && pwd -P)" ] \
+  && git -C "$proj" remote get-url origin >/dev/null 2>&1; then
+  base_branch="$(grep -iE '^\|[[:space:]]*Base branch[[:space:]]*\|' "$proj/.claude/project/project-context.md" 2>/dev/null \
+    | sed -E 's/.*\|[^|]*\|[[:space:]]*`?([A-Za-z0-9_.\/-]+)`?[[:space:]]*\|.*/\1/' \
+    | head -1 || true)"
+  base_branch="${base_branch:-main}"
+  cur_branch="$(git -C "$proj" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+  ref="$base_branch"
+  case "$cur_branch" in "$base_branch" | epic/*) ref="$cur_branch" ;; esac
+  # No `timeout` on macOS: run the fetch in the background and stop it after ~5s.
+  GIT_TERMINAL_PROMPT=0 git -C "$proj" fetch --quiet origin "$ref" </dev/null >/dev/null 2>&1 &
+  fetch_pid=$!
+  for _ in $(seq 1 50); do
+    kill -0 "$fetch_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill "$fetch_pid" 2>/dev/null || true
+  if wait "$fetch_pid" 2>/dev/null; then
+    behind="$(git -C "$proj" rev-list --count "HEAD..origin/$ref" 2>/dev/null || true)"
+    if [ -n "$behind" ] && [ "$behind" -gt 0 ] 2>/dev/null; then
+      behind_warn="⚠️ REPO BEHIND: this checkout is ${behind} commit(s) behind origin/${ref}. Pull before starting story work."
+    fi
+  fi
+fi
+
 # (2) Assemble additionalContext: drift warning (if any) + root mapping (if known) + project-context.
 intro=""
 if [ -n "$plugin_root" ]; then
@@ -58,6 +93,11 @@ When any SDLC agent, command, or ref instruction references \${CLAUDE_PLUGIN_ROO
   [ -n "$drift" ] && intro="${drift}
 
 ${intro}"
+fi
+if [ -n "$behind_warn" ]; then
+  if [ -n "$intro" ]; then intro="${behind_warn}
+
+${intro}"; else intro="$behind_warn"; fi
 fi
 
 ctx="$proj/.claude/project/project-context.md"
