@@ -1,3 +1,13 @@
+## 0.51.8 (2026-11-17)
+
+### 🩹 Fixes
+
+- **sdlc:** pin the background run's model, default opus ([3bbba93](https://github.com/whimzyLive/nightshift-ai/commit/3bbba93))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.7 (2026-11-14)
 
 ### 🚀 Features
