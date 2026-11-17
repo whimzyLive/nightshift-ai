@@ -23,7 +23,7 @@ Optional shell file the launcher sources. Everything in it is exported to the se
 | ------------------------- | ------------- | ----------------------------------------------------------------- |
 | `BG_RUN_PERMISSION_MODE`  | `auto`        | `--permission-mode` of the session                                |
 | `BG_RUN_COMMAND`          | `/sdlc:auto`  | slash command the session runs for the key                        |
-| `BG_RUN_MODEL`            | `opus`        | `--model` of the session; e.g. `sonnet` to A/B the orchestrator   |
+| `BG_RUN_MODEL`            | `sonnet`      | `--model` of the session; e.g. `opus` to A/B the orchestrator     |
 | `BG_RUN_EXTRA_RULES`      | empty         | repo rules appended after the rules below                         |
 | any other variable        | unset         | exported to the session, for example the base ref a gate compares |
 
