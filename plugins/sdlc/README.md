@@ -18,7 +18,7 @@ quality gate and AC check run in parallel; Copilot review on the PR is advisory.
 ## Consumer repo requirements
 
 - `.claude/project/project-context.md` — project constants (auto-loaded each session by this
-  plugin's SessionStart hook).
+  plugin's SessionStart hook, which also warns on plugin drift and a repo behind origin).
 - `.claude/project/agents/<domain>.md` — optional per-domain override bindings.
 - Add `.claude/.sdlc-plugin-root` to the repo's `.gitignore` (see below).
 
