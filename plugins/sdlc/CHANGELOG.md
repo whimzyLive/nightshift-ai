@@ -1,3 +1,17 @@
+## 0.51.9 (2026-11-17)
+
+### 🚀 Features
+
+- **sdlc:** warn at session start when the checkout is behind origin ([66a4d25](https://github.com/whimzyLive/nightshift-ai/commit/66a4d25))
+
+### 🩹 Fixes
+
+- **sdlc:** default the background run's model to sonnet ([a235c39](https://github.com/whimzyLive/nightshift-ai/commit/a235c39))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.8 (2026-11-17)
 
 ### 🩹 Fixes
