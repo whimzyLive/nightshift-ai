@@ -159,7 +159,7 @@ and in `.claude/project/agents/designer.md`, which `/sdlc:init` scaffolds for a 
 (`/sdlc:auto` inside), skips a story whose blockers are not Done (naming an open Design story as the reason), staggers the starts, and arms a
 10-minute session-local monitor tick that push-notifies when a run needs a person, stalls, or finishes.
 `scripts/run-bg.sh KEY [note] [session-id]` starts or resumes one run; per-repo settings go in the optional
-`.claude/project/bg-run.env`. `scripts/bg-status.sh KEY...` prints one line per story with a verdict
+`.claude/project/bg-run.env` (`BG_RUN_MODEL`, default `opus`, sets the run's model, e.g. `sonnet`). `scripts/bg-status.sh KEY...` prints one line per story with a verdict
 (`RUNNING`, `NEEDS_HUMAN`, `STALLED`, `DONE`, `NO_SESSION`) taken from the transcript, the PR and Jira, not
 from the session state. A run that must stop for a decision opens a draft PR with a `Needs a human`
 section and ends with `NEEDS YOU:`. Concurrency guidance, ordering, resume and the monitor prompt:
