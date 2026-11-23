@@ -1,3 +1,13 @@
+## 0.51.14 (2026-11-23)
+
+### 🩹 Fixes
+
+- **sdlc:** cut dep-gate acli and gh round-trips ([8ffdaed](https://github.com/whimzyLive/nightshift-ai/commit/8ffdaed))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.13 (2026-11-23)
 
 ### 🚀 Features
