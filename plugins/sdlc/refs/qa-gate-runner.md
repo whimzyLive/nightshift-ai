@@ -39,6 +39,8 @@ cd "$WORKTREE"
 # ... run the project-context Tooling + Quality Gate commands here (never `Design check`) ...
 ```
 
+   Each command runs in the foreground with the Bash `timeout` at 600000, never polled: `refs/long-commands.md`.
+
    Scope, decided from the diff and never by judgement:
 
 ```text

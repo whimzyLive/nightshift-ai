@@ -112,6 +112,8 @@ commands here; see
 Follow `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md` — shared protocol for all domain
 engineers.
 
+Before a build, test or gate command, read `${CLAUDE_PLUGIN_ROOT}/refs/long-commands.md`; hand back only when none is still running.
+
 ## Completion checklist
 
 1. Stage your changed paths and check every comment line `git diff --cached -U0` adds against the

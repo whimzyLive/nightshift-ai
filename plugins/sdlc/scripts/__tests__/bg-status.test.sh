@@ -311,12 +311,14 @@ contains "run-bg start: rules carry NEEDS YOU" "NEEDS YOU:"
 contains "run-bg start: rules forbid SendMessage resume" "never resume an agent with SendMessage"
 contains "run-bg start: rules forbid AskUserQuestion" "Never call AskUserQuestion in a background run"
 contains "run-bg start: rules send questions through the handoff" "do the human handoff instead"
+contains "run-bg start: rules say a still-running handback is not waited on" "do not wait for a follow-up notification"
 contains "run-bg: ANTHROPIC_API_KEY unset" "KEY_SET=unset"
 
 (cd "$repo" && env PATH="$work/bin:$PATH" CLAUDE_LOG="$work/claude.log" bash scripts/run-bg.sh S-1 "carry on" "$SID")
 contains "run-bg resume: --resume with the full id" "[--bg][--resume][$SID]"
 contains "run-bg resume: note is the prompt" "[carry on]"
 contains "run-bg resume: rules forbid AskUserQuestion" "Never call AskUserQuestion in a background run"
+contains "run-bg resume: rules say a still-running handback is not waited on" "do not wait for a follow-up notification"
 if grep -qF -- "[-n]" "$work/claude.log"; then bad "run-bg resume: no -n"; else ok "run-bg resume: no -n"; fi
 
 rm -f "$work/claude.log"
