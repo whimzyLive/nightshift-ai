@@ -73,7 +73,7 @@ for S in NEEDS: apply commands/spec.md Steps 1-4 INLINE (questions + approval vi
   not approved -> stop the preflight; spawn nothing; bare release (a re-run resumes here)
 ```
 
-`triage(S)` is `refs/triage.md` applied inline for `S`. Every child then reaches A0 already approved.
+`triage(S)` is `scripts/triage.sh S`. Every child then reaches A0 already approved.
 
 ## E0c — Design preflight: finals and library blockers
 

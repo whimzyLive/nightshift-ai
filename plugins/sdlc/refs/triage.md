@@ -1,40 +1,24 @@
 # Triage protocol
 
-Shared complexity-routing protocol for SDLC commands. Reference this from any command that needs to decide whether a story is **lightweight** (no spec, implement directly) or **full** (a spec the user approves in session before implementation). This is the single source of truth for the threshold, the decision table, and the missing-points handling — `/triage`, `/auto`, and `/impl` all reference it rather than re-stating the logic.
+Complexity routing for SDLC commands: a story is **lightweight** (no spec, implement directly) or **full** (a spec the user approves in session first). `scripts/triage.sh` is the implementation; this ref describes the rules it applies. Callers run the script and route on its output: they never compute the route, look up the threshold or probe the points themselves.
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/triage.sh <KEY> [ISSUE_TYPE]
+```
 
 ## Inputs
 
-- `<KEY>` — a Jira story key, e.g. `ED-100`, `CER-123`. The project key lives in `.claude/project/project-context.md` — never fetch it via acli.
-- `<ISSUE_TYPE>` — **optional** lower-cased issue-type name (e.g. `bug`, `story`). When the caller already
-  has it (the `/auto` inline path threads its Step-0 `ITYPE`), pass it in so this protocol derives
-  `WORK_KIND` with **zero extra Jira I/O**. When absent (standalone `/impl`, `/triage`), the protocol
-  fetches it itself — see **Work-kind derivation**.
+- `<KEY>` — a Jira story key. The project key lives in `.claude/project/project-context.md`, never fetched via acli.
+- `<ISSUE_TYPE>` — optional issue-type name (e.g. `bug`, `story`). When the caller already has it (`/auto` passes its Step-0 `ITYPE`) the script makes zero extra Jira calls for it; otherwise it fetches it.
 
 ## Work-kind derivation (defect vs feature)
 
-The protocol classifies the issue as a **defect** (Bug) or a **feature** (everything else) and emits
-`WORK_KIND=defect|feature`. This is derived from the issue's `issuetype.name`, **input-or-fetch**:
-
-- **Input handed in** (`<ISSUE_TYPE>` provided) → use it directly; do **not** re-fetch (the `/auto`
-  inline path already fetched it at Step 0 — re-fetching would double the per-story `acli` round-trips
-  on the autonomous worker's hottest entry path).
-- **No input** (standalone `/impl`, `/triage`) → fetch with the **exact** canonical one-liner
-  `commands/auto.md` Step 0 uses — reproduce it verbatim, do **not** write a divergent variant:
-  ```bash
-  bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1
-  acli jira workitem view <KEY> --fields issuetype --json | jq -r '.fields.issuetype.name // empty' | tr '[:upper:]' '[:lower:]'
-  ```
-  The `// empty` and `tr '[:upper:]' '[:lower:]'` are load-bearing: without `// empty` an unreadable
-  type yields the literal string `null` (not empty) and the fail-safe-to-`feature` mis-fires; without
-  the `tr` an `issuetype.name` of `Bug` fails the lowercase `bug` compare.
-
-Classify by comparing the (already lower-cased) type to `bug`:
+The issue is a **defect** (Bug) or a **feature** (everything else), from `issuetype.name`, input-or-fetch. The script fetches it with the one-liner `commands/auto.md` Step 0 uses; the `// empty` and the lower-casing are load-bearing there.
 
 - lower-cases to `bug` → `WORK_KIND=defect`
-- any other type, **or** an unreadable/empty value → `WORK_KIND=feature` (**fail-safe**: the absence of
-  a positive Bug signal must never route a feature into the debugging path)
+- any other type, **or** an unreadable/empty value → `WORK_KIND=feature` (**fail-safe**: no positive Bug signal never routes a feature into the debugging path)
 
-The check is purely on the issue-type string — it does not read points, labels, or any custom field.
+The check is on the issue-type string only; it does not read points, labels or any custom field.
 
 > **Known limitation (accepted, not net-new).** The predicate is a literal case-insensitive
 > `issuetype.name == "bug"` compare. `refs/jira-fetch.md` notes that literal issue-type-name matching is
@@ -46,27 +30,25 @@ The check is purely on the issue-type string — it does not read points, labels
 
 ## Threshold resolution (AC-4)
 
-The lightweight threshold `T` MUST be configurable, not hard-coded. Resolution order, **first match wins**:
+The lightweight threshold `T` is configurable, first match wins:
 
-1. **Per-repo override** in `.claude/project/project-context.md` — an optional `## Triage` section with a token row `Lightweight threshold (story points, inclusive)` holding an integer:
+1. **Per-repo override** in `.claude/project/project-context.md` — an optional `## Triage` section with the token row `Lightweight threshold (story points, inclusive)` holding an integer:
 
    ```markdown
    ## Triage
 
    | Token                                           | Value |
    | ----------------------------------------------- | ----- |
-   | Lightweight threshold (story points, inclusive) | `3`   |
+   | Lightweight threshold (story points, inclusive) | `<N>` |
    ```
 
 2. **Built-in default `3`** when the section or token is absent.
 
-If the override token is present but **non-numeric / malformed**, ignore it, fall back to `T = 3`, and emit a `WARNING:` line (see Error handling).
+A present but non-integer token is ignored: `T = 3` plus a `WARNING:` line. The script reads the file itself (from a linked worktree it falls back to the primary checkout's copy) and prints the value it used as `THRESHOLD=<T>`, so a wrong route is visible in the transcript. No environment variable and no separate config file.
 
-`.claude/project/project-context.md` is already the mandated first read for every SDLC command, so resolving `T` adds no new file read. No environment variable and no separate config file — configuration stays in the one project-context file, matching every other per-repo SDLC constant.
+## Story-point reading
 
-## Story-point reading (reused, not reinvented)
-
-Read the story's points via the existing `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` **"Reading story points"** protocol: JQL-probe BOTH the `Story point estimate` and `Story Points` field names, then candidate-probe the value on the populated field. Report `missing` **only** when neither field name is populated. Do **not** duplicate the probe loop here — reference the ref. Do **not** trust `fields.customfield_*` from the view JSON (ids vary by instance).
+The script follows `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` "Reading story points": JQL-probe BOTH the `Story point estimate` and `Story Points` field names (retrying across index lag), then candidate-probe the value on the populated field. `missing` only when neither field is populated; a set field whose value is outside the candidate list, or any acli error, exits non-zero rather than reporting `missing`. It never trusts `fields.customfield_*` from the view JSON.
 
 ## Decision table
 
@@ -86,16 +68,17 @@ A defect with `STORY_POINTS=missing` still reports `STORY_POINTS=missing` honest
 
 ## Output contract
 
-The protocol returns a deterministic, machine-parseable block. The two `=` lines are **always emitted (required)**; the `WARNING:` line is **optional** and appears only in the degraded cases (missing points, malformed threshold):
+The script prints a deterministic, machine-parseable block. The three `=` lines are **always emitted (required)**; the `WARNING:` line is **optional** and appears only in the degraded cases (missing points, malformed threshold); a final `THRESHOLD=<T>` line reports the threshold used:
 
 ```
 WARNING: <message>           # optional — only on missing points / malformed threshold
 WORK_KIND=defect|feature     # required
 TRIAGE=lightweight|full      # required
 STORY_POINTS=N|missing       # required
+THRESHOLD=<T>                # informational — the threshold the decision used
 ```
 
-Callers MUST route on the required `=` lines only and MUST ignore the optional `WARNING:` line for
+Callers MUST route on the `WORK_KIND=`/`TRIAGE=`/`STORY_POINTS=` lines only and MUST ignore the `WARNING:` and `THRESHOLD=` lines for
 routing. `WORK_KIND=` is the **new** third required line (defect-vs-feature classification — see
 **Work-kind derivation**); it is emitted alongside the unchanged `TRIAGE=`/`STORY_POINTS=` lines, so
 existing two-line parsers stay back-compatible. `STORY_POINTS=` carries the same meaning as scrum-master Mode 3's line, so existing parsers are reused; `TRIAGE=` is a dedicated key distinct from scrum-master's `QUALITY=` (quality/refinement is a different concern from complexity routing).

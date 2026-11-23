@@ -1,5 +1,5 @@
 ---
-description: Full SDLC automation for a Jira story. Assesses the story (a label probe when it is already AI-Ready), applies the shared triage protocol (refs/triage.md, inline), and routes a `full` story through spec-in-session → your approval → implementation, shipping spec and code in ONE PR, or a `lightweight` story (<= threshold pts, inclusive) straight to implementation. Full Auto waits for checks and merges; otherwise the PR is left for you. Copilot review is advisory. Pass --async-review for service-driven execution where JSON-RPC events replace the human merge.
+description: Full SDLC automation for a Jira story. Assesses the story (a label probe when it is already AI-Ready), runs scripts/triage.sh for the routing, and routes a `full` story through spec-in-session → your approval → implementation, shipping spec and code in ONE PR, or a `lightweight` story (<= threshold pts, inclusive) straight to implementation. Full Auto waits for checks and merges; otherwise the PR is left for you. Copilot review is advisory. Pass --async-review for service-driven execution where JSON-RPC events replace the human merge.
 ---
 
 Parse $ARGUMENTS:
@@ -19,7 +19,7 @@ ITYPE="$(acli jira workitem view STORY_KEY --fields issuetype --json 2>/dev/null
 ```
 
 - `story` **or** `bug` (any non-epic implementable type) → **Step 0b**, then **Step 1** (single-story flow). **Retain
-  `ITYPE`** — it feeds the inline triage (zero extra Jira I/O) and the Step-2 missing-points bypass.
+  `ITYPE`** — it feeds the triage (zero extra Jira I/O) and the Step-2 missing-points bypass.
   A `bug` triages `WORK_KIND=defect` + `TRIAGE=lightweight` → Workflow B (systematic debugging).
 - `epic` → **read `${CLAUDE_PLUGIN_ROOT}/refs/epic-orchestration.md` (explicit path) and follow it —
   never Steps 1+ for the epic key.** Unreadable → **STOP** with the missing path. The single-story
@@ -69,11 +69,11 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/assess-ready.sh STORY_KEY   # AI_READY=yes|no
 - **Missing points** (non-Bug, `STORY_POINTS=missing` from Step 1 or from the triage below) → **stop**:
   "Story points not set on STORY_KEY — set them in Jira, then re-run `/auto STORY_KEY`."
 
-Apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md` **INLINE**, passing `ITYPE` as `<ISSUE_TYPE>`. Capture
+Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/triage.sh STORY_KEY ITYPE` (the Step 0 value) and route on its
 `WORK_KIND=defect|feature` (threaded into the impl phase — debugging variant + branch prefix) and
-`TRIAGE`. Triage STOPs without its `WORK_KIND=`/`TRIAGE=`/`STORY_POINTS=` block (e.g. an `acli`
-failure) → **STOP** and surface it; never guess a route. **Never invoke the `/triage` command** — its
-final action releases the worker slot mid-`/auto`; apply the ref.
+`TRIAGE=` lines only; never compute the route, threshold or points yourself. A non-zero exit (no
+`TRIAGE=` line, e.g. an `acli` failure) → **STOP** and surface it; never guess a route. **Never
+invoke the `/triage` command** — its final action releases the worker slot mid-`/auto`.
 
 - `TRIAGE=full` → **Workflow A** (approved spec, then impl — one PR)
 - `TRIAGE=lightweight` → **Workflow B** (direct impl, tasks from the story)
