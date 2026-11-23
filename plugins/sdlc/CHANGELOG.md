@@ -1,3 +1,13 @@
+## 0.51.12 (2026-11-23)
+
+### 🩹 Fixes
+
+- **sdlc:** accept natural --paths forms and add --help to skills-for ([f7eebaa](https://github.com/whimzyLive/nightshift-ai/commit/f7eebaa))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.11 (2026-11-23)
 
 ### 🩹 Fixes
