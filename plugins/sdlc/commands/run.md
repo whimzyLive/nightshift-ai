@@ -19,8 +19,7 @@ resume procedure and the monitor tick prompt). This command does not restate the
 
 1. **Read context.** Read `.claude/project/project-context.md`. Run
    `bash ${CLAUDE_PLUGIN_ROOT}/scripts/jira-site-guard.sh || exit 1`. Resolve `DONE_STATUS` (the
-   `Pipeline done status` row) and the lightweight threshold `T` per `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`
-   "Threshold resolution".
+   `Pipeline done status` row).
 2. **Check each key.** For every key:
    - Existing run: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/bg-status.sh KEY`. Verdict `RUNNING`,
      `STALLED` or `NEEDS_HUMAN` -> do not launch a second session; list it as `already running` and
@@ -34,8 +33,7 @@ resume procedure and the monitor tick prompt). This command does not restate the
      `EPIC=` line), and no run can close it, a person does. A `REASON=` saying KEY is itself the Design
      story -> never launch it; list it as `design story: closed by a person`. **Never launch a story
      with an open blocker.** A story with no parent epic has no derivable blockers; say so in the table.
-   - Size: read the story points per `${CLAUDE_PLUGIN_ROOT}/refs/jira-fetch.md` "Reading story points"
-     and apply `${CLAUDE_PLUGIN_ROOT}/refs/triage.md`. A `full` story (points above `T`, or missing) will
+   - Size: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/triage.sh KEY`, read only its `TRIAGE=` line. A `full` story will
      stop for spec approval: mark it `full: stops for spec approval` so the user knows to expect a
      `NEEDS YOU:` push and answer it. A bug or a `lightweight` story runs straight through.
 3. **Launch.** For each launchable key, in order, while live runs < `MAX` (concurrency guidance in the

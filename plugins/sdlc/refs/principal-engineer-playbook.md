@@ -26,9 +26,9 @@ and create the PR only after QA returns a `clean` verdict (a draft PR on `capped
   approved spec on the story branch — `SPEC := docs/superpowers/specs/<STORY-KEY>.md`, its
   `## Implementation tasks` (a plan doc `docs/superpowers/plans/<STORY-KEY>.md` on the branch, when one
   exists, is used instead).
-- `STORY_POINTS` — `N` | `missing`, from the caller's inline `refs/triage.md` block; default `missing`.
+- `STORY_POINTS` — `N` | `missing`, from the caller's `scripts/triage.sh` block; default `missing`.
   Passed on to QA, which uses it only to pick the round-1 reviewer model.
-- `WORK_KIND` — `defect` | `feature`, from the caller's inline `refs/triage.md`; default `feature`.
+- `WORK_KIND` — `defect` | `feature`, from the caller's `scripts/triage.sh`; default `feature`.
   `defect` → read `${CLAUDE_PLUGIN_ROOT}/refs/defect-variant.md` now (the systematic-debugging
   ladder) and use the `fix/` prefix. `LIGHTWEIGHT` and `WORK_KIND` are **orthogonal** — a lightweight
   **feature** keeps the normal feature ladder.

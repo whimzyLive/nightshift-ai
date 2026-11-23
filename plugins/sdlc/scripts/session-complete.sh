@@ -8,7 +8,7 @@
 #
 # Invoked as the FINAL step of each TOP-LEVEL SDLC slash command — exactly once per driven session.
 # A command that runs ANOTHER command's logic as a sub-step must apply that command's *ref* inline
-# (e.g. /auto and /impl apply refs/triage.md) rather than invoking the nested *command*, so this
+# or run its script (e.g. /auto and /impl run scripts/triage.sh) rather than invoking the nested *command*, so this
 # script fires only once, at the end of the top-level flow. Calling it from a nested command would
 # emit the sentinel mid-flow and release the worker slot before the parent finishes.
 #
