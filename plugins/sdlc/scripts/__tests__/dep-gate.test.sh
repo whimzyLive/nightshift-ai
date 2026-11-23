@@ -24,16 +24,16 @@ case "$*" in
   "jira workitem search --jql parent = EP-1 --json") echo '[{"key":"S-1"},{"key":"B-1"}]' ;;
   "jira workitem link list --key B-1 --json") echo '{"issueLinks":[{"typeName":"Blocks","outwardIssueKey":"S-1"}]}' ;;
   # real acli 1.3.22: `--fields key` turns each hit into `null`, so the mock does too
-  "jira workitem search --jql key = B-1 AND labels = \"UI-Components\" --fields key --json")
+  "jira workitem search --jql key in (B-1) AND labels = \"UI-Components\" --fields key --json")
     if [ "${MOCK_UI:-0}" = 1 ]; then echo '[null]'; else echo '[]'; fi ;;
-  "jira workitem search --jql key = B-1 AND labels = \"UI-Components\" --json")
+  "jira workitem search --jql key in (B-1) AND labels = \"UI-Components\" --json")
     [ "${MOCK_LABEL_FAIL:-0}" = 1 ] && exit 1
     [ "${MOCK_LABEL_FAIL:-0}" = 2 ] && { echo '[]'; exit 1; }
     if [ "${MOCK_UI:-0}" = 1 ]; then echo '[{"key":"B-1","fields":{"summary":"s"}}]'; else echo '[]'; fi ;;
-  "jira workitem search --jql key = B-1 AND labels = \"Design\" --json")
+  "jira workitem search --jql key in (B-1) AND labels = \"Design\" --json")
     [ "${MOCK_DESIGN_FAIL:-0}" = 1 ] && exit 1
     if [ "${MOCK_DESIGN:-0}" = 1 ]; then echo '[{"key":"B-1"}]'; else echo '[]'; fi ;;
-  "jira workitem search --jql key = B-1 AND statusCategory = Done --json")
+  "jira workitem search --jql key in (B-1) AND statusCategory = Done --json")
     [ "${MOCK_DONE_FAIL:-0}" = 1 ] && exit 1
     if [ "${MOCK_DONE:-0}" = 1 ]; then echo '[{"key":"B-1"}]'; else echo '[]'; fi ;;
   "jira workitem search --jql key = S-1 AND labels = \"Design\" --json")
@@ -116,13 +116,68 @@ cat > "$work/bin/acli" <<'EOF'
 case "$*" in
   "jira workitem view S-1 --fields parent --json") echo '{"fields":{"parent":{"key":"EP-1"}}}' ;;
   "jira workitem search --jql parent = EP-1 --json") echo '[{"key":"S-1"},{"key":"D-1"}]' ;;
-  "jira workitem search --jql key = D-1 AND labels = \"Design\" --json") echo '[{"key":"D-1"}]' ;;
+  "jira workitem search --jql key in (D-1) AND labels = \"Design\" --json") echo '[{"key":"D-1"}]' ;;
   "jira workitem link list --key D-1 --json") echo '{"issueLinks":[{"typeName":"Blocks","outwardIssueKey":"S-9"}]}' ;;
   *) echo '[]' ;;
 esac
 EOF
 check "backend story the open Design story does not block proceeds" 0 "GATE=PASS"
 check "backend story has no blockers"                               0 "=BLOCKERS="
+
+# Call budget: four Done blockers among nine siblings. Every acli/gh call is logged; the stub
+# answers by shape, so it holds for any query form (per blocker or batched).
+cat > "$work/bin/acli" <<'EOF'
+#!/usr/bin/env bash
+echo "acli $*" >> "$CALL_LOG"
+case "$*" in
+  "jira workitem view S-1 --fields parent --json") echo '{"fields":{"parent":{"key":"EP-1"}}}' ;;
+  "jira workitem search --jql parent = EP-1 --json")
+    echo '[{"key":"S-1"},{"key":"X-1"},{"key":"B-1"},{"key":"X-2"},{"key":"B-2"},{"key":"X-3"},{"key":"B-3"},{"key":"X-4"},{"key":"B-4"},{"key":"X-5"}]' ;;
+  "jira workitem link list --key B-"*) echo '{"issueLinks":[{"typeName":"Blocks","outwardIssueKey":"S-1"}]}' ;;
+  "jira workitem link list --key "*) echo '{"issueLinks":[]}' ;;
+  *"labels = "*) echo '[]' ;;
+  *"statusCategory = Done"*) echo '[{"key":"B-1"},{"key":"B-2"},{"key":"B-3"},{"key":"B-4"}]' ;;
+  *) echo '[]' ;;
+esac
+EOF
+cat > "$work/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "gh $*" >> "$CALL_LOG"
+echo '[]'
+EOF
+chmod +x "$work/bin/acli" "$work/bin/gh"
+export CALL_LOG="$work/calls.log"
+: > "$CALL_LOG"
+budget_out="$(env PATH="$work/bin:$PATH" bash "$work/scripts/dep-gate.sh" S-1 2>&1)"; budget_rc=$?
+acli_calls="$(grep -c '^acli ' "$CALL_LOG")"; gh_calls="$(grep -c '^gh ' "$CALL_LOG")"
+check_val() {
+  if [ "$2" = "$3" ]; then pass=$((pass + 1)); echo "ok   $1"
+  else fail=$((fail + 1)); echo "FAIL $1 (got '$2', want '$3')"; fi
+}
+check_val "four Done blockers pass"            "$budget_rc:$(printf '%s\n' "$budget_out" | grep -c '^GATE=PASS')" "0:1"
+check_val "four Done blockers are all named"   "$(printf '%s\n' "$budget_out" | grep '^BLOCKERS=')" "BLOCKERS=B-1 B-2 B-3 B-4"
+check_val "four Done blockers need no gh call" "$gh_calls" "0"
+check_val "four Done blockers cost 15 acli calls" "$acli_calls" "15"
+
+# Open (not Done) blockers whose feat/ branch has a PR cost one gh call each, not two.
+cat > "$work/bin/acli" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  "jira workitem view S-1 --fields parent --json") echo '{"fields":{"parent":{"key":"EP-1"}}}' ;;
+  "jira workitem search --jql parent = EP-1 --json") echo '[{"key":"S-1"},{"key":"B-1"},{"key":"B-2"}]' ;;
+  "jira workitem link list --key B-"*) echo '{"issueLinks":[{"typeName":"Blocks","outwardIssueKey":"S-1"}]}' ;;
+  *) echo '[]' ;;
+esac
+EOF
+cat > "$work/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "gh $*" >> "$CALL_LOG"
+case "$*" in *"feat/"*) echo '[{"number":1}]' ;; *) echo '[]' ;; esac
+EOF
+: > "$CALL_LOG"
+budget_out="$(env PATH="$work/bin:$PATH" bash "$work/scripts/dep-gate.sh" S-1 2>&1)"; budget_rc=$?
+check_val "open blockers with a feat/ PR pass"        "$budget_rc" "0"
+check_val "open blockers with a feat/ PR cost one gh call each" "$(grep -c '^gh ' "$CALL_LOG")" "2"
 
 echo "dep-gate: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
