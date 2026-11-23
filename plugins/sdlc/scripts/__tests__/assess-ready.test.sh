@@ -20,6 +20,7 @@ EOF
 # Real acli 1.3.22 shapes: full objects without --fields; `[null]` per hit with `--fields key`.
 cat > "$work/bin/acli" <<'EOF'
 #!/usr/bin/env bash
+[ -n "${CALL_LOG:-}" ] && echo "acli $*" >> "$CALL_LOG"
 case "$*" in
   *'"AI-Ready"'*) mode="${MOCK_READY:-none}" ;;
   *'"Spec-Approved"'*) mode="${MOCK_SPEC:-none}" ;;
@@ -56,6 +57,15 @@ check "a different key never counts"           0 "AI_READY=no SPEC_APPROVED=no" 
 check "acli error is unknown, not 'no'"        1 "AI_READY=unknown SPEC_APPROVED=no"      MOCK_READY=error
 check "unparseable output is unknown"          1 "AI_READY=yes SPEC_APPROVED=unknown"     MOCK_READY=hit MOCK_SPEC=garbage
 check "site guard failure is unknown for both" 1 "AI_READY=unknown SPEC_APPROVED=unknown" MOCK_GUARD_FAIL=1 MOCK_READY=hit
+
+calls="$work/calls.log"
+: > "$calls"
+env PATH="$work/bin:$PATH" CALL_LOG="$calls" MOCK_READY=hit bash "$work/scripts/assess-ready.sh" S-1 >/dev/null 2>&1
+if [ "$(grep -c '^acli ' "$calls")" -eq 2 ]; then
+  pass=$((pass + 1)); echo "ok   both label probes cost exactly two acli calls"
+else
+  fail=$((fail + 1)); echo "FAIL both label probes cost exactly two acli calls (got $(grep -c '^acli ' "$calls"))"
+fi
 
 echo "assess-ready: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

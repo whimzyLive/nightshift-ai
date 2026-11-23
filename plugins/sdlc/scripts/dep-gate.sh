@@ -47,6 +47,23 @@ probe() {
   printf '%s' "$json" | jq --arg k "$1" '[.[]? | select(.key == $k)] | length' 2>/dev/null
 }
 
+# Keys, among the comma-separated <keys>, that match <clause>; non-zero or empty = could not answer.
+# Matches on each hit's own key, never `--fields key` (acli returns `[null]` for that).
+probe_keys() {
+  local json out
+  json="$(acli jira workitem search --jql "key in ($1) AND $2" --json 2>/dev/null)" || return 1
+  out="$(printf '%s' "$json" | jq -r 'if type == "array" then "ok " + ([.[] | .key? // empty] | join(" ")) else empty end' 2>/dev/null)"
+  [ -n "$out" ] || return 1
+  printf '%s' "${out#ok}"
+}
+
+# Number of PRs whose head is exactly <branch> in <state>; 0 when gh yields nothing.
+pr_count() {
+  local n
+  n="$(gh pr list --head "$1" --state "$2" --json number 2>/dev/null | jq 'length' 2>/dev/null)"
+  echo "${n:-0}"
+}
+
 guard_err="$(bash "$here/jira-site-guard.sh" 2>&1)" || fail "jira-site-guard: ${guard_err:-unknown failure (re-run: bash $here/jira-site-guard.sh)}"
 
 # 1. Parent epic — MUST pass --fields parent; the default view strips it (returns null).
@@ -76,16 +93,33 @@ siblings="$(acli jira workitem search --jql "parent = $epic" --json 2>/dev/null 
 [ -z "$siblings" ] && fail "could not list children of $epic (cannot verify dependencies)"
 
 # 3. Inversion: a sibling S blocks $story iff S's links have outwardIssueKey == $story.
-blockers=""
+#    One acli call per sibling, run in batches of six in parallel (each call is seconds of JVM
+#    startup); results are read back in sibling order so BLOCKERS= keeps the epic's order.
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+n=0
+cand=()
 while IFS= read -r s; do
   [ -z "$s" ] && continue
   [ "$s" = "$story" ] && continue
-  if acli jira workitem link list --key "$s" --json 2>/dev/null \
-       | jq -e --arg k "$story" \
-         '.issueLinks[]? | select(.typeName=="Blocks" and .outwardIssueKey==$k)' >/dev/null; then
-    blockers="${blockers:+$blockers }$s"
-  fi
+  cand[$n]="$s"
+  (
+    if acli jira workitem link list --key "$s" --json 2>/dev/null \
+         | jq -e --arg k "$story" \
+           '.issueLinks[]? | select(.typeName=="Blocks" and .outwardIssueKey==$k)' >/dev/null; then
+      : > "$tmp/hit.$n"
+    fi
+  ) &
+  n=$((n + 1))
+  [ $((n % 6)) -eq 0 ] && wait
 done <<< "$siblings"
+wait
+blockers=""
+i=0
+while [ "$i" -lt "$n" ]; do
+  [ -e "$tmp/hit.$i" ] && blockers="${blockers:+$blockers }${cand[$i]}"
+  i=$((i + 1))
+done
 echo "BLOCKERS=$blockers"
 
 # 4. Every blocker must already have a feat/<blocker> OR fix/<blocker> PR (open or merged).
@@ -93,7 +127,7 @@ echo "BLOCKERS=$blockers"
 #    Two EXACT --head lookups (pass if EITHER yields >=1 PR). Keep exact --head semantics — do NOT
 #    use `gh pr list --search`: it ignores --state (express state in-query) and its head: qualifier
 #    is a substring/ref match, not the exact branch match --head gives; either pitfall silently
-#    corrupts the gate. The doubled round-trip (2 exact calls per blocker) is acceptable.
+#    corrupts the gate. Done blockers need no lookup; the rest cost one call when feat/ has a PR, two otherwise.
 #    Both-present (a stale opposite-prefix PR for an abandoned attempt) is a LEGAL state, not a
 #    contradiction — never assert/error on "two matches"; pass if either prefix has a PR.
 rc=0
@@ -101,13 +135,19 @@ unmerged=""
 ui_blockers=""
 design_blockers=""
 itype=""
+# One search per clause covers every blocker; a blocker is in a set iff its own key is a hit.
+ui_set="" design_set="" done_set=""
+if [ -n "$blockers" ]; then
+  keylist="${blockers// /,}"
+  ui_set="$(probe_keys "$keylist" 'labels = "UI-Components"')" || fail "cannot read labels of blockers $blockers (cannot verify dependencies)"
+  design_set="$(probe_keys "$keylist" "labels = \"$DESIGN_LABEL\"")" || fail "cannot read labels of blockers $blockers (cannot verify dependencies)"
+  done_set="$(probe_keys "$keylist" 'statusCategory = Done')" || fail "cannot read the status of blockers $blockers (cannot verify dependencies)"
+fi
 for dep in $blockers; do
-  ui="$(probe "$dep" 'labels = "UI-Components"')" || fail "cannot read labels of blocker $dep (cannot verify dependencies)"
-  [ -z "$ui" ] && fail "cannot read labels of blocker $dep (cannot verify dependencies)"
-  design="$(probe "$dep" "labels = \"$DESIGN_LABEL\"")" || fail "cannot read labels of blocker $dep (cannot verify dependencies)"
-  [ -z "$design" ] && fail "cannot read labels of blocker $dep (cannot verify dependencies)"
-  done_hit="$(probe "$dep" 'statusCategory = Done')" || fail "cannot read the status of blocker $dep (cannot verify dependencies)"
-  [ -z "$done_hit" ] && fail "cannot read the status of blocker $dep (cannot verify dependencies)"
+  ui=0 design=0 done_hit=0
+  case " $ui_set " in *" $dep "*) ui=1 ;; esac
+  case " $design_set " in *" $dep "*) design=1 ;; esac
+  case " $done_set " in *" $dep "*) done_hit=1 ;; esac
 
   if [ "$design" -gt 0 ]; then
     if [ "$done_hit" -gt 0 ]; then echo "$dep PR: done"; continue; fi
@@ -123,22 +163,24 @@ for dep in $blockers; do
   fi
   if [ "$ui" -eq 0 ] && [ "$done_hit" -gt 0 ]; then echo "$dep PR: done"; continue; fi
 
-  feat_found="$(gh pr list --head "feat/$dep" --state all --json number 2>/dev/null | jq 'length')"
-  fix_found="$(gh pr list --head "fix/$dep"  --state all --json number 2>/dev/null | jq 'length')"
-  if [ "${feat_found:-0}" -eq 0 ] && [ "${fix_found:-0}" -eq 0 ]; then
+  # A merged PR is also an `all` PR, so a UI blocker is settled by the merged lookups first, and a
+  # plain blocker stops at the first prefix that has a PR.
+  if [ "$ui" -gt 0 ]; then
+    ui_blockers="${ui_blockers:+$ui_blockers }$dep"
+    if [ "$(pr_count "feat/$dep" merged)" -eq 0 ] && [ "$(pr_count "fix/$dep" merged)" -eq 0 ]; then
+      if [ "$(pr_count "feat/$dep" all)" -eq 0 ] && [ "$(pr_count "fix/$dep" all)" -eq 0 ]; then
+        echo "$dep PR: NO"
+        rc=1
+      else
+        echo "$dep PR: unmerged"
+        unmerged="${unmerged:+$unmerged }$dep"
+      fi
+      continue
+    fi
+  elif [ "$(pr_count "feat/$dep" all)" -eq 0 ] && [ "$(pr_count "fix/$dep" all)" -eq 0 ]; then
     echo "$dep PR: NO"
     rc=1
     continue
-  fi
-  if [ "$ui" -gt 0 ]; then
-    ui_blockers="${ui_blockers:+$ui_blockers }$dep"
-    feat_merged="$(gh pr list --head "feat/$dep" --state merged --json number 2>/dev/null | jq 'length')"
-    fix_merged="$(gh pr list --head "fix/$dep"  --state merged --json number 2>/dev/null | jq 'length')"
-    if [ "${feat_merged:-0}" -eq 0 ] && [ "${fix_merged:-0}" -eq 0 ]; then
-      echo "$dep PR: unmerged"
-      unmerged="${unmerged:+$unmerged }$dep"
-      continue
-    fi
   fi
   echo "$dep PR: yes"
 done
