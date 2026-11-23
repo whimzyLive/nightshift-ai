@@ -25,6 +25,12 @@ case "$*" in
     printf '%s\n' ${MOCK_LIBS-L-1 L-2} | arr ;;
   'jira workitem search --jql parent = EP-1 AND labels = "Widgets" ORDER BY created ASC --json')
     printf 'W-1\n' | arr ;;
+  'jira workitem search --jql key in ('*') AND statusCategory = Done --json')
+    k="${5#key in (}"; k="${k%%)*}"
+    if [ "${MOCK_DONE:-0}" = 1 ]; then head -1 "$MOCK_STATE/design" | grep -xF "$(printf '%s\n' ${k//,/ })" | arr; else echo '[]'; fi ;;
+  'jira workitem search --jql key in ('*') AND labels = "Design" --json')
+    k="${5#key in (}"; k="${k%%)*}"
+    grep -xF "$(printf '%s\n' ${k//,/ })" "$MOCK_STATE/design" | arr ;;
   'jira workitem search --jql key = '*' AND statusCategory = Done --json')
     if [ "${MOCK_DONE:-0}" = 1 ]; then head -1 "$MOCK_STATE/design" | arr; else echo '[]'; fi ;;
   'jira workitem search --jql parent = EP-1 AND key = '*' --json')
