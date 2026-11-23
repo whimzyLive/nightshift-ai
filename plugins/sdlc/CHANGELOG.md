@@ -1,3 +1,13 @@
+## 0.51.10 (2026-11-23)
+
+### 🩹 Fixes
+
+- **sdlc:** stop agents and the orchestrator waiting on long commands ([043122a](https://github.com/whimzyLive/nightshift-ai/commit/043122a))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.9 (2026-11-17)
 
 ### 🚀 Features
