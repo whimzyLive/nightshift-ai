@@ -149,7 +149,7 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
    doc: the story's ACs verbatim — plus, on the full path, the `SPEC` path and this agent's
    `## Implementation tasks` lines.
 5. **Skills for this dispatch** — paste the output of
-   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <owned paths of this phase> --print-prompt`
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <comma-joined owned paths> --print-prompt`
    (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
 6. The story's Design paths — each page path WITH its render/screenshot PNG path, the agent reads the PNG (none: Grep for the region, then a bounded Read of the page) before building. When the story's Design row names no PNG (older or AI-Ready stories), resolve it from the design index (the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins) — + the story's component-plan rows (surface, component, action; `docs/design/<slug>/component-plan.md`, none when the Epic has no plan) + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
    and any plan "grounding corrections" verbatim — short items only; spec sections by name, not by

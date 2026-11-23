@@ -74,7 +74,7 @@ Other keys on a row (for example `note`) are ignored by the resolver and preserv
 ## Resolving a dispatch — `scripts/skills-for.sh`
 
 ```
-skills-for.sh <agent> [--mode <m>] [--paths <glob,glob,...>] [--manifest <path>] [--contract <path>] [--print-prompt]
+skills-for.sh <agent> [--mode <m>] [--paths <p>[,<p>...] | <p> <p>...] [--manifest <path>] [--contract <path>] [--print-prompt]
 ```
 
 - Reads the plugin contract rows (`refs/skills-contract.json`) and the repo manifest, merges them by
