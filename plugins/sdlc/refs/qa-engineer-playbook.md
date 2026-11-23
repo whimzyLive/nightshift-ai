@@ -244,7 +244,7 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 3. Story key.
 4. The reviewer findings for that domain, **verbatim**.
 5. **Skills for this dispatch** — paste the output of
-   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <the domain's owned paths> --print-prompt`
+   `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <comma-joined owned paths> --print-prompt`
    (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
 6. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Fix ONLY these issues, run your **Comments**

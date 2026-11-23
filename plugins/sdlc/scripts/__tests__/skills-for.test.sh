@@ -115,5 +115,26 @@ check "print-prompt: a step starting with if is not re-prefixed" "- conventional
 check "shipped contract: a namespaced skill name resolves intact" "SKILL=anthropic-skills:skill-creator REQUIRED=yes STEP=when a gap or a new skill is needed" \
   "$(run ai-enablement-engineer --manifest "$no_manifest" --contract "$shipped_contract" --mode analyze | grep 'skill-creator')"
 
+check "paths: space-separated values after --paths" 1 \
+  "$(run platform-engineer "${args[@]}" --paths infra/ backend/ --print-prompt | grep -c golang-testing)"
+check "paths: space-separated values stop at the next flag" 1 \
+  "$(run platform-engineer "${args[@]}" --paths infra/ docs/ --print-prompt | grep -c conventional-commit)"
+check "paths: repeated --paths accumulates" 1 \
+  "$(run platform-engineer "${args[@]}" --paths infra/ --paths backend/ | grep -c golang-testing)"
+check "paths: comma form mixed with a repeat" 1 \
+  "$(run platform-engineer "${args[@]}" --paths infra/,docs/ --paths backend/ | grep -c golang-testing)"
+check "paths: space-separated values none of which match" 0 \
+  "$(run platform-engineer "${args[@]}" --paths infra/ docs/ | grep -c golang-testing)"
+check "paths: flags after the values still apply" 1 \
+  "$(run platform-engineer --paths backend/ contracts/ --manifest "$work/m2.json" --contract "$work/contract.json" | grep -c golang-testing)"
+check "paths: --paths with no value is rejected" 2 "$(rc_of platform-engineer --paths)"
+check "mode: a trailing --mode with no value is rejected, not looped on" 2 "$(rc_of platform-engineer --mode)"
+check "--help prints the usage line and exits 0" "0 usage: skills-for.sh" \
+  "$(o="$(bash "$sf" --help 2>&1)"; echo "$? ${o:0:20}")"
+check "-h is --help" 0 "$(rc_of -h)"
+check "--help does not need an agent or a contract" 0 "$(rc_of --help --contract "$work/missing.json")"
+check "unknown argument: error names it and prints the usage line" "2 yes yes" \
+  "$(bash "$sf" platform-engineer --bogus 2>"$work/err" >/dev/null; rc=$?; echo "$rc $(grep -q "unknown argument '--bogus'" "$work/err" && echo yes) $(grep -q '^usage: skills-for.sh' "$work/err" && echo yes)")"
+
 if [ "$failures" -eq 0 ]; then echo "PASS: skills-for"; exit 0; fi
 echo "FAIL: $failures skills-for case(s) failed"; exit 1

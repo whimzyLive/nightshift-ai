@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# skills-for.sh <agent> [--mode <m>] [--paths <glob,glob,...>] [--manifest <path>] [--contract <path>] [--print-prompt]
+# skills-for.sh <agent> [--mode <m>] [--paths <p>[,<p>...] | <p> <p>...] [--manifest <path>] [--contract <path>] [--print-prompt]
 #
 # Resolves which skills a dispatch should name, from the plugin contract rows (refs/skills-contract.json)
 # merged under the repo manifest (.claude/project/skills.json). Rows merge by `name`; the repo row
@@ -22,19 +22,28 @@ set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 agents_dir="$here/../agents"
 
+USAGE="usage: skills-for.sh <agent> [--mode <m>] [--paths <p>[,<p>...] | --paths <p> <p>...] [--manifest <path>] [--contract <path>] [--print-prompt] [--help]"
 AGENT=""; MODE=""; PATHS=""; MANIFEST=".claude/project/skills.json"; CONTRACT=""; PRINT_PROMPT=0
+need_value() { [ "$1" -ge 2 ] || { echo "skills-for.sh: '$2' needs a value" >&2; echo "$USAGE" >&2; exit 2; }; }
+# --paths takes every following argument up to the next flag, and may repeat.
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --mode)         MODE="${2:-}"; shift 2 ;;
-    --paths)        PATHS="${2:-}"; shift 2 ;;
-    --manifest)     MANIFEST="${2:-}"; shift 2 ;;
-    --contract)     CONTRACT="${2:-}"; shift 2 ;;
+    -h|--help)      echo "$USAGE"; exit 0 ;;
+    --mode)         need_value "$#" "$1"; MODE="$2"; shift 2 ;;
+    --paths)
+      need_value "$#" "$1"; shift
+      while [ "$#" -gt 0 ]; do
+        case "$1" in -*) break ;; esac
+        PATHS="${PATHS:+$PATHS,}$1"; shift
+      done ;;
+    --manifest)     need_value "$#" "$1"; MANIFEST="$2"; shift 2 ;;
+    --contract)     need_value "$#" "$1"; CONTRACT="$2"; shift 2 ;;
     --print-prompt) PRINT_PROMPT=1; shift ;;
-    -*) echo "skills-for.sh: unknown argument '$1'" >&2; exit 2 ;;
-    *)  if [ -z "$AGENT" ]; then AGENT="$1"; shift; else echo "skills-for.sh: unexpected argument '$1'" >&2; exit 2; fi ;;
+    -*) echo "skills-for.sh: unknown argument '$1'" >&2; echo "$USAGE" >&2; exit 2 ;;
+    *)  if [ -z "$AGENT" ]; then AGENT="$1"; shift; else echo "skills-for.sh: unexpected argument '$1'" >&2; echo "$USAGE" >&2; exit 2; fi ;;
   esac
 done
-[ -n "$AGENT" ] || { echo "skills-for.sh: usage: skills-for.sh <agent> [--mode <m>] [--paths <globs>] [--manifest <path>] [--contract <path>] [--print-prompt]" >&2; exit 2; }
+[ -n "$AGENT" ] || { echo "skills-for.sh: $USAGE" >&2; exit 2; }
 [ -n "$CONTRACT" ] || CONTRACT="${CLAUDE_PLUGIN_ROOT:-$here/..}/refs/skills-contract.json"
 
 command -v jq >/dev/null 2>&1 || { echo "skills-for.sh: jq is required" >&2; exit 2; }
