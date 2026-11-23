@@ -1,3 +1,13 @@
+## 0.51.13 (2026-11-23)
+
+### 🚀 Features
+
+- **sdlc:** run QA fix agents for disjoint domains in parallel worktrees ([8f6f6d6](https://github.com/whimzyLive/nightshift-ai/commit/8f6f6d6))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.12 (2026-11-23)
 
 ### 🩹 Fixes
