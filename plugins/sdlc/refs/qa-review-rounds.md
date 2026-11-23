@@ -38,6 +38,8 @@ wait := end the turn with no tool call; each agent's handback resumes the sessio
 never -> wait with a shell loop (`pgrep`, `sleep`, `until`, `while`) on an agent, a commit or a
   process: `pgrep -f` matches the loop's own shell, so it runs to its cap after the agent is done
 a handback is the finish -> every command the agent started has exited; nothing runs on behind it
+handback while a command still runs | a "still running" return -> never wait for a follow-up notification;
+  check the state yourself (branch, worktree, the command's output file), then continue or re-dispatch the remaining step
 ```
 
 The same wait rule holds for every dispatch in a story run (the implementing agent, a fix round, the
