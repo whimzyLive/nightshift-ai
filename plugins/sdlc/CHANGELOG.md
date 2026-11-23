@@ -1,3 +1,13 @@
+## 0.51.11 (2026-11-23)
+
+### 🩹 Fixes
+
+- **sdlc:** route lightweight vs full with triage.sh, not the model ([8ef9502](https://github.com/whimzyLive/nightshift-ai/commit/8ef9502))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.10 (2026-11-23)
 
 ### 🩹 Fixes
