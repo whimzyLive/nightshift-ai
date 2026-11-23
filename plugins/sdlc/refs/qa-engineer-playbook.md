@@ -197,8 +197,8 @@ NX_CACHE_DIRECTORY=$(printf '%s\n' "$setup_out" | grep '^NX_CACHE_DIRECTORY=' | 
 ```
 
 For each Critical / Important group (grouped by domain), dispatch the owning domain agent with the
-`Agent` tool — each finding with its class and every listed site (`refs/qa-review-rounds.md` § Round 1). The harness's `isolation: "worktree"` param is NOT set — the orchestrator owns
-isolation via the `$WORKTREE` re-provisioned above. **Branch the dispatch mechanism on the `SDLC
+`Agent` tool (`SDLC parallel fixes` `enabled` and >=2 single-domain groups: `refs/parallel-fixes.md`) — each finding with its class and every listed site (`refs/qa-review-rounds.md` § Round 1). The harness's `isolation: "worktree"` param is NOT set — the `$WORKTREE`
+re-provisioned above is the isolation. **Branch the dispatch mechanism on the `SDLC
 agent reuse` token** (`.claude/project/project-context.md` Tooling):
 
 - `disabled` → today's behaviour: dispatch a **fresh** `Agent({ subagent_type: "<agent-name>", ... })`
@@ -208,10 +208,10 @@ agent reuse` token** (`.claude/project/project-context.md` Tooling):
   consistent with `scrum-master.md`'s resume-trust rule), avoiding re-paid frontmatter/skill
   injection. An instance that has merely returned its result **is** resumable — that is the normal
   case. **Fall back to a fresh `Agent(...)` dispatch** only when the resume fails (`SendMessage`
-  errors) or a session boundary lost the instance — the explicit fallback, not an error. Accepted trade-off until NA-23 lands: a resumed instance re-pays
-  frontmatter skill injection (harness bug #76337) — wasted tokens, not a correctness risk.
+  errors) or a session boundary lost the instance — the fallback, not an error. Accepted until NA-23: a resumed instance re-pays
+  frontmatter skill injection (bug #76337) — tokens, not correctness.
 
-Record the reuse decision (AC-3, rolled into Step 8's verdict):
+Record the reuse decision (rolled into Step 8's verdict):
 
 ```text
 SDLC agent reuse = disabled -> fresh Agent(...), REUSE=false, reason=disabled-by-config
@@ -232,7 +232,7 @@ no row matches the dispatched domain -> dispatch without a ledger row
 
 A resolved row is placed before item 4's findings below.
 
-Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST include:
+The prompt (fresh dispatch) or resume message (reused instance) MUST include:
 
 1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
    "Your working directory for ALL work is `<WORKTREE>` — `cd` into it before any read, edit,
@@ -257,7 +257,7 @@ Either way, the prompt (fresh dispatch) or resume message (reused instance) MUST
 10. "Context reuse: a path already read in full in this transcript is never re-read — see the `## Context reuse` section of ${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md."
 11. "Bounded reads: Grep-first, then Read with `offset`/`limit` for files over ~400 lines — see the `## Bounded reads` section of `${CLAUDE_PLUGIN_ROOT}/refs/domain-agent-handoff.md`."
 
-**Before dispatching**, snapshot the primary checkout's state (spec §5, same machine guard as
+**Before dispatching**, snapshot the primary checkout's state (same machine guard as
 principal playbook Step 5) — a snapshot to diff against later, not an assertion; the primary may
 already be dirty (unrelated developer WIP), and that pre-existing dirt is not itself a violation:
 

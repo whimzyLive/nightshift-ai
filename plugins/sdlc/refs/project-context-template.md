@@ -103,6 +103,10 @@ generated file — every slot must be replaced with an actual value.
   whose build tool can run only what a diff touches (e.g. `pnpm exec nx affected -t test
   --base=<BASE_SHA>`). Keep `<BASE_SHA>` literal: the QA gate fills it with the story's base and
   runs the row in place of `Typecheck` / `Test` (`refs/qa-gate-runner.md`). Absent = the full command.
+- **SDLC parallel fixes** — optional `## Tooling` row, `enabled` | `disabled`; absent = `disabled`.
+  `enabled` lets a QA fix round run domain agents with disjoint findings side by side in their own
+  worktrees (`refs/parallel-fixes.md`). Turn it on only when the repo's tests are isolated per
+  worktree (own database name, own ports): the plugin cannot see a shared database or port.
 - **UI library** — the shared component package other workspaces import (e.g.
   `packages/ui/`); omit the row when there is none. `/design` inventories
   components against it (`refs/ui-components.md`).
