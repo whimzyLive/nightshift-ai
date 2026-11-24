@@ -30,6 +30,13 @@ dispatch in ONE message, all three in the background:
   reviewer   := Step 1 dispatch, model: $REVIEWER_MODEL (Step 1 "Reviewer model")
   gate       := Step 6 offload, model: "haiku"   # runs scripted commands, no judgement
   verifier   := Step 7 offload, model: "sonnet"
+Design check set AND a Design row exists (the gate runs the full row this round): the verifier
+  is dispatched with `DESIGN_REPORT=defer` (code, tests, Dev Notes in parallel; Design lines `pending gate`).
+  After the gate hands back at ROUND_HEAD -> ONE short verifier pass, `DESIGN_REPORT=read`, Design lines only;
+  its lines replace the `pending gate` lines; `Unmet`/`Owner`/`Design not checked` are the union of both passes
+  still `pending gate` -> re-offload the gate once, re-read; still pending -> capped,
+  `design not checked: <KEY> no valid report` on `Open (capped):`; never a fix round on its own
+  no Design row | `Design check` unset -> no second pass, the verifier runs as before
 reviewer prompt also says: "Read-only. Do not run builds, tests, typecheck or containers —
   the quality gate owns every test run (parallel runs collide on shared ports and databases)."
 wait for all three -> triage (Step 2) uses the reviewer's findings; Steps 6/7 consequences apply
@@ -54,7 +61,7 @@ any fix commit pushed this round (HEAD != ROUND_HEAD) -> the gate is stale: the 
   | every `met` line's evidence is a path (`path` or `path:line`) -- a test name or a sha can't be
     matched to a diff, so it forces a re-run
   | `git diff --name-only PREV_HEAD..HEAD` touches none of those paths
-  -> then its last block carries forward unchanged (record `AC verify: carried` for Step 8); the
+  -> then its last block carries forward unchanged (record `AC verify: carried` for Step 8) except Design lines, which the gate's new run re-reads (read pass above); the
   gate re-running every round still catches a fix that breaks an AC's test
 no fix this round (review clean, gate pass, verifier met) -> results stand -> Step 5, then Step 8
 gate fail or Unmet only (review clean) -> Step 3 fix for that error, then the next round: gate +

@@ -29,7 +29,7 @@ A non-empty result is NOT a stop here — capture it verbatim into the stray-fil
 return below and let the orchestrator STOP; never silently clean it yourself.
 
 3. Run the quality-gate commands from `.claude/project/project-context.md` (Tooling + Quality
-   Gate, EXCEPT the Tooling row `Design check` and `Design check report` — step 4a alone runs
+   Gate, EXCEPT the Tooling rows `Design check`, `Design check (scoped)` and `Design check report` — step 4a alone runs
    those, and only when `RUN_DESIGN_CHECK=yes`) **inside `$WORKTREE`** (`cd "$WORKTREE"` first — never the primary checkout), with the
    shared Nx cache exported so the gate run hits the warm cache (spec §3):
 
@@ -55,7 +55,7 @@ every command run once per gate; never a second "to be sure" run of one that exi
 4. `RUN_INFRA=yes` → also run the infra build with the stage flag from project-context (still
    inside `$WORKTREE`). Never decide this yourself.
 
-4a. `RUN_DESIGN_CHECK=yes` → also run the project-context Tooling `Design check` command (still
+4a. `RUN_DESIGN_CHECK=yes` → also run the project-context Tooling `Design check` command, the full row, never `Design check (scoped)` (still
    inside `$WORKTREE`). Its non-zero exit is `Gate: fail`. The report must be git-ignored (the default `.tmp/` is), so step 2 stays a plain `git status --porcelain`. It writes its report file (the `Design check
    report` path, default `.tmp/design-check/report.txt`); put that PATH and the exit code in `Evidence`,
    never board names — the AC verifier reads the file (`refs/ac-verification.md`). `RUN_DESIGN_CHECK=no`

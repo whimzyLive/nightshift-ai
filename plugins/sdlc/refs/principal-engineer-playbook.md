@@ -153,7 +153,7 @@ Hand the agent **paths, never pasted content** — it reads the spec, plan slice
    (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
 6. The story's Design paths — each page path WITH its render/screenshot PNG path, the agent reads the PNG (none: Grep for the region, then a bounded Read of the page) before building. When the story's Design row names no PNG (older or AI-Ready stories), resolve it from the design index (the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins) — + the story's component-plan rows (surface, component, action; `docs/design/<slug>/component-plan.md`, none when the Epic has no plan) + Dev Notes verbatim (`${CLAUDE_PLUGIN_ROOT}/refs/design-references.md`)
    and any plan "grounding corrections" verbatim — short items only; spec sections by name, not by
-   paste.
+   paste. A design check is named by Tooling row (`Design check (scoped)` for boards X, Y), never a pasted command, even one in the Dev Notes (`refs/design-references.md` Design check (scoped)).
 7. "Branch `<BRANCH_PREFIX>/<STORY-KEY>` already exists on remote and is checked out in `<WORKTREE>`
    (the working directory named in item 1). Do NOT create a new branch. Do your work there and
    commit."
