@@ -237,12 +237,13 @@ The prompt (fresh dispatch) or resume message (reused instance) MUST include:
 1. **Mandatory first instruction (verbatim, with the real captured `$WORKTREE` substituted):**
    "Your working directory for ALL work is `<WORKTREE>` — `cd` into it before any read, edit,
    build, test, or commit. Do NOT operate in the primary checkout."
+   FRESH dispatch only (a resumed instance already has it): "Before anything else do the First steps of your agent definition, including reading your project override `.claude/project/agents/<agent-name>.md`." Never paste override content.
 2. **Cache instruction (verbatim, with the real captured `$NX_CACHE_DIRECTORY` substituted):**
    "Before running any `nx` command (build/test/quality gate), export
    `NX_CACHE_DIRECTORY=<abs path>` so tasks hit the shared warm cache — this also covers your own
    quality-gate run in Step 6."
 3. Story key.
-4. The reviewer findings for that domain, **verbatim**.
+4. The reviewer findings for that domain, **verbatim**. A design check is named by Tooling row, never a pasted command, even one in the findings, Dev Notes or a prior gate (`refs/design-references.md` Design check (scoped)).
 5. **Skills for this dispatch** — paste the output of
    `bash ${CLAUDE_PLUGIN_ROOT}/scripts/skills-for.sh <agent-name> --mode <m> --paths <comma-joined owned paths> --print-prompt`
    (omit `--mode` when the agent has none); empty output → "No skills apply for this task."
@@ -392,7 +393,7 @@ fallback := Read qa-gate-runner.md, run INLINE; offload=inline-fallback
 carry Evidence -> Step-8 `Quality gate:`
 ```
 
-A design-check failure is a gate failure; the verifier reads its report file (`refs/design-references.md`).
+A design-check failure is a gate failure; the verifier reads its report file after the gate (`refs/design-references.md`).
 
 Any failure → identify the workspace from the error, dispatch the owning domain agent with the
 **exact** error (Step 3 protocol), push, and re-run the FULL gate (inside `$WORKTREE`). Repeat until clean.
@@ -403,9 +404,10 @@ Follow `${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md` — the plan-task checkli
 checklist, and (on `WORK_KIND=defect`) the regression-evidence contract all live there.
 
 ```text
-offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND>,
+offload := Agent("general-purpose", model: "sonnet", <STORY-KEY> <WORKTREE> <BRANCH_PREFIX> <BASE_SHA> <WORK_KIND> [DESIGN_REPORT],
   "Follow ${CLAUDE_PLUGIN_ROOT}/refs/ac-verification.md. Return ONLY its block.")
 Unmet non-empty -> dispatch each Owner(Step3), push, rerun 6-7
+Design lines `pending gate` -> second pass `DESIGN_REPORT=read` after the gate (`refs/qa-review-rounds.md`); never Unmet
 Design not checked non-empty -> ONCE per run: ask the owner for a REAL check entry per board (`refs/design-references.md`), push, rerun 6-7; still `uncovered`|`not-checked` -> capped, `Open (capped)`: `design uncovered: <KEY>` | `design not checked: <KEY> <ticket>`
 WORK_KIND=defect,Regression evidence n/a|!fail-before/pass-after -> blocked
 no Verification: -> re-offload once, fallback

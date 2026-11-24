@@ -43,6 +43,7 @@ generated file — every slot must be replaced with an actual value.
 | Test | `<test cmd>` |
 | UI library | `<shared component package path>` |
 | Design check | `<design-check cmd>` |
+| Design check (scoped) | `<scoped-design-check cmd>` |
 
 ## Design
 <!-- OPTIONAL section for repos with a UI. Delete the whole section when there is no design workflow; /sdlc:design --draft|--plan|--final needs the rows marked required. -->
@@ -119,6 +120,11 @@ generated file — every slot must be replaced with an actual value.
   (`/init` git-ignores `.tmp/`); a custom path MUST be git-ignored too, or the gate's stray-file check stops on it. The command must write that report on every run, even when nothing is
   affected, from one non-cached aggregate step covering every board (e.g. Nx `cache: false`), or the
   verifier reads a stale or missing report. Line format: `refs/design-references.md` Design check.
+- **Design check (scoped)** — optional command that checks only the story's boards (it takes the story's
+  Design row board paths; how the list is passed is the repo's); omit the row when there is none.
+  Set = domain agents iterate with it and never run `Design check`; only the QA gate runs the full
+  row. Absent = agents run `Design check` as before. Its report goes to the same path with line 1
+  `design-check: partial ...`; `partial` is never a pass (`refs/design-references.md` Design check (scoped)).
 - **Design** — all rows optional unless a mode needs them; omit any blank row, and the whole section when the repo has no design workflow. `/init` never asks for them; a repo adds the section once its design system exists.
   - `Pattern vocabulary` (required by every mode) — path to the file of fixed pattern names, each naming its template or component. `Bundle inventory` (plan, final) — folder with one entry per component the design bundle exports; the plan's "exists in the bundle" test greps it, never reads source. `Bundle global` (plan, final) — the global name the bundle exposes in the browser (e.g. `window.<Name>`); boards mount `<Global>.<Component>`. `Bundle entry` (optional, plan) — the file the bundle is built from; with it, the plan's control audit (`scripts/library-exports.sh`) tells a part the bundle exports without an inventory entry from a library export the bundle lacks. Without it, every library export with no inventory entry is listed as not exported, and the designer confirms against the bundle.
   - `Wireframe targets` (draft) — which frames `--draft` draws: `web` (browser-frame boards; the default when the row is absent), `phone` (device-frame boards only), or `web, phone` (every screen of the journey, empty and error states included, also gets a phone board; no web-only screens). Draft boards are written to the session temp dir, never the repo. `Final page prefix` (final) — the prefix of final board files.

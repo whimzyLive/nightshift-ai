@@ -55,7 +55,7 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
         - otherwise (a detection-only or static field) fill it from Step 2.5 or the template default,
           no prompt.
 
-        Exception: the optional `Design check` and `Design check report` Tooling rows are never
+        Exception: the optional `Design check`, `Design check (scoped)` and `Design check report` Tooling rows are never
         filled from the template, a default or a guess, and never prompted — a missing row stays
         missing (a placeholder like `<design-check cmd>` would run as a command). Existence is
         detected as the row being present with a non-empty value, the same test as in the token
@@ -532,6 +532,7 @@ are documented in that template file. Token slots to substitute:
 | `<typecheck cmd>` / `<test cmd>` | confirmed commands (Step 3) |
 | `<shared component package path>` | the shared UI package other workspaces import (e.g. `packages/ui/`) when one exists — otherwise omit the `UI library` row |
 | `<design-check cmd>` | the repo's design-fidelity command when one exists (e.g. `pnpm exec nx affected -t fidelity`) — otherwise omit the `Design check` row; never ask for it, a repo adds it when its check exists |
+| `<scoped-design-check cmd>` | never asked; omit the `Design check (scoped)` row unless the repo already has a command that checks only named boards |
 | `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
 | `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<wireframe-targets>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked, except `Wireframe targets`: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. When the section is written, ask `Wireframe targets` once: `web` (Recommended) \| `phone` \| `web, phone` — the frames `/sdlc:design --draft` draws; `web` when skipped. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
 | `<threshold>` | lightweight threshold (Step 3) |

@@ -41,7 +41,7 @@ unset | empty -> everything below is off; Design rows stay "implementing UI exis
 story Design rows should name boards by the full `docs/design/<slug>/pages/<file>` path; a bare `pages/x.html` or a Title is resolved only inside the story's resolved design(s) and must match exactly one row
 check := renders each board under docs/design/<slug>/pages/ and the screen that builds it,
          compares computed styles of named elements and the pixels of a region, fails on any difference no deviation accepts
-runs := the domain agent of a UI story (before returning) | the QA gate when a Design row exists or a changed path is owned by web/mobile (refs/qa-gate-runner.md)
+runs := the domain agent of a UI story (before returning; with `Design check (scoped)` set, that row instead, below) | the QA gate when a Design row exists or a changed path is owned by web/mobile (refs/qa-gate-runner.md)
 failure -> routed to the owning agent like any gate failure; fix the screen, the design-system component, or the board
 report := the check writes a text file at project-context Tooling `Design check report` (default `.tmp/design-check/report.txt`; init already git-ignores `.tmp/`; a custom path MUST be git-ignored, the gate's clean-tree assert is a plain `git status --porcelain`):
           line 1 `design-check: pass|fail sha=<git HEAD of the worktree>` then optional space-separated `key=value` fields (readers ignore unknown keys), then one `<KEY> pass|fail|not-checked <ticket>` line per board
@@ -54,6 +54,19 @@ the command MUST write the report on EVERY run, including a nothing-affected run
 ```
 
 These are requirements on the repo's check; the plugin ships none and enforces none.
+
+**Design check (scoped)** — optional second row, for the iteration loop.
+
+```text
+Design check (scoped) := project-context Tooling row (a command that takes the story's Design row board paths; how the list is passed is the repo's)
+set   -> domain agents iterate with it on the story's boards and never run `Design check`; the QA gate alone runs `Design check`, once per gate
+unset -> agents run `Design check` as above; nothing else changes
+scoped report := written to the same report path; line 1 `design-check: partial ...` (verdict `partial`); `partial` is never a pass: it satisfies neither the gate nor the AC verifier
+              a later full run rewrites the file; the verifier reads only the gate's full run (refs/ac-verification.md)
+dispatch := name the Tooling row, never paste a design-check command -- including one quoted in Dev Notes or run by a previous gate
+            Dev Notes pass verbatim; the row name governs which command runs
+            e.g. "run the `Design check (scoped)` row for boards X, Y"
+```
 
 **Deviations** — the one way to accept a difference.
 
@@ -83,7 +96,7 @@ domain agent, before building a UI task -> Reads the PNG (none -> Grep for the r
 ## Fidelity-first (only when `Design check` is set)
 
 ```text
-order := write the board's check entry FIRST -> run the Design check -> treat the failing report as the to-do list -> build until it passes
+order := write the board's check entry FIRST -> run the Design check (the `Design check (scoped)` row on the story's boards when set) -> treat the failing report as the to-do list -> build until it passes
 a difference owned by another ticket -> propose a deviation in `Summary:` with reason and ticket; a person adds it (Deviations above); never to get a pass
 never -> change code only to match a probe (refs/ui-components.md Look logic); fix the screen, the design-system component, or the board
 Design check unset -> none of this applies; Reading rules below stand
@@ -92,12 +105,12 @@ Design check unset -> none of this applies; Reading rules below stand
 ## Domain agent duties (Design references and check)
 
 ```text
-UI story := its Design rows or web/mobile-owned paths; run the check ONCE before committing (again only after fixing a failure it reported)
+UI story := its Design rows or web/mobile-owned paths; run the check ONCE before committing (again only after fixing a failure it reported); `Design check (scoped)` set -> run that row on the story's boards instead, as often as the loop needs, never the full `Design check`
 dispatch -> each Design row's page path AND its PNG path; read the PNG before building a UI task (none -> Grep for the region, then a bounded Read of the page; pages are large)
 the PNG is the page row's Render; a screenshot row the Design section also names for the same board wins
 the row's "take from it" line vs the image -> the image wins; ACs, Dev Notes and design-system tokens/components still rank above the design (Authority)
 Design check set -> a failure is fixed in the screen or the design-system component, never by adding or loosening a deviation; propose a deviation in `Summary:`
-return Summary with a design check run -> `design check: <pass|fail> — <n> boards, <n> style diffs, pixels <ratio>%, report <path>`; no such part on a story without one
+return Summary with a design check run (a scoped run counts) -> `design check: <pass|fail> — <n> boards, <n> style diffs, pixels <ratio>%, report <path>`; no such part on a story without one
 asked to cover an uncovered or not-checked board -> add a real check entry or report why you cannot
 ```
 
@@ -150,6 +163,6 @@ Dev Note conflicts with an AC or a project rule -> follow the AC/rule, record th
 | scrum-master, product-manager | Write the sections per `jira-story-template.md`; move any HOW out of ACs into Dev Notes |
 | solutions-architect | Spec gets a `## Design & Dev Notes` section: each UI surface -> the design row(s) it implements; each Dev Note verbatim + where the spec honours it or why it deviates |
 | tech-lead | Every UI task names the design path(s) it implements; each Dev Note rides on the task(s) it constrains |
-| principal-engineer | Resolve the design (above) before Step 3; pass Design paths + Dev Notes verbatim in every domain-agent prompt (item 6), on both the full and lightweight paths |
-| domain agents | Build from the story's plan rows' components; a conflict with the board is a stop and report, never a kept copy. With `Design check` set, run it for a UI story and report counts + pixel ratio, with the report/heat-map path, in `Summary:` (Domain agent duties above). Before a UI task, Read the named render/screenshot (Grep-then-window any `.html` page); follow every Dev Note; a deviation goes in the return `Summary:` with its reason |
-| QA | With `Design check` set, the gate runs it and verification requires its evidence per Design row. The reviewer sees Dev Notes + Design through the story description (lightweight) or the plan tasks (full); verification adds `Dev Note <n>:` / `Design <n>:` lines (`refs/ac-verification.md`) |
+| principal-engineer | Resolve the design (above) before Step 3; pass Design paths + Dev Notes verbatim in every domain-agent prompt (item 6), on both the full and lightweight paths; name design-check rows, never paste their command (Design check (scoped) above) |
+| domain agents | Build from the story's plan rows' components; a conflict with the board is a stop and report, never a kept copy. With `Design check` set, run it (the scoped row when set) for a UI story and report counts + pixel ratio, with the report/heat-map path, in `Summary:` (Domain agent duties above). Before a UI task, Read the named render/screenshot (Grep-then-window any `.html` page); follow every Dev Note; a deviation goes in the return `Summary:` with its reason |
+| QA | With `Design check` set, the gate runs the full row and verification requires its evidence per Design row (Design lines resolve after the gate; `refs/qa-review-rounds.md`). The reviewer sees Dev Notes + Design through the story description (lightweight) or the plan tasks (full); verification adds `Dev Note <n>:` / `Design <n>:` lines (`refs/ac-verification.md`) |
