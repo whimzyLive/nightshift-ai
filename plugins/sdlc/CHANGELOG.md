@@ -1,3 +1,13 @@
+## 0.51.15 (2026-11-24)
+
+### 🚀 Features
+
+- **sdlc:** scoped design check row, by-name dispatch, deferred Design pass ([e607e20](https://github.com/whimzyLive/nightshift-ai/commit/e607e20))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.14 (2026-11-23)
 
 ### 🩹 Fixes
