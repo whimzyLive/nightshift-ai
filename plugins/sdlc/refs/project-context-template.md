@@ -77,6 +77,14 @@ generated file — every slot must be replaced with an actual value.
 | Lightweight threshold (story points, inclusive) | `<threshold>` |
 | Plan step                                       | `<plan-step>` |
 
+## Story sizing
+
+| Token          | Value              |
+| -------------- | ------------------ |
+| Max story size | `<max-story-size>` |
+<!-- OPTIONAL: delete this row for no floor. -->
+| Min story size | `<min-story-size>` |
+
 ## Code Review
 
 | Token        | Value            |
@@ -163,6 +171,11 @@ generated file — every slot must be replaced with an actual value.
 - **Reviewer model threshold** — OPTIONAL. Integer story points; a non-Bug story at or under it gets a
   `sonnet` first-round QA reviewer, everything else `opus`. Omit the row (the default) to keep `opus`
   always. Substitute the `/init` answer, or delete the row when left unset.
+- **Max story size / Min story size** — each one of 1, 2, 3, 5, 8, 13, min <= max. `Max story size` is
+  the split ceiling (default `8`). `Min story size` is a soft floor: the scrum master merges a smaller
+  slice into a qualifying neighbour, never inflating an estimate; delete the row for no floor (the
+  default). Read by `${CLAUDE_PLUGIN_ROOT}/scripts/story-sizing.sh`; rules in
+  `${CLAUDE_PLUGIN_ROOT}/refs/story-sizing.md`. `/init` asks for both (Step 3c) and writes the section.
 - **Review retention window** — default `6 months` when the founder does not request otherwise.
   Accepted formats are **exactly** `<n> months` (wall-clock age) or `<n> stories` (activity-based —
   preferred for low-activity repos, where wall-clock decay would expire still-relevant rules

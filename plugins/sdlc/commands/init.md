@@ -208,6 +208,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
 | Reviewer model threshold | OPTIONAL — story points at/under which the first QA review round uses `sonnet` instead of `opus` (Bugs and unpointed stories stay `opus`); default unset = `opus` always |
 | Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` is read (NA-104) — `spec`/`plan` are ignored entirely (no reviewer request either, unconditionally). Default (omitted) = `impl` reviews. Not an interactive picker — the only value that changes anything **excludes** `impl` (e.g. `spec`); writing `impl` itself is a no-op, same as omitting the row. **Excluding `impl` downgrades it to `REVIEW_MODE=none`, which skips the checks-green wait too — under `Full Auto` the impl PR auto-merges unreviewed and without waiting for CI**, and its `@copilot` request still fires but sits unaddressed. |
+| Max story size / Min story size | story-size ceiling and soft floor for the scrum master (`## Story sizing`); values 1, 2, 3, 5, 8, 13; defaults `8` / none |
 | Plan step | OPTIONAL — `on` \| `off`; default `off` (spec → implementation, no plan). Not an interactive picker — write the row only if the founder asks for a plan step on full-path stories. |
 | Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
 
@@ -256,6 +257,14 @@ free-text fields MUST be asked as plain questions (no picker — open values hav
    `options: [Opus always (default, omit the row), 3, 5, 2]`. A number writes the
    `Reviewer model threshold (story points, inclusive)` row; the default deletes the row from the
    written file.
+3c. **Story sizing** — two pickers, `multiSelect: false`, each ending in "Other" for a typed value.
+   `header: "Max story"`, `options: [8 (default), 13, 5, 3]` writes `Max story size`;
+   `header: "Min story"`, `options: [None (default, omit the row), 2, 3, 5]` writes `Min story size`.
+   Allowed values are 1, 2, 3, 5, 8, 13, and min must not exceed max (the rules `scripts/story-sizing.sh`
+   enforces): on an invalid or typed-out-of-set value, or min > max, say why and re-ask. Always write the
+   `## Story sizing` section; accepting both defaults (`8`, no floor) changes no behaviour. On a re-run
+   against an initialised repo, show the current values first and offer to keep them; they become the
+   pre-selected defaults.
 4. **Active agents** — `header: "Agents"`, `multiSelect: true`, `options:` the five domain agents
    below, each `label` the agent name and `description` its "select when…" row from the table. This
    is the ONLY multi-select picker; the result is the active-agent set.
@@ -536,6 +545,7 @@ are documented in that template file. Token slots to substitute:
 | `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
 | `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<wireframe-targets>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked, except `Wireframe targets`: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. When the section is written, ask `Wireframe targets` once: `web` (Recommended) \| `phone` \| `web, phone` — the frames `/sdlc:design --draft` draws; `web` when skipped. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
 | `<threshold>` | lightweight threshold (Step 3) |
+| `<max-story-size>` / `<min-story-size>` | Story sizing pickers (Step 3c) — `8` / no row by default; the `Min story size` row is omitted when no floor is chosen |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |

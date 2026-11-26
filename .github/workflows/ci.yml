@@ -143,6 +143,8 @@ jobs:
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/triage.test.sh
       - if: '!cancelled()'
+        run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/story-sizing.test.sh
+      - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/fix-worktrees.test.sh
       - if: '!cancelled()'
         run: bash tools/ci-retry.sh bash plugins/sdlc/scripts/__tests__/scoped-design-check.test.sh

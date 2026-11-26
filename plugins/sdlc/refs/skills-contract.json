@@ -121,7 +121,7 @@
       "agents": ["scrum-master"],
       "required": true,
       "when": {
-        "step": "before creating a story over 8 points or with several outcomes",
+        "step": "before creating a story over the max story size (default 8 points) or with several outcomes",
         "mode": ["decompose"]
       }
     },
