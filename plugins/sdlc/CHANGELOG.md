@@ -1,3 +1,18 @@
+## 0.51.16 (2026-11-26)
+
+### 🚀 Features
+
+- **sdlc:** ask for story sizing in /sdlc:init ([22bd655](https://github.com/whimzyLive/nightshift-ai/commit/22bd655))
+- **sdlc:** project-wide story sizing bounds for the scrum master ([2650877](https://github.com/whimzyLive/nightshift-ai/commit/2650877))
+
+### 🩹 Fixes
+
+- **sdlc:** apply the story-size merge rule in numbered scrum-master steps ([dd5410b](https://github.com/whimzyLive/nightshift-ai/commit/dd5410b))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.15 (2026-11-24)
 
 ### 🚀 Features
