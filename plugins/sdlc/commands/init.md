@@ -57,7 +57,8 @@ Before doing anything else, check whether `.claude/project/project-context.md` a
 
         Exception: the optional `Design check`, `Design check (scoped)` and `Design check report` Tooling rows are never
         filled from the template, a default or a guess, and never prompted — a missing row stays
-        missing (a placeholder like `<design-check cmd>` would run as a command). Existence is
+        missing (a placeholder like `<design-check cmd>` would run as a command); the same holds for
+        the optional `## Story sizing` section. Existence is
         detected as the row being present with a non-empty value, the same test as in the token
         table below.
 
@@ -208,6 +209,7 @@ suggestion (see _Prompt mechanics_ below). Collect:
 | Review trigger | when the loop requests/waits for review — `on-update` (default) / `on-create` / `none` |
 | Reviewer model threshold | OPTIONAL — story points at/under which the first QA review round uses `sonnet` instead of `opus` (Bugs and unpointed stories stay `opus`); default unset = `opus` always |
 | Review gate | OPTIONAL — comma-separated subset of `spec,plan,impl`; only `impl` is read (NA-104) — `spec`/`plan` are ignored entirely (no reviewer request either, unconditionally). Default (omitted) = `impl` reviews. Not an interactive picker — the only value that changes anything **excludes** `impl` (e.g. `spec`); writing `impl` itself is a no-op, same as omitting the row. **Excluding `impl` downgrades it to `REVIEW_MODE=none`, which skips the checks-green wait too — under `Full Auto` the impl PR auto-merges unreviewed and without waiting for CI**, and its `@copilot` request still fires but sits unaddressed. |
+| Min story size / Max story size | OPTIONAL `## Story sizing` rows, values 1, 2, 3, 5, 8, 13; defaults no floor / `8`. Not an interactive picker — write the section only if the founder asks to size stories differently, otherwise omit it. |
 | Plan step | OPTIONAL — `on` \| `off`; default `off` (spec → implementation, no plan). Not an interactive picker — write the row only if the founder asks for a plan step on full-path stories. |
 | Review retention window | OPTIONAL — dual-form `<n> months` \| `<n> stories`; default `6 months`. Not an interactive picker — write a non-default `Review retention window` token only if the founder requests one. |
 
@@ -536,6 +538,7 @@ are documented in that template file. Token slots to substitute:
 | `Design check report` row | only when the repo's check writes elsewhere than `.tmp/design-check/report.txt` — otherwise omit the row; a custom path must be git-ignored |
 | `## Design` section (`<pattern-vocabulary-path>`, `<bundle-inventory-path>`, `<bundle-global>`, `<wireframe-targets>`, `<final-page-prefix>`, `<component-review-cmd>`, `<library-label>`, `<design-canvas>`, `<publish-recipe-path>`, `<model>`) | never asked, except `Wireframe targets`: write the section only when the repo already has these (e.g. a design-system doc in the repo); otherwise omit the whole section — a repo adds it once its design system exists. When the section is written, ask `Wireframe targets` once: `web` (Recommended) \| `phone` \| `web, phone` — the frames `/sdlc:design --draft` draws; `web` when skipped. Rows left blank are omitted (`refs/project-context-template.md` Fill rules) |
 | `<threshold>` | lightweight threshold (Step 3) |
+| `<min-story-size>` / `<max-story-size>` | only when the founder asks — otherwise omit the whole `## Story sizing` section |
 | `<plan-step>` | `on` only when the founder asks for a plan step — otherwise omit the `Plan step` row |
 | `<review-agent>` | Review agent picker (Step 3) — `claude-inline` default |
 | `<review-mode>` | Review trigger picker (Step 3) — `on-update` default |

@@ -86,7 +86,7 @@ Do not include role or surface in summary if it makes it longer than 8 words —
 | Complex workflow with multiple states | 8 |
 | New domain entity + full CRUD (all applicable surfaces) | 13 |
 
-**Flag anything estimated >8 points for splitting before creating in Jira.**
+**Flag anything estimated over the max story size (`scripts/story-sizing.sh`, default 8) for splitting before creating in Jira.** Size bounds, merge rule and AC count by size: `refs/story-sizing.md`.
 
 ## Decomposition rules
 
@@ -117,7 +117,7 @@ Split only at these boundaries:
 
 - Each AC must be binary: either done or not done — no partial states
 - Each AC must be independently testable by a QA or product person
-- Minimum 3 ACs per story; maximum 6 — if you need more, split the story
+- Minimum 3 ACs per story; maximum by size — 6 up to 5 points, 10 at 8, 14 at 13 (grouped under outcome sub-headings above 6); if you need more, split the story (`refs/story-sizing.md`)
 - AC should describe WHAT is verifiable, not HOW it is implemented — the HOW goes in **Dev Notes**
 
 ## Authoring quality
@@ -146,4 +146,4 @@ Format is necessary but not sufficient — a story that fills the template can s
 
 **Not a disguised tech task.** If the story delivers no user-visible outcome (e.g. "refactor the API", "upgrade the library"), it is an engineering task, not a story — flag it, do not force it into this template.
 
-**Too big = split.** Signs a story is oversized: it covers multiple distinct outcomes, multiple roles, or needs more than 6 ACs. Split it (see `user-story-splitting`) before creating — never ship the oversized story.
+**Too big = split.** Signs a story is oversized: it covers multiple distinct outcomes, multiple roles, or needs more ACs than its size allows. Split it (see `user-story-splitting`) before creating — never ship the oversized story.
