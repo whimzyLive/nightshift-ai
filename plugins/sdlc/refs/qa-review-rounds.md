@@ -26,7 +26,7 @@ re-review is always `sonnet`.
 
 ```text
 ROUND_HEAD := git rev-parse origin/<BRANCH_PREFIX>/<STORY-KEY>
-dispatch in ONE message, all three in the background:
+dispatch in ONE message, all three in the background (round 1 with the design check already red: reviewer and verifier only — "Round 1 — design check already red" below):
   reviewer   := Step 1 dispatch, model: $REVIEWER_MODEL (Step 1 "Reviewer model")
   gate       := Step 6 offload, model: "haiku"   # runs scripted commands, no judgement
   verifier   := Step 7 offload, model: "sonnet"
@@ -90,6 +90,33 @@ prompt also says:
 
 Step 3 hands the fix agent the whole class with every site, never one instance: "fix the class,
 then search the diff for any site the list missed".
+
+## Round 1 — design check already red
+
+The orchestrator holds the implementing agents' hand-backs in this session. A fresh `/review` or
+`/review-fix` session has none, so round 1 there is as above.
+
+```text
+1. HAND_BACK := the Summary of the LAST implementation-phase hand-back pushed to the branch
+   (Story mode via /impl or /auto only)
+2. HAND_BACK has a part `design check: fail — ... report <path>` (the format of
+   refs/design-references.md Domain agent duties) -> RED_PATH := <path>
+   no such part | `design check: pass` -> round 1 is the full round above; stop here
+3. RED := bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-check-red.sh "$WORKTREE/<RED_PATH>"
+   (DESIGN_RED=yes plus one FAILING=<board line> per failing board)
+   DESIGN_RED=no -> the full round above; stop here   # the hand-back and the report disagree, or the report is gone: never skip on a guess
+4. DESIGN_RED=yes -> round 1 dispatches the reviewer and the verifier only, in ONE message, both in the
+   background; the verifier takes `DESIGN_REPORT=defer`. The gate is NOT dispatched
+5. Step 2 triage as usual, then Step 3 dispatches the fix to the agent that returned HAND_BACK, even
+   when the reviewer found nothing. The fix prompt carries the reviewer's findings verbatim plus:
+   `Design check: red. Report: <RED_PATH>. Failing boards:` and the FAILING lines. It names the
+   `Design check (scoped)` row when set, else `Design check`, never a pasted command
+6. This round counts as round 1 against MAX_REVIEW_ROUNDS. The fix commit makes HEAD != ROUND_HEAD, so
+   the gate runs in the next round alongside the resumed reviewer, as the staleness rule above says
+```
+
+A clean exit still needs a passing gate on the final HEAD: step 5 always dispatches a fix, so a
+round with the gate skipped never ends the run.
 
 ## Re-review — resume the same reviewer (Step 4)
 

@@ -381,6 +381,8 @@ committed rule file.
 
 ## Step 6 — Quality gate
 
+Round 1 with the design check already red in the hand-back skips this offload: `refs/qa-review-rounds.md` "Round 1 — design check already red".
+
 ```text
 offload := Agent("general-purpose", model: "haiku", <STORY-KEY> <WORKTREE> <NX_CACHE_DIRECTORY> <BRANCH_PREFIX> <BASE_SHA> <RUN_INFRA> <RUN_DESIGN_CHECK>,
   # RUN_INFRA := yes when a changed path belongs to platform-engineer infra, else no
