@@ -1,3 +1,14 @@
+## 0.51.17 (2026-11-27)
+
+### 🩹 Fixes
+
+- **sdlc:** take the red design-check report path from the hand-back in any wording ([6fcaafd](https://github.com/whimzyLive/nightshift-ai/commit/6fcaafd))
+- **sdlc:** stop QA rounds waiting on a known-red or serial design check ([e079048](https://github.com/whimzyLive/nightshift-ai/commit/e079048))
+
+### ❤️ Thank You
+
+- Rushi Patel @whimzyLive
+
 ## 0.51.16 (2026-11-26)
 
 ### 🚀 Features
