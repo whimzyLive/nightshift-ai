@@ -97,11 +97,11 @@ The orchestrator holds the implementing agents' hand-backs in this session. A fr
 `/review-fix` session has none, so round 1 there is as above.
 
 ```text
-1. HAND_BACK := the Summary of the LAST implementation-phase hand-back pushed to the branch
+1. HAND_BACK := the full text (Note and Summary) of the LAST implementation-phase hand-back pushed to the branch
    (Story mode via /impl or /auto only)
-2. HAND_BACK has a part `design check: fail — ... report <path>` (the format of
-   refs/design-references.md Domain agent duties) -> RED_PATH := <path>
-   no such part | `design check: pass` -> round 1 is the full round above; stop here
+2. RED_PATH := the design-check report path HAND_BACK names anywhere in its text, in any wording
+   names none -> the project-context Tooling `Design check report` path, else the default
+   `.tmp/design-check/report.txt` (refs/design-references.md Design check)
 3. RED := bash ${CLAUDE_PLUGIN_ROOT}/scripts/design-check-red.sh "$WORKTREE/<RED_PATH>"
    (DESIGN_RED=yes plus one FAILING=<board line> per failing board)
    DESIGN_RED=no -> the full round above; stop here   # the hand-back and the report disagree, or the report is gone: never skip on a guess

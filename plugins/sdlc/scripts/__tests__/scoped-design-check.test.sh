@@ -49,7 +49,8 @@ has "$r/project-context-template.md" '| Gate parallel design check |' "template 
 has "$r/project-context-template.md" '**Gate parallel design check**' "template documents the parallel row"
 
 has "$r/qa-review-rounds.md" '## Round 1 — design check already red' "rounds ref has the red-design section"
-has "$r/qa-review-rounds.md" '`design check: fail — ... report <path>`' "trigger text is the documented hand-back part"
+has "$r/qa-review-rounds.md" 'names anywhere in its text, in any wording' "report path is taken from the hand-back in any wording"
+has "$r/qa-review-rounds.md" '`.tmp/design-check/report.txt`' "default report path is the fallback"
 has "$r/qa-review-rounds.md" 'design-check-red.sh' "trigger is confirmed by script"
 has "$r/qa-review-rounds.md" 'The gate is NOT dispatched' "round 1 skips the gate"
 has "$r/qa-review-rounds.md" 'This round counts as round 1' "skipped-gate round still counts"
