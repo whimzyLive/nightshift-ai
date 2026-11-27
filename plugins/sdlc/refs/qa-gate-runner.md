@@ -39,6 +39,8 @@ cd "$WORKTREE"
 # ... run the project-context Tooling + Quality Gate commands here (never `Design check`) ...
 ```
 
+   With `GATE_PARALLEL_DESIGN=on` (step 4a) the test command waits for 4a's combined call.
+
    Each command runs in the foreground with the Bash `timeout` at 600000, never polled: `refs/long-commands.md`.
 
    Scope, decided from the diff and never by judgement:
@@ -60,6 +62,27 @@ every command run once per gate; never a second "to be sure" run of one that exi
    report` path, default `.tmp/design-check/report.txt`); put that PATH and the exit code in `Evidence`,
    never board names — the AC verifier reads the file (`refs/ac-verification.md`). `RUN_DESIGN_CHECK=no`
    → never run it. Never decide this yourself; never edit the check's config.
+
+   Order, decided by the script, never by judgement:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/gate-parallel-design.sh   # GATE_PARALLEL_DESIGN=on | off; non-zero exit or no output -> off
+```
+
+   `off` → the design check runs after every step 3 command, one at a time, as before.
+   `on` → step 3 runs every command EXCEPT the test command first (typecheck and the other fast
+   checks, so a cheap failure is still found early); then ONE Bash call runs the test command and
+   the design check at the same time, each to its own log, and waits for both:
+
+```bash
+LOG="$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/tmp-dir.sh)"
+( <Design check command> ) > "$LOG/gate-design.log" 2>&1 & DESIGN_PID=$!
+( <test command> ) > "$LOG/gate-test.log" 2>&1; TEST_EXIT=$?
+wait "$DESIGN_PID"; DESIGN_EXIT=$?
+tail -n 5 "$LOG/gate-test.log" "$LOG/gate-design.log"
+```
+
+   Both exit codes count: `Gate: fail` when either is non-zero. `Commands` and `Evidence` keep one entry per command, as above; the final status lines come from the log tails.
 
 5. Capture each command's exact string, its **exit code**, and its verbatim final status line(s) —
    never paraphrase. `Gate: pass` only when every command exited 0, any non-zero exit is `fail` —
